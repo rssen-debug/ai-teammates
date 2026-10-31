@@ -117,9 +117,19 @@ NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/
 DATABASE_URL=
 DATABASE_URL_UNPOOLED=
 
-# Neon AI Gateway
+# Neon AI Gateway (skip if you use Kilo Code below instead)
 NEON_AI_GATEWAY_BASE_URL=
 NEON_AI_GATEWAY_TOKEN=
+
+# Kilo Code: optional. With a key set, the chat agent talks to the Kilo
+# gateway (OpenAI-compatible) instead of the Neon AI Gateway. Get a key at
+# app.kilo.ai. Model defaults to kilo-auto/frontier; set
+# KILO_PRICING_INPUT and KILO_PRICING_OUTPUT to what Kilo bills you (see
+# GET https://ai-gateway.kilo.ai/api/v1/models for per-model prices).
+KILO_API_KEY=
+KILO_MODEL=
+KILO_PRICING_INPUT=
+KILO_PRICING_OUTPUT=
 
 # Trigger.dev: the development key and the project ref
 TRIGGER_SECRET_KEY=
@@ -150,6 +160,25 @@ npx trigger.dev@4.7.3 dev  # terminal 2: Trigger.dev tasks
 
 Open [http://localhost:3000](http://localhost:3000), sign up, pick a plan and create your first teammate.
 
+## 🤖 Models
+
+The chat agent's model comes from `lib/model.ts`. Two backends, picked at
+runtime:
+
+- **Kilo Code** (default when set): the [Kilo gateway](https://kilo.ai), an
+  OpenAI-compatible endpoint that routes to many coding models behind one key
+  (`https://ai-gateway.kilo.ai/api/v1`, override with `KILO_AI_GATEWAY_URL`).
+  Set `KILO_API_KEY` (alias `KILOCODE_API_KEY`), optionally `KILO_MODEL`
+  (default `kilo-auto/frontier`; cheaper tiers: `kilo-auto/efficient`,
+  `kilo-auto/free`, or pin one directly like `anthropic/claude-sonnet-4.6`),
+  and the two pricing vars the usage meter needs. Smoke-test your key with
+  `npm run test:kilo`.
+- **Neon AI Gateway** (fallback): `gpt-5`, as before. Set
+  `NEON_AI_GATEWAY_BASE_URL` and `NEON_AI_GATEWAY_TOKEN`.
+
+Both are read from the environment, so local dev needs them in `.env.local`
+and production in the Trigger.dev project settings.
+
 ## 🚢 Deployment
 
 The app runs on Railway and the tasks run on Trigger.dev, so there are two things to deploy.
@@ -176,6 +205,12 @@ CLERK_SECRET_KEY=
 DAYTONA_API_KEY=
 NEON_AI_GATEWAY_BASE_URL=
 NEON_AI_GATEWAY_TOKEN=
+
+# Or use Kilo Code instead of the Neon gateway (either one, not both)
+KILO_API_KEY=
+KILO_MODEL=
+KILO_PRICING_INPUT=
+KILO_PRICING_OUTPUT=
 
 # Optional: only if you use Sentry
 NEXT_PUBLIC_SENTRY_DSN=
