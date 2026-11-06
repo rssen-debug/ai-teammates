@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { VerifiedSkillLedger } from '../../apps/desktop/electron/verified-skills.js';
+import { VerifiedSkillLedger } from '../../packages/core/src/verified-skills.js';
 
 describe('verified Buddy skills (not an IQ metric)', () => {
   it('begins at 1/100; idle events, errors and repetitions do not increase level', () => {

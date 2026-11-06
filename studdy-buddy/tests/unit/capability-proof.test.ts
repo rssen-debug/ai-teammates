@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateCapabilityProof } from '../../apps/desktop/electron/capability-proof.js';
+import { calculateCapabilityProof } from '../../packages/core/src/capability-proof.js';
 
 describe('evidence-only Skills meter', () => {
   it('starts at zero without real verified events', () => {

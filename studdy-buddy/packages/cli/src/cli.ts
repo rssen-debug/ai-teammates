@@ -1,0 +1,276 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { StuddyRuntime, summarizeSnapshot, SpeechPlayer, type RuntimeOptions } from '@studdy/core';
+import { maskKey } from '@studdy/ai-router';
+import { voiceSettingsSchema, type ProviderConfig } from '@studdy/shared';
+import { box, dots, palette, statusLine, supportsColor } from './theme.js';
+
+export interface CliIO {
+  out: (text: string) => void;
+  err: (text: string) => void;
+  color?: boolean;
+  stdin?: NodeJS.ReadableStream;
+}
+export interface CliOptions extends RuntimeOptions { cwd?: string; version?: string; }
+
+const PRESETS: Record<string, { id: string; name: string; baseUrl: string; modelId: string }> = {
+  kilo: { id: 'kilo', name: 'Kilo Gateway', baseUrl: 'https://ai-gateway.kilo.ai/api/v1', modelId: 'kilo-auto/free' },
+  deepseek: { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', modelId: 'deepseek-v4-flash' },
+  openrouter: { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', modelId: 'openrouter/auto' },
+  opencode: { id: 'opencode', name: 'OpenCode Zen', baseUrl: 'https://opencode.ai/zen/v1', modelId: 'deepseek-v4-flash-free' },
+};
+
+export const HELP = `${dots(false)}  Studdy Buddy CLI
+
+Användning:
+  studdy                         Interaktiv chatt + live-status
+  studdy ask "förklara varför…"  Engångsfråga till din AI
+  studdy setup                   Full åtkomst + guide för AI-nyckel
+  studdy provider set <preset> --key-stdin
+  studdy provider test           Live-test mot vald provider
+  studdy status                  Kompakt dashboard
+  studdy doctor                  Lokal hälsokontroll
+  studdy open "Google Chrome"    Starta valfri app, verifierat
+  studdy apps | windows          Lista appar/fönster
+  studdy snapshot <window-id>    Läs UI-träd med ref:er
+  studdy screenshot <id> <fil>   Spara skärmbild (med permission)
+  studdy see <id> "fråga"        Skärmbild + UIA + visionmodell
+  studdy click <ref>             Klicka observerad UI-ref
+  studdy type <ref> "text"       Skriv i observerat fält
+  studdy press <combo> [id]      Tangenttryck, t.ex. ctrl+s
+  studdy focus <window-id>       Fokusera fönster
+  studdy watch                   Live-dashboard, uppdateras på plats
+  studdy bridge [--port N]       Starta webbläsar-brygga + skriv token
+  studdy sites [allow <host>]    Tillåtna/väntande webbsidor
+  studdy gmail connect <id>      Anslut Gmail med OAuth/PKCE
+  studdy gmail list [sökfråga]   Läs inbox
+  studdy github configure owner/repo --token-stdin --enable
+  studdy github sync             Publicera redigerad debugjournal
+  studdy memory                  Skriv/synka Obsidian-minne
+  studdy progress | readiness    Lärande och readiness
+  studdy history | logs          Historik / bounded logg
+  studdy voice "text"            Lokal Windows-TTS
+  studdy models                  Providerprofil
+  studdy reset --yes             Rensa lokal chatthistorik
+
+Miljö:
+  STUDDY_DATA_DIR                Lokal datakatalog
+  STUDDY_AGENT_DESKTOP_BINARY    Override för native helper
+  STUDDY_API_KEY                 Engångsnyckel (hellre --key-stdin)
+  NO_COLOR                       Stäng av ANSI-färger
+
+Nycklar tas aldrig som argument. Använd --key-stdin eller interactive prompt.
+`;
+
+export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}): Promise<number> {
+  const color = io.color ?? supportsColor();
+  const p = palette(color);
+  const args = argv.filter(a => a !== '--no-color');
+  const json = args.includes('--json');
+  const positional = args.filter(a => !a.startsWith('--'));
+  const command = positional[0] ?? 'help';
+  const runtime = new StuddyRuntime(options);
+  const out = (value: unknown) => io.out(json ? JSON.stringify(value, null, 2) : String(value));
+  try {
+    switch (command) {
+      case 'help': case '--help': case '-h': io.out(HELP); return 0;
+      case 'version': case '--version': case '-v': out({ version: options.version ?? '0.2.0' }); return 0;
+      case 'setup': {
+        const changed = runtime.configureFullAccess();
+        const provider = runtime.services.activeProvider();
+        const native = await runtime.nativeStatus();
+        io.out(box('Setup', [
+          statusLine('Full åtkomst', true, color, changed ? 'beviljad en gång' : 'redan konfigurerad, respekterar återkallelser'),
+          statusLine('Native helper', native.available, color, native.detail),
+          '', 'Lägg till AI-nyckel utan att lämna den i shell-historiken:',
+          p.mint('  studdy provider set kilo --key-stdin'),
+          p.dim('  eller: deepseek | openrouter | opencode'),
+          '', `Provider: ${provider ? provider.name + (provider.hasApiKey ? ' · nyckel sparad' : ' · nyckel saknas') : 'ingen konfigurerad'}`,
+        ], color));
+        return 0;
+      }
+      case 'provider': {
+        const sub = positional[1];
+        if (sub === 'set') {
+          const preset = PRESETS[positional[2] ?? ''];
+          if (!preset) { io.err(`Okänd preset. Välj ${Object.keys(PRESETS).join(', ')}.`); return 2; }
+          const key = args.includes('--key-stdin') ? await readAll(io.stdin ?? process.stdin) : process.env.STUDDY_API_KEY;
+          if (!key?.trim()) { io.err('Ingen nyckel. Skicka via --key-stdin eller STUDDY_API_KEY.'); return 2; }
+          const saved = runtime.services.saveProvider({ ...preset, apiKey: key.trim() });
+          if (!saved.ok) { io.err(saved.error.message); return 1; }
+          out({ ok: true, provider: preset.id, key: maskKey(key.trim()) });
+          return 0;
+        }
+        if (sub === 'test') {
+          const result = await runtime.services.testProvider();
+          out(result); return result.ok && result.data.ok ? 0 : 1;
+        }
+        if (sub === 'list') { out(runtime.services.activeProvider()); return 0; }
+        io.err('Använd provider set|test|list.'); return 2;
+      }
+      case 'status': {
+        const live = runtime.liveStatus();
+        const provider = runtime.services.activeProvider();
+        const native = await runtime.nativeStatus();
+        const snapshot = runtime.services.learning.snapshot();
+        const ledger = runtime.ledger().details();
+        const bridge = runtime.bridgeStatus();
+        const data = { live, provider, native, learning: snapshot, ledger, bridge, dataDir: runtime.dataDir };
+        if (json) { out(data); return 0; }
+        io.out(box(`${dots(color)}  Studdy Buddy`, [
+          statusLine('AI', Boolean(provider?.hasApiKey), color, provider ? `${provider.name} · ${provider.modelId}` : 'ingen provider · studdy setup'),
+          statusLine('Live', live.observing, color, live.observing ? `${live.windowTitle} · ${live.elementCount} element` : live.activity),
+          statusLine('Datorstyrning', native.available && runtime.services.permissions.isGranted('computer.actions'), color, native.detail),
+          statusLine('Webbläsare', bridge.running, color, `${runtime.services.siteAllowList().length} tillåtna sidor`),
+          statusLine('Minne', existsSync(join(runtime.dataDir, 'Obsidian-Vault')), color, runtime.dataDir),
+          '', `${p.violet('Nivå ' + ledger.level)}  ${p.dim(ledger.verified + ' verifierade skills')}  ${p.dim(snapshot.concepts.length + ' begrepp')}`,
+        ], color));
+        return 0;
+      }
+      case 'doctor': {
+        const native = await runtime.nativeStatus();
+        const provider = runtime.services.activeProvider();
+        const checks = [
+          { name: 'Node', ok: Number(process.versions.node.split('.')[0]) >= 22, detail: process.version, blocked: false },
+          { name: 'Databas', ok: true, detail: runtime.databasePath(), blocked: false },
+          { name: 'Native helper', ok: native.available, detail: native.detail, blocked: !native.available },
+          { name: 'AI-nyckel', ok: Boolean(provider?.hasApiKey), detail: provider?.hasApiKey ? 'sparad i lokalt valv' : 'saknas · studdy setup', blocked: false },
+          { name: 'Full åtkomst', ok: runtime.services.permissions.isGranted('computer.actions'), detail: 'kör studdy setup', blocked: false },
+        ];
+        if (json) { out({ checks }); return checks.some(c => !c.ok && !c.blocked) ? 1 : 0; }
+        io.out(box('Doctor', checks.map(c => statusLine(c.name, c.ok, color, c.detail)), color));
+        return checks.some(c => !c.ok && !c.blocked) ? 1 : 0;
+      }
+      case 'open': case 'launch': {
+        const name = positional.slice(1).join(' ').trim();
+        if (!name) { io.err('Ange appnamn, t.ex. studdy open "Google Chrome".'); return 2; }
+        const result = await runtime.launchApp(name);
+        out(result); return result.ok ? 0 : 1;
+      }
+      case 'apps': { const r = await runtime.adapter.listApps(); out(r); return r.error ? 1 : 0; }
+      case 'windows': { const r = await runtime.adapter.listWindows(); out(r); return r.error ? 1 : 0; }
+      case 'snapshot': {
+        if (!runtime.services.permissions.check('observe', ['application.observe']).allowed) { io.err('Observation är avstängd. Kör studdy setup.'); return 1; }
+        const id = positional[1];
+        if (!id) { io.err('Ange window-id från studdy windows.'); return 2; }
+        const snap = await runtime.adapter.snapshot(id);
+        out(json ? snap : summarizeSnapshot(snap)); return snap.accessible ? 0 : 1;
+      }
+      case 'screenshot': {
+        const r = await runtime.screenshot(positional[1] ?? '', positional[2] ?? 'studdy-screen.png');
+        out(r); return r.ok ? 0 : 1;
+      }
+      case 'see': {
+        const r = await runtime.see(positional[1] ?? '', positional.slice(2).join(' ') || 'Vad ser du?');
+        out(r); return r.ok ? 0 : 1;
+      }
+      case 'click': case 'type': case 'press': case 'focus': {
+        const r = await runtime.computerAction(command, positional.slice(1));
+        out(r); return r.ok ? 0 : 1;
+      }
+      case 'ask': case 'chat': {
+        const question = positional.slice(1).join(' ').trim();
+        if (!question) { io.err('Skriv en fråga: studdy ask "varför…?"'); return 2; }
+        const result = await runtime.chat(question);
+        if (!result.ok) { io.err(result.error.message); return 1; }
+        out(json ? result.data : result.data.message.text);
+        return result.data.degraded ? 1 : 0;
+      }
+      case 'watch': {
+        runtime.observer.start();
+        const render = () => {
+          const s = runtime.liveStatus();
+          process.stdout.write('\x1b[2J\x1b[H' + box(`${dots(color)}  Live`, [
+            statusLine(s.observing ? 'Observerar' : 'Väntar', s.observing, color, s.windowTitle ?? s.activity),
+            p.dim(`${s.elementCount} element · nivå ${s.level} · Ctrl+C avslutar`),
+          ], color) + '\n');
+        };
+        render();
+        const timer = setInterval(render, 1000);
+        await new Promise<void>(resolve => process.once('SIGINT', () => resolve()));
+        clearInterval(timer);
+        return 0;
+      }
+      case 'bridge': {
+        const portIndex = args.indexOf('--port');
+        const port = portIndex >= 0 ? Number(args[portIndex + 1]) : undefined;
+        const { status, token } = await runtime.startBridge(port);
+        if (!status.running) { io.err(status.detail); return 1; }
+        io.out(box('Browser bridge', [
+          statusLine('Loopback WebSocket', true, color, `ws://${status.host}:${status.port}`),
+          '', 'Token (klistra in i Studdy-tillägget):', p.mint(token),
+          '', p.dim('Endast tillåtna sidor läses. Ctrl+C avslutar.'),
+        ], color));
+        await new Promise<void>(resolve => process.once('SIGINT', () => resolve()));
+        return 0;
+      }
+      case 'sites': {
+        if (positional[1] === 'allow' && positional[2]) { out({ allowed: runtime.allowSite(positional[2]) }); return 0; }
+        out({ allowed: runtime.services.siteAllowList(), pending: runtime.pendingSites(), bridge: runtime.bridgeStatus() }); return 0;
+      }
+      case 'gmail': {
+        const sub = positional[1];
+        if (sub === 'connect') {
+          const id = positional[2];
+          if (!id) { io.err('Ange Google OAuth client-id.'); return 2; }
+          const r = await runtime.gmail.connect(id); out(r); return r.connected ? 0 : 1;
+        }
+        if (sub === 'list') { io.out(await runtime.inbox(positional.slice(2).join(' ') || undefined)); return 0; }
+        if (sub === 'disconnect') { await runtime.gmail.disconnect(); out({ ok: true }); return 0; }
+        out(runtime.gmail.status()); return 0;
+      }
+      case 'github': {
+        const sub = positional[1];
+        if (sub === 'configure') {
+          const token = args.includes('--token-stdin') ? (await readAll(io.stdin ?? process.stdin)).trim() : undefined;
+          out(runtime.github.configure({ repository: positional[2] ?? '', token, enabled: args.includes('--enable') })); return 0;
+        }
+        if (sub === 'sync') { const r = await runtime.github.publish(); out(r); return r.ok ? 0 : 1; }
+        if (sub === 'report') { io.out(runtime.github.report()); return 0; }
+        out(runtime.github.status()); return 0;
+      }
+      case 'memory': { out({ path: runtime.syncMemory() }); return 0; }
+      case 'progress': out({ learning: runtime.services.learning.snapshot(), skills: runtime.ledger().details() }); return 0;
+      case 'readiness': out(runtime.services.readiness()); return 0;
+      case 'history': out(runtime.services.history()); return 0;
+      case 'logs': {
+        const path = join(runtime.dataDir, 'studdy.log');
+        io.out(existsSync(path) ? readFileSync(path, 'utf8') : 'Ingen logg ännu.'); return 0;
+      }
+      case 'voice': {
+        const text = positional.slice(1).join(' ');
+        const player = new SpeechPlayer();
+        const r = await player.speak(text, voiceSettingsSchema.parse({ enabled: true, provider: 'windows-native' }));
+        out(r); return r.ok ? 0 : 1;
+      }
+      case 'models': out(runtime.services.activeProvider()); return 0;
+      case 'reset': {
+        if (!args.includes('--yes')) { io.err('Detta rensar lokal chatthistorik. Kör studdy reset --yes.'); return 2; }
+        runtime.services.resetChat(); out({ ok: true }); return 0;
+      }
+      case 'test': {
+        const cwd = options.cwd ?? process.cwd();
+        return await new Promise<number>(resolve => {
+          const child = spawn(process.execPath, [join(cwd, 'node_modules', 'vitest', 'vitest.mjs'), 'run'], { cwd, stdio: 'inherit', shell: false });
+          child.on('exit', c => resolve(c ?? 1));
+        });
+      }
+      default: io.err(`Okänt kommando: ${command}\n\n${HELP}`); return 2;
+    }
+  } catch (error) {
+    runtime.journal.record('cli.' + command, error);
+    io.err(error instanceof Error ? error.message : String(error));
+    return 1;
+  } finally {
+    await runtime.close();
+  }
+}
+
+async function readAll(stream: NodeJS.ReadableStream): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('utf8').trim();
+}
+
+export type { ProviderConfig };

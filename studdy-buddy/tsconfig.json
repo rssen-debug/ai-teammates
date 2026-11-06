@@ -4,7 +4,6 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
@@ -31,12 +30,10 @@
       "@studdy/curriculum": ["packages/curriculum/src/index.ts"],
       "@studdy/packet-tracer": ["packages/packet-tracer/src/index.ts"],
       "@studdy/voice-engine": ["packages/voice-engine/src/index.ts"],
-      "@studdy/mascot": ["packages/mascot/src/index.ts"],
-      "@studdy/screen-overlay": ["packages/screen-overlay/src/index.ts"],
-      "@studdy/chat-ui": ["packages/chat-ui/src/index.ts"],
-      "@studdy/cli": ["packages/cli/src/index.ts"]
+      "@studdy/cli": ["packages/cli/src/index.ts"],
+      "@studdy/core": ["packages/core/src/index.ts"]
     }
   },
   "include": ["packages/**/*.ts", "packages/**/*.tsx", "apps/desktop/src/**/*.ts", "apps/desktop/src/**/*.tsx", "tests/**/*.ts"],
-  "exclude": ["node_modules", "**/dist/**", "apps/desktop/electron"]
+  "exclude": ["node_modules", "**/dist/**", "archive"]
 }

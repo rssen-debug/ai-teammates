@@ -7,7 +7,7 @@ import {
   normalizeSiteRule,
   validatePageContext,
   validateSelection,
-} from '../../apps/desktop/electron/browser-bridge.js';
+} from '../../packages/core/src/browser-bridge.js';
 import {
   mascotWindowOptions,
   overlayWindowOptions,
@@ -15,7 +15,7 @@ import {
   initialMascotBounds,
   shouldIgnoreMouse,
   MASCOT_SIZE,
-} from '../../apps/desktop/electron/windows.js';
+} from '../../packages/core/src/windows.js';
 
 describe('browser bridge authentication', () => {
   const token = 'a'.repeat(48);

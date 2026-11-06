@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { noteId, renderVault } from '../../apps/desktop/electron/study-vault.js';
+import { noteId, renderVault } from '../../packages/core/src/study-vault.js';
 
 describe('Obsidian-compatible study memory', () => {
   it('exports demonstrated concepts and labels uncertainty', () => {

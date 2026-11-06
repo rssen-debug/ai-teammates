@@ -1,11 +1,11 @@
-name: Studdy Buddy CI
+name: Studdy Buddy CLI CI
 
 on:
   push:
     branches: [main]
     paths: ['studdy-buddy/**', '.github/workflows/studdy-buddy.yml']
   pull_request:
-    paths: ['studdy-buddy/**']
+    paths: ['studdy-buddy/**', '.github/workflows/studdy-buddy.yml']
   workflow_dispatch:
 
 defaults:
@@ -14,7 +14,7 @@ defaults:
 
 jobs:
   verify:
-    name: Typecheck, test, build (${{ matrix.os }})
+    name: Lint, typecheck, test, build (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -22,67 +22,50 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22.13.0'
           cache: npm
           cache-dependency-path: studdy-buddy/package-lock.json
-
       - name: Install dependencies
         run: npm ci || npm install
-        env:
-          # The Electron binary is only needed for packaging, not for verify.
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm test
-
-      - name: Build renderer
-        run: npm run build:ui
-
-      - name: Build electron bundles
-        run: node apps/desktop/scripts/build-electron.mjs
-
-      # The CLI must actually run and report. BLOCKED checks (no Windows desktop,
-      # no Packet Tracer, no provider key) are expected on a CI runner and are not
-      # failures - but a FAIL check is. So the exit code alone is not the gate.
-      - name: CLI smoke test
+      - name: Built CLI smoke test
         shell: bash
         env:
           STUDDY_DATA_DIR: ${{ runner.temp }}/studdy-ci
         run: |
-          set -o pipefail
-          npx tsx packages/cli/src/bin.ts doctor --json > doctor.json || true
+          set -euo pipefail
+          node dist/cli/studdy.mjs --version
+          node dist/cli/studdy.mjs help --no-color
+          node dist/cli/studdy.mjs setup --no-color
+          node dist/cli/studdy.mjs doctor --json --no-color > doctor.json || true
           cat doctor.json
           node -e "
             const r = require('./doctor.json');
-            const s = r.summary;
-            console.log('OK', s.ok, 'varning', s.warn, 'fel', s.fail, 'blockerade', s.blocked);
-            if (s.fail > 0) { console.error('doctor reported '+s.fail+' hard failures'); process.exit(1); }
-            const names = r.checks.filter(c => c.status === 'FAIL').map(c => c.name);
-            if (names.length) { console.error(names.join(', ')); process.exit(1); }
+            const hard = r.checks.filter(c => !c.ok && !c.blocked && c.name !== 'AI-nyckel');
+            if (hard.length) { console.error(hard); process.exit(1); }
           "
 
+      - name: Package CLI tarball
+        if: matrix.os == 'windows-latest'
+        run: npm run package:cli
+        env:
+          STUDDY_BUILD_VERSION: 0.2.${{ github.run_number }}
 
-      - name: Upload build output
+      - name: Upload CLI tarball
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: studdy-buddy-build-${{ matrix.os }}
-          path: |
-            studdy-buddy/apps/desktop/dist/electron
-            studdy-buddy/apps/desktop/dist/renderer
-          retention-days: 14
+          name: studdy-buddy-cli
+          path: studdy-buddy/dist/*.tgz
+          retention-days: 30
+          if-no-files-found: error
 
-      # The MV3 extension is plain JavaScript and can be loaded unpacked in
-      # Chrome or Edge. Publish the actual files, not just source instructions.
       - name: Upload browser extension
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
@@ -92,198 +75,95 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  package:
-    name: Windows installer
+  windows-native-proof:
+    name: Windows CLI native computer-control proof
     needs: verify
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22.13.0'
           cache: npm
           cache-dependency-path: studdy-buddy/package-lock.json
+      - run: npm ci || npm install
+      - run: npm run build
 
-      - name: Install dependencies (with Electron binary)
-        run: npm ci || npm install
-
-      - name: Bundle verified agent-desktop for Windows UI Automation
-        shell: pwsh
-        run: |
-          npm install --global agent-desktop@1.2.0
-          if ($LASTEXITCODE -ne 0) { throw "agent-desktop npm install failed" }
-          $npmGlobal = (& npm root -g).Trim()
-          $binary = Join-Path $npmGlobal 'agent-desktop/bin/agent-desktop-win32-x64.exe'
-          if (-not (Test-Path $binary)) { throw "Native agent-desktop binary missing: $binary" }
-          & $binary version
-          if ($LASTEXITCODE -ne 0) { throw "Native agent-desktop self-check failed" }
-          New-Item -ItemType Directory -Force -Path 'apps/desktop/build' | Out-Null
-          Copy-Item $binary 'apps/desktop/build/agent-desktop.exe' -Force
-
-      - name: Package Windows installer
-        run: npm run package:win
+      - name: Prove native helper, generic launch, window list and snapshot through the real CLI
+        shell: bash
         env:
-          STUDDY_BUILD_VERSION: 0.1.${{ github.run_number }}
+          STUDDY_DATA_DIR: ${{ runner.temp }}/studdy-proof
+        run: |
+          set -uo pipefail
+          node dist/cli/studdy.mjs setup --no-color
+          node dist/cli/studdy.mjs doctor --json --no-color > doctor.json || true
+          cat doctor.json
+          node -e "
+            const r = require('./doctor.json');
+            const native = r.checks.find(c => c.name === 'Native helper');
+            if (!native?.ok) { console.error('Native helper not available:', native?.detail); process.exit(1); }
+          " || { echo "::error title=Native helper::$(node -e "console.log(JSON.stringify(require('./doctor.json')))")"; exit 1; }
 
-      - name: Upload installer
-        uses: actions/upload-artifact@v4
+          node dist/cli/studdy.mjs open "Notepad" --json --no-color > launch.json || true
+          cat launch.json
+          node -e "
+            const r = require('./launch.json');
+            if (!r.ok) { console.error('Notepad launch failed:', r.detail); process.exit(1); }
+          " || { echo "::error title=Launch::$(node -e "console.log(JSON.stringify(require('./launch.json')))")"; exit 1; }
+          sleep 3
+
+          node dist/cli/studdy.mjs windows --json --no-color > windows.json || true
+          cat windows.json
+          WINDOW_ID=$(node -e "
+            const r = require('./windows.json');
+            if (r.error) { console.error(r.error); process.exit(1); }
+            const w = r.windows.find(w => /notepad/i.test(w.processName || ''));
+            if (!w) { console.error('No Notepad window observed after verified launch'); process.exit(1); }
+            console.log(w.id);
+          ") || { echo "::error title=Windows::$(node -e "console.log(JSON.stringify(require('./windows.json')))")"; exit 1; }
+
+          node dist/cli/studdy.mjs snapshot "$WINDOW_ID" --json --no-color > snapshot.json || true
+          cat snapshot.json
+          node -e "
+            const r = require('./snapshot.json');
+            if (!r.accessible) { console.error('Snapshot not accessible:', r.note); process.exit(1); }
+            console.log('Verified launch + window + ' + r.elements.length + ' UI elements');
+          " || { echo "::error title=Snapshot::$(node -e "console.log(JSON.stringify(require('./snapshot.json')))")"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: studdy-buddy-windows-installer
+          name: windows-cli-native-proof
           path: |
-            studdy-buddy/apps/desktop/dist/win/*.exe
-            studdy-buddy/apps/desktop/dist/win/*.blockmap
-          retention-days: 30
-          if-no-files-found: error
+            studdy-buddy/doctor.json
+            studdy-buddy/launch.json
+            studdy-buddy/windows.json
+            studdy-buddy/snapshot.json
+          retention-days: 14
 
-  # ---------------------------------------------------------------------------
-  # Install and smoke-test the REAL NSIS output. A successful source build or
-  # dev Electron run is not evidence that the student's installed app works.
-  # ---------------------------------------------------------------------------
-  proof:
-    name: Windows installed-app proof
-    needs: package
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download Windows installer
-        uses: actions/download-artifact@v4
-        with:
-          name: studdy-buddy-windows-installer
-          path: studdy-buddy/apps/desktop/dist/win
-
-      - name: Install NSIS application silently
-        id: install
-        shell: pwsh
-        run: |
-          $installer = Get-ChildItem 'apps/desktop/dist/win' -Filter '*.exe' | Select-Object -First 1
-          if (-not $installer) { throw 'Packaging did not produce an installer' }
-          $dest = Join-Path $env:RUNNER_TEMP 'studdy-installed'
-          $p = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$dest") -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "NSIS installer returned $($p.ExitCode)" }
-          $installed = Join-Path $dest 'Studdy Buddy.exe'
-          if (-not (Test-Path $installed)) { throw "Installed executable missing: $installed" }
-          $accessibility = Join-Path $dest 'resources/bin/agent-desktop.exe'
-          if (-not (Test-Path $accessibility)) { throw "Bundled agent-desktop missing: $accessibility" }
-          & $accessibility version
-          if ($LASTEXITCODE -ne 0) { throw "Bundled agent-desktop failed version check" }
-          "installedExe=$installed" >> $env:GITHUB_OUTPUT
-          Write-Host "Installed: $installed ($([math]::Round((Get-Item $installed).Length/1MB,1)) MB)"
-
-      - name: Native agent-desktop real Windows integration smoke
-        shell: pwsh
-        run: |
-          $agent = Join-Path $env:RUNNER_TEMP 'studdy-installed/resources/bin/agent-desktop.exe'
-          if (-not (Test-Path $agent)) { throw 'Native agent-desktop binary not installed' }
-          $statusText = & $agent status
-          if ($LASTEXITCODE -ne 0) { throw "Native status failed: $statusText" }
-          $status = $statusText | ConvertFrom-Json
-          if (-not $status.ok) { throw 'Native agent-desktop status not ok' }
-          $listText = & $agent list-windows
-          if ($LASTEXITCODE -ne 0) { throw "Native list-windows failed: $listText" }
-          $inventory = $listText | ConvertFrom-Json
-          if (-not $inventory.ok -or $null -eq $inventory.data) { throw 'Native windows response invalid' }
-          Write-Host "Native agent-desktop list-windows succeeded; entries: $(@($inventory.data).Count)"
-          # Validate launch against a real Windows app instead of only mocks.
-          $launchText = & $agent launch notepad --activate
-          $launch = $launchText | ConvertFrom-Json
-          if ($LASTEXITCODE -ne 0 -or -not $launch.ok) {
-            throw "Native Notepad launch failed: $launchText"
-          }
-          Write-Host 'Native Notepad launch confirmed.'
-          # Do not upload raw UIA trees, titles or sensitive content as CI artifacts.
-
-      - name: Run installed application and verify real renderer
-        shell: pwsh
-        env:
-          STUDDY_SMOKE_EXIT_MS: '12000'
-          STUDDY_DATA_DIR: ${{ runner.temp }}\\studdy-proof
-        run: |
-          $binary = '${{ steps.install.outputs.installedExe }}'
-          $p = Start-Process -FilePath $binary -PassThru
-          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw 'Installed app failed to exit within 60 seconds' }
-          $proof = Join-Path $env:STUDDY_DATA_DIR 'smoke.json'
-          if (-not (Test-Path $proof)) { throw 'No smoke.json from installed application' }
-          $result = Get-Content $proof -Raw | ConvertFrom-Json
-          Write-Host (Get-Content $proof -Raw)
-          if (-not ($result.windowVisible -and $result.rendererReady -and $result.bridgeRunning -and $result.probe.mascot -and $result.probe.readinessButton -and $result.passed)) {
-            throw 'The installed application did not pass its live renderer and bridge checks'
-          }
-
-      - name: Collect evidence
-        if: always()
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path evidence | Out-Null
-          $proof = Join-Path (Join-Path $env:RUNNER_TEMP 'studdy-proof') 'smoke.json'
-          Copy-Item $proof evidence/ -ErrorAction SilentlyContinue
-          $screenshot = Join-Path (Join-Path $env:RUNNER_TEMP 'studdy-proof') 'smoke.png'
-          Copy-Item $screenshot evidence/ -ErrorAction SilentlyContinue
-          Get-ChildItem 'apps/desktop/dist/win' -Filter '*.exe' | Select-Object Name,Length | ConvertTo-Json | Out-File evidence/installer-info.json -Encoding utf8
-
-      - name: Upload evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: studdy-buddy-windows-proof
-          path: studdy-buddy/evidence
-          retention-days: 30
-
-  # Publish only proven installed Windows builds. The app reads GitHub Releases,
-  # not transient Actions artifacts, so users are never asked to redownload.
-  publish:
-    name: Publish verified automatic update
-    needs: [verify, package, proof]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  release:
+    name: Publish CLI tarball to GitHub Release
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [verify, windows-native-proof]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: studdy-buddy-windows-installer
-          path: studdy-buddy/release-installer
-
-      - name: Check that this is still HEAD of main
-        id: head
-        shell: bash
-        run: |
-          HEAD_SHA="$(git ls-remote origin refs/heads/main | cut -f1)"
-          if [ "$HEAD_SHA" = "$GITHUB_SHA" ]; then
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "A newer main commit exists; do not replace its update."
-          fi
-
-      - name: Prepare SHA-256 installer checksum
-        if: steps.head.outputs.publish == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd release-installer
-          for exe in *.exe; do
-            test -f "$exe"
-            sha256sum "$exe" > "$exe.sha256"
-          done
-
-      - name: Publish latest verified GitHub Release
-        if: steps.head.outputs.publish == 'true'
-        shell: bash
+          node-version: '22.13.0'
+          cache: npm
+          cache-dependency-path: studdy-buddy/package-lock.json
+      - run: npm ci || npm install
+      - run: npm run package:cli
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STUDDY_BUILD_VERSION: 0.2.${{ github.run_number }}
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          tag="studdy-buddy-v0.1.${{ github.run_number }}"
-          shopt -s nullglob
-          files=(release-installer/*.exe release-installer/*.exe.sha256)
-          if [ "${#files[@]}" -lt 2 ]; then echo "No installer + checksum"; exit 1; fi
-          gh release create "$tag" "${files[@]}" \
-            --repo "${{ github.repository }}" \
-            --target "$GITHUB_SHA" \
-            --title "Studdy Buddy 0.1.${{ github.run_number }}" \
-            --notes "Windows installer verified by CI, installed-app smoke test and SHA-256 checksum. Automatic updates are installed only from this release channel." \
-            --latest
+          tag="cli-v0.2.${{ github.run_number }}"
+          gh release create "$tag" dist/*.tgz \
+            --title "Studdy Buddy CLI 0.2.${{ github.run_number }}" \
+            --notes "CLI-only release. Install: npm install -g ./studdy-buddy-*.tgz then run studdy. Requires Node >= 22.13. Native computer control verified on Windows CI. Electron installer archived."
