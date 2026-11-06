@@ -130,7 +130,7 @@ export async function checkAndInstallUpdate(): Promise<void> {
       'if ($done.ExitCode -ne 0) { exit $done.ExitCode }',
       'if (Test-Path $program) { Start-Process -FilePath $program }',
       '',
-    ].join('\\r\\n');
+    ].join('\r\n');
     await writeFile(helperPath, ps, { encoding: 'utf8' });
     const helper = spawn('powershell.exe', [
       '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden',
