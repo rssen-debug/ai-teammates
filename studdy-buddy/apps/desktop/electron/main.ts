@@ -571,6 +571,17 @@ function registerIpc(svc: StuddyServices): void {
     }
   });
 
+  ipcMain.handle(IPC.observeLiveStatus, () => {
+    // True observation status, not a fake green light based on API credentials.
+    const observing = isStudyLive();
+    return ok({
+      connected: Boolean(svc.activeProvider()?.hasApiKey),
+      observing,
+      windowTitle: observing ? authorizedWindowTitle : null,
+      lastObservedAt: lastStudySeen > 0 ? lastStudySeen : null,
+    });
+  });
+
   ipcMain.handle(IPC.observeSelectWindow, async (_e, sourceId: unknown) => {
     if (sourceId === null || sourceId === '') {
       authorizedWindowTitle = null;
