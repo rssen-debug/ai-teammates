@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Studdy Buddy",
+  "version": "0.2.0",
+  "description": "Låter Studdy Buddy läsa studiesidan du har öppen (Canvas, NetAcad, Moodle, valfri sajt du tillåter) med din tillåtelse.",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "optional_host_permissions": ["https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Studdy Buddy",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  }
+}

@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# build output
+dist/
+build/
+out/
+coverage/
+
+# local runtime data (never commit a real study database)
+*.db
+*.db-wal
+*.db-shm
+.data/
+secrets/
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# python worker venvs (optional workers)
+python/**/.venv/
+python/**/__pycache__/

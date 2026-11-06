@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studdy Buddy</title>
+    <style>
+      :root {
+        color-scheme: dark light;
+        --bg: #181a1f;
+        --fg: #f2f4f7;
+        --muted: #9aa3b2;
+        --accent: #8fcbae;
+        --border: rgba(255, 255, 255, 0.12);
+        --danger: #f08a7a;
+      }
+      body {
+        margin: 0;
+        width: 300px;
+        padding: 14px 16px 16px;
+        font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        font-size: 13px;
+      }
+      h1 { font-size: 13px; margin: 0 0 4px; font-weight: 600; }
+      p { margin: 0 0 12px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+      label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+      input[type='text'], input[type='number'] {
+        width: 100%; box-sizing: border-box; background: #111318; color: var(--fg);
+        border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; font-size: 12px; margin-bottom: 10px;
+        font-family: ui-monospace, monospace;
+      }
+      .row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+      .status { font-size: 11px; color: var(--muted); }
+      .status.ok { color: var(--accent); }
+      .status.warn { color: var(--danger); }
+      button {
+        width: 100%; background: var(--accent); color: #0e1512; border: none; border-radius: 999px;
+        padding: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+      }
+      ul { padding-left: 16px; margin: 0 0 10px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+    <h1>Studdy Buddy</h1>
+    <p>Läser den studiesida du har öppen – Canvas, NetAcad, Moodle eller vilken sajt du än tillåter i appen. Inget läses eller skickas förrän du kopplar ihop tillägget med appen.</p>
+
+    <div class="row">
+      <input type="checkbox" id="enabled" />
+      <label for="enabled" style="margin: 0">Aktivera läsning</label>
+    </div>
+
+    <label for="token">Token från appen (Inställningar → Behörigheter)</label>
+    <input type="text" id="token" placeholder="Klistra in token" autocomplete="off" spellcheck="false" />
+
+    <label for="port">Port</label>
+    <input type="number" id="port" min="1024" max="65535" value="8765" />
+
+    <button id="save">Spara</button>
+    <p class="status" id="status" style="margin-top: 10px"></p>
+
+    <div id="sites-block" style="margin-top: 12px">
+      <label>Sajter appen läser</label>
+      <p id="sites" style="margin-bottom: 8px">Inga sajter tillåtna ännu.</p>
+      <button id="allow-current" style="background: transparent; color: var(--accent); border: 1px solid var(--border);">
+        Tillåt den här sajten i appen
+      </button>
+    </div>
+
+    <ul style="margin-top: 12px">
+      <li>Läser: rubriker, navigering, markerad text.</li>
+      <li>Gör aldrig: klickar, skickar in svar eller går vidare i kursen.</li>
+      <li>Läser aldrig: lösenordsfält, formulärvärden eller inloggningstoken.</li>
+    </ul>
+
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>
