@@ -473,7 +473,23 @@ export function App() {
       const result = await bridge.provider.save(patch);
       if (!result.ok) return { ok: false, message: result.error.message };
       setProvider(result.data);
-      return { ok: true, message: 'Providern sparades.' };
+      // The single setup flow is the explicit consent screen. Persist scoped
+      // observation permissions BEFORE declaring the agent ready, rather than
+      // launching four fire-and-forget IPC writes and racing the mode change.
+      const scopes: PermissionKey[] = ['application.observe', 'screen.capture', 'browser.read', 'provider.dataShare'];
+      for (const scope of scopes) {
+        const grant = await bridge.permissions.grant(scope);
+        if (!grant.ok) {
+          return { ok: false, message: 'AI-nyckeln sparades men observation kunde inte aktiveras: ' + grant.error.message };
+        }
+      }
+      const modeChange = await bridge.permissions.setMode('VISUAL_GUIDE');
+      if (!modeChange.ok) {
+        return { ok: false, message: 'AI sparades men visuell guidning gick inte att aktivera: ' + modeChange.error.message };
+      }
+      setPermissions(prev => prev.map(p => scopes.includes(p.key) ? { ...p, granted: true } : p));
+      setSettings(prev => ({ ...prev, permissionMode: 'VISUAL_GUIDE' }));
+      return { ok: true, message: 'AI och observation är sparade. Buddy läser bara tillåtna fönster.' };
     },
     [bridge],
   );
