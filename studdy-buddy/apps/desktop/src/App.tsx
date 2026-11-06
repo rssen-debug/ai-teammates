@@ -311,7 +311,7 @@ export function App() {
       }
 
       setMessages((prev) => [...prev.filter((m) => m.id !== optimistic.id), { ...optimistic }, result.data.message]);
-      if (result.data.notice) setNotice(result.data.notice);
+      if (result.data.notice || result.data.error) setNotice(result.data.notice ?? result.data.error);
       if (result.data.degraded) setSignal('error');
       else setSignal('answer-delivered');
 
