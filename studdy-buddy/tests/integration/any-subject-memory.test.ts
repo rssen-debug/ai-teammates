@@ -300,9 +300,10 @@ describe('prompt construction is subject-agnostic', () => {
     expect(prompt).not.toMatch(/DVA120|Packet Tracer|CCNA/);
   });
 
-  it('tells the model to ask rather than assume when nothing is known', () => {
+  it('starts with universal help rather than assuming a study subject', () => {
     const prompt = buildSystemPrompt({ mode: 'NORMAL', language: 'sv-SE', contextBlock: '', knowledgeBlock: '' });
-    expect(prompt).toMatch(/not yet established/);
+    expect(prompt).toMatch(/No study subject is active/);
+    expect(prompt).toMatch(/Help with the user.s actual task directly/);
     expect(prompt).toMatch(/do not assume prior knowledge/);
   });
 });
