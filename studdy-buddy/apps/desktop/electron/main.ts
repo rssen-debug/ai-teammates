@@ -65,7 +65,9 @@ let vaultTimer: ReturnType<typeof setInterval> | null = null;
 
 function markStudySeen(): void { lastStudySeen = Date.now(); }
 function isStudyLive(): boolean {
-  return Boolean(services?.activeProvider()?.hasApiKey && Date.now() - lastStudySeen < 35_000);
+  // "Green" means the desktop accessibility observer REALLY succeeded,
+  // independent of whether an AI API key exists.
+  return Boolean(services?.permissions.isGranted('application.observe') && Date.now() - lastStudySeen < 35_000);
 }
 function syncStudyVault(): void {
   if (!services) return;
@@ -82,10 +84,6 @@ function startStudyObservation(): void {
     const svc = services;
     if (!svc || !adapter || observationBusy) return;
     if (!svc.permissions.isGranted('application.observe')) {
-      observationState = 'off';
-      return;
-    }
-    if (!svc.activeProvider()?.hasApiKey) {
       observationState = 'off';
       return;
     }
@@ -132,7 +130,7 @@ function startStudyObservation(): void {
           // Bound memory growth in a session. Hashes only, no raw UI history.
           if (companionSignatures.size > 100) companionSignatures.clear();
           mascotWindow?.webContents.send(IPC.companionHintEvent, { kind: 'thinking', text: hint.label });
-          if (svc.permissions.isGranted('provider.dataShare')) {
+          if (svc.permissions.isGranted('provider.dataShare') && svc.activeProvider()?.hasApiKey) {
             proactiveBusy = true;
             try {
               const answer = await svc.ask({ text: hint.question, mode: 'QUICK' });
