@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 /**
