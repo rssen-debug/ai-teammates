@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { StuddyServices } from '../../apps/desktop/electron/services.js';
+import { StuddyServices } from '../../packages/core/src/services.js';
 
 /**
  * End-to-end service test: settings -> provider -> permission -> question ->

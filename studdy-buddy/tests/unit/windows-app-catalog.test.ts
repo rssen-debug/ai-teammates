@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { findStartMenuApp, shortcutName } from '../../apps/desktop/electron/windows-app-catalog.js';
+import { findStartMenuApp, shortcutName } from '../../packages/core/src/windows-app-catalog.js';
 
 describe('Windows app discovery (no hardcoded Edge or Chrome launch)', () => {
   it('normalizes common user app names and finds a real Start Menu shortcut', () => {

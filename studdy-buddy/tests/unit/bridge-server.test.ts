@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { WebSocket } from 'ws';
-import { BrowserBridgeServer, isLoopbackAddress } from '../../apps/desktop/electron/bridge-server.js';
+import { BrowserBridgeServer, isLoopbackAddress } from '../../packages/core/src/bridge-server.js';
 import type { SourcePage, SelectionContext } from '@studdy/shared';
 
 /**

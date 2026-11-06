@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowedObservationTitle, detectCompanionHint } from '../../apps/desktop/electron/companion-observer.js';
+import { allowedObservationTitle, detectCompanionHint } from '../../packages/core/src/companion-observer.js';
 import type { UiSnapshot } from '@studdy/shared';
 
 function snapshot(text: string): UiSnapshot {

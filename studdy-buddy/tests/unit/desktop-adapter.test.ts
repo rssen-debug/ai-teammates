@@ -8,8 +8,8 @@ import {
   flattenTree,
   readEnvelope,
   type CommandRunner,
-} from '../../apps/desktop/electron/desktop-adapter.js';
-import { classifyApp as _unused } from '../../apps/desktop/electron/desktop-adapter.js';
+} from '../../packages/core/src/desktop-adapter.js';
+import { classifyApp as _unused } from '../../packages/core/src/desktop-adapter.js';
 
 function runnerReturning(map: Record<string, { code: number; stdout: string; stderr: string }>): CommandRunner {
   return {

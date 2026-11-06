@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { StuddyServices } from '../../apps/desktop/electron/services.js';
+import { StuddyServices } from '../../packages/core/src/services.js';
 import { extractConcepts, stem, tokenize } from '@studdy/learning-engine';
 import { toHistoryMessages, MAX_HISTORY_CHARS, MAX_HISTORY_TURNS, buildSystemPrompt } from '@studdy/ai-router';
 import type { SourcePage } from '@studdy/shared';

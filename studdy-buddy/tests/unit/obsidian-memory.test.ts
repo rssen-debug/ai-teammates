@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ObsidianMemory } from '../../apps/desktop/electron/obsidian-memory.js';
+import { ObsidianMemory } from '../../packages/core/src/obsidian-memory.js';
 
 const paths: string[] = [];
 function newVault(): ObsidianMemory {

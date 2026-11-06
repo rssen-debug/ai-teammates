@@ -1,83 +1,98 @@
-# Studdy Buddy
+# Studdy Buddy CLI
 
-A small monkey that sits on your desktop while you study, watches the course page
-you have open, and explains things briefly — in Swedish or English, in text by
-default, out loud only when you ask.
+Studdy Buddy är nu en **CLI först**. Ingen Electron-installator, ingen exe som produkt.
+Samma studie-, minnes-, webbläsar- och datorstyrningslogik körs i Node.js och exponeras
+som ett snyggt, scriptbart terminalgränssnitt.
 
-It is a real Windows Electron app, not a webpage. It works for **whatever you are
-studying**: Canvas, NetAcad, Moodle, Itslearning, a university portal, a docs site.
-Networking and Packet Tracer are a deep special case, not the only case.
+## Installera
 
----
-
-## What it actually does today
-
-| | |
-| --- | --- |
-| **Tutor** | Short, structured answers with per-mode length budgets (QUICK 1–2 sentences … DEEP). Never starts with filler, never invents what it saw. |
-| **Memory** | SQLite: sessions, transcript, discovered curriculum, topics, evidence, mastery, review schedule, usage, permission grants. The last ~10 turns of the conversation and a labelled summary of your recorded progress go into every request. |
-| **Course discovery** | Reads the navigation tree and headings of the page you allow and derives whatever structure that page exposes. Module count is whatever the site shows — 6, 9, 17, 21 — never a hardcoded number. |
-| **Progress** | Three separate things, never conflated: what the platform reports as complete, what you were observed working on, and what evidence shows you know. Reading is never mastery. |
-| **Quizzes** | Original questions, one at a time, targeted at your weakest concepts and due reviews. Graded assessments get concept help, never the answer. |
-| **Packet Tracer** | Parses visible IOS output (`show ip interface brief`, `ip route`, `vlan brief`, `mac address-table`, ping) and refuses to state a cause it cannot see. |
-| **Voice** | Off by default. Opt in per request, Swedish/English, with pronunciation rules for IPs, CIDR, MACs and `Gi0/1`. |
-| **Privacy** | Nothing enabled by default. Per-site allow-list, granular permissions, no keylogging, no key in the renderer, no screenshot on disk. |
-
-## Quick start
+Kräver **Node >= 22.13** (för `node:sqlite`).
 
 ```bash
-cd studdy-buddy
-ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install   # the Electron binary download needs network access
+npm install -g ./studdy-buddy-0.2.0.tgz
+studdy
+```
+
+Eller från repo:
+
+```bash
+npm ci
+npm run studdy          # interaktiv chatt
+npm run doctor          # hälsokontroll
+npm run build           # bygger dist/cli/studdy.mjs
+npm run package:cli     # skapar dist/studdy-buddy-*.tgz
+```
+
+## Kom igång
+
+```bash
+studdy setup
+# Lägg nyckeln via stdin så den inte hamnar i shell-historiken:
+echo "$KILO_KEY" | studdy provider set kilo --key-stdin
+studdy provider test
+studdy ask "förklara subnetting som om jag vore nybörjare"
+```
+
+Presets: `kilo`, `deepseek`, `openrouter`, `opencode`. Nycklar sparas i ett lokalt
+AES-256-GCM-valv (`secrets.vault`), aldrig i klartext i databasen och aldrig som argument.
+
+## Kommandon
+
+| Kommando | Vad det gör |
+| --- | --- |
+| `studdy` | Interaktiv chatt + live-status, skriver bara vid faktisk statusväxling |
+| `studdy ask "…"` | Engångsfråga till din AI |
+| `studdy status` | Kompakt dashboard |
+| `studdy doctor` | Ärlig lokal hälsokontroll; BLOCKED ≠ FAIL |
+| `studdy open "Google Chrome"` | Generisk appstart via native helper, verifierad |
+| `studdy apps` / `windows` | Lista appar/fönster |
+| `studdy snapshot <id>` | Läs UI-träd med `ref:`er |
+| `studdy see <id> "fråga"` | Skärmbild + UIA + visionmodell |
+| `studdy screenshot <id> <fil>` | Spara skärmbild |
+| `studdy click <ref>` / `type <ref> "text"` | Styra observerade UI-element |
+| `studdy press ctrl+s [id]` / `focus <id>` | Tangenter/fokus |
+| `studdy watch` | Live-dashboard som uppdateras på plats |
+| `studdy bridge` | Loopback-WebSocket för webbläsartillägget + token |
+| `studdy sites allow example.com` | Explicit site-allowlist |
+| `studdy gmail connect <client-id>` | OAuth/PKCE, read-only |
+| `studdy github configure owner/repo --token-stdin --enable` | Debugjournal till GitHub |
+| `studdy memory` | Synka Obsidian-minne |
+| `studdy progress` / `readiness` | Lärande, nivå och readiness |
+| `studdy voice "text"` | Lokal Windows-TTS |
+
+Alla kommandon stödjer `--json` där det är meningsfullt och `--no-color`.
+
+## Full åtkomst — vad det betyder
+
+`studdy setup` beviljar en gång appens egna scopes: observation, skärmbild,
+webbläsarläsning, datorhandlingar och provider-delning. Senare återkallelser respekteras.
+Det betyder **inte** att vi kringgår Windows UAC, konton, lösenord eller privata fönster.
+Privata fönster (bank, login, Gmail-chatt m.fl.) blockeras från observation.
+
+Datorstyrning på Windows använder den lilla native hjälparen `agent-desktop` (Apache-2.0)
+via npm-paketet. Den är inte Electron-appen. På Linux/macOS saknas Windows UI
+Automation; CLI:t rapporterar det ärligt som BLOCKED i stället för att låtsas fungera.
+
+## Webbläsartillägg
+
+`apps/browser-extension` är oförändrat och kopplar till `studdy bridge` på
+`ws://127.0.0.1:8765` med token. Bryggan är loopback-only, token-autentiserad,
+2 MB-cap och läser bara sidor du uttryckligen tillåtit.
+
+## Arkiv
+
+Den gamla Electron-appen, dess UI-paket och installer-scripts ligger i
+`archive/electron-desktop` **endast som referens**. De installeras inte, byggs inte,
+packas inte och publiceras inte. CI bygger och bevisar CLI:t.
+
+## Testning
+
+```bash
+npm run lint
 npm run typecheck
 npm test
-node apps/desktop/scripts/package-win.mjs     # builds renderer + main; makes the installer on Windows
+npm run build
 ```
 
-Then: **Inställningar → AI-provider** (endpoint, model id, key), and
-**Inställningar → Webbläsare** to allow the site you study on and copy the key the
-browser extension needs.
-
-The AI provider is never hardcoded. DeepSeek's official model id is
-`deepseek-flash`; a third-party provider may call it something else, so the field is
-yours to fill in. Capabilities are probed, not assumed.
-
-## Layout
-
-```
-apps/
-  desktop/           Electron main, preload, renderer, packaging
-  browser-extension/ MV3 extension (any site you allow)
-packages/
-  shared/            types, IPC contract, settings schema, Result<T>
-  database/          SQLite driver (node:sqlite), migrations, repos
-  learning-engine/   BKT mastery, prerequisites, topics, review schedule
-  curriculum/        page snapshot -> curriculum graph, assessment modes
-  quiz-engine/       question bank, grading, adaptive selection
-  ai-router/         provider client, budget, cache, structured answers
-  agent-core/        permissions, context assembly, task loop, resume
-  packet-tracer/     IOS parsing, fault diagnosis, simulation walkthrough
-  screen-overlay/    DPI-aware geometry, highlights, tooltips
-  mascot/            animation state machine, expression mapping
-  voice-engine/      pronunciation, chunking, provider abstraction
-  chat-ui/           bubble, settings panel, design tokens
-  cli/               doctor / status / models / progress / logs
-tests/               unit + integration (280 tests)
-docs/                AGENT_DESKTOP.md, BROWSER_EXTENSION.md
-```
-
-## Read this before believing anything
-
-* **`BUILD_STATUS.md`** — what is verified, what is implemented but unverified, what
-  is blocked, and why. The unverified list is longer than the verified one on
-  purpose: this was built on Linux without Windows, Packet Tracer, a browser or an
-  API key.
-* **`TEST_RESULTS.md`** — the actual commands, outputs and per-file test counts.
-* **`SECURITY.md`** — the permission model, what is never collected, and the honest
-  limitations (the credential vault is not Windows DPAPI yet).
-
-## Status in one line
-
-The application is real, builds, typechecks, and its logic is covered by 280
-passing tests including two end-to-end flows. Anything that depends on Windows, a
-browser, Packet Tracer or a live AI provider is marked **BLOCKED** until someone
-runs it there.
+Windows CI kör dessutom ett riktigt native-bevis: `doctor` → `open "Google Chrome"` →
+`windows` → `snapshot` och failar om något steg inte faktiskt lyckas.
