@@ -39,6 +39,7 @@ export function App() {
   const [view, setView] = useState<View>('chat');
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [signal, setSignal] = useState<MascotSignal>('app-idle');
+  const [companionThought, setCompanionThought] = useState<string | null>(null);
   const [mascotGaze, setMascotGaze] = useState<{ x: number; y: number } | null>(null);
   const [greeting, setGreeting] = useState<string | null>(null);
   const [bridgeMissing, setBridgeMissing] = useState(false);
@@ -185,6 +186,24 @@ export function App() {
     void read();
     const timer = window.setInterval(() => void read(), 4000);
     return () => { active = false; window.clearInterval(timer); };
+  }, [bridge]);
+
+  // A compact unsolicited hint outside chat. It fades away automatically.
+  useEffect(() => {
+    if (!bridge) return;
+    let hide: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = bridge.observe.onCompanionHint((event) => {
+      const text = typeof event?.text === 'string' ? event.text.slice(0, 190).trim() : '';
+      if (!text) return;
+      setCompanionThought(text);
+      setSignal(event.kind === 'thinking' ? 'message-sent' : 'hint-shown');
+      if (hide) clearTimeout(hide);
+      hide = setTimeout(() => {
+        setCompanionThought(null);
+        setSignal('app-idle');
+      }, event.kind === 'thinking' ? 18000 : 11000);
+    });
+    return () => { unsubscribe(); if (hide) clearTimeout(hide); };
   }, [bridge]);
 
   // ---- boot -------------------------------------------------------------
@@ -591,8 +610,8 @@ export function App() {
           <Buddy size={116} signal={signal} studyLive={observation.observing} lookAt={mascotGaze} reducedMotion={settings.reducedMotion} />
         </button>
 
-        <div className="studdy-mascot-hint" aria-hidden={bubbleOpen}>
-          {!bubbleOpen && <span>Buddy · klicka för chatt</span>}
+        <div className={`studdy-mascot-hint ${companionThought ? 'is-thinking' : ''}`} aria-live="polite" aria-atomic="true">
+          {!bubbleOpen && <span>{companionThought ?? (observation.observing ? 'Ser studiefönstret · redo' : 'Buddy · redo')}</span>}
         </div>
 
         <div className="studdy-mascot-tools">
@@ -734,6 +753,21 @@ html, body, #root { margin:0; padding:0; background: transparent; overflow: hidd
 }
 .studdy-mascot-btn:active { cursor: grabbing; }\n.studdy-mascot-btn:hover { transform: scale(1.03); }
 .studdy-mascot-btn:focus-visible { outline: 2px solid #8FCBAE; outline-offset: 4px; }
+.studdy-mascot-hint.is-thinking {
+  background: rgba(29,34,41,.97);
+  color: #f1f5f5;
+  border: 1px solid rgba(98,241,162,.36);
+  border-radius: 10px;
+  padding: 6px 8px;
+  bottom: -13px;
+  left: -32px;
+  right: -155px;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.35;
+  box-shadow: 0 7px 18px rgba(0,0,0,.24);
+  animation: studdy-rise 200ms ease-out;
+}
 .studdy-mascot-hint {
   position: absolute; bottom: -4px; left: 0; right: 0; text-align: center;
   font-size: 10px; color: rgba(255,255,255,0.78); text-shadow: 0 1px 6px rgba(0,0,0,0.6);
