@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { openDatabase } from '@studdy/database';
 import { LearningService } from '@studdy/learning-engine';
-import { buildContext, doctor, status, models, progress, logs, type DoctorReport, type CliContext } from './commands.js';
+import { buildContext, buildReadiness, doctor, status, models, progress, logs, type DoctorReport, type CliContext } from './commands.js';
 import { toSpokenText, voiceAvailability } from '@studdy/voice-engine';
 
 /**
@@ -109,6 +109,37 @@ function run(): number {
           out(`  ${c.label.padEnd(24)} ${c.state.padEnd(13)} ${(c.probability * 100).toFixed(0).padStart(3)} %`);
         }
         if (report.due.length) out(`\n  Att repetera: ${report.due.join(', ')}`);
+      }
+      ctx.db?.close();
+      return 0;
+    }
+
+    case 'readiness': {
+      const learning = ctx.db ? new LearningService(ctx.db) : null;
+      const course = ctx.db?.curriculum.latestCourse() ?? null;
+      const result = buildReadiness(learning, course);
+      if (json) out(JSON.stringify(result, null, 2));
+      else {
+        heading('Tentaberedskap');
+        if (result.score === null) {
+          out('  Kan inte mätas ännu. Ingen kunskap är registrerad.');
+        } else {
+          out(`  ${result.headline}`);
+          out('');
+          out(`  Täckning   ${String(result.parts.coverage.value).padStart(3)} / 100  (vikt 40)  ${result.parts.coverage.detail}`);
+          out(`  Kunskap    ${String(result.parts.mastery.value).padStart(3)} / 100  (vikt 40)  ${result.parts.mastery.detail}`);
+          out(`  Retention  ${String(result.parts.retention.value).padStart(3)} / 100  (vikt 20)  ${result.parts.retention.detail}`);
+        }
+        out(`  Säkerhet på underlaget: ${result.confidence}`);
+        if (result.limitations.length) {
+          out('');
+          for (const line of result.limitations) out(`  · ${line}`);
+        }
+        if (result.nextSteps.length) {
+          out('');
+          out('  Nästa steg:');
+          for (const step of result.nextSteps) out(`  → ${step.label}: ${step.reason}`);
+        }
       }
       ctx.db?.close();
       return 0;

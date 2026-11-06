@@ -520,6 +520,25 @@ app.whenReady().then(async () => {
   createTray();
   await startBridge(services);
 
+  // Proof hook: `STUDDY_SMOKE_EXIT_MS` makes a real launch render, report, and
+  // exit on its own. CI uses it to show that the packaged app actually starts on
+  // Windows instead of only "building successfully". Inert unless set.
+  const smokeExitMs = Number(process.env.STUDDY_SMOKE_EXIT_MS ?? '');
+  if (Number.isFinite(smokeExitMs) && smokeExitMs > 0) {
+    setTimeout(async () => {
+      const rendererReady = mascotWindow?.webContents.isLoading?.() === false;
+      console.log(`[smoke] window visible: ${mascotWindow?.isVisible?.() ?? false}`);
+      console.log(`[smoke] renderer loaded: ${rendererReady}`);
+      console.log(`[smoke] bridge running: ${bridge?.status().running ?? false} on port ${bridge?.status().port ?? '-'}`);
+      const probe = await mascotWindow?.webContents.executeJavaScript?.(
+        "({ title: document.title, mascot: !!document.querySelector('.studdy-mascot-btn'), readinessButton: !!document.querySelector('[aria-label=\"Framsteg och tentaberedskap\"]') })",
+      );
+      console.log(`[smoke] renderer probe: ${JSON.stringify(probe)}`);
+      quitting = true;
+      app.quit();
+    }, smokeExitMs);
+  }
+
   process.on('uncaughtException', (err) => {
     console.error('[studdy] uncaught', redact(String(err?.stack ?? err)));
   });
