@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatMessage, ModelCapabilities, PermissionKey, PermissionMode, ProviderConfig, ResponseMode, Settings } from '@studdy/shared';
 import { createId, DEFAULT_SETTINGS } from '@studdy/shared';
-import { Buddy, type MascotSignal } from '@studdy/mascot';
+import type { MascotSignal } from '@studdy/mascot';
 import { ChatBubble, ProgressPanel, SettingsPanel, themeFor, type BridgePanelState } from '@studdy/chat-ui';
 import type { ReadinessScore } from '@studdy/learning-engine';
 import { getBridge } from './bridge.js';
@@ -586,11 +586,20 @@ export function App() {
             setSignal('user-typing');
           }}
         >
-          <Buddy size={116} signal={signal} studyLive={observation.observing} lookAt={mascotGaze} reducedMotion={settings.reducedMotion} />
+          <ProofDots score={observation.capability?.score ?? 0} active={observation.observing} busy={streaming || signal === 'message-sent'} gaze={mascotGaze} reducedMotion={settings.reducedMotion} />
         </button>
 
         <div className={`studdy-mascot-hint ${companionThought ? 'is-thinking' : ''}`} aria-live="polite" aria-atomic="true">
-          {!bubbleOpen && <span>{companionThought ?? (observation.observing ? 'Ser studiefönstret · redo' : 'Buddy · redo')}</span>}
+          {!bubbleOpen && (
+            <span>
+              {companionThought ?? (streaming ? 'Skapar svar…' : observation.observing
+                ? ('Läser ' + (observation.windowTitle ?? 'aktivt fönster').slice(0, 45))
+                : observation.state === 'unavailable' ? 'Windows-observatören saknas'
+                : observation.state === 'private' ? 'Privat fönster · pausad'
+                : observation.state === 'off' ? 'Observation är avstängd'
+                : 'Redo · väntar på tillåtet fönster')}
+            </span>
+          )}
         </div>
 
         <div className="studdy-mascot-tools">
@@ -673,7 +682,7 @@ export function App() {
             <ChatBubble
               messages={visibleMessages}
               observing={observation.observing}
-              studyPresence={streaming ? 'Svarar…' : observation.observing ? 'LIVE · observerar' : observation.state === 'off' ? 'Observation behöver aktiveras' : observation.state === 'unavailable' ? 'Agent-desktop ej tillgänglig' : observation.state === 'private' ? 'Privat fönster · pausad' : observation.state === 'no-window' ? 'Inget tillåtet fönster' : observation.state === 'starting' ? 'Startar observation…' : provider?.hasApiKey ? 'REDO · ingen skärm läses' : 'Anslut AI-nyckel'}
+              studyPresence={streaming ? 'Skapar svar…' : observation.observing ? 'LIVE · ' + (observation.windowTitle ?? 'tillåtet fönster').slice(0, 36) : observation.state === 'off' ? 'Observation behöver aktiveras' : observation.state === 'unavailable' ? 'Agent-desktop ej tillgänglig' : observation.state === 'private' ? 'Privat fönster · pausad' : observation.state === 'no-window' ? 'Inget tillåtet fönster' : observation.state === 'starting' ? 'Startar observation…' : provider?.hasApiKey ? 'REDO · ingen skärm läses' : 'Anslut AI-nyckel'}
 
               mode={mode}
               onModeChange={changeMode}
@@ -692,6 +701,36 @@ export function App() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * A tiny activity cluster, not a character. Dots turn green only on a REAL
+ * observer heartbeat. The brightness is tied to locally verified distinct
+ * task outcomes. "Skills" is an evidence counter, not claimed AI intelligence.
+ */
+function ProofDots({ score, active, busy, gaze, reducedMotion }: {
+  score: number;
+  active: boolean;
+  busy: boolean;
+  gaze: { x: number; y: number } | null;
+  reducedMotion: boolean;
+}) {
+  const progress = Math.max(0, Math.min(100, score));
+  return (
+    <div className={`buddy-proof-dots ${active ? 'is-live' : ''} ${busy ? 'is-busy' : ''} ${reducedMotion ? 'is-still' : ''}`}
+      role="img"
+      aria-label={active ? `Live observation · ${progress} verifierade unika uppgifter av 100` : `Pausad eller redo · ${progress} verifierade unika uppgifter av 100`}
+      title={`Skills ${progress}/100: antal unika, bekräftade uppgifter i lokalt loggade resultat. Inte ett IQ-test.`}
+    >
+      <div className="buddy-proof-orbit" style={{ transform: `translate(${(gaze?.x ?? 0) * 2}px, ${(gaze?.y ?? 0) * 2}px)` }}>
+        {Array.from({ length: 5 }, (_, index) => (
+          <span key={index} className={`buddy-proof-dot buddy-proof-dot-${index}`}
+            style={{ ['--proof-glow' as string]: active ? Math.min(1, .38 + progress / 140) : 0 }}/>
+        ))}
+      </div>
+      <span className="buddy-proof-skills">Skills <strong>{progress}/100</strong></span>
     </div>
   );
 }
@@ -717,6 +756,39 @@ html, body, #root { margin:0; padding:0; background: transparent; overflow: hidd
   position: absolute; left: 8px; top: 8px; right: 8px; z-index: 20;
   background: rgba(180,64,47,0.92); color:#fff; font-size: 11px; padding: 6px 8px; border-radius: 8px;
 }
+.buddy-proof-dots {
+  width: 116px; height: 116px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px; color: #f1f5f4;
+  font-size: 10px; letter-spacing: .02em;
+}
+.buddy-proof-orbit { position: relative; width: 82px; height: 73px; transition: transform 300ms ease; }
+.buddy-proof-dot {
+  position: absolute; width: 15px; height: 15px; border-radius: 50%;
+  background: #f4f6f6; opacity: .86;
+  box-shadow: 0 0 10px rgba(244,246,246,.14);
+  transition: background 450ms ease, box-shadow 450ms ease, opacity 450ms ease;
+}
+.buddy-proof-dot-0 { left: 33px; top: 5px; }
+.buddy-proof-dot-1 { left: 12px; top: 23px; }
+.buddy-proof-dot-2 { left: 54px; top: 23px; }
+.buddy-proof-dot-3 { left: 22px; top: 48px; }
+.buddy-proof-dot-4 { left: 45px; top: 48px; }
+.buddy-proof-dots.is-live .buddy-proof-dot {
+  background: #49f59d;
+  box-shadow: 0 0 calc(5px + 14px * var(--proof-glow)) rgba(51,255,149,.68);
+  opacity: calc(.65 + .35 * var(--proof-glow));
+  animation: buddy-proof-heartbeat 2.4s ease-in-out infinite;
+}
+.buddy-proof-dots.is-live .buddy-proof-dot:nth-child(2) { animation-delay: .15s; }
+.buddy-proof-dots.is-live .buddy-proof-dot:nth-child(3) { animation-delay: .3s; }
+.buddy-proof-dots.is-live .buddy-proof-dot:nth-child(4) { animation-delay: .45s; }
+.buddy-proof-dots.is-live .buddy-proof-dot:nth-child(5) { animation-delay: .6s; }
+.buddy-proof-dots.is-busy .buddy-proof-orbit { animation: buddy-proof-think 1.4s linear infinite; }
+.buddy-proof-dots.is-still * { animation: none !important; }\n@media (prefers-reduced-motion: reduce) { .buddy-proof-dots * { animation: none !important; } }
+.buddy-proof-skills { color: #d5e0dc; white-space: nowrap; text-shadow: 0 1px 5px #16191c; }
+.buddy-proof-skills strong { color: #57f0a0; }
+@keyframes buddy-proof-heartbeat { 0%,100% { transform: scale(.9); } 50% { transform: scale(1.1); } }
+@keyframes buddy-proof-think { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 .studdy-mascot-zone {
   position: absolute; left: 8px; top: 8px; width: 132px; height: 132px;
   display: flex; align-items: center; justify-content: center;
