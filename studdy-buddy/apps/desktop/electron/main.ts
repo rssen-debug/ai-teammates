@@ -918,7 +918,7 @@ app.whenReady().then(async () => {
             const progressButton = document.querySelector('[aria-label="Framsteg och tentaberedskap"]');
             progressButton?.click();
             await pause();
-            const progress = Boolean(document.querySelector('.studdy-progress-empty, .buddy-progress-root, [aria-label="Framsteg och tentaberedskap"]'));
+            const progress = Boolean(document.querySelector('.studdy-progress-empty, .buddy-progress'));
             return { chat, settings, progress };
           })()
         `) ?? null;
