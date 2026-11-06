@@ -143,8 +143,11 @@ export class OpenAiCompatibleClient {
     if (request.temperature !== undefined) payload.temperature = request.temperature;
     if (request.jsonMode) payload.response_format = { type: 'json_object' };
     if (request.tools) payload.tools = request.tools;
-    if (request.reasoning === 'deep') payload.reasoning_effort = 'high';
-    else if (request.reasoning === 'off') payload.reasoning_effort = 'low';
+    // Generic OpenAI-compatible gateways do not consistently implement
+    // reasoning_effort. The model can still reason from the prompt, but sending
+    // an unsupported vendor-specific parameter produces HTTP 400 (Kilo, etc.).
+    // Only add capability-specific parameters after an explicit provider probe.
+    void request.reasoning;
     return JSON.stringify(payload);
   }
 
