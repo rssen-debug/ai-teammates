@@ -190,7 +190,10 @@ export function parseWindows(stdout: string): WindowInfo[] {
   // under `windows`, and a bare array is still accepted for fixture simplicity.
   const raw = safeJson(stdout);
   const envelope = readEnvelope(stdout);
-  const data: unknown = Array.isArray(raw) ? raw : envelope.ok ? (envelope.data ?? null) : null;
+  // list-windows returns data as an ARRAY in the official JSON envelope.
+  // readEnvelope narrows data to records for other commands, so extract the
+  // raw array here instead of accidentally discarding every real window.
+  const data: unknown = Array.isArray(raw) ? raw : envelope.ok && isRecord(raw) ? (raw.data ?? null) : null;
   const rows = Array.isArray(data) ? data : isRecord(data) && Array.isArray(data.windows) ? (data.windows as unknown[]) : [];
   const out: WindowInfo[] = [];
   for (const row of rows) {
