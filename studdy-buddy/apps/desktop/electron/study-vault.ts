@@ -82,7 +82,7 @@ export function writeStudyVault(db: Database, root: string, now = new Date()): s
     concepts, updatedAt: now.toISOString(),
   };
   const rendered = renderVault(snapshot);
-  const vault = join(root, 'Study Vault');
+  const vault = join(root, 'Obsidian-Vault');
   const generated = join(vault, 'Concepts');
   mkdirSync(generated, { recursive: true });
   writeChanged(join(vault, 'Buddy – Studieläge.md'), rendered.index);
