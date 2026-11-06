@@ -10,6 +10,7 @@
  * `electron` is marked external (it is provided by the runtime), and so is
  * `node:sqlite` (a Node builtin that must not be bundled).
  */
+import { spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +45,9 @@ const common = {
 };
 
 try {
+  const iconJob = spawnSync(process.execPath, [resolve(appRoot, 'scripts/generate-icons.mjs')], { cwd: repoRoot, encoding: 'utf8' });
+  if (iconJob.status !== 0) throw new Error('Icon generation failed: ' + (iconJob.stderr || iconJob.stdout || iconJob.error?.message));
+  console.log(iconJob.stdout.trim());
   // .cjs extension is required: the repo root package.json sets "type": "module",
   // so a CommonJS bundle named .js would be executed as ESM and crash at load.
   await build({ ...common, entryPoints: [resolve(appRoot, 'electron/main.ts')], outExtension: { '.js': '.cjs' } });
