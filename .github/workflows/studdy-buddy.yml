@@ -96,35 +96,39 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $false
+          function Fail($msg) {
+            Write-Host "::error title=Windows native proof::$msg"
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "### Windows native proof failed`n`n$msg"
+            exit 1
+          }
+          function RunCli([string[]]$CliArgs, [string]$File) {
+            & node dist/cli/studdy.mjs @CliArgs --json --no-color | Tee-Object -FilePath $File
+            $code = $LASTEXITCODE
+            $raw = Get-Content $File -Raw
+            Write-Host "exit=$code args=$($CliArgs -join ' ')"
+            Write-Host $raw
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "#### $($CliArgs -join ' ') (exit $code)`n`n```json`n$raw`n```"
+            return @{ code = $code; raw = $raw; json = ($raw | ConvertFrom-Json) }
+          }
           node dist/cli/studdy.mjs setup --no-color
-          node dist/cli/studdy.mjs doctor --json --no-color | Tee-Object -FilePath doctor.json
-          Write-Host "doctor exit=$LASTEXITCODE"
-          Get-Content doctor.json -Raw | Write-Host
-          $doctor = Get-Content doctor.json -Raw | ConvertFrom-Json
-          $native = $doctor.checks | Where-Object name -eq 'Native helper'
-          if (-not $native.ok) { throw "Native helper not available: $($native.detail)" }
+          $doctor = RunCli @('doctor') 'doctor.json'
+          $native = $doctor.json.checks | Where-Object { $_.name -eq 'Native helper' }
+          if (-not $native.ok) { Fail "Native helper not available: $($native.detail)" }
 
-          node dist/cli/studdy.mjs open "Google Chrome" --json --no-color | Tee-Object -FilePath launch.json
-          Write-Host "launch exit=$LASTEXITCODE"
-          Get-Content launch.json -Raw | Write-Host
-          $launch = Get-Content launch.json -Raw | ConvertFrom-Json
-          if (-not $launch.ok) { throw "Chrome launch failed: $($launch.detail)" }
+          $launch = RunCli @('open', 'Google Chrome') 'launch.json'
+          if (-not $launch.json.ok) { Fail "Chrome launch failed: $($launch.json.detail)" }
           Start-Sleep -Seconds 3
 
-          node dist/cli/studdy.mjs windows --json --no-color | Tee-Object -FilePath windows.json
-          Write-Host "windows exit=$LASTEXITCODE"
-          Get-Content windows.json -Raw | Write-Host
-          $windows = Get-Content windows.json -Raw | ConvertFrom-Json
-          if ($windows.error) { throw $windows.error }
-          $chrome = $windows.windows | Where-Object { $_.processName -match 'chrome' } | Select-Object -First 1
-          if (-not $chrome) { throw 'No Chrome window observed after verified launch' }
+          $windows = RunCli @('windows') 'windows.json'
+          if ($windows.json.error) { Fail "list-windows failed: $($windows.json.error)" }
+          $chrome = $windows.json.windows | Where-Object { $_.processName -match 'chrome' } | Select-Object -First 1
+          if (-not $chrome) { Fail 'No Chrome window observed after verified launch' }
 
-          node dist/cli/studdy.mjs snapshot $chrome.id --json --no-color | Tee-Object -FilePath snapshot.json
-          Write-Host "snapshot exit=$LASTEXITCODE"
-          Get-Content snapshot.json -Raw | Write-Host
-          $snapshot = Get-Content snapshot.json -Raw | ConvertFrom-Json
-          if (-not $snapshot.accessible) { throw "Snapshot not accessible: $($snapshot.note)" }
-          Write-Host "Verified launch + window + $($snapshot.elements.Count) UI elements"
+          $snapshot = RunCli @('snapshot', $chrome.id) 'snapshot.json'
+          if (-not $snapshot.json.accessible) { Fail "Snapshot not accessible: $($snapshot.json.note)" }
+          Write-Host "Verified launch + window + $($snapshot.json.elements.Count) UI elements"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "### Verified`nLaunch + window + $($snapshot.json.elements.Count) UI elements"
+          exit 0
 
       - uses: actions/upload-artifact@v4
         if: always()
