@@ -391,6 +391,24 @@ function registerIpc(svc: StuddyServices): void {
       return ok({ message, degraded: false, error: null, trimmed: false, notice: null });
     }
 
+    // Minimal, user-initiated activation for existing installations. One chat
+    // command persists scoped observation. It does NOT grant control over
+    // clicks, passwords or private-app content.
+    const startLive = /^(?:starta\s+live|aktivera\s+(?:live|observation|skärmläsning)|enable\s+(?:live|observation)|du\s+får\s+(?:se|läsa)\s+min\s+skärm)[.!?]*$/i.test(text);
+    if (startLive) {
+      const session = svc.ensureSession();
+      svc.db.messages.append({ sessionId: session.id, role: 'user', text, mode });
+      svc.permissions.grant('application.observe');
+      svc.permissions.grant('screen.capture');
+      svc.permissions.setMode('VISUAL_GUIDE');
+      const status = adapter ? await adapter.status() : null;
+      const responseText = status?.available
+        ? 'Observation är aktiverad. Jag söker nu tillåtna fönster automatiskt. Lampan blir grön först när jag faktiskt har läst ett fönster.'
+        : 'Observation är aktiverad, men agent-desktop kan inte nås just nu: ' + (status?.detail ?? 'verktyget saknas');
+      const message = svc.db.messages.append({ sessionId: session.id, role: 'buddy', text: responseText, mode });
+      return ok({ message, degraded: !status?.available, error: status?.available ? null : 'DESKTOP_UNAVAILABLE', trimmed: false, notice: null });
+    }
+
     // Universal application launcher: use the agent-desktop OS backend,
     // rather than hardcoding Edge, Chrome or any other app into the chat AI.
     // An explicit user request is required for each launch.
