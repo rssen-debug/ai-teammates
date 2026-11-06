@@ -52,7 +52,7 @@ export interface StuddyBridge {
     capture(windowId: string): Promise<BridgeResult<{ id: string; name: string; png: string }>>;
     sources(): Promise<BridgeResult<{ id: string; name: string }[]>>;
     selectWindow(sourceId: string | null): Promise<BridgeResult<{ title: string | null }>>;
-    liveStatus(): Promise<BridgeResult<{ connected: boolean; observing: boolean; windowTitle: string | null; lastObservedAt: number | null }>>;
+    liveStatus(): Promise<BridgeResult<{ connected: boolean; observing: boolean; windowTitle: string | null; lastObservedAt: number | null; state: 'starting' | 'active' | 'off' | 'private' | 'unavailable' | 'no-window' }>>;
     onCompanionHint(listener: (event: { text: string; kind: string }) => void): () => void;
     cursorContext(): Promise<BridgeResult<{ point: { x: number; y: number }; displayId: string }>>;
   };
