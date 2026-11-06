@@ -111,82 +111,51 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
-  # Windows proof. This job does not build anything new: it installs the app the
-  # way a student would, launches it, and lets it report what it actually found.
-  # Its artifacts (JSON + logs) are the evidence. If the app cannot start, this
-  # job fails - it never "passes with a warning".
+  # Install and smoke-test the REAL NSIS output. A successful source build or
+  # dev Electron run is not evidence that the student's installed app works.
   # ---------------------------------------------------------------------------
   proof:
-    name: Windows launch proof
+    name: Windows installed-app proof
     needs: package
     runs-on: windows-latest
-    outputs:
-      installer: ${{ steps.find.outputs.installer }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22.13.0'
-
-      - name: Download built app (renderer + main)
-        uses: actions/download-artifact@v4
-        with:
-          name: studdy-buddy-build-windows-latest
-          path: studdy-buddy/apps/desktop/dist
-
-      - name: Download installer
+      - name: Download Windows installer
         uses: actions/download-artifact@v4
         with:
           name: studdy-buddy-windows-installer
           path: studdy-buddy/apps/desktop/dist/win
 
-      - name: Verify an installer file actually exists
-        id: find
+      - name: Install NSIS application silently
+        id: install
         shell: pwsh
         run: |
-          $exe = Get-ChildItem studdy-buddy/apps/desktop/dist/win -Filter *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $exe) { Write-Error "No .exe was produced. Packaging failed."; exit 1 }
-          "installer=$($exe.FullName)" >> $env:GITHUB_OUTPUT
-          "size=$([math]::Round($exe.Length/1MB,1)) MB" | Out-File -FilePath installer-info.txt -Encoding utf8
-          Get-Content installer-info.txt
+          $installer = Get-ChildItem 'apps/desktop/dist/win' -Filter '*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Packaging did not produce an installer' }
+          $dest = Join-Path $env:RUNNER_TEMP 'studdy-installed'
+          $p = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$dest") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "NSIS installer returned $($p.ExitCode)" }
+          $installed = Join-Path $dest 'Studdy Buddy.exe'
+          if (-not (Test-Path $installed)) { throw "Installed executable missing: $installed" }
+          "installedExe=$installed" >> $env:GITHUB_OUTPUT
+          Write-Host "Installed: $installed ($([math]::Round((Get-Item $installed).Length/1MB,1)) MB)"
 
-      - name: Install Electron binary for the launch test
-        working-directory: studdy-buddy
-        run: npm ci || npm install
-
-      - name: Ensure the runtime manifest exists next to the bundle
-        shell: pwsh
-        run: |
-          $dist = "studdy-buddy/apps/desktop/dist"
-          if (-not (Test-Path "$dist/electron/main.cjs")) { Write-Error "main.cjs missing from the artifact"; exit 1 }
-          if (-not (Test-Path "$dist/renderer/index.html")) { Write-Error "renderer missing from the artifact"; exit 1 }
-          @{ name="studdy-buddy"; productName="Studdy Buddy"; version="0.1.0"; private=$true; main="electron/main.cjs"; type="commonjs" } |
-            ConvertTo-Json | Out-File -FilePath "$dist/package.json" -Encoding utf8
-          Get-Content "$dist/package.json"
-
-      - name: Launch the packaged main process (real window, 12 s)
-        working-directory: studdy-buddy
+      - name: Run installed application and verify real renderer
         shell: pwsh
         env:
           STUDDY_SMOKE_EXIT_MS: '12000'
-          STUDDY_DATA_DIR: ${{ runner.temp }}\studdy-proof
+          STUDDY_DATA_DIR: ${{ runner.temp }}\\studdy-proof
         run: |
-          $log = "smoke.log"
-          $p = Start-Process -FilePath "node_modules\electron\dist\electron.exe" `
-            -ArgumentList "apps\desktop\dist" `
-            -RedirectStandardOutput $log -RedirectStandardError "smoke.err.log" `
-            -PassThru -NoNewWindow
-          if (-not $p.WaitForExit(60000)) { $p.Kill(); Write-Error "App did not start within 60 s"; exit 1 }
-          Write-Host "---- stdout ----"; Get-Content $log -ErrorAction SilentlyContinue
-          Write-Host "---- stderr ----"; Get-Content smoke.err.log -ErrorAction SilentlyContinue
-          if (-not (Select-String -Path $log -Pattern 'renderer probe' -Quiet)) {
-            Write-Error "The app started but the renderer never reported. This is a failure, not a warning."
-            exit 1
-          }
-          if (-not (Select-String -Path $log -Pattern '"mascot":true' -Quiet)) {
-            Write-Error "The mascot element was not found in the live renderer."
-            exit 1
+          $binary = '${{ steps.install.outputs.installedExe }}'
+          $p = Start-Process -FilePath $binary -PassThru
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw 'Installed app failed to exit within 60 seconds' }
+          $proof = Join-Path $env:STUDDY_DATA_DIR 'smoke.json'
+          if (-not (Test-Path $proof)) { throw 'No smoke.json from installed application' }
+          $result = Get-Content $proof -Raw | ConvertFrom-Json
+          Write-Host (Get-Content $proof -Raw)
+          if (-not ($result.windowVisible -and $result.rendererReady -and $result.bridgeRunning -and $result.probe.mascot -and $result.probe.readinessButton -and $result.passed)) {
+            throw 'The installed application did not pass its live renderer and bridge checks'
           }
 
       - name: Collect evidence
@@ -194,17 +163,14 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path evidence | Out-Null
-          Copy-Item studdy-buddy/smoke.log evidence/ -ErrorAction SilentlyContinue
-          Copy-Item studdy-buddy/smoke.err.log evidence/ -ErrorAction SilentlyContinue
-          Copy-Item installer-info.txt evidence/ -ErrorAction SilentlyContinue
-          if (Test-Path "${{ runner.temp }}\studdy-proof") {
-            Copy-Item "${{ runner.temp }}\studdy-proof\*" evidence/ -Recurse -ErrorAction SilentlyContinue
-          }
+          $proof = Join-Path (Join-Path $env:RUNNER_TEMP 'studdy-proof') 'smoke.json'
+          Copy-Item $proof evidence/ -ErrorAction SilentlyContinue
+          Get-ChildItem 'apps/desktop/dist/win' -Filter '*.exe' | Select-Object Name,Length | ConvertTo-Json | Out-File evidence/installer-info.json -Encoding utf8
 
-      - name: Upload proof
+      - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: studdy-buddy-windows-proof
-          path: evidence
+          path: studdy-buddy/evidence
           retention-days: 30
