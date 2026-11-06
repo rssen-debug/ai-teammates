@@ -590,6 +590,17 @@ function safeHost(url: string): string | null {
 
 app.whenReady().then(async () => {
   services = new StuddyServices({ dataDir: dataDir() });
+  // The student requested an always-available companion. Configure Windows
+  // login startup once (never overwrite a subsequent Windows/user choice).
+  if (app.isPackaged && process.platform === 'win32' &&
+      !services.db.checkpoints.get<boolean>('startup.preference.configured')) {
+    try {
+      app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
+      services.db.checkpoints.set('startup.preference.configured', true);
+    } catch (error) {
+      console.warn('[startup] Login startup not available:', String(error));
+    }
+  }
   adapter = new DesktopAccessibilityAdapter({ platform: process.platform });
   speech = new SpeechPlayer(process.platform);
 
