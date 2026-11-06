@@ -13,6 +13,7 @@ import { startAutomaticUpdates } from './auto-update.js';
 import { allowedObservationTitle, detectCompanionHint } from './companion-observer.js';
 import { DebugJournal } from './debug-journal.js';
 import { GitHubDebugSync } from './debug-sync.js';
+import { GmailConnector } from './gmail-connector.js';
 import { writeStudyVault } from './study-vault.js';
 
 /**
@@ -43,6 +44,7 @@ let bridge: BrowserBridgeServer | null = null;
 let quitting = false;
 let diagnosticJournal: DebugJournal | null = null;
 let githubDebug: GitHubDebugSync | null = null;
+let gmail: GmailConnector | null = null;
 let githubSyncTimer: ReturnType<typeof setInterval> | null = null;
 function diagnostic(source: string, error: unknown, severity: 'warn' | 'error' = 'error'): void {
   diagnosticJournal?.record(source, error, severity);
@@ -344,6 +346,30 @@ function registerIpc(svc: StuddyServices): void {
     // Universal agent's first two local tools: explicitly requested, fixed
     // commands. There is no arbitrary shell execution and no cloud call.
     const text = p.text.trim();
+    // A deterministic, read-only Gmail tool that requires an explicit user
+    // request. The model never sees credentials or the OAuth refresh token.
+    const inboxRequest = /^(?:visa|kolla|läs|hämta|show|check|read)(?:\\s+(?:mina|min|my|the))?\\s+(?:senaste\\s+)?(?:gmail|mejl|mail|emails|inbox|inkorgen)(?:\\s+(?:senaste|latest))?[.!?]*$/i.test(text);
+    if (inboxRequest) {
+      const session = svc.ensureSession();
+      svc.db.messages.append({ sessionId: session.id, role: 'user', text, mode });
+      let responseText: string;
+      try {
+        if (!gmail?.status().connected) {
+          responseText = 'Gmail är inte anslutet. Öppna Inställningar → Gmail och logga in med Google. Buddy behöver aldrig ditt lösenord.';
+        } else {
+          const emails = await gmail.list('in:inbox', 6);
+          responseText = emails.length === 0
+            ? 'Inga mejl hittades i inkorgen.'
+            : 'Senaste mejlen:\\n' + emails.map((mail, index) =>
+                String(index + 1) + '. ' + mail.subject.slice(0, 110) + ' — ' + mail.from.slice(0, 95)).join('\\n');
+        }
+      } catch (error) {
+        responseText = 'Gmail kunde inte läsas: ' + (error instanceof Error ? error.message : 'okänt fel');
+      }
+      const message = svc.db.messages.append({ sessionId: session.id, role: 'buddy', text: responseText, mode });
+      return ok({ message, degraded: false, error: null, trimmed: false, notice: null });
+    }
+
     const calculatorRequest = /^(?:öppna|starta|visa|open|launch)(?:s+(?:upp|the|en|min))?s+(?:miniräknaren|miniräknare|calculator|calc)(?:s*(?:åt mig|please))?[.!?]*$/i.test(text);
     const memoryRequest = /^(?:öppna|visa|open|show)s+(?:mitts+)?(?:minne|minnet|obsidian(?:s+vault)?|memory)(?:s+mapp(?:en)?)?[.!?]*$/i.test(text);
     if (calculatorRequest || memoryRequest) {
@@ -498,6 +524,26 @@ function registerIpc(svc: StuddyServices): void {
       svc.permissions.setMode(next.permissionMode);
     }
     return ok(next);
+  });
+
+  // ---- Gmail: explicit OAuth consent and on-demand read-only access ----
+  ipcMain.handle(IPC.gmailStatus, () => gmail ? ok(gmail.status()) : fail('NOT_READY', 'Gmail är inte startat.'));
+  ipcMain.handle(IPC.gmailConnect, async (_e, clientId: unknown) => {
+    if (!gmail || typeof clientId !== 'string' || clientId.length > 180)
+      return fail('BAD_CLIENT', 'Ange ett Google OAuth Desktop Client ID.');
+    try { return ok(await gmail.connect(clientId)); }
+    catch (error) { return fail('GMAIL_OAUTH', error instanceof Error ? error.message : 'Gmail kunde inte anslutas.'); }
+  });
+  ipcMain.handle(IPC.gmailDisconnect, async () => {
+    if (!gmail) return fail('NOT_READY', 'Gmail är inte startat.');
+    await gmail.disconnect();
+    return ok({ connected: false });
+  });
+  ipcMain.handle(IPC.gmailList, async (_e, query: unknown) => {
+    if (!gmail) return fail('NOT_READY', 'Gmail är inte startat.');
+    if (typeof query !== 'string' || query.length > 180) return fail('BAD_QUERY', 'Sökfrågan är för lång.');
+    try { return ok(await gmail.list(query)); }
+    catch (error) { return fail('GMAIL_READ', error instanceof Error ? error.message : 'Gmail kunde inte läsas.'); }
   });
 
   // ---- provider ----
@@ -858,6 +904,7 @@ function safeHost(url: string): string | null {
 app.whenReady().then(async () => {
   diagnosticJournal = new DebugJournal(dataDir());
   githubDebug = new GitHubDebugSync(dataDir());
+  gmail = new GmailConnector(dataDir());
   // Retain concise redacted operational failures on the student's own disk.
   // No screenshots, prompts, browser URLs, clipboard or tokens go to debugger.md.
   const previousError = console.error.bind(console);
