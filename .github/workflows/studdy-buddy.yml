@@ -110,6 +110,8 @@ jobs:
 
       - name: Package Windows installer
         run: npm run package:win
+        env:
+          STUDDY_BUILD_VERSION: 0.1.${{ github.run_number }}
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
@@ -187,3 +189,61 @@ jobs:
           name: studdy-buddy-windows-proof
           path: studdy-buddy/evidence
           retention-days: 30
+
+  # Publish only proven installed Windows builds. The app reads GitHub Releases,
+  # not transient Actions artifacts, so users are never asked to redownload.
+  publish:
+    name: Publish verified automatic update
+    needs: [verify, package, proof]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: studdy-buddy-windows-installer
+          path: release-installer
+
+      - name: Check that this is still HEAD of main
+        id: head
+        shell: bash
+        run: |
+          HEAD_SHA="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$HEAD_SHA" = "$GITHUB_SHA" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "A newer main commit exists; do not replace its update."
+          fi
+
+      - name: Prepare SHA-256 installer checksum
+        if: steps.head.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-installer
+          for exe in *.exe; do
+            test -f "$exe"
+            sha256sum "$exe" > "$exe.sha256"
+          done
+
+      - name: Publish latest verified GitHub Release
+        if: steps.head.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="studdy-buddy-v0.1.${{ github.run_number }}"
+          shopt -s nullglob
+          files=(release-installer/*.exe release-installer/*.exe.sha256)
+          if [ "${#files[@]}" -lt 2 ]; then echo "No installer + checksum"; exit 1; fi
+          gh release create "$tag" "${files[@]}" \
+            --repo "${{ github.repository }}" \
+            --target "$GITHUB_SHA" \
+            --title "Studdy Buddy 0.1.${{ github.run_number }}" \
+            --notes "Windows installer verified by CI, installed-app smoke test and SHA-256 checksum. Automatic updates are installed only from this release channel." \
+            --latest
