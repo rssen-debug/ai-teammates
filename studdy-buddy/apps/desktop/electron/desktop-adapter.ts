@@ -151,8 +151,8 @@ export class DesktopAccessibilityAdapter {
   async launchApp(name: string): Promise<{ ok: boolean; detail: string }> {
     if (this.platform !== 'win32') return { ok: false, detail: 'Programstart kräver Windows.' };
     const app = name.trim();
-    if (!app || app.length > 80 || !/^[\\p{L}\\p{N} ._-]+$/u.test(app) ||
-        /^(?:cmd|powershell|pwsh|wscript|cscript|regedit|mshta|rundll32|schtasks|taskkill|terminal|bash)(?:\\.exe)?$/i.test(app)) {
+    if (!app || app.length > 80 || !/^[\p{L}\p{N} ._-]+$/u.test(app) ||
+        /^(?:cmd|powershell|pwsh|wscript|cscript|regedit|mshta|rundll32|schtasks|taskkill|terminal|bash)(?:\.exe)?$/i.test(app)) {
       return { ok: false, detail: 'Appnamnet får inte vara ett kommando, en sökväg eller ett skript.' };
     }
     const result = await this.runner.run(this.binary, ['launch', app, '--activate'], Math.max(this.timeoutMs, 30_000));
