@@ -325,8 +325,11 @@ function registerIpc(svc: StuddyServices): void {
     if (typeof windowId !== 'string') return fail('BAD_ARGS', 'windowId saknas.');
     try {
       const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 1600, height: 1000 } });
-      const match = sources.find((s) => s.id === windowId) ?? sources[0];
-      if (!match || match.thumbnail.isEmpty()) return fail('CAPTURE_EMPTY', 'Fönstret kunde inte fångas.');
+      // Never silently capture an unrelated first window when an id is stale or
+      // comes from a different API (agent-desktop UIA ids != Electron ids).
+      const match = sources.find((source) => source.id === windowId);
+      if (!match) return fail('CAPTURE_NOT_FOUND', 'Det valda fönstret hittades inte. Välj det på nytt.');
+      if (match.thumbnail.isEmpty()) return fail('CAPTURE_EMPTY', 'Det valda fönstret kunde inte fångas.');
       // Only a downscaled capture leaves this function; nothing is written to disk.
       return ok({ id: match.id, name: match.name, png: match.thumbnail.toPNG().toString('base64') });
     } catch (err) {
