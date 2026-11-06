@@ -21,7 +21,7 @@ function run(cmd, args, cwd) {
   // Capture the output as well as showing it: CI log downloads are not always
   // reachable, but check-run annotations are. On failure we re-emit the tail as
   // ::error:: lines so the reason survives even when the raw log does not.
-  const result = spawnSync(cmd, args, { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
+  const result = spawnSync(cmd, args, { cwd, encoding: 'utf8', shell: false });
   process.stdout.write(result.stdout ?? '');
   process.stderr.write(result.stderr ?? '');
   if (result.status !== 0) {
@@ -47,7 +47,7 @@ function step(label, fn) {
 const started = Date.now();
 
 // Launch the installed CLI through Node directly. On Windows, npm's `npx` is a\n// .cmd shim and execFileSync('npx') fails with spawnSync ENOENT. Avoid shells.\nconst viteCli = join(repoRoot, 'node_modules', 'vite', 'bin', 'vite.js');\nconst builderCli = join(repoRoot, 'node_modules', 'electron-builder', 'cli.js');\nstep('Renderer (vite)', () => run(process.execPath, [viteCli, 'build', '--config', 'apps/desktop/vite.config.ts'], repoRoot));
-step('Electron bundles (esbuild)', () => run('node', ['apps/desktop/scripts/build-electron.mjs'], repoRoot));
+step('Electron bundles (esbuild)', () => run(process.execPath, ['apps/desktop/scripts/build-electron.mjs'], repoRoot));
 
 // Write a runtime package.json into dist so Electron resolves the entry point.
 step('Runtime manifest', () => {
@@ -110,7 +110,7 @@ step('Windows installer (electron-builder)', () => {
     process.exit(1);
   }
   // --publish never: a build must never upload anything implicitly.
-  run('npx', ['electron-builder', '--win', 'nsis', '--config', configPath, '--publish', 'never'], appRoot);
+  run(process.execPath, [builderCli, '--win', 'nsis', '--config', configPath, '--publish', 'never'], appRoot);
 });
 
 step('Confirm the installer exists', () => {
