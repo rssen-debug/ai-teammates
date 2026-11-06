@@ -88,9 +88,22 @@ export function SettingsPanel(props: SettingsPanelProps) {
   };
 
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [quickProvider, setQuickProvider] = useState<'kilo' | 'deepseek'>(
-    props.provider?.baseUrl?.includes('kilo.ai') ? 'kilo' : props.provider?.baseUrl?.includes('deepseek.com') ? 'deepseek' : 'kilo',
-  );
+  type QuickProvider = 'kilo' | 'deepseek' | 'openrouter' | 'opencode' | 'custom';
+  const initialQuickProvider: QuickProvider = props.provider?.baseUrl?.includes('kilo.ai') ? 'kilo' :
+    props.provider?.baseUrl?.includes('deepseek.com') ? 'deepseek' :
+    props.provider?.baseUrl?.includes('openrouter.ai') ? 'openrouter' :
+    props.provider?.baseUrl?.includes('opencode.ai') ? 'opencode' :
+    props.provider?.hasApiKey ? 'custom' : 'kilo';
+  const defaults: Record<QuickProvider, { name: string; url: string; model: string }> = {
+    kilo: { name: 'Kilo Code', url: 'https://ai-gateway.kilo.ai/api/v1', model: 'kilo-auto/free' },
+    deepseek: { name: 'DeepSeek', url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+    openrouter: { name: 'OpenRouter', url: 'https://openrouter.ai/api/v1', model: '' },
+    opencode: { name: 'OpenCode Zen', url: 'https://opencode.ai/zen/v1', model: 'deepseek-v4-flash' },
+    custom: { name: 'OpenAI-kompatibel', url: props.provider?.baseUrl ?? '', model: '' },
+  };
+  const [quickProvider, setQuickProvider] = useState<QuickProvider>(initialQuickProvider);
+  const [quickModel, setQuickModel] = useState(props.provider?.modelId ?? defaults[initialQuickProvider].model);
+  const [quickBaseUrl, setQuickBaseUrl] = useState(props.provider?.baseUrl ?? '');
   const [quickKey, setQuickKey] = useState('');
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickStatus, setQuickStatus] = useState<string | null>(null);
@@ -120,20 +133,21 @@ export function SettingsPanel(props: SettingsPanelProps) {
   };
 
   const saveQuick = async () => {
-    if (quickBusy || !quickKey.trim()) return;
+    const endpoint = quickProvider === 'custom' ? quickBaseUrl.trim() : defaults[quickProvider].url;
+    const needsNewKey = !props.provider?.hasApiKey || props.provider?.baseUrl !== endpoint;
+    if (quickBusy || !quickModel.trim() || !endpoint ||
+        (needsNewKey && !quickKey.trim())) return;
     setQuickBusy(true);
     setQuickStatus(null);
     try {
       const result = await props.onSaveProvider({
-        name: quickProvider === 'kilo' ? 'Kilo Code' : 'DeepSeek',
-        baseUrl: quickProvider === 'kilo' ? 'https://ai-gateway.kilo.ai/api/v1' : 'https://api.deepseek.com/v1',
-        modelId: quickProvider === 'kilo' ? 'kilo-auto/free' : 'deepseek-flash',
-        // Try the same automatic route for on-demand screenshots. A real
-        // provider response determines whether this route supports vision;
-        // no screen is sent until the student asks and sharing is permitted.
-        visionModelId: quickProvider === 'kilo' ? 'kilo-auto/free' : 'deepseek-flash',
+        name: defaults[quickProvider].name,
+        baseUrl: endpoint,
+        modelId: quickModel.trim(),
+        // Never claim vision support without a real provider capability probe.
+        visionModelId: quickProvider === 'kilo' ? quickModel.trim() : null,
         fallbackModelId: null,
-        apiKey: quickKey.trim(),
+        ...(quickKey.trim() ? { apiKey: quickKey.trim() } : {}),
         dailyCostLimitUsd: 2,
       });
       if (!result.ok) {
@@ -169,11 +183,28 @@ export function SettingsPanel(props: SettingsPanelProps) {
           <p className="buddy-s-hint">En gång: välj leverantör, klistra in nyckeln och spara. Buddy kommer ihåg den lokalt.</p>
           <label>
             AI-leverantör
-            <select value={quickProvider} onChange={(event) => setQuickProvider(event.target.value as 'kilo' | 'deepseek')}>
-              <option value="kilo">Kilo Code (gratis om modellen är tillgänglig)</option>
-              <option value="deepseek">DeepSeek API</option>
+            <select value={quickProvider} onChange={(event) => {
+              const value = event.target.value as QuickProvider;
+              setQuickProvider(value);
+              setQuickModel(defaults[value].model);
+            }}>
+              <option value="kilo">Kilo Code</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="opencode">OpenCode Zen</option>
+              <option value="custom">Annan OpenAI-kompatibel</option>
             </select>
           </label>
+          <label>
+            Modell
+            <input value={quickModel} onChange={(event) => setQuickModel(event.target.value)}
+              placeholder="Modell-ID, t.ex. kilo-auto/free"/>
+          </label>
+          {quickProvider === 'custom' && <label>
+            API-adress
+            <input value={quickBaseUrl} onChange={event => setQuickBaseUrl(event.target.value)}
+              placeholder="https://din-provider.example/api/v1"/>
+          </label>}
           <label>
             API-nyckel
             <input type="password" value={quickKey}
@@ -185,13 +216,13 @@ export function SettingsPanel(props: SettingsPanelProps) {
             />
           </label>
           <div className="buddy-s-actions">
-            <button type="button" className="buddy-s-btn is-primary" disabled={quickBusy || !quickKey.trim()}
+            <button type="button" className="buddy-s-btn is-primary" disabled={quickBusy || !quickModel.trim() || (!quickKey.trim() && (!props.provider?.hasApiKey || props.provider?.baseUrl !== (quickProvider === 'custom' ? quickBaseUrl : defaults[quickProvider].url)))}
               onClick={() => void saveQuick()}>{quickBusy ? 'Sparar…' : 'Spara och börja'}</button>
             <button type="button" className="buddy-s-btn" onClick={() => setAdvancedOpen(true)}>Avancerat</button>
           </div>
           {quickStatus && <p className="buddy-s-hint" role="status">{quickStatus}</p>}
           {props.provider?.hasApiKey && <p className="buddy-s-hint">En nyckel finns redan sparad. Den följer med vid uppdateringar.</p>}
-          <p className="buddy-s-hint">När du sparar godkänner du att Buddy läser valt studiefönster och skickar relevant innehåll till AI-providern när du ställer en skärmfråga. Kilo Auto Free kan behandla indata hos underleverantörer. Mikrofon och datorklick kräver separat aktivering eller bekräftelse.</p>
+          <p className="buddy-s-hint">Buddy får följa godkända fönster och skicka relevant kontext till den valda providern när du ber om hjälp. Kilo Auto Free kan dela indata med underleverantörer. Datoråtgärder kräver särskilt godkännande. Andra API:er kan ha olika format; multimodala video-API:er stöds inte automatiskt som chatt.</p>
         </section>
       </div>
     );
