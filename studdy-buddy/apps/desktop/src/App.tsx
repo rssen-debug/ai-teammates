@@ -674,6 +674,7 @@ export function App() {
               captureSources={captureSources}
               captureSourceId={captureSourceId}
               captureActive={Boolean(captureSourceId)}
+              observing={observation.observing}
               studyPresence={streaming ? 'Svarar…' : observation.observing ? 'GRÖN · läser valt fönster' : provider?.hasApiKey ? 'REDO · ingen skärm läses' : 'Anslut AI-nyckel'}
               onCaptureSourceChange={captureAllowed ? (sourceId) => {
                 setCaptureSourceId(sourceId);
