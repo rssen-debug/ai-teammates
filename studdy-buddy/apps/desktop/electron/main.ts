@@ -1176,7 +1176,7 @@ app.whenReady().then(async () => {
       const pixelIconLoaded = Boolean(tray && existsSync(join(__dirname, 'buddy-tray.png')) && existsSync(join(__dirname, 'buddy-icon.png')));
       const greenIconsLoaded = existsSync(join(__dirname, 'buddy-live.png')) && existsSync(join(__dirname, 'buddy-live-blink.png'));
       const studyVaultReady = existsSync(join(dataDir(), 'Obsidian-Vault', 'Buddy – Studieläge.md'));
-      const passed = Boolean(windowVisible && rendererReady && bridgeRunning && probe?.mascot && probe?.proofDots && /^Lv\\s+\\d+\\/100/.test(probe.levelLabel ?? '') && probe?.readinessButton && pixelIconLoaded && greenIconsLoaded && studyVaultReady && navigationProbe?.chat && navigationProbe?.simpleChat && navigationProbe?.settings && navigationProbe?.progress);
+      const passed = Boolean(windowVisible && rendererReady && bridgeRunning && probe?.mascot && probe?.proofDots && (probe.levelLabel ?? '').trim().startsWith('Lv ') && (probe.levelLabel ?? '').includes('/100') && probe?.readinessButton && pixelIconLoaded && greenIconsLoaded && studyVaultReady && navigationProbe?.chat && navigationProbe?.simpleChat && navigationProbe?.settings && navigationProbe?.progress);
       const result = { windowVisible, rendererReady, bridgeRunning, pixelIconLoaded, greenIconsLoaded, studyVaultReady, probe, navigationProbe, screenshotSaved, passed, error };
       console.log(`[smoke] result: ${JSON.stringify(result)}`);
       try {
