@@ -173,15 +173,10 @@ export function SettingsPanel(props: SettingsPanelProps) {
         setQuickStatus(result.message);
         return;
       }
-      // Scoped study permissions are persisted; capture still needs an
-      // approved study window and the browser extension still needs its
-      // own browser permissions. Never enable unattended desktop clicks.
-      for (const key of ['screen.capture', 'application.observe', 'browser.read', 'provider.dataShare'] as PermissionKey[]) {
-        props.onPermission(key, true);
-      }
-      props.onModeChange('VISUAL_GUIDE');
+      // The single-save callback awaits every scoped permission before it
+      // returns success. No race against the first background observation.
       setQuickKey('');
-      setQuickStatus('Sparat! Buddy är redo för textfrågor. Välj ett studiefönster för skärmhjälp.');
+      setQuickStatus('Sparat. Buddy söker nu tillåtna fönster automatiskt.');
     } catch (error) {
       setQuickStatus(error instanceof Error ? error.message : String(error));
     } finally {
