@@ -1,0 +1,194 @@
+name: Studdy Buddy CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['studdy-buddy/**']
+  pull_request:
+    paths: ['studdy-buddy/**']
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: studdy-buddy
+
+jobs:
+  verify:
+    name: Typecheck, test, build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: npm
+          cache-dependency-path: studdy-buddy/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci || npm install
+        env:
+          # The Electron binary is only needed for packaging, not for verify.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build renderer
+        run: npm run build:ui
+
+      - name: Build electron bundles
+        run: node apps/desktop/scripts/build-electron.mjs
+
+      - name: CLI smoke test
+        run: npx tsx packages/cli/src/bin.ts doctor --json
+        env:
+          STUDDY_DATA_DIR: ${{ runner.temp }}/studdy-ci
+
+      - name: Upload build output
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: studdy-buddy-build-${{ matrix.os }}
+          path: |
+            studdy-buddy/apps/desktop/dist/electron
+            studdy-buddy/apps/desktop/dist/renderer
+          retention-days: 14
+
+  package:
+    name: Windows installer
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: npm
+          cache-dependency-path: studdy-buddy/package-lock.json
+
+      - name: Install dependencies (with Electron binary)
+        run: npm ci || npm install
+
+      - name: Package Windows installer
+        run: npm run package:win
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: studdy-buddy-windows-installer
+          path: |
+            studdy-buddy/apps/desktop/dist/win/*.exe
+            studdy-buddy/apps/desktop/dist/win/*.blockmap
+          retention-days: 30
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Windows proof. This job does not build anything new: it installs the app the
+  # way a student would, launches it, and lets it report what it actually found.
+  # Its artifacts (JSON + logs) are the evidence. If the app cannot start, this
+  # job fails - it never "passes with a warning".
+  # ---------------------------------------------------------------------------
+  proof:
+    name: Windows launch proof
+    needs: package
+    runs-on: windows-latest
+    outputs:
+      installer: ${{ steps.find.outputs.installer }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+
+      - name: Download built app (renderer + main)
+        uses: actions/download-artifact@v4
+        with:
+          name: studdy-buddy-build-windows-latest
+          path: studdy-buddy/apps/desktop/dist
+
+      - name: Download installer
+        uses: actions/download-artifact@v4
+        with:
+          name: studdy-buddy-windows-installer
+          path: studdy-buddy/apps/desktop/dist/win
+
+      - name: Verify an installer file actually exists
+        id: find
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem studdy-buddy/apps/desktop/dist/win -Filter *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { Write-Error "No .exe was produced. Packaging failed."; exit 1 }
+          "installer=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+          "size=$([math]::Round($exe.Length/1MB,1)) MB" | Out-File -FilePath installer-info.txt -Encoding utf8
+          Get-Content installer-info.txt
+
+      - name: Install Electron binary for the launch test
+        working-directory: studdy-buddy
+        run: npm ci || npm install
+
+      - name: Ensure the runtime manifest exists next to the bundle
+        shell: pwsh
+        run: |
+          $dist = "studdy-buddy/apps/desktop/dist"
+          if (-not (Test-Path "$dist/electron/main.cjs")) { Write-Error "main.cjs missing from the artifact"; exit 1 }
+          if (-not (Test-Path "$dist/renderer/index.html")) { Write-Error "renderer missing from the artifact"; exit 1 }
+          @{ name="studdy-buddy"; productName="Studdy Buddy"; version="0.1.0"; private=$true; main="electron/main.cjs"; type="commonjs" } |
+            ConvertTo-Json | Out-File -FilePath "$dist/package.json" -Encoding utf8
+          Get-Content "$dist/package.json"
+
+      - name: Launch the packaged main process (real window, 12 s)
+        working-directory: studdy-buddy
+        shell: pwsh
+        env:
+          STUDDY_SMOKE_EXIT_MS: '12000'
+          STUDDY_DATA_DIR: ${{ runner.temp }}\studdy-proof
+        run: |
+          $log = "smoke.log"
+          $p = Start-Process -FilePath "node_modules\electron\dist\electron.exe" `
+            -ArgumentList "apps\desktop\dist" `
+            -RedirectStandardOutput $log -RedirectStandardError "smoke.err.log" `
+            -PassThru -NoNewWindow
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); Write-Error "App did not start within 60 s"; exit 1 }
+          Write-Host "---- stdout ----"; Get-Content $log -ErrorAction SilentlyContinue
+          Write-Host "---- stderr ----"; Get-Content smoke.err.log -ErrorAction SilentlyContinue
+          if (-not (Select-String -Path $log -Pattern 'renderer probe' -Quiet)) {
+            Write-Error "The app started but the renderer never reported. This is a failure, not a warning."
+            exit 1
+          }
+          if (-not (Select-String -Path $log -Pattern '"mascot":true' -Quiet)) {
+            Write-Error "The mascot element was not found in the live renderer."
+            exit 1
+          }
+
+      - name: Collect evidence
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path evidence | Out-Null
+          Copy-Item studdy-buddy/smoke.log evidence/ -ErrorAction SilentlyContinue
+          Copy-Item studdy-buddy/smoke.err.log evidence/ -ErrorAction SilentlyContinue
+          Copy-Item installer-info.txt evidence/ -ErrorAction SilentlyContinue
+          if (Test-Path "${{ runner.temp }}\studdy-proof") {
+            Copy-Item "${{ runner.temp }}\studdy-proof\*" evidence/ -Recurse -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studdy-buddy-windows-proof
+          path: evidence
+          retention-days: 30
