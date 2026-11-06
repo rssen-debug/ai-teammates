@@ -40,6 +40,7 @@ export const IPC = {
   screenSources: 'observe:sources',
   observeSelectWindow: 'observe:select-window',
   observeLiveStatus: 'observe:live-status',
+  companionHintEvent: 'companion:hint-event',
   cursorContext: 'observe:cursor-context',
   // browser bridge (extension -> main). Site-agnostic: any allowed study site.
   bridgeStatus: 'bridge:status',
