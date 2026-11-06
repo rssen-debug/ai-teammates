@@ -94,5 +94,5 @@ npm test
 npm run build
 ```
 
-Windows CI kör dessutom ett riktigt native-bevis: `doctor` → `open "Google Chrome"` →
+Windows CI kör dessutom ett riktigt native-bevis: `doctor` → `open "Notepad"` →
 `windows` → `snapshot` och failar om något steg inte faktiskt lyckas.

@@ -19,6 +19,8 @@ och ingår inte i aktiva scripts, beroenden, CI eller release.
 - CLI provider-protokoll mot lokal mock ✅
 - Live-observer: grön endast efter riktig tillgänglig snapshot, stale efter 35 s ✅
 
+## Verifierat i GitHub Actions
+- Windows native proof ✅: doctor → open "Notepad" → windows → snapshot (run 42313457560).
+
 ## Ej verifierat här
-- Windows native launch/window/snapshot: kräver Windows CI (workflow uppdaterad).
 - Live Kilo: sandbox-egress tillåter inte Kilo API; ingen nyckel persistad eller live-testad.

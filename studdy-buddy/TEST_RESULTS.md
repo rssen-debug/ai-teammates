@@ -23,4 +23,4 @@ npm run package:cli
 ## Ärliga blockerare
 - Linux-sandbox: `agent-desktop` Windows UI Automation = BLOCKED, inte FAIL.
 - Kilo live-test: ej kört (egress). Provider-protokoll testat mot lokal mock.
-- Windows GUI/native launch/snapshot: CI-jobb `windows-native-proof` körs i GitHub Actions.
+- Windows native launch/window/snapshot: ✅ grönt i CI run 42313457560 (`windows-native-proof`).
