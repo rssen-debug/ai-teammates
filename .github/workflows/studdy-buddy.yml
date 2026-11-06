@@ -102,14 +102,14 @@ jobs:
             const r = require('./doctor.json');
             const native = r.checks.find(c => c.name === 'Native helper');
             if (!native?.ok) { console.error('Native helper not available:', native?.detail); process.exit(1); }
-          " || exit 1
+          " || { echo "::error title=Native helper::$(cat doctor.json)"; exit 1; }
 
           node dist/cli/studdy.mjs open "Google Chrome" --json --no-color > launch.json || true
           cat launch.json
           node -e "
             const r = require('./launch.json');
             if (!r.ok) { console.error('Chrome launch failed:', r.detail); process.exit(1); }
-          " || exit 1
+          " || { echo "::error title=Launch::$(cat launch.json)"; exit 1; }
           sleep 3
 
           node dist/cli/studdy.mjs windows --json --no-color > windows.json || true
@@ -120,7 +120,7 @@ jobs:
             const w = r.windows.find(w => /chrome/i.test(w.processName || ''));
             if (!w) { console.error('No Chrome window observed after verified launch'); process.exit(1); }
             console.log(w.id);
-          ") || exit 1
+          ") || { echo "::error title=Windows::$(cat windows.json)"; exit 1; }
 
           node dist/cli/studdy.mjs snapshot "$WINDOW_ID" --json --no-color > snapshot.json || true
           cat snapshot.json
@@ -128,7 +128,7 @@ jobs:
             const r = require('./snapshot.json');
             if (!r.accessible) { console.error('Snapshot not accessible:', r.note); process.exit(1); }
             console.log('Verified launch + window + ' + r.elements.length + ' UI elements');
-          " || exit 1
+          " || { echo "::error title=Snapshot::$(cat snapshot.json)"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         if: always()
