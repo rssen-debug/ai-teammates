@@ -11,6 +11,7 @@ import { SpeechPlayer } from './speech.js';
 import { BrowserBridgeServer } from './bridge-server.js';
 import { startAutomaticUpdates } from './auto-update.js';
 import { DebugJournal } from './debug-journal.js';
+import { GitHubDebugSync } from './debug-sync.js';
 import { writeStudyVault } from './study-vault.js';
 
 /**
@@ -40,6 +41,8 @@ let speech: SpeechPlayer | null = null;
 let bridge: BrowserBridgeServer | null = null;
 let quitting = false;
 let diagnosticJournal: DebugJournal | null = null;
+let githubDebug: GitHubDebugSync | null = null;
+let githubSyncTimer: ReturnType<typeof setInterval> | null = null;
 function diagnostic(source: string, error: unknown, severity: 'warn' | 'error' = 'error'): void {
   diagnosticJournal?.record(source, error, severity);
 }
@@ -664,6 +667,31 @@ function registerIpc(svc: StuddyServices): void {
   ipcMain.handle(IPC.voiceTest, () => ok(speech?.availability() ?? []));
 
   // ---- diagnostics ----
+  ipcMain.handle(IPC.debugSyncStatus, () => {
+    if (!githubDebug) return fail('NOT_READY', 'Felsynkronisering är inte startad.');
+    return ok(githubDebug.status());
+  });
+  ipcMain.handle(IPC.debugSyncConfigure, (_e, input: unknown) => {
+    if (!githubDebug || !input || typeof input !== 'object') return fail('BAD_ARGS', 'Inställningar saknas.');
+    const data = input as { repository?: unknown; token?: unknown; enabled?: unknown };
+    if (typeof data.repository !== 'string' || typeof data.enabled !== 'boolean' ||
+        (data.token !== undefined && typeof data.token !== 'string')) {
+      return fail('BAD_ARGS', 'Ogiltigt repository, nyckel eller samtycke.');
+    }
+    try {
+      return ok(githubDebug.configure({
+        repository: data.repository, enabled: data.enabled,
+        token: typeof data.token === 'string' ? data.token : undefined,
+      }));
+    } catch (error) {
+      return fail('BAD_CONFIG', error instanceof Error ? error.message : 'Ogiltiga GitHub-inställningar.');
+    }
+  });
+  ipcMain.handle(IPC.debugSyncNow, async () => {
+    if (!githubDebug) return fail('NOT_READY', 'Felsynkronisering är inte startad.');
+    return ok(await githubDebug.publish());
+  });
+
   ipcMain.handle(IPC.diagnosticsRun, async () => {
     const diag = svc.diagnostics();
     const adapterStatus = adapter ? await adapter.status() : { available: false, version: null, detail: 'Ej initierad', mode: 'unavailable' as const };
@@ -786,6 +814,7 @@ function safeHost(url: string): string | null {
 
 app.whenReady().then(async () => {
   diagnosticJournal = new DebugJournal(dataDir());
+  githubDebug = new GitHubDebugSync(dataDir());
   // Retain concise redacted operational failures on the student's own disk.
   // No screenshots, prompts, browser URLs, clipboard or tokens go to debugger.md.
   const previousError = console.error.bind(console);
@@ -838,6 +867,11 @@ app.whenReady().then(async () => {
   vaultTimer.unref();
   // Update only from verified official release artifacts. No extra setup.
   startAutomaticUpdates();
+  // Network upload is opt-in. Disabled until the owner supplies a restricted PAT.
+  githubSyncTimer = setInterval(() => {
+    if (githubDebug?.status().enabled) void githubDebug.publish();
+  }, 30 * 60_000);
+  githubSyncTimer.unref();
 
   // Opt-in launch probe: record machine-readable evidence under STUDDY_DATA_DIR.
   // Packaged GUI processes on Windows do not reliably expose stdout, so CI must
@@ -928,6 +962,7 @@ app.on('before-quit', () => {
   if (blinkTimer) clearInterval(blinkTimer);
   if (observationTimer) clearInterval(observationTimer);
   if (vaultTimer) clearInterval(vaultTimer);
+  if (githubSyncTimer) clearInterval(githubSyncTimer);
   syncStudyVault();
   speech?.stop();
   void bridge?.stop();
