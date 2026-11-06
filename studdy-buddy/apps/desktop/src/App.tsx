@@ -117,7 +117,13 @@ export function App() {
       return;
     }
     setCaptureSources(result.data);
-    setCaptureSourceId((previous) => result.data.some((source) => source.id === previous) ? previous : '');
+    // Within an authorized study session, automatically reuse the single
+    // visible Packet Tracer source. Never auto-select a generic browser window
+    // because unrelated private tabs may be open there.
+    const packetTracer = result.data.filter((source) => /packet\s*tracer/i.test(source.name));
+    setCaptureSourceId((previous) => result.data.some((source) => source.id === previous)
+      ? previous
+      : packetTracer.length === 1 ? packetTracer[0]!.id : '');
   }, [bridge, captureAllowed]);
 
   useEffect(() => {
