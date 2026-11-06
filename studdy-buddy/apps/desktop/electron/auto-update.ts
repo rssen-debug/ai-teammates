@@ -2,7 +2,7 @@ import { app } from 'electron';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 /**
  * Updates only from the public, CI-proven official GitHub Release channel.
@@ -112,16 +112,33 @@ export async function checkAndInstallUpdate(): Promise<void> {
     await rename(partial, target);
     console.info(`[auto-update] verified ${release.tag_name}. Starting silent NSIS installer.`);
 
-    // No elevated privileges; per-user NSIS installer, same installation path.
-    // Child can continue after Buddy exits, which releases its executable.
-    const install = spawn(target, ['/S', `/D=${dirname(process.execPath)}`], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-    });
-    install.on('error', (error) => console.error('[auto-update] installer:', error.message));
-    install.unref();
-    setTimeout(() => app.quit(), 1200);
+    // Launch a local update helper which waits for Buddy to exit, installs
+    // silently without elevation, then relaunches the exact old executable path.
+    // This avoids leaving the mascot "dead" after a background update.
+    const quotePs = (value: string) => "'" + value.replace(/'/g, "''") + "'";
+    const helperPath = join(updates, 'complete-update.ps1');
+    const ps = [
+      '$ErrorActionPreference = "Stop"',
+      `$oldPid = ${process.pid}`,
+      'for ($i = 0; $i -lt 40; $i++) {',
+      '  if (-not (Get-Process -Id $oldPid -ErrorAction SilentlyContinue)) { break }',
+      '  Start-Sleep -Milliseconds 500',
+      '}',
+      `$installer = ${quotePs(target)}`,
+      `$program = ${quotePs(process.execPath)}`,
+      '$done = Start-Process -FilePath $installer -ArgumentList "/S" -Wait -PassThru',
+      'if ($done.ExitCode -ne 0) { exit $done.ExitCode }',
+      'if (Test-Path $program) { Start-Process -FilePath $program }',
+      '',
+    ].join('\\r\\n');
+    await writeFile(helperPath, ps, { encoding: 'utf8' });
+    const helper = spawn('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden',
+      '-ExecutionPolicy', 'Bypass', '-File', helperPath,
+    ], { detached: true, stdio: 'ignore', windowsHide: true });
+    helper.on('error', (error) => console.error('[auto-update] helper:', error.message));
+    helper.unref();
+    setTimeout(() => app.quit(), 700);
   } catch (error) {
     console.warn('[auto-update] no update installed:', error instanceof Error ? error.message : String(error));
   } finally {
