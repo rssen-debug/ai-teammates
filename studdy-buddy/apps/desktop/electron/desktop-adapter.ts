@@ -144,6 +144,25 @@ export class DesktopAccessibilityAdapter {
     return { windows: parseWindows(result.stdout), error: null };
   }
 
+  /** Launch an app by its OS display name through agent-desktop. Explicit
+   * user action only; no commands, scripts, shell syntax or path arguments.
+   * Returns CLI-confirmed process status, not a fabricated success response.
+   */
+  async launchApp(name: string): Promise<{ ok: boolean; detail: string }> {
+    if (this.platform !== 'win32') return { ok: false, detail: 'Programstart kräver Windows.' };
+    const app = name.trim();
+    if (!app || app.length > 80 || !/^[\\p{L}\\p{N} ._-]+$/u.test(app) ||
+        /^(?:cmd|powershell|pwsh|wscript|cscript|regedit|mshta|rundll32|schtasks|taskkill|terminal|bash)(?:\\.exe)?$/i.test(app)) {
+      return { ok: false, detail: 'Appnamnet får inte vara ett kommando, en sökväg eller ett skript.' };
+    }
+    const result = await this.runner.run(this.binary, ['launch', app, '--activate'], Math.max(this.timeoutMs, 30_000));
+    const envelope = readEnvelope(result.stdout);
+    if (result.code !== 0 || !envelope.ok) {
+      return { ok: false, detail: describeFailure(result, envelope) };
+    }
+    return { ok: true, detail: app };
+  }
+
   /** Captures an accessibility snapshot for one window. */
   async snapshot(windowId: string): Promise<UiSnapshot> {
     const empty: UiSnapshot = {
