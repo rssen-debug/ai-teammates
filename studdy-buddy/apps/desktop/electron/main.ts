@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, nativeImage, shell } from 'electron';
 import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { IPC, fail, ok, mergeSettings, type PermissionKey, type PermissionMode, type ResponseMode } from '@studdy/shared';
 import { StuddyServices } from './services.js';
 import { DesktopAccessibilityAdapter } from './desktop-adapter.js';
@@ -520,20 +520,34 @@ app.whenReady().then(async () => {
   createTray();
   await startBridge(services);
 
-  // Proof hook: `STUDDY_SMOKE_EXIT_MS` makes a real launch render, report, and
-  // exit on its own. CI uses it to show that the packaged app actually starts on
-  // Windows instead of only "building successfully". Inert unless set.
+  // Opt-in launch probe: record machine-readable evidence under STUDDY_DATA_DIR.
+  // Packaged GUI processes on Windows do not reliably expose stdout, so CI must
+  // verify the actual installed executable by reading this file, not console text.
   const smokeExitMs = Number(process.env.STUDDY_SMOKE_EXIT_MS ?? '');
   if (Number.isFinite(smokeExitMs) && smokeExitMs > 0) {
     setTimeout(async () => {
+      const windowVisible = mascotWindow?.isVisible?.() ?? false;
       const rendererReady = mascotWindow?.webContents.isLoading?.() === false;
-      console.log(`[smoke] window visible: ${mascotWindow?.isVisible?.() ?? false}`);
-      console.log(`[smoke] renderer loaded: ${rendererReady}`);
-      console.log(`[smoke] bridge running: ${bridge?.status().running ?? false} on port ${bridge?.status().port ?? '-'}`);
-      const probe = await mascotWindow?.webContents.executeJavaScript?.(
-        "({ title: document.title, mascot: !!document.querySelector('.studdy-mascot-btn'), readinessButton: !!document.querySelector('[aria-label=\"Framsteg och tentaberedskap\"]') })",
-      );
-      console.log(`[smoke] renderer probe: ${JSON.stringify(probe)}`);
+      const bridgeRunning = bridge?.status().running ?? false;
+      let probe: { title?: string; mascot?: boolean; readinessButton?: boolean } | null = null;
+      let error: string | null = null;
+      try {
+        probe = await mascotWindow?.webContents.executeJavaScript?.(
+          "({ title: document.title, mascot: !!document.querySelector('.studdy-mascot-btn'), readinessButton: !!document.querySelector('[aria-label=\"Framsteg och tentaberedskap\"]') })",
+        ) ?? null;
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
+      const passed = Boolean(windowVisible && rendererReady && bridgeRunning && probe?.mascot && probe?.readinessButton);
+      const result = { windowVisible, rendererReady, bridgeRunning, probe, passed, error };
+      console.log(`[smoke] result: ${JSON.stringify(result)}`);
+      try {
+        writeFileSync(join(dataDir(), 'smoke.json'), JSON.stringify(result, null, 2));
+      } catch (err) {
+        console.error('[smoke] could not save evidence:', String(err));
+        process.exitCode = 1;
+      }
+      if (!passed) process.exitCode = 1;
       quitting = true;
       app.quit();
     }, smokeExitMs);
