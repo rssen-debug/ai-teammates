@@ -1,5 +1,7 @@
 appId: se.studdybuddy.app
 productName: Studdy Buddy
+# Exact version matches package-lock.json; electron-builder cannot package a range such as ^37.10.3.
+electronVersion: 37.10.3
 copyright: Copyright © 2026 Studdy Buddy
 
 directories:
