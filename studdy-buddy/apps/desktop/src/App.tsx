@@ -474,6 +474,17 @@ export function App() {
     setNotice('Inlärningshistoriken raderades för den här sessionen.');
   }, [bridge]);
 
+  // One-click navigation. Never leave a hidden settings/progress view open
+  // behind a collapsed chat; that was causing the "click several times" bug.
+  const openView = (next: View) => {
+    if (next === 'progress') void refreshProgress();
+    setView(next);
+    setBubbleOpen(true);
+  };
+  useEffect(() => {
+    void bridge?.window.setExpanded(bubbleOpen);
+  }, [bridge, bubbleOpen]);
+
   const visibleMessages = useMemo(() => messages.slice(-40), [messages]);
 
   return (
@@ -490,23 +501,22 @@ export function App() {
         <button
           type="button"
           className="studdy-mascot-btn"
-          aria-label={bubbleOpen ? 'Stäng samtalet med Buddy' : 'Öppna samtal med Buddy'}
+          aria-label="Öppna chatten med Buddy"
           onPointerDown={beginMascotDrag}
           onPointerMove={moveMascotDrag}
           onPointerUp={endMascotDrag}
           onPointerCancel={endMascotDrag}
           onClick={() => {
             if (suppressClickRef.current) { suppressClickRef.current = false; return; }
-            setBubbleOpen((open) => !open);
-            setSignal(bubbleOpen ? 'app-idle' : 'user-typing');
+            openView('chat');
+            setSignal('user-typing');
           }}
-          onDoubleClick={() => setView('settings')}
         >
           <Buddy size={116} signal={signal} lookAt={mascotGaze} reducedMotion={settings.reducedMotion} />
         </button>
 
         <div className="studdy-mascot-hint" aria-hidden={bubbleOpen}>
-          {!bubbleOpen && <span>Klicka för att fråga</span>}
+          {!bubbleOpen && <span>Buddy · klicka för chatt</span>}
         </div>
 
         <div className="studdy-mascot-tools">
@@ -514,14 +524,13 @@ export function App() {
             type="button"
             aria-label="Framsteg och tentaberedskap"
             onClick={() => {
-              if (view !== 'progress') void refreshProgress();
-              setView(view === 'progress' ? 'chat' : 'progress');
+              openView('progress');
             }}
             title="Framsteg"
           >
             ◎
           </button>
-          <button type="button" aria-label="Inställningar" onClick={() => setView(view === 'settings' ? 'chat' : 'settings')} title="Inställningar">
+          <button type="button" aria-label="Inställningar" onClick={() => openView('settings')} title="Inställningar">
             ⚙
           </button>
           {settings.voice.enabled && (
@@ -540,6 +549,11 @@ export function App() {
 
       {bubbleOpen && (
         <div className="studdy-bubble-zone" ref={bubbleRef}>
+          <nav className="studdy-views" aria-label="Buddy navigering">
+            <button type="button" aria-pressed={view === 'chat'} className={view === 'chat' ? 'selected' : ''} onClick={() => openView('chat')}>Chatt</button>
+            <button type="button" aria-pressed={view === 'progress'} className={view === 'progress' ? 'selected' : ''} onClick={() => openView('progress')}>Minne & framsteg</button>
+            <button type="button" aria-pressed={view === 'settings'} className={view === 'settings' ? 'selected' : ''} onClick={() => openView('settings')}>Inställningar</button>
+          </nav>
           {view === 'progress' ? (
             readiness ? (
               <ProgressPanel
@@ -650,6 +664,7 @@ html, body, #root { margin:0; padding:0; background: transparent; overflow: hidd
   position: absolute; right: -6px; top: 4px; display: flex; flex-direction: column; gap: 4px;
   opacity: 0; transition: opacity 140ms ease; -webkit-app-region: no-drag;
 }
+.studdy-mascot-tools { opacity: .95; }
 .studdy-mascot-zone:hover .studdy-mascot-tools { opacity: 1; }
 .studdy-mascot-tools button {
   width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.16);
@@ -661,6 +676,21 @@ html, body, #root { margin:0; padding:0; background: transparent; overflow: hidd
   position: absolute; left: 8px; top: 146px; width: 344px; -webkit-app-region: no-drag;
   animation: studdy-rise 180ms ease-out;
 }
+.studdy-views {
+  box-sizing: border-box; display: flex; gap: 5px; align-items: center;
+  margin-bottom: 8px; padding: 5px; border: 1px solid #3a414c;
+  border-radius: 11px; background: rgba(22, 25, 32, .97);
+  box-shadow: 0 9px 28px rgba(0,0,0,.24);
+}
+.studdy-views button {
+  flex: 1; min-width: 0; border: 0; border-radius: 8px; padding: 7px 2px;
+  background: transparent; color: #abb3c0; font: 500 11px ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer; white-space: nowrap;
+}
+.studdy-views button.selected { background: #343c46; color: #f0faf4; }
+.studdy-views button:focus-visible { outline: 2px solid #78dba4; outline-offset: 2px; }
+.studdy-bubble-zone .buddy-settings { max-height: calc(100vh - 205px); box-sizing: border-box; overflow-y: auto; }
+.studdy-bubble-zone .buddy-bubble-root { max-height: calc(100vh - 205px); }
 @keyframes studdy-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 `;
