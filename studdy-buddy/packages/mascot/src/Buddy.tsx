@@ -20,13 +20,15 @@ export interface BuddyProps {
   state?: AnimationState;
   size?: number;
   reducedMotion?: boolean;
+  /** Green light means an approved study context is actually being observed. */
+  studyLive?: boolean;
   /** Rotates the gaze toward a screen point, in -1..1 coordinates. */
   lookAt?: { x: number; y: number } | null;
   onStateChange?: (state: AnimationState) => void;
   className?: string;
 }
 
-export function Buddy({ signal, state: forcedState, size = 132, reducedMotion = false, lookAt, onStateChange, className }: BuddyProps) {
+export function Buddy({ signal, state: forcedState, size = 132, reducedMotion = false, studyLive = false, lookAt, onStateChange, className }: BuddyProps) {
   const [controller, setController] = useState<MascotControllerState>(() => initialMascotState());
   const [blinkController, setBlinkController] = useState<MascotControllerState>(() => initialMascotState());
   const reported = useRef<AnimationState | null>(null);
@@ -188,6 +190,14 @@ export function Buddy({ signal, state: forcedState, size = 132, reducedMotion = 
           </g>
         )}
       </svg>
+      {studyLive && (
+        <g aria-hidden="true">
+          <circle cx="132" cy="133" r="13" fill="#292337" />
+          <circle cx="132" cy="133" r="9" fill="#33EC7F"
+            style={{ animation: reducedMotion ? undefined : 'buddy-live-pulse 1.4s ease-in-out infinite' }} />
+          <circle cx="128" cy="129" r="3" fill="#E4FFEB" />
+        </g>
+      )}
       <span className="sr-only" role="status" aria-live="polite">
         {STATE_LABEL[effectiveState]}
       </span>
@@ -225,6 +235,7 @@ const keyframes = `
 @keyframes buddy-arm-right { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(12deg); } }
 @keyframes buddy-pulse { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
 @keyframes buddy-zzz { 0% { opacity: 0; transform: translateY(4px); } 50% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
+@keyframes buddy-live-pulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
 @keyframes buddy-talk { 0%,100% { transform: scaleY(0.7); } 50% { transform: scaleY(1.15); } }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; }
