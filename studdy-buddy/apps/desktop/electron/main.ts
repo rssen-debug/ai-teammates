@@ -30,6 +30,8 @@ const RENDERER_URL = process.env.STUDDY_RENDERER_URL ?? null;
 let mascotWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let blinkTimer: ReturnType<typeof setInterval> | null = null;
+let blinkReset: ReturnType<typeof setTimeout> | null = null;
 let services: StuddyServices | null = null;
 let adapter: DesktopAccessibilityAdapter | null = null;
 let speech: SpeechPlayer | null = null;
@@ -75,6 +77,7 @@ function createMascotWindow(): BrowserWindow {
     ...(mascotWindowOptions(preloadPath(), entry.url ?? null, { devTools: isDev }) as Record<string, never>),
     x: bounds.x,
     y: bounds.y,
+    ...(existsSync(join(__dirname, 'buddy-icon.png')) ? { icon: join(__dirname, 'buddy-icon.png') } : {}),
   } as ConstructorParameters<typeof BrowserWindow>[0]);
 
   if (entry.file) void win.loadFile(entry.file);
@@ -117,15 +120,17 @@ function createOverlayWindow(): BrowserWindow | null {
 }
 
 function createTray(): void {
-  // A 16x16 inline PNG keeps the tray icon dependency-free.
-  const icon = nativeImage.createFromBuffer(
-    Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWklEQVR42u3SMQEAAAgDoJnc6BpjDyQMlXl4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg8tQMBAQH/nwAAAABJRU5ErkJggg==',
-      'base64',
-    ),
-  );
+  // Icons are generated from the SAME original pixel monkey as the desktop
+  // mascot and bundled into the installed app. No placeholder icon remains.
+  const iconPath = join(__dirname, 'buddy-tray.png');
+  const blinkPath = join(__dirname, 'buddy-blink.png');
+  const icon = existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
+  if (icon.isEmpty()) {
+    console.warn('[tray] No bundled Buddy icon; tray disabled rather than showing a stock symbol.');
+    return;
+  }
   tray = new Tray(icon);
-  tray.setToolTip('Studdy Buddy');
+  tray.setToolTip('Studdy Buddy • redo att hjälpa');
   const menu = Menu.buildFromTemplate([
     { label: 'Visa Buddy', click: () => mascotWindow?.show() },
     { label: 'Göm Buddy', click: () => mascotWindow?.hide() },
@@ -134,6 +139,19 @@ function createTray(): void {
   ]);
   tray.setContextMenu(menu);
   tray.on('click', () => mascotWindow?.show());
+
+  // Calm, low-cost blink animation in Windows notification area.
+  // This is a genuine changing icon, not repeated AI requests.
+  if (existsSync(blinkPath)) {
+    const blink = nativeImage.createFromPath(blinkPath);
+    blinkTimer = setInterval(() => {
+      if (!tray || blink.isEmpty()) return;
+      tray.setImage(blink);
+      if (blinkReset) clearTimeout(blinkReset);
+      blinkReset = setTimeout(() => tray?.setImage(icon), 175);
+    }, 5100);
+    blinkTimer.unref();
+  }
 }
 
 function registerIpc(svc: StuddyServices): void {
@@ -637,6 +655,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   quitting = true;
+  if (blinkTimer) clearInterval(blinkTimer);
+  if (blinkReset) clearTimeout(blinkReset);
   speech?.stop();
   void bridge?.stop();
   bridge = null;
