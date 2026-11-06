@@ -21,7 +21,7 @@ export function findStartMenuApp(requested: string, roots = startMenuRoots()): s
   const items: { label: string; file: string }[] = [];
   const walk = (dir: string, depth: number): void => {
     if (depth > 4 || items.length >= 2500) return;
-    let entries: ReturnType<typeof readdirSync>;
+    let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>;
     try { entries = readdirSync(dir, { withFileTypes: true }); }
     catch { return; }
     for (const entry of entries) {
