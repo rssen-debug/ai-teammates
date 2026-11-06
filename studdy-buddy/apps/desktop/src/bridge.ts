@@ -94,6 +94,12 @@ export interface StuddyBridge {
     stop(): Promise<BridgeResult<boolean>>;
     test(): Promise<BridgeResult<{ provider: string; configured: boolean; detail: string }[]>>;
   };
+  gmail: {
+    status(): Promise<BridgeResult<{ connected: boolean; configured: boolean; connecting: boolean }>>;
+    connect(clientId: string): Promise<BridgeResult<{ connected: boolean; detail: string }>>;
+    disconnect(): Promise<BridgeResult<{ connected: boolean }>>;
+    list(query: string): Promise<BridgeResult<{ id: string; threadId: string; subject: string; from: string; date: string; snippet: string }[]>>;
+  };
   diagnostics: {
     run(): Promise<BridgeResult<unknown>>;
     githubStatus(): Promise<BridgeResult<{ repository: string; enabled: boolean; hasToken: boolean; target: string }>>;
