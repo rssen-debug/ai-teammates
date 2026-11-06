@@ -21,8 +21,8 @@ describe('Obsidian-compatible study memory', () => {
       courseName: 'Cisco', lastTopic: 'IP <script> test', updatedAt: '2026-11-06T00:00:00Z',
       concepts: [{ id: '../foo', label: 'Bit | values', state: 'PRACTICING', probability: 0.4, confidence: 0.3, evidenceCount: 1, independentCorrect: 0, lastEvidenceAt: null, reviewDueAt: null }],
     });
-    expect(result.notes[0].name).toBe(noteId('../foo') + '.md');
-    expect(result.notes[0].text).not.toContain('Bit | values');
+    expect(result.notes[0]!.name).toBe(noteId('../foo') + '.md');
+    expect(result.notes[0]!.text).not.toContain('Bit | values');
     expect(result.index).not.toContain('<script>');
   });
 });
