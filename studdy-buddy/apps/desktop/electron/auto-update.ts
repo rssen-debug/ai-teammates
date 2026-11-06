@@ -132,7 +132,9 @@ export async function checkAndInstallUpdate(): Promise<void> {
 /** Start after UI startup; recheck periodically without interrupting normal study. */
 export function startAutomaticUpdates(): void {
   if (!app.isPackaged || process.platform !== 'win32') return;
-  setTimeout(() => void checkAndInstallUpdate(), 30_000);
-  const interval = setInterval(() => void checkAndInstallUpdate(), 60 * 60_000);
+  setTimeout(() => void checkAndInstallUpdate(), 15_000);
+  // Approximately two minutes after a verified release is published, without
+  // exhausting GitHub's unauthenticated API rate limits.
+  const interval = setInterval(() => void checkAndInstallUpdate(), 2 * 60_000);
   interval.unref();
 }
