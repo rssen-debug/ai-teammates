@@ -36,8 +36,9 @@ export function findStartMenuApp(requested: string, roots = startMenuRoots()): s
   for (const root of roots) walk(root, 0);
   const exact = items.filter(item => item.label === key);
   if (exact.length) return exact[0]!.file;
-  const prefix = items.filter(item => item.label.startsWith(key + ' '));
-  if (prefix.length === 1) return prefix[0]!.file;
-  const substring = items.filter(item => item.label.includes(key));
-  return substring.length === 1 ? substring[0]!.file : null;
+  // An apparent single prefix match can still be ambiguous with an
+  // embedded-name match (Chrome Canary vs Google Chrome). Consider every
+  // partial candidate before opening anything.
+  const partial = items.filter(item => item.label.includes(key));
+  return partial.length === 1 ? partial[0]!.file : null;
 }
