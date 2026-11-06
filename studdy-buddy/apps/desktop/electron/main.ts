@@ -906,24 +906,19 @@ app.whenReady().then(async () => {
       try {
         navigationProbe = await mascotWindow?.webContents.executeJavaScript?.(`
           (async () => {
-            const pause = () => new Promise(resolve => setTimeout(resolve, 120));
+            const pause = () => new Promise(resolve => setTimeout(resolve, 160));
             const mascot = document.querySelector('.studdy-mascot-btn');
-            if (!document.querySelector('[aria-label="Buddy navigering"]')) {
-              mascot?.click();
-              await pause();
-            }
-            const tabs = Array.from(document.querySelectorAll('[aria-label="Buddy navigering"] button'));
-            const clickTab = async (label) => {
-              const button = tabs.find(b => b.textContent?.includes(label));
-              button?.click();
-              await pause();
-              return Boolean(button?.getAttribute('aria-pressed') === 'true');
-            };
-            const chat = await clickTab('Chatt') &&
-              Boolean(document.querySelector('[aria-label="Samtal med Buddy"]'));
-            const settings = await clickTab('Inställningar') &&
-              Boolean(document.querySelector('[aria-label="Enkel inställning"]'));
-            const progress = await clickTab('Minne & framsteg');
+            mascot?.click();
+            await pause();
+            const chat = Boolean(document.querySelector('[aria-label="Samtal med Buddy"]'));
+            const settingsButton = document.querySelector('[aria-label="Inställningar"]');
+            settingsButton?.click();
+            await pause();
+            const settings = Boolean(document.querySelector('[aria-label="Enkel inställning"]'));
+            const progressButton = document.querySelector('[aria-label="Framsteg och tentaberedskap"]');
+            progressButton?.click();
+            await pause();
+            const progress = Boolean(document.querySelector('.studdy-progress-empty, .buddy-progress-root, [aria-label="Framsteg och tentaberedskap"]'));
             return { chat, settings, progress };
           })()
         `) ?? null;
