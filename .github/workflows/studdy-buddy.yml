@@ -50,10 +50,26 @@ jobs:
       - name: Build electron bundles
         run: node apps/desktop/scripts/build-electron.mjs
 
+      # The CLI must actually run and report. BLOCKED checks (no Windows desktop,
+      # no Packet Tracer, no provider key) are expected on a CI runner and are not
+      # failures - but a FAIL check is. So the exit code alone is not the gate.
       - name: CLI smoke test
-        run: npx tsx packages/cli/src/bin.ts doctor --json
+        shell: bash
         env:
           STUDDY_DATA_DIR: ${{ runner.temp }}/studdy-ci
+        run: |
+          set -o pipefail
+          npx tsx packages/cli/src/bin.ts doctor --json > doctor.json || true
+          cat doctor.json
+          node -e "
+            const r = require('./doctor.json');
+            const s = r.summary;
+            console.log('OK', s.ok, 'varning', s.warn, 'fel', s.fail, 'blockerade', s.blocked);
+            if (s.fail > 0) { console.error('doctor reported '+s.fail+' hard failures'); process.exit(1); }
+            const names = r.checks.filter(c => c.status === 'FAIL').map(c => c.name);
+            if (names.length) { console.error(names.join(', ')); process.exit(1); }
+          "
+
 
       - name: Upload build output
         if: matrix.os == 'windows-latest'
