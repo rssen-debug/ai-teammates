@@ -217,6 +217,8 @@ export function App() {
   // Track which regions contain solid UI. The mascot box is fixed; the bubble
   // grows with content, so we measure it.
   const mascotRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; windowX: number; windowY: number; moved: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -230,6 +232,38 @@ export function App() {
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
   }, [bridge, bubbleOpen]);
+
+  // A frameless Electron window has no native title bar. The monkey itself is
+  // draggable, while a short click continues to toggle chat. Using pointer capture
+  // avoids losing drag when the cursor leaves the character.
+  const beginMascotDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0 || !bridge) return;
+    dragRef.current = {
+      pointerId: event.pointerId, startX: event.screenX, startY: event.screenY,
+      windowX: window.screenX, windowY: window.screenY, moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    void bridge.window.setIgnoreMouse(false);
+  };
+  const moveMascotDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !bridge) return;
+    const dx = event.screenX - drag.startX;
+    const dy = event.screenY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    drag.moved = true;
+    void bridge.window.setPosition(drag.windowX + dx, drag.windowY + dy);
+  };
+  const endMascotDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    suppressClickRef.current = drag.moved;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    window.setTimeout(() => { suppressClickRef.current = false; }, 0);
+  };
 
   // ---- inactivity -------------------------------------------------------
   useEffect(() => {
@@ -407,7 +441,12 @@ export function App() {
           type="button"
           className="studdy-mascot-btn"
           aria-label={bubbleOpen ? 'Stäng samtalet med Buddy' : 'Öppna samtal med Buddy'}
+          onPointerDown={beginMascotDrag}
+          onPointerMove={moveMascotDrag}
+          onPointerUp={endMascotDrag}
+          onPointerCancel={endMascotDrag}
           onClick={() => {
+            if (suppressClickRef.current) { suppressClickRef.current = false; return; }
             setBubbleOpen((open) => !open);
             setSignal(bubbleOpen ? 'app-idle' : 'user-typing');
           }}
@@ -542,13 +581,13 @@ html, body, #root { margin:0; padding:0; background: transparent; overflow: hidd
 .studdy-mascot-zone {
   position: absolute; left: 8px; top: 8px; width: 132px; height: 132px;
   display: flex; align-items: center; justify-content: center;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
 }
 .studdy-mascot-btn {
-  background: none; border: none; padding: 0; cursor: pointer; -webkit-app-region: no-drag;
+  background: none; border: none; padding: 0; cursor: grab; touch-action: none; -webkit-app-region: no-drag;
   border-radius: 50%; transition: transform 160ms ease;
 }
-.studdy-mascot-btn:hover { transform: scale(1.03); }
+.studdy-mascot-btn:active { cursor: grabbing; }\n.studdy-mascot-btn:hover { transform: scale(1.03); }
 .studdy-mascot-btn:focus-visible { outline: 2px solid #8FCBAE; outline-offset: 4px; }
 .studdy-mascot-hint {
   position: absolute; bottom: -4px; left: 0; right: 0; text-align: center;
