@@ -23,6 +23,10 @@ files:
 extraMetadata:
   main: electron/main.cjs
 
+extraResources:
+  - from: build/agent-desktop.exe
+    to: bin/agent-desktop.exe
+
 win:
   target:
     - target: nsis
