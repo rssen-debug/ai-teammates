@@ -65,6 +65,12 @@ function portrait(size, expression = 'awake') {
   rect(22,33,5,3,COLORS.blush);
   rect(21,38,9,2,COLORS.ink);rect(23,40,5,1,COLORS.shaded);
   rect(12,35,3,2,COLORS.blush);rect(34,35,3,2,COLORS.blush);
+  if (expression === 'active') {
+    // Green online pulse in the original icon, visible at 16–32px in the tray.
+    ellipse(37,36,10,10,COLORS.ink);
+    ellipse(39,38,6,6,'#5CE39D');
+    rect(40,39,2,2,'#D7FFE7');
+  }
   // Distinct mint glint at upper right.
   rect(39,7,3,7,COLORS.sparkle);rect(37,9,7,3,COLORS.sparkle);
   if (expression === 'live' || expression === 'live-blink') {
@@ -128,6 +134,7 @@ writeFileSync(join(runtime,'buddy-icon.png'),portrait(256));
 writeFileSync(join(runtime,'buddy-tray.png'),portrait(32));
 writeFileSync(join(runtime,'buddy-blink.png'),portrait(32,'blink'));
 writeFileSync(join(runtime,'buddy-curious.png'),portrait(32,'curious'));
+writeFileSync(join(runtime,'buddy-active.png'),portrait(32,'active'));
 writeFileSync(join(runtime,'buddy-live.png'),portrait(32,'live'));
 writeFileSync(join(runtime,'buddy-live-blink.png'),portrait(32,'live-blink'));
 
