@@ -17,6 +17,7 @@ export interface StuddyBridge {
   };
   window: {
     setIgnoreMouse(ignore: boolean): Promise<BridgeResult<boolean>>;
+    setExpanded(expanded: boolean): Promise<BridgeResult<boolean>>;
     setPosition(x: number, y: number): Promise<BridgeResult<boolean>>;
     getBounds(): Promise<BridgeResult<{ x: number; y: number; width: number; height: number } | null>>;
     displays(): Promise<BridgeResult<{ id: string; bounds: { x: number; y: number; width: number; height: number }; scaleFactor: number; isPrimary: boolean }[]>>;
