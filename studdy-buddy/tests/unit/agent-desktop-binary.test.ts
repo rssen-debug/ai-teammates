@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveAgentDesktopBinary } from '@studdy/core';
+import { join } from 'node:path';
 
 describe('native binary resolution', () => {
   it('returns plain command on non-Windows', () => {
@@ -13,11 +14,12 @@ describe('native binary resolution', () => {
     expect(resolved).toContain('agent-desktop.exe');
   });
   it('finds node_modules native x64 binary', () => {
-    const target = 'C:/repo/node_modules/agent-desktop/bin/agent-desktop-win32-x64.exe';
+    const target = join('C:/repo', 'node_modules', 'agent-desktop', 'bin', 'agent-desktop-win32-x64.exe');
     expect(resolveAgentDesktopBinary({ platform: 'win32', arch: 'x64', isPackaged: false, cwd: 'C:/repo', exists: (p) => p === target })).toBe(target);
   });
   it('walks up from installed CLI bundle directory', () => {
-    const target = '/opt/lib/node_modules/studdy-buddy/node_modules/agent-desktop/bin/agent-desktop-win32-x64.exe';
-    expect(resolveAgentDesktopBinary({ platform: 'win32', isPackaged: false, moduleDir: '/opt/lib/node_modules/studdy-buddy', exists: (p) => p === target })).toBe(target);
+    const moduleDir = join('/opt/lib/node_modules', 'studdy-buddy');
+    const target = join(moduleDir, 'node_modules', 'agent-desktop', 'bin', 'agent-desktop-win32-x64.exe');
+    expect(resolveAgentDesktopBinary({ platform: 'win32', isPackaged: false, moduleDir, exists: (p) => p === target })).toBe(target);
   });
 });
