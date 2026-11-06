@@ -71,6 +71,10 @@ export const IPC = {
   debugSyncStatus: 'debug:sync-status',
   debugSyncConfigure: 'debug:sync-configure',
   debugSyncNow: 'debug:sync-now',
+  gmailStatus: 'gmail:status',
+  gmailConnect: 'gmail:connect',
+  gmailDisconnect: 'gmail:disconnect',
+  gmailList: 'gmail:list',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
