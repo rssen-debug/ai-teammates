@@ -29,6 +29,7 @@ export function App() {
   // but kept so capability results survive a re-render of the panel.
   const [, setCapabilities] = useState<ModelCapabilities | null>(null);
   const [usage, setUsage] = useState<{ requests: number; estimatedCostUsd: number; limitUsd: number } | null>(null);
+  const [githubDebug, setGithubDebug] = useState<{ repository: string; enabled: boolean; hasToken: boolean; target: string } | null>(null);
   const [permissions, setPermissions] = useState<{ key: PermissionKey; granted: boolean }[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [mode, setMode] = useState<ResponseMode>('NORMAL');
@@ -83,6 +84,27 @@ export function App() {
         setPlatformProgress({ completed: withFlag.filter((n) => n.platformCompleted === true).length, total: withFlag.length });
       }
     }
+  }, [bridge]);
+
+  const refreshGitHubDebug = useCallback(async () => {
+    if (!bridge) return;
+    const result = await bridge.diagnostics.githubStatus();
+    if (result.ok) setGithubDebug(result.data);
+  }, [bridge]);
+
+  const configureGitHub = useCallback(async (config: { repository: string; token?: string; enabled: boolean }) => {
+    if (!bridge) return { ok: false, message: 'Appkoppling saknas.' };
+    const result = await bridge.diagnostics.githubConfigure(config);
+    if (!result.ok) return { ok: false, message: result.error.message };
+    setGithubDebug(result.data);
+    return { ok: true, message: config.enabled ? 'Sparat! Rensade felkoder synkas nu automatiskt.' : 'GitHub-synk är avstängd.' };
+  }, [bridge]);
+
+  const syncGitHubNow = useCallback(async () => {
+    if (!bridge) return { ok: false, message: 'Appkoppling saknas.' };
+    const result = await bridge.diagnostics.githubSyncNow();
+    return result.ok ? { ok: result.data.ok, message: result.data.detail }
+      : { ok: false, message: result.error.message };
   }, [bridge]);
 
   const addSite = async (site: string) => {
@@ -171,6 +193,7 @@ export function App() {
         bridge.app.info(),
       ]);
       if (s.ok) setSettings(s.data);
+      void refreshGitHubDebug();
       if (p.ok && p.data.length > 0) setProvider(p.data[0] ?? null);
       // First launch needs only a provider key; open the compact onboarding
       // automatically rather than forcing the student through settings tabs.
@@ -198,7 +221,7 @@ export function App() {
     })();
 
     return () => mql?.removeEventListener?.('change', onChange);
-  }, [bridge]);
+  }, [bridge, refreshGitHubDebug]);
 
   // A page the extension reports changes what Buddy knows: refresh the bridge
   // state so the settings panel shows the current course, and tell the student
@@ -595,6 +618,9 @@ export function App() {
               onAddSite={addSite}
               onRemoveSite={removeSite}
               onRotateBridgeToken={rotateBridgeToken}
+              githubDebug={githubDebug}
+              onGitHubConfigure={configureGitHub}
+              onGitHubSyncNow={syncGitHubNow}
             />
           ) : (
             <ChatBubble
