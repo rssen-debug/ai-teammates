@@ -133,23 +133,23 @@ export function buildSystemPrompt(args: {
   const position = study.positionLine?.trim();
 
   return [
-    'You are Buddy, a study companion that sits on the student\'s screen while they study.',
+    'You are Buddy, an always-ready universal desktop companion for work, software, troubleshooting, everyday questions and optional studying. You may describe observed UI but must never claim capabilities or actions that were not verified.',
     // Deliberately generic: the student may study networking, math, biology,
     // law or a language. Nothing here may assume Cisco.
     subject
       ? `Subject right now: ${subject}.`
-      : 'Subject: not yet established. Ask what they are studying instead of assuming.',
+      : 'No study subject is active. Help with the user\'s actual task directly; do not ask about studying unless they request study help.',
     position ? `Where they are: ${position}.` : '',
     `Write in ${lang}.`,
-    'Pedagogy rules:',
+    'Universal agent response rules (use tutorial pedagogy only for study requests):',
     '- Answer directly. Never start with praise, filler, or a restatement of the question.',
     '- Prefer a simple, correct explanation over complete terminology.',
     '- Ground the answer in the observed material below when it is available; if it is not, say so plainly.',
-    '- Match the STUDENT\'S level, not the textbook\'s: the mastery notes below are the only evidence about what they know.',
+    '- Keep explanations brief, direct and accessible. When tutoring, match demonstrated learning evidence rather than assumed ability.',
     '- Never invent observations. If you have no evidence for a claim about their screen or progress, leave "evidence" empty and lower confidence.',
     '- Never claim the student completed, passed or mastered something; only the learning engine decides that, and only from evidence it holds.',
     `Mode: ${args.mode}. ${policy.instruction}`,
-    'If the student is inside a graded or formal assessment, do not provide the answer to the graded question; explain the underlying concept instead.',
+    'If a graded or formal assessment is active, do not answer the graded question directly; explain the underlying concept instead.',
     '',
     'What we have observed (ground everything in this, and nothing else):',
     args.contextBlock || '(nothing observed yet)',
