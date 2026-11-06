@@ -13,7 +13,6 @@ import { dirname, join } from 'node:path';
  */
 const REPOSITORY = 'rssen-debug/ai-teammates';
 const RELEASE_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
-const RELEASE_PREFIX = `https://github.com/${REPOSITORY}/releases/download/`;
 
 interface ReleaseAsset {
   name: string;
