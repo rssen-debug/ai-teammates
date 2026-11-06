@@ -265,9 +265,8 @@ export function App() {
         const r = mascotRef.current.getBoundingClientRect();
         setMascotGaze({ x: (event.clientX - r.left - r.width / 2) / (r.width / 2), y: (event.clientY - r.top - r.height / 2) / (r.height / 2) });
       }
-      const overBubble = bubbleOpen && isInside(bubbleRef.current, event.clientX, event.clientY);
-      const ignore = !dragRef.current && !(overMascot || overBubble);
-      void bridge.window.setIgnoreMouse(ignore);
+      // OS-level pointer hit testing in Electron now owns click-through.
+      // Never race it from a React mousemove handler (first click loss).
     };
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
