@@ -641,8 +641,9 @@ app.whenReady().then(async () => {
       } catch (err) {
         console.error('[smoke] screenshot unavailable:', String(err));
       }
-      const passed = Boolean(windowVisible && rendererReady && bridgeRunning && probe?.mascot && probe?.readinessButton);
-      const result = { windowVisible, rendererReady, bridgeRunning, probe, screenshotSaved, passed, error };
+      const pixelIconLoaded = Boolean(tray && existsSync(join(__dirname, 'buddy-tray.png')) && existsSync(join(__dirname, 'buddy-icon.png')));
+      const passed = Boolean(windowVisible && rendererReady && bridgeRunning && probe?.mascot && probe?.readinessButton && pixelIconLoaded);
+      const result = { windowVisible, rendererReady, bridgeRunning, pixelIconLoaded, probe, screenshotSaved, passed, error };
       console.log(`[smoke] result: ${JSON.stringify(result)}`);
       try {
         writeFileSync(join(dataDir(), 'smoke.json'), JSON.stringify(result, null, 2));
