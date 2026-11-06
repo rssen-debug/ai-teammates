@@ -235,8 +235,6 @@ export function SettingsPanel(props: SettingsPanelProps) {
           </div>
           <button type="button" className="buddy-s-btn" style={{ border: 'none', background: 'transparent', fontSize: 11, opacity: .65, marginTop: 8, padding: '4px 0' }}
             onClick={() => setAdvancedOpen(true)}>Integritet och verktyg</button>
-          <div style={{ display: 'none' }}>
-          </div>
           {quickStatus && <p className="buddy-s-hint" role="status">{quickStatus}</p>}
           {props.provider?.hasApiKey && <p className="buddy-s-hint">En nyckel finns redan sparad. Den följer med vid uppdateringar.</p>}
           <p className="buddy-s-hint">Buddy får följa godkända fönster och skicka relevant kontext till den valda providern när du ber om hjälp. Kilo Auto Free kan dela indata med underleverantörer. Datoråtgärder kräver särskilt godkännande. Andra API:er kan ha olika format; multimodala video-API:er stöds inte automatiskt som chatt.</p>
