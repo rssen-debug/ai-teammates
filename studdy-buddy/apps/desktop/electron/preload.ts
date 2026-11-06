@@ -65,6 +65,7 @@ const api = {
     snapshot: (windowId: string) => invoke(IPC.snapshotTake, windowId),
     capture: (windowId: string) => invoke(IPC.screenCapture, windowId),
     sources: () => invoke(IPC.screenSources),
+    selectWindow: (sourceId: string | null) => invoke(IPC.observeSelectWindow, sourceId),
     cursorContext: () => invoke(IPC.cursorContext),
   },
 
