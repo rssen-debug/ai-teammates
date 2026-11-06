@@ -339,10 +339,6 @@ export function App() {
         setNotice('Öppna Inställningar → Behörigheter och aktivera Skicka kontext till AI för att analysera det valda fönstret.');
         return;
       }
-      if (captureSourceId && !provider?.visionModelId) {
-        setNotice('Du har valt ett fönster, men ingen visionmodell. Ange ett bildkapabelt Vision Model ID i Inställningar → AI-provider.');
-        return;
-      }
       setSignal('message-sent');
       setBubbleOpen(true);
       const optimistic: ChatMessage = {
