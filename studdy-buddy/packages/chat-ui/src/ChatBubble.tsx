@@ -33,6 +33,10 @@ export interface ChatBubbleProps {
   notice?: string | null;
   placeholder?: string;
   disabled?: boolean;
+  captureSources?: { id: string; name: string }[];
+  captureSourceId?: string;
+  onCaptureSourceChange?: (sourceId: string) => void;
+  onRefreshCaptureSources?: () => void;
 }
 
 const MODES: { id: ResponseMode; label: string; hint: string }[] = [
@@ -126,6 +130,21 @@ export function ChatBubble(props: ChatBubbleProps) {
               {m.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {props.onCaptureSourceChange && (
+        <div className="buddy-capture-row">
+          <label htmlFor="buddy-capture-source">Skärmkälla</label>
+          <select id="buddy-capture-source" aria-label="Välj fönster att dela med Buddy"
+            value={props.captureSourceId ?? ''} onChange={(event) => props.onCaptureSourceChange?.(event.target.value)}>
+            <option value="">Ingen skärmbild delas</option>
+            {(props.captureSources ?? []).map((source) => (
+              <option key={source.id} value={source.id}>{source.name}</option>
+            ))}
+          </select>
+          <button type="button" aria-label="Uppdatera fönsterlistan" title="Uppdatera fönster"
+            onClick={props.onRefreshCaptureSources}>↻</button>
         </div>
       )}
 
@@ -342,6 +361,11 @@ const bubbleCss = `
   box-shadow: var(--buddy-shadow); backdrop-filter: blur(18px) saturate(120%);
   overflow: hidden; font-size: var(--buddy-font-ui);
 }
+.buddy-capture-row { display:flex; align-items:center; gap:6px; padding: 0 12px 9px; color:var(--buddy-text-muted); font-size:11px; }
+.buddy-capture-row label { white-space:nowrap; }
+.buddy-capture-row select { min-width:0; flex:1; padding:5px 6px; color:var(--buddy-text); background:var(--buddy-surface-sunken); border:1px solid var(--buddy-border); border-radius:7px; font-size:11px; }
+.buddy-capture-row button { color:var(--buddy-text); background:transparent; border:1px solid var(--buddy-border); border-radius:7px; cursor:pointer; }
+.buddy-capture-row :focus-visible { outline:2px solid var(--buddy-accent); }
 .buddy-bubble-header { display:flex; align-items:center; justify-content:space-between; padding: 10px 12px 8px; }
 .buddy-bubble-title { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; letter-spacing:0.01em; }
 .buddy-bubble-dot { width:8px; height:8px; border-radius:50%; background: var(--buddy-accent); box-shadow: 0 0 0 3px var(--buddy-accent-soft); }
