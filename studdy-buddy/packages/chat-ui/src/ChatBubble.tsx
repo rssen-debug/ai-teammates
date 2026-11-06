@@ -160,8 +160,9 @@ export function ChatBubble(props: ChatBubbleProps) {
       <div className="buddy-bubble-scroll" ref={scrollRef} aria-live="polite" aria-relevant="additions text">
         {props.messages.length === 0 && (
           <div className="buddy-empty">
-            <p>Markera text i NetAcad och fråga, eller skriv här.</p>
-            <p className="buddy-empty-hint">Röst är avstängd tills du slår på den.</p>
+            <p>Buddy är din desktop-agent. Fråga om det du arbetar med, i vilket program som helst.</p>
+            <p className="buddy-empty-hint">Testa: ”Öppna miniräknaren”, ”Öppna mitt minne” eller välj ett fönster och fråga vad Buddy ser.</p>
+            <p className="buddy-empty-hint">Röst är av tills du begär den. Skärmen delas bara med tillåtelse.</p>
           </div>
         )}
         {props.messages.map((message) => (
