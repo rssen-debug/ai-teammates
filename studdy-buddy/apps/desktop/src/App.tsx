@@ -405,20 +405,8 @@ export function App() {
   const send = useCallback(
     async (text: string, selectedText?: string) => {
       if (!bridge) return;
-      // Never let the model answer a screen-awareness question without visual
-      // evidence: doing so produces the misleading 'I cannot see your screen'.
-      const isScreenQuestion = /(?:sk[aä]rm|f[oö]nster|screen|packet\s*tracer|vad ser du|what do you see)/i.test(text);
-      if (isScreenQuestion && !captureSourceId && !selectedText) {
-        setNotice(captureAllowed
-          ? 'Välj Packet Tracer eller Chrome under Skärmkälla ovan och fråga igen. Ingen skärmbild har skickats.'
-          : 'Öppna Inställningar → Behörigheter och aktivera Skärmbild. Välj sedan ett fönster under Skärmkälla.');
-        setBubbleOpen(true);
-        return;
-      }
-      if (captureSourceId && !dataSharingAllowed) {
-        setNotice('Öppna Inställningar → Behörigheter och aktivera Skicka kontext till AI för att analysera det valda fönstret.');
-        return;
-      }
+      // The main process resolves a safe focused window on-demand and returns
+      // an honest answer if it has no evidence. No manual window-picker prompt.
       setSignal('message-sent');
       setBubbleOpen(true);
       const optimistic: ChatMessage = {
@@ -434,7 +422,7 @@ export function App() {
       setStreaming(true);
       setNotice(null);
 
-      const result = await bridge.chat.send({ text, mode, context: selectedText ? { selectedText } : captureSourceId ? { captureSourceId } : undefined });
+      const result = await bridge.chat.send({ text, mode, context: selectedText ? { selectedText } : undefined });
 
       setStreaming(false);
       if (!result.ok) {
@@ -458,7 +446,7 @@ export function App() {
         }
       }
     },
-    [bridge, mode, captureSourceId, captureAllowed, dataSharingAllowed, provider?.visionModelId],
+    [bridge, mode],
   );
 
   // Reactive browser-selection assistance. The extension has already
@@ -715,16 +703,9 @@ export function App() {
           ) : (
             <ChatBubble
               messages={visibleMessages}
-              captureSources={captureSources}
-              captureSourceId={captureSourceId}
-              captureActive={Boolean(captureSourceId)}
               observing={observation.observing}
               studyPresence={streaming ? 'Svarar…' : observation.observing ? 'GRÖN · läser valt fönster' : provider?.hasApiKey ? 'REDO · ingen skärm läses' : 'Anslut AI-nyckel'}
-              onCaptureSourceChange={captureAllowed ? (sourceId) => {
-                setCaptureSourceId(sourceId);
-                setLiveContext(sourceId ? 'Universell agent · valt fönster aktivt' : 'Redo när du behöver hjälp');
-              } : undefined}
-              onRefreshCaptureSources={captureAllowed ? () => void refreshCaptureSources() : undefined}
+
               mode={mode}
               onModeChange={changeMode}
               onSend={(text) => void send(text)}
