@@ -3,7 +3,7 @@ name: Studdy Buddy CI
 on:
   push:
     branches: [main]
-    paths: ['studdy-buddy/**']
+    paths: ['studdy-buddy/**', '.github/workflows/studdy-buddy.yml']
   pull_request:
     paths: ['studdy-buddy/**']
   workflow_dispatch:
@@ -80,6 +80,17 @@ jobs:
             studdy-buddy/apps/desktop/dist/electron
             studdy-buddy/apps/desktop/dist/renderer
           retention-days: 14
+
+      # The MV3 extension is plain JavaScript and can be loaded unpacked in
+      # Chrome or Edge. Publish the actual files, not just source instructions.
+      - name: Upload browser extension
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: studdy-buddy-browser-extension
+          path: studdy-buddy/apps/browser-extension/
+          retention-days: 30
+          if-no-files-found: error
 
   package:
     name: Windows installer
