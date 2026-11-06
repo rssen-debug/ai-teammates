@@ -370,33 +370,47 @@ function registerIpc(svc: StuddyServices): void {
       return ok({ message, degraded: false, error: null, trimmed: false, notice: null });
     }
 
-    const calculatorRequest = /^(?:öppna|starta|visa|open|launch)(?:s+(?:upp|the|en|min))?s+(?:miniräknaren|miniräknare|calculator|calc)(?:s*(?:åt mig|please))?[.!?]*$/i.test(text);
-    const memoryRequest = /^(?:öppna|visa|open|show)s+(?:mitts+)?(?:minne|minnet|obsidian(?:s+vault)?|memory)(?:s+mapp(?:en)?)?[.!?]*$/i.test(text);
-    if (calculatorRequest || memoryRequest) {
+    // Intent-checked, allowlisted app launchers. Do not let the model execute
+    // arbitrary processes, shell commands, executable paths or URLs.
+    const calculatorRequest = /^(?:öppna|starta|visa|open|launch)\s+(?:(?:upp|the|en|min)\s+)?(?:miniräknaren|miniräknare|calculator|calc)(?:\s+(?:åt mig|please))?[.!?]*$/i.test(text);
+    const edgeRequest = /^(?:kan du\s+)?(?:öppna|starta|visa|open|launch)\s+(?:(?:upp|min|the|webbläsaren|browser)\s+)?(?:microsoft\s+)?edge(?:\s+(?:åt mig|please|nu))?[.!?]*$/i.test(text);
+    const memoryRequest = /^(?:öppna|visa|open|show)\s+(?:mitt\s+)?(?:minne|minnet|obsidian(?:\s+vault)?|memory)(?:\s+mapp(?:en)?)?[.!?]*$/i.test(text);
+    if (calculatorRequest || edgeRequest || memoryRequest) {
       const session = svc.ensureSession();
       svc.db.messages.append({ sessionId: session.id, role: 'user', text, mode });
       let responseText: string;
+      let degraded = false;
       try {
-        if (calculatorRequest) {
-          if (process.platform !== 'win32') throw new Error('Miniräknarverktyget stöds just nu på Windows.');
-          await new Promise<void>((resolve, reject) => {
-            const child = spawn('calc.exe', [], { detached: true, stdio: 'ignore', windowsHide: false });
-            child.once('error', reject);
-            child.once('spawn', () => { child.unref(); resolve(); });
-          });
-          responseText = 'Miniräknaren startades. Säg till om du vill ha hjälp med en beräkning.';
+        if (calculatorRequest || edgeRequest) {
+          if (process.platform !== 'win32') throw new Error('Programstart stöds just nu på Windows.');
+          if (edgeRequest) {
+            // Windows App Paths / ShellExecute resolves installed Edge without
+            // accepting user-controlled executable names. Wait for launch
+            // confirmation, not merely a language-model claim.
+            const error = await shell.openExternal('microsoft-edge:');
+            if (error) throw new Error(String(error));
+            responseText = 'Jag öppnade Microsoft Edge.';
+          } else {
+            await new Promise<void>((resolve, reject) => {
+              const child = spawn('calc.exe', [], { detached: true, stdio: 'ignore', windowsHide: false });
+              child.once('error', reject);
+              child.once('spawn', () => { child.unref(); resolve(); });
+            });
+            responseText = 'Jag startade Miniräknaren.';
+          }
         } else {
           const folder = svc.memory?.path;
           if (!folder) throw new Error('Minnesvalvet är inte tillgängligt.');
           const error = await shell.openPath(folder);
           if (error) throw new Error(error);
-          responseText = 'Jag öppnade din lokala Obsidian-minnesmapp. Du kan lägga till den som ett vault i Obsidian.';
+          responseText = 'Jag öppnade din lokala minnesmapp.';
         }
       } catch (err) {
-        responseText = 'Jag kunde inte öppna verktyget: ' + (err instanceof Error ? err.message : String(err));
+        degraded = true;
+        responseText = 'Jag kunde inte öppna programmet: ' + (err instanceof Error ? err.message : String(err));
       }
       const message = svc.db.messages.append({ sessionId: session.id, role: 'buddy', text: responseText, mode });
-      return ok({ message, degraded: responseText.startsWith('Jag kunde inte'), error: null, trimmed: false, notice: null });
+      return ok({ message, degraded, error: degraded ? 'TOOL_FAILED' : null, trimmed: false, notice: null });
     }
 
     let selectedText = typeof p.context?.selectedText === 'string' ? p.context.selectedText : '';
