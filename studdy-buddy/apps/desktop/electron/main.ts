@@ -10,6 +10,7 @@ import { redact } from './log.js';
 import { SpeechPlayer } from './speech.js';
 import { BrowserBridgeServer } from './bridge-server.js';
 import { startAutomaticUpdates } from './auto-update.js';
+import { allowedObservationTitle, detectCompanionHint } from './companion-observer.js';
 import { DebugJournal } from './debug-journal.js';
 import { GitHubDebugSync } from './debug-sync.js';
 import { writeStudyVault } from './study-vault.js';
@@ -54,6 +55,9 @@ let mouseRegionTimer: ReturnType<typeof setInterval> | null = null;
 let mouseIgnored = true;
 let observationBusy = false;
 let lastUiSnapshot = 0;
+let lastCompanionHintAt = 0;
+const companionSignatures = new Set<string>();
+let proactiveBusy = false;
 let observationTimer: ReturnType<typeof setInterval> | null = null;
 let vaultTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -90,16 +94,44 @@ function startStudyObservation(): void {
         authorizedWindowTitle ? null :
         result.windows.find(w => !w.minimized && w.appKind === 'PACKET_TRACER') ??
         result.windows.find(w => !w.minimized && w.appKind === 'NETACAD' && /netacad|networking academy/i.test(w.title));
-      if (!active) return;
+      if (!active || !allowedObservationTitle(active.title)) return;
       markStudySeen();
-      if (Date.now() - lastUiSnapshot > 60_000) {
+      if (Date.now() - lastUiSnapshot > 12_000) {
         lastUiSnapshot = Date.now();
         const snapshot = await adapter.snapshot(active.id);
-        // Only store counts and a coarse app kind. UIA snapshots may contain
-        // private text; do not persist or send them anywhere automatically.
         if (snapshot.accessible) svc.db.observations.record('agent.uia.heartbeat', {
           kind: active.appKind, elementCount: snapshot.elements.length,
         });
+        const hint = detectCompanionHint(snapshot, active.title);
+        if (hint && !proactiveBusy && !companionSignatures.has(hint.signature) &&
+            Date.now() - lastCompanionHintAt > 3 * 60_000) {
+          lastCompanionHintAt = Date.now();
+          companionSignatures.add(hint.signature);
+          // Bound memory growth in a session. Hashes only, no raw UI history.
+          if (companionSignatures.size > 100) companionSignatures.clear();
+          mascotWindow?.webContents.send(IPC.companionHintEvent, { kind: 'thinking', text: hint.label });
+          if (svc.permissions.isGranted('provider.dataShare')) {
+            proactiveBusy = true;
+            try {
+              const answer = await svc.ask({ text: hint.question, mode: 'QUICK' });
+              if (answer.ok && !answer.data.degraded) {
+                mascotWindow?.webContents.send(IPC.companionHintEvent, {
+                  kind: 'answer', text: answer.data.message.text.slice(0, 190),
+                });
+              } else {
+                mascotWindow?.webContents.send(IPC.companionHintEvent, {
+                  kind: 'tip', text: 'Jag såg ett fel i ' + active.title.slice(0, 38) + '. Jag kan hjälpa dig.',
+                });
+              }
+            } catch (error) {
+              diagnostic('companion.proactive', error, 'warn');
+            } finally { proactiveBusy = false; }
+          } else {
+            mascotWindow?.webContents.send(IPC.companionHintEvent, {
+              kind: 'tip', text: 'Jag upptäckte ett fel. Vill du att jag förklarar?',
+            });
+          }
+        }
       }
     } catch (error) {
       console.warn('[study-observer] not available:', String(error));
