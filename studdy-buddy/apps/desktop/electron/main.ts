@@ -57,6 +57,7 @@ let mouseRegionTimer: ReturnType<typeof setInterval> | null = null;
 let mouseIgnored = true;
 let observationBusy = false;
 let lastUiSnapshot = 0;
+let observationState: 'starting' | 'active' | 'off' | 'private' | 'unavailable' | 'no-window' = 'starting';
 let lastCompanionHintAt = 0;
 const companionSignatures = new Set<string>();
 let proactiveBusy = false;
@@ -80,12 +81,19 @@ function startStudyObservation(): void {
   if (!adapter) return;
   const tick = async () => {
     const svc = services;
-    if (!svc || !adapter || observationBusy ||
-        !svc.permissions.check('observe', ['application.observe']).allowed ||
-        !svc.activeProvider()?.hasApiKey) return;
+    if (!svc || !adapter || observationBusy) return;
+    if (!svc.permissions.isGranted('application.observe')) {
+      observationState = 'off';
+      return;
+    }
+    if (!svc.activeProvider()?.hasApiKey) {
+      observationState = 'off';
+      return;
+    }
     observationBusy = true;
     try {
       const result = await adapter.listWindows();
+      if (result.error) { observationState = 'unavailable'; return; }
       // A user-selected window takes precedence over study-specific defaults.
       // Matching is exact, and duplicate titles are rejected to avoid reading
       // a different program with a coincidentally identical title.
@@ -102,12 +110,17 @@ function startStudyObservation(): void {
           !/studdy.buddy/i.test(w.title)) ??
         result.windows.find(w => !w.minimized && w.appKind === 'PACKET_TRACER') ??
         result.windows.find(w => !w.minimized && w.appKind === 'NETACAD' && /netacad|networking academy/i.test(w.title));
-      if (!active || !allowedObservationTitle(active.title) || /studdy.buddy/i.test(active.title)) return;
+      if (!active) { observationState = 'no-window'; return; }
+      if (!allowedObservationTitle(active.title) || /studdy.buddy/i.test(active.title)) {
+        observationState = 'private';
+        return;
+      }
       if (Date.now() - lastUiSnapshot > 12_000) {
         lastUiSnapshot = Date.now();
         const snapshot = await adapter.snapshot(active.id);
         if (snapshot.accessible) {
           markStudySeen();
+          observationState = 'active';
           svc.db.observations.record('agent.uia.heartbeat', {
           kind: active.appKind, elementCount: snapshot.elements.length,
           });
@@ -144,6 +157,7 @@ function startStudyObservation(): void {
         }
       }
     } catch (error) {
+      observationState = 'unavailable';
       console.warn('[study-observer] not available:', String(error));
     } finally { observationBusy = false; }
   };
@@ -707,6 +721,7 @@ function registerIpc(svc: StuddyServices): void {
       observing,
       windowTitle: observing ? authorizedWindowTitle : null,
       lastObservedAt: lastStudySeen > 0 ? lastStudySeen : null,
+      state: observing ? 'active' : observationState,
     });
   });
 
