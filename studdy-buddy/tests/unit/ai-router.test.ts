@@ -149,6 +149,28 @@ describe('ExplanationEngine + AiRouter', () => {
     ).rejects.toThrow(/vision-modell/i);
   });
 
+  it('recovers from Kilo 402 by switching text requests to Auto Free', async () => {
+    const kilo = { ...provider, name: 'Kilo Code', baseUrl: 'https://ai-gateway.kilo.ai/api/v1', modelId: 'kilo-auto/efficient' };
+    const seen: string[] = [];
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { model?: string };
+      seen.push(body.model ?? '');
+      if (body.model === 'kilo-auto/efficient') {
+        return jsonResponse({ error: { message: 'Paid Model - Credits Required' } }, 402);
+      }
+      return completion('Hej Buddy!');
+    }) as unknown as typeof fetch;
+    makeRouter(fetchImpl);
+    const response = await router.complete(kilo, {
+      task: 'explain',
+      messages: [{ role: 'user', content: 'Hej' }],
+      cacheable: false,
+    });
+    expect(response.text).toBe('Hej Buddy!');
+    expect(seen).toEqual(['kilo-auto/efficient', 'kilo-auto/free']);
+    expect(db.providers.list()[0]?.modelId).toBe('kilo-auto/free');
+  });
+
   it('reports provider health honestly on failure', async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ error: { message: 'nope' } }, 500)) as unknown as typeof fetch;
     makeRouter(fetchImpl);
