@@ -52,6 +52,7 @@ export function App() {
   const [position, setPosition] = useState<string[] | null>(null);
   const [systemDark, setSystemDark] = useState(true);
   const inactivity = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSelectionHelpAt = useRef(0);
   const theme = themeFor(settings.theme, systemDark);
 
   // ---- browser bridge ----------------------------------------------------
@@ -346,12 +347,12 @@ export function App() {
 
   // ---- chat -------------------------------------------------------------
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, selectedText?: string) => {
       if (!bridge) return;
       // Never let the model answer a screen-awareness question without visual
       // evidence: doing so produces the misleading 'I cannot see your screen'.
       const isScreenQuestion = /(?:sk[aä]rm|f[oö]nster|screen|packet\s*tracer|vad ser du|what do you see)/i.test(text);
-      if (isScreenQuestion && !captureSourceId) {
+      if (isScreenQuestion && !captureSourceId && !selectedText) {
         setNotice(captureAllowed
           ? 'Välj Packet Tracer eller Chrome under Skärmkälla ovan och fråga igen. Ingen skärmbild har skickats.'
           : 'Öppna Inställningar → Behörigheter och aktivera Skärmbild. Välj sedan ett fönster under Skärmkälla.');
@@ -377,7 +378,7 @@ export function App() {
       setStreaming(true);
       setNotice(null);
 
-      const result = await bridge.chat.send({ text, mode, context: captureSourceId ? { captureSourceId } : undefined });
+      const result = await bridge.chat.send({ text, mode, context: selectedText ? { selectedText } : captureSourceId ? { captureSourceId } : undefined });
 
       setStreaming(false);
       if (!result.ok) {
@@ -403,6 +404,40 @@ export function App() {
     },
     [bridge, mode, captureSourceId, captureAllowed, dataSharingAllowed, provider?.visionModelId],
   );
+
+  // Reactive browser-selection assistance. The extension has already
+  // restricted events to allowed sites; never observe arbitrary browser tabs.
+  // No always-on screen capture or LLM polling. One lightweight call only
+  // after an intentional text selection, with a cooldown to avoid spam/costs.
+  useEffect(() => {
+    if (!bridge || settings.proactive === 'OFF' || !provider?.hasApiKey || !dataSharingAllowed ||
+        !permissions.some(p => p.key === 'browser.read' && p.granted)) return;
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = bridge.bridge.onSelection((event: unknown) => {
+      const selection = event as { text?: string; url?: string };
+      const highlighted = typeof selection.text === 'string' ? selection.text.trim() : '';
+      if (highlighted.length < 9 || highlighted.length > 450 || streaming) return;
+      if (/\b(?:password|lösenord|token|secret|api.key|authorization|bearer|private.key|personnummer|bankid)\b/i.test(highlighted) ||
+          /\beyJ[A-Za-z0-9_-]{12,}\./.test(highlighted)) return;
+      // For assessments, do not auto-answer questions or interrupt a test.
+      if (/quiz|exam|assessment|prov|tentamen|testattempt/i.test(selection.url ?? '')) return;
+      const now = Date.now();
+      if (now - lastSelectionHelpAt.current < (settings.proactive === 'QUIET' ? 90_000 : 30_000)) return;
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(() => {
+        lastSelectionHelpAt.current = Date.now();
+        setView('chat');
+        setBubbleOpen(true);
+        setLiveContext('Jag såg din markering · hjälper dig nu');
+        setSignal('hint-shown');
+        void send('Förklara kort och enkelt den här markerade texten på svenska. Börja direkt med poängen, ge ett exempel om det behövs.', highlighted);
+      }, 700);
+    });
+    return () => {
+      if (pending) clearTimeout(pending);
+      unsubscribe();
+    };
+  }, [bridge, settings.proactive, provider?.hasApiKey, dataSharingAllowed, permissions, send, streaming]);
 
   const changeMode = useCallback(
     (next: ResponseMode) => {
