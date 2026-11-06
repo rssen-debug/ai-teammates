@@ -29,6 +29,9 @@ export interface SettingsPanelProps {
   onAddSite?: (site: string) => Promise<void>;
   onRemoveSite?: (site: string) => Promise<void>;
   onRotateBridgeToken?: () => Promise<void>;
+  gmailStatus?: { connected: boolean; configured: boolean; connecting: boolean } | null;
+  onGmailConnect?: (clientId: string) => Promise<{ ok: boolean; message: string }>;
+  onGmailDisconnect?: () => Promise<{ ok: boolean; message: string }>;
   githubDebug?: { repository: string; enabled: boolean; hasToken: boolean; target: string } | null;
   onGitHubConfigure?: (config: { repository: string; token?: string; enabled: boolean }) => Promise<{ ok: boolean; message: string }>;
   onGitHubSyncNow?: () => Promise<{ ok: boolean; message: string }>;
@@ -107,6 +110,22 @@ export function SettingsPanel(props: SettingsPanelProps) {
   const [quickKey, setQuickKey] = useState('');
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickStatus, setQuickStatus] = useState<string | null>(null);
+  const [gmailOpen, setGmailOpen] = useState(false);
+  const [gmailClientId, setGmailClientId] = useState('');
+  const [gmailBusy, setGmailBusy] = useState(false);
+  const [gmailFeedback, setGmailFeedback] = useState<string | null>(null);
+  const connectGmail = async () => {
+    if (!props.onGmailConnect || gmailBusy) return;
+    setGmailBusy(true);
+    try { const result = await props.onGmailConnect(gmailClientId.trim()); setGmailFeedback(result.message); if (result.ok) setGmailClientId(''); }
+    finally { setGmailBusy(false); }
+  };
+  const disconnectGmail = async () => {
+    if (!props.onGmailDisconnect || gmailBusy) return;
+    setGmailBusy(true);
+    try { const result = await props.onGmailDisconnect(); setGmailFeedback(result.message); }
+    finally { setGmailBusy(false); }
+  };
   const [githubOpen, setGithubOpen] = useState(false);
   const [githubRepo, setGithubRepo] = useState(props.githubDebug?.repository || 'rssen-debug/ai-teammates');
   const [githubToken, setGithubToken] = useState('');
@@ -223,6 +242,30 @@ export function SettingsPanel(props: SettingsPanelProps) {
           {quickStatus && <p className="buddy-s-hint" role="status">{quickStatus}</p>}
           {props.provider?.hasApiKey && <p className="buddy-s-hint">En nyckel finns redan sparad. Den följer med vid uppdateringar.</p>}
           <p className="buddy-s-hint">Buddy får följa godkända fönster och skicka relevant kontext till den valda providern när du ber om hjälp. Kilo Auto Free kan dela indata med underleverantörer. Datoråtgärder kräver särskilt godkännande. Andra API:er kan ha olika format; multimodala video-API:er stöds inte automatiskt som chatt.</p>
+          {props.onGmailConnect && (
+            <div style={{ paddingTop: 10 }}>
+              <button type="button" className="buddy-s-btn" onClick={() => setGmailOpen(v => !v)}>
+                {props.gmailStatus?.connected ? 'Gmail ✓ Ansluten' : 'Anslut Gmail (valfritt)'}
+              </button>
+              {gmailOpen && (
+                <>
+                  <p className="buddy-s-hint">Gmail ansluts via Googles egen inloggning, med enbart läsbehörighet. Du behöver ett OAuth Desktop Client ID från Google Cloud Console. Skriv aldrig in Gmail-lösenord eller passkey här.</p>
+                  {!props.gmailStatus?.connected && <label>Google OAuth Desktop Client ID
+                    <input type="text" value={gmailClientId} onChange={e => setGmailClientId(e.target.value)}
+                      placeholder="123456789-xxx.apps.googleusercontent.com"/>
+                  </label>}
+                  <div className="buddy-s-actions">
+                    {props.gmailStatus?.connected
+                      ? <button type="button" className="buddy-s-btn" disabled={gmailBusy} onClick={() => void disconnectGmail()}>Koppla bort Gmail</button>
+                      : <button type="button" className="buddy-s-btn is-primary" disabled={gmailBusy || !gmailClientId.trim()} onClick={() => void connectGmail()}>
+                          {gmailBusy ? 'Loggar in…' : 'Logga in med Google'}
+                        </button>}
+                  </div>
+                  {gmailFeedback && <p className="buddy-s-hint" role="status">{gmailFeedback}</p>}
+                </>
+              )}
+            </div>
+          )}
         </section>
       </div>
     );
