@@ -58,6 +58,18 @@ describe('DesktopAccessibilityAdapter', () => {
     expect(status.mode).toBe('cli-json');
   });
 
+  it('launches a requested application through the native CLI and reports actual failure', async () => {
+    const runner = runnerReturning({
+      'launch Google Chrome --activate': { code: 0, stdout: JSON.stringify({ ok: true, data: { app: 'Google Chrome', pid: 1298 } }), stderr: '' },
+      'launch Missing App --activate': { code: 1, stdout: JSON.stringify({ ok: false, error: { message: 'App not found' } }), stderr: '' },
+    });
+    const adapter = new DesktopAccessibilityAdapter({ platform: 'win32', runner });
+    expect((await adapter.launchApp('Google Chrome')).ok).toBe(true);
+    expect((await adapter.launchApp('Missing App')).detail).toContain('App not found');
+    expect((await adapter.launchApp('powershell')).ok).toBe(false);
+    expect((await adapter.launchApp('C:\\Windows\\System32\\cmd.exe')).ok).toBe(false);
+  });
+
   it('returns an empty list plus an error when window enumeration fails', async () => {
     const adapter = new DesktopAccessibilityAdapter({
       platform: 'win32',
@@ -197,9 +209,10 @@ describe('the real CLI envelope (observed, not assumed)', () => {
         { role: 'tab', name: 'Desktop', ref_id: '@s1:e9' },
       ],
     });
-    expect(elements.map((e) => e.name)).toEqual(['PC0', 'Desktop']);
-    expect(elements[0]?.ref).toBe('@s1:e2');
-    expect(elements[0]?.bounds).toEqual({ x: 10, y: 20, width: 30, height: 40 });
+    expect(elements.map((e) => e.name)).toEqual(['Packet Tracer', 'PC0', 'Desktop']);
+    expect(elements[0]?.ref).toBe('');
+    expect(elements[1]?.ref).toBe('@s1:e2');
+    expect(elements[1]?.bounds).toEqual({ x: 10, y: 20, width: 30, height: 40 });
   });
 
   it('reports an incomplete snapshot as a partial observation', async () => {
