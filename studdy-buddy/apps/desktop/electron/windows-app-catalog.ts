@@ -35,7 +35,10 @@ export function findStartMenuApp(requested: string, roots = startMenuRoots()): s
   };
   for (const root of roots) walk(root, 0);
   const exact = items.filter(item => item.label === key);
-  if (exact.length) return exact[0]!.file;
+  if (exact.length === 1) return exact[0]!.file;
+  // Duplicate shortcut labels can point at different applications.
+  // Fail closed rather than arbitrarily choosing by filesystem traversal order.
+  if (exact.length > 1) return null;
   // An apparent single prefix match can still be ambiguous with an
   // embedded-name match (Chrome Canary vs Google Chrome). Consider every
   // partial candidate before opening anything.
