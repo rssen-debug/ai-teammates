@@ -17,6 +17,7 @@ import { GmailConnector } from './gmail-connector.js';
 import { writeStudyVault } from './study-vault.js';
 import { calculateCapabilityProof } from './capability-proof.js';
 import { VerifiedSkillLedger } from './verified-skills.js';
+import { findStartMenuApp } from './windows-app-catalog.js';
 
 /**
  * Electron main process.
@@ -479,13 +480,24 @@ function registerIpc(svc: StuddyServices): void {
           };
           const resolvedName = aliases[programName.toLowerCase()] ?? programName;
           const result = await adapter.launchApp(resolvedName);
-          if (!result.ok) throw new Error(result.detail);
-          // A successful native CLI result is evidence of process launch.
-          // Never count a model's self-reported action as proof.
-          const launchProof = createHash('sha256').update(resolvedName.toLowerCase()).digest('hex').slice(0, 20);
-          svc.db.observations.record('agent.capability.launch', { proof: launchProof });
-          new VerifiedSkillLedger(svc.db.checkpoints).record('launch:' + launchProof, true);
-          responseText = 'Jag startade ' + result.detail + '.';
+          if (result.ok) {
+            // A successful native agent-desktop response is verified evidence
+            // that the app process started or attached successfully.
+            const launchProof = createHash('sha256').update(resolvedName.toLowerCase()).digest('hex').slice(0, 20);
+            svc.db.observations.record('agent.capability.launch', { proof: launchProof });
+            new VerifiedSkillLedger(svc.db.checkpoints).record('launch:' + launchProof, true);
+            responseText = 'Jag startade ' + result.detail + '.';
+          } else {
+            // Windows CLI launch only accepts system app image names / absolute
+            // paths. Discover normal installed apps from Start-menu shortcuts.
+            const shortcut = findStartMenuApp(resolvedName);
+            if (!shortcut) throw new Error('Jag hittar inte ' + resolvedName + ' i Windows appregister eller Start-menyn. ' + result.detail);
+            const launchError = await shell.openPath(shortcut);
+            if (launchError) throw new Error('Windows kunde inte öppna genvägen: ' + launchError);
+            // Shell accepted the launch, but it is not independent proof of a
+            // visible running window. Do not inflate the verified Skills score.
+            responseText = 'Jag skickade startkommandot till ' + resolvedName + '.';
+          }
         }
       } catch (error) {
         degraded = true;
