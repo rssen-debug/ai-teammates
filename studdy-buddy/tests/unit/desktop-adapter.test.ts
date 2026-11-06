@@ -87,6 +87,30 @@ describe('DesktopAccessibilityAdapter', () => {
     expect(windows[2]?.appKind).toBe('OTHER');
   });
 
+  it('retains real list-windows envelope data arrays and focused state', async () => {
+    const adapter = new DesktopAccessibilityAdapter({
+      platform: 'win32',
+      runner: runnerReturning({
+        'list-windows': {
+          code: 0,
+          stdout: JSON.stringify({
+            version: '2.6', ok: true, command: 'list-windows',
+            data: [
+              { id: 'w17', title: 'PowerShell', process: 'powershell.exe', focused: true },
+              { id: 'w18', title: 'Packet Tracer', process: 'PacketTracer.exe', focused: false },
+            ],
+          }),
+          stderr: '',
+        },
+      }),
+    });
+    const result = await adapter.listWindows();
+    expect(result.error).toBeNull();
+    expect(result.windows).toHaveLength(2);
+    expect(result.windows[0]?.focused).toBe(true);
+    expect(result.windows[1]?.appKind).toBe('PACKET_TRACER');
+  });
+
   it('marks a snapshot accessible only when it actually contains elements', () => {
     const empty = parseSnapshot('{"elements":[]}', 'w1');
     expect(empty.accessible).toBe(false);
