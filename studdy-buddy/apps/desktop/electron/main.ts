@@ -423,7 +423,36 @@ function registerIpc(svc: StuddyServices): void {
     let selectedText = typeof p.context?.selectedText === 'string' ? p.context.selectedText : '';
     // User-selected, per-question screen grounding. A UIA window id is NOT a
     // desktopCapturer id; the renderer must choose an actual capture source.
-    const sourceId = p.context?.captureSourceId;
+    let sourceId = p.context?.captureSourceId;
+    const screenQuestion = /(?:sk[aä]rm|f[oö]nster|screen|vad ser du|what do you see|what is on|kolla vad jag|titta p[aå])/i.test(p.text);
+    // An explicit user screen question authorizes one-time analysis of the
+    // foreground, non-sensitive app. Never silently screenshot on idle.
+    if (sourceId === undefined && screenQuestion && adapter &&
+        svc.permissions.isGranted('screen.capture') &&
+        svc.permissions.isGranted('provider.dataShare')) {
+      try {
+        const windows = await adapter.listWindows();
+        const active = windows.windows.find(w => w.focused && !w.minimized &&
+          allowedObservationTitle(w.title) && !/studdy.buddy/i.test(w.title));
+        if (active) {
+          const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 } });
+          const sameTitle = sources.filter(x => x.name === active.title && allowedObservationTitle(x.name));
+          if (sameTitle.length === 1) sourceId = sameTitle[0]!.id;
+        }
+      } catch (error) {
+        diagnostic('screen.auto-select', error, 'warn');
+      }
+    }
+    if (screenQuestion && sourceId === undefined && !selectedText) {
+      const session = svc.ensureSession();
+      svc.db.messages.append({ sessionId: session.id, role: 'user', text: p.text.trim(), mode });
+      const message = svc.db.messages.append({
+        sessionId: session.id, role: 'buddy',
+        text: 'Jag ser inget läsbart aktivt fönster just nu. Öppna programmet du vill ha hjälp med och fråga igen.',
+        mode,
+      });
+      return ok({ message, degraded: false, error: null, trimmed: false, notice: null });
+    }
     if (sourceId !== undefined) {
       if (typeof sourceId !== 'string' || !sourceId.trim()) return fail('BAD_SOURCE', 'Välj ett fönster först.');
       const gate = svc.permissions.check('observe', ['screen.capture']);
