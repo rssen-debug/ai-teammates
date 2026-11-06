@@ -45,7 +45,7 @@ export function App() {
   const [bridgeState, setBridgeState] = useState<BridgePanelState | null>(null);
   const [captureSources, setCaptureSources] = useState<{ id: string; name: string }[]>([]);
   const [captureSourceId, setCaptureSourceId] = useState('');
-  const [liveContext, setLiveContext] = useState('Redo när du börjar plugga');
+  const [liveContext, setLiveContext] = useState('Redo');
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
   const [courseInfo, setCourseInfo] = useState<{ name: string; moduleCount: number } | null>(null);
   const [platformProgress, setPlatformProgress] = useState<{ completed: number; total: number } | null>(null);
@@ -145,7 +145,7 @@ export function App() {
     // visible Packet Tracer source. Never auto-select a generic browser window
     // because unrelated private tabs may be open there.
     const packetTracer = result.data.filter((source) => /packet\s*tracer/i.test(source.name));
-    if (packetTracer.length === 1) setLiveContext('Packet Tracer upptäckt · bild vid fråga');
+    if (packetTracer.length === 1) setLiveContext('Packet Tracer ansluten');
     setCaptureSourceId((previous) => result.data.some((source) => source.id === previous)
       ? previous
       : packetTracer.length === 1 ? packetTracer[0]!.id : '');
@@ -169,7 +169,7 @@ export function App() {
   }, [captureAllowed, provider?.hasApiKey, refreshCaptureSources]);
 
   useEffect(() => {
-    if (bubbleOpen && !captureAllowed) setLiveContext('Redo när du börjar plugga');
+    if (bubbleOpen && !captureAllowed) setLiveContext('Redo');
   }, [bubbleOpen, captureAllowed]);
 
   // ---- boot -------------------------------------------------------------
@@ -238,7 +238,7 @@ export function App() {
         return;
       }
       if (e.page?.url && e.page.url !== lastUrl) {
-        setLiveContext('Studieflik upptäckt · följer lektionen');
+        setLiveContext('Webbläsare ansluten');
         setSignal('hint-shown');
         void refreshProgress();
         lastUrl = e.page.url;
@@ -428,7 +428,7 @@ export function App() {
         lastSelectionHelpAt.current = Date.now();
         setView('chat');
         setBubbleOpen(true);
-        setLiveContext('Jag såg din markering · hjälper dig nu');
+        setLiveContext('Markering upptäckt · hjälper dig');
         setSignal('hint-shown');
         void send('Förklara kort och enkelt den här markerade texten på svenska. Börja direkt med poängen, ge ett exempel om det behövs.', highlighted);
       }, 700);
@@ -573,7 +573,7 @@ export function App() {
             setSignal('user-typing');
           }}
         >
-          <Buddy size={116} signal={signal} studyLive={Boolean(provider?.hasApiKey && (captureSourceId || liveContext.startsWith('Studieflik')))} lookAt={mascotGaze} reducedMotion={settings.reducedMotion} />
+          <Buddy size={116} signal={signal} studyLive={Boolean(provider?.hasApiKey)} lookAt={mascotGaze} reducedMotion={settings.reducedMotion} />
         </button>
 
         <div className="studdy-mascot-hint" aria-hidden={bubbleOpen}>
@@ -663,7 +663,7 @@ export function App() {
               captureSources={captureSources}
               captureSourceId={captureSourceId}
               captureActive={Boolean(captureSourceId)}
-              studyPresence={liveContext}
+              studyPresence={provider?.hasApiKey ? (streaming ? 'Bearbetar…' : liveContext === 'Redo' ? 'AI ansluten · redo' : liveContext) : 'Anslut AI-nyckel'}
               onCaptureSourceChange={captureAllowed ? (sourceId) => {
                 setCaptureSourceId(sourceId);
                 setLiveContext(sourceId ? 'Universell agent · valt fönster aktivt' : 'Redo när du behöver hjälp');
