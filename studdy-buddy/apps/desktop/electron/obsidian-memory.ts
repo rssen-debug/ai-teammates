@@ -56,7 +56,7 @@ export class ObsidianMemory {
 
   /** Retrieve a tiny, relevant subset from prior days for better continuity. */
   recall(question: string, maxChars = 1300): string[] {
-    const query = new Set(this.scrub(question).toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []);
+    const query = new Set(this.scrub(question).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []);
     if (!query.size) return [];
     const daily = join(this.path, 'Daily');
     let files: string[];
@@ -68,9 +68,9 @@ export class ObsidianMemory {
       const sections = body.split(/\n## /).slice(1);
       for (const section of sections) {
         const text = section.replace(/^[^\n]*\n/, '').trim().slice(0, 520);
-        const words = new Set(text.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []);
+        const words = new Set(text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []);
         let shared = 0;
-        for (const word of query) if (words.has(word)) shared += 1;
+        for (const word of query) if ([...words].some(candidate => candidate === word || candidate.startsWith(word) || word.startsWith(candidate))) shared += 1;
         if (shared) candidates.push({ text, score: shared });
       }
     }
