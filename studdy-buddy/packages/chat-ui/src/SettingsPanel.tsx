@@ -101,7 +101,10 @@ export function SettingsPanel(props: SettingsPanelProps) {
         name: quickProvider === 'kilo' ? 'Kilo Code' : 'DeepSeek',
         baseUrl: quickProvider === 'kilo' ? 'https://ai-gateway.kilo.ai/api/v1' : 'https://api.deepseek.com/v1',
         modelId: quickProvider === 'kilo' ? 'kilo-auto/free' : 'deepseek-flash',
-        visionModelId: null,
+        // Try the same automatic route for on-demand screenshots. A real
+        // provider response determines whether this route supports vision;
+        // no screen is sent until the student asks and sharing is permitted.
+        visionModelId: quickProvider === 'kilo' ? 'kilo-auto/free' : 'deepseek-flash',
         fallbackModelId: null,
         apiKey: quickKey.trim(),
         dailyCostLimitUsd: 2,
