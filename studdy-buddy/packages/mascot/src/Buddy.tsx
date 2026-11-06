@@ -31,7 +31,23 @@ export interface BuddyProps {
 export function Buddy({ signal, state: forcedState, size = 132, reducedMotion = false, studyLive = false, lookAt, onStateChange, className }: BuddyProps) {
   const [controller, setController] = useState<MascotControllerState>(() => initialMascotState());
   const [blinkController, setBlinkController] = useState<MascotControllerState>(() => initialMascotState());
+  const [ambientGlance, setAmbientGlance] = useState({ x: 0, y: 0 });
   const reported = useRef<AnimationState | null>(null);
+
+  // A living idle character occasionally glances around, even if the pointer
+  // stays completely still. This does not require any LLM calls or observation.
+  useEffect(() => {
+    if (reducedMotion || lookAt) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const move = () => {
+      if (!active) return;
+      setAmbientGlance({ x: (Math.random() - 0.5) * 2.6, y: (Math.random() - 0.5) * 1.5 });
+      timer = setTimeout(move, 1900 + Math.random() * 3200);
+    };
+    timer = setTimeout(move, 900);
+    return () => { active = false; clearTimeout(timer); };
+  }, [lookAt, reducedMotion]);
 
   // Signal -> state machine. Forced state (tests/storybook) wins over signals.
   useEffect(() => {
@@ -74,8 +90,8 @@ export function Buddy({ signal, state: forcedState, size = 132, reducedMotion = 
   }, [controller.current, reducedMotion]);
 
   useEffect(() => {
-    if (controller.transientUntil === null) return;
-    const ms = Math.max(0, controller.transientUntil - Date.now());
+    if (blinkController.transientUntil === null) return;
+    const ms = Math.max(0, blinkController.transientUntil - Date.now());
     const timer = setTimeout(() => setBlinkController((prev) => tick(prev)), ms + 10);
     return () => clearTimeout(timer);
   }, [blinkController.transientUntil]);
@@ -96,12 +112,12 @@ export function Buddy({ signal, state: forcedState, size = 132, reducedMotion = 
   const bob = !reducedMotion && ['CELEBRATING', 'ENCOURAGING', 'POINTING'].includes(effectiveState);
 
   const gaze = useMemo(() => {
-    if (!lookAt) return { x: expression.pupilX, y: expression.pupilY };
+    if (!lookAt) return { x: expression.pupilX + ambientGlance.x, y: expression.pupilY + ambientGlance.y };
     return { x: expression.pupilX + lookAt.x * 5, y: expression.pupilY + lookAt.y * 4 };
-  }, [lookAt, expression.pupilX, expression.pupilY]);
+  }, [lookAt, ambientGlance.x, ambientGlance.y, expression.pupilX, expression.pupilY]);
 
   return (
-    <div className={className} style={{ width: size, height: size, position: 'relative', lineHeight: 0 }}>
+    <div className={className} style={{ width: size, height: size, position: 'relative', lineHeight: 0, animation: reducedMotion ? undefined : 'buddy-idle-sway 6.4s ease-in-out infinite' }}>
       <style>{keyframes}</style>
       <svg
         viewBox="0 0 160 160"
@@ -228,6 +244,7 @@ function PixelMouth({ open, curve, speaking, reducedMotion }: { open: number; cu
 }
 
 const keyframes = `
+@keyframes buddy-idle-sway { 0%,100% { transform: rotate(-1.4deg) translateY(0); } 28% { transform: rotate(1deg) translateY(-2px); } 65% { transform: rotate(-.4deg) translateY(1px); } }
 @keyframes buddy-breathe { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.012); } }
 @keyframes buddy-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 @keyframes buddy-tail { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-7deg); } }
