@@ -392,43 +392,45 @@ function registerIpc(svc: StuddyServices): void {
       return ok({ message, degraded: false, error: null, trimmed: false, notice: null });
     }
 
-    // Intent-checked, allowlisted app launchers. Do not let the model execute
-    // arbitrary processes, shell commands, executable paths or URLs.
-    const calculatorRequest = /^(?:öppna|starta|visa|open|launch)\s+(?:(?:upp|the|en|min)\s+)?(?:miniräknaren|miniräknare|calculator|calc)(?:\s+(?:åt mig|please))?[.!?]*$/i.test(text);
-    const edgeRequest = /^(?:kan du\s+)?(?:öppna|starta|visa|open|launch)\s+(?:(?:upp|min|the|webbläsaren|browser)\s+)?(?:microsoft\s+)?edge(?:\s+(?:åt mig|please|nu))?[.!?]*$/i.test(text);
-    const memoryRequest = /^(?:öppna|visa|open|show)\s+(?:mitt\s+)?(?:minne|minnet|obsidian(?:\s+vault)?|memory)(?:\s+mapp(?:en)?)?[.!?]*$/i.test(text);
-    if (calculatorRequest || edgeRequest || memoryRequest) {
+    // Universal application launcher: use the agent-desktop OS backend,
+    // rather than hardcoding Edge, Chrome or any other app into the chat AI.
+    // An explicit user request is required for each launch.
+    const launchMatch = text.match(/^(?:(?:kan du|could you|please)\s+)?(?:öppna|starta|kör|open|launch|start)\s+(?:(?:upp|min/mitt|the|my|en|ett)\s+)?(.+?)(?:\s+(?:åt mig|nu|please))?[.!?]*$/i);
+    const programName = launchMatch?.[1]?.trim() ?? '';
+    const openMemory = /^(?:mitt\s+)?(?:minne|minnet|obsidian(?:\s+vault)?|memory)(?:\s+mapp(?:en)?)?$/i.test(programName);
+    if (launchMatch && (openMemory || programName)) {
       const session = svc.ensureSession();
       svc.db.messages.append({ sessionId: session.id, role: 'user', text, mode });
       let responseText: string;
       let degraded = false;
       try {
-        if (calculatorRequest || edgeRequest) {
-          if (process.platform !== 'win32') throw new Error('Programstart stöds just nu på Windows.');
-          if (edgeRequest) {
-            // Windows App Paths / ShellExecute resolves installed Edge without
-            // accepting user-controlled executable names. Wait for launch
-            // confirmation, not merely a language-model claim.
-            await shell.openExternal('microsoft-edge:');
-            responseText = 'Jag öppnade Microsoft Edge.';
-          } else {
-            await new Promise<void>((resolve, reject) => {
-              const child = spawn('calc.exe', [], { detached: true, stdio: 'ignore', windowsHide: false });
-              child.once('error', reject);
-              child.once('spawn', () => { child.unref(); resolve(); });
-            });
-            responseText = 'Jag startade Miniräknaren.';
-          }
-        } else {
+        if (openMemory) {
           const folder = svc.memory?.path;
           if (!folder) throw new Error('Minnesvalvet är inte tillgängligt.');
           const error = await shell.openPath(folder);
           if (error) throw new Error(error);
-          responseText = 'Jag öppnade din lokala minnesmapp.';
+          responseText = 'Jag öppnade din minnesmapp.';
+        } else {
+          if (!adapter) throw new Error('agent-desktop är inte anslutet.');
+          const aliases: Record<string, string> = {
+            chrome: 'Google Chrome',
+            'google chrome': 'Google Chrome',
+            edge: 'Microsoft Edge',
+            'microsoft edge': 'Microsoft Edge',
+            miniräknare: 'Calculator',
+            miniräknaren: 'Calculator',
+            anteckningar: 'Notepad',
+            'visual studio code': 'Visual Studio Code',
+            vscode: 'Visual Studio Code',
+          };
+          const resolvedName = aliases[programName.toLowerCase()] ?? programName;
+          const result = await adapter.launchApp(resolvedName);
+          if (!result.ok) throw new Error(result.detail);
+          responseText = 'Jag startade ' + result.detail + '.';
         }
-      } catch (err) {
+      } catch (error) {
         degraded = true;
-        responseText = 'Jag kunde inte öppna programmet: ' + (err instanceof Error ? err.message : String(err));
+        responseText = 'Jag kunde inte starta programmet: ' + (error instanceof Error ? error.message : String(error));
       }
       const message = svc.db.messages.append({ sessionId: session.id, role: 'buddy', text: responseText, mode });
       return ok({ message, degraded, error: degraded ? 'TOOL_FAILED' : null, trimmed: false, notice: null });
