@@ -223,7 +223,7 @@ export function parseWindows(stdout: string): WindowInfo[] {
   for (const row of rows) {
     if (!isRecord(row)) continue;
     const title = String(row.title ?? row.name ?? '');
-    const processName = String(row.process ?? row.processName ?? row.app ?? '');
+    const processName = String(row.process ?? row.processName ?? row.app_name ?? row.app ?? '');
     if (!title && !processName) continue;
     out.push({
       id: String(row.id ?? row.handle ?? row.hwnd ?? title),
