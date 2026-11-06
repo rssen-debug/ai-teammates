@@ -23,7 +23,8 @@ Legend
 | Area | Status | Evidence |
 | --- | --- | --- |
 | TypeScript typecheck (whole repo, strict) | VERIFIED | `npm run typecheck` → 0 errors |
-| Automated test suite | VERIFIED | `npm test` → **280 tests, 16 files, all passing** (see TEST_RESULTS.md) |
+| Node/Electron runtime floor | VERIFIED (and a real bug fixed) | CI failed on pinned Node **22.12**, where `node:sqlite` still needs `--experimental-sqlite`; `package.json` claimed `>=22.5.0`. Electron 33 bundles Node **20**, where the module does not exist at all, so the packaged app could never have opened its own database. Floor is now `>=22.13`, Electron `^37`, CI pins 22.13, and `tests/unit/runtime-floor.test.ts` fails if either regresses |
+| Automated test suite | VERIFIED | `npm test` → **300 tests, 19 files, all passing** (see TEST_RESULTS.md) |
 | SQLite persistence + versioned migrations | VERIFIED | Fresh DB creates 19 tables, schema v4; migration idempotency test; WAL mode |
 | Settings/provider persistence | VERIFIED | Survives reopen; API key never present in the `provider_config` table (asserted) |
 | Bayesian Knowledge Tracing | VERIFIED | `tests/unit/learning-engine.test.ts` (13 tests) |
@@ -71,6 +72,9 @@ Legend
 | CLI `doctor` / `status` / `models` / `progress` / `logs` / `voice-test` | VERIFIED | Real runs against a real database (output in TEST_RESULTS.md) |
 | CLI honest blocking | VERIFIED | Reports BLOCKED for Windows-only checks instead of guessing |
 | ESLint gate | VERIFIED | `npm run lint` → **0 errors, 0 warnings** (flat config, typescript-eslint). Wired into CI. |
+| 0-100 readiness scale | VERIFIED | Derived from coverage (40) + mastery (40) + retention (20), each with its own detail line; returns `null` (shown as `–`) rather than `0` when nothing is recorded; reading alone cannot move it (`tests/unit/readiness.test.ts`, 12 tests) |
+| Progress panel rendering | VERIFIED | Real component rendered in jsdom: score, three weighted meters, every limitation, next steps, and platform completion shown separately from knowledge (`tests/unit/progress-panel.test.tsx`, 5 tests) |
+| `studdy readiness` CLI | VERIFIED | Real run against a real database: empty profile prints "Kan inte mätas ännu", a seeded profile prints `38/100` with all three parts and its limitations |
 | Single build/dev entry point | VERIFIED | `node apps/desktop/scripts/dev.mjs` builds renderer + main + runtime manifest and then launches Electron; on a machine without the Electron binary it prints the reason and the fix instead of crashing |
 
 ## Implemented, not verified here
@@ -88,7 +92,8 @@ Legend
 | Vision capability | BLOCKED | Requires a provider with a vision model. The probe exists; it was not run against a real endpoint. |
 | Tool calling | BLOCKED | Same reason. The probe exists and reports `false` on failure rather than assuming support. |
 | Browser extension in Chrome/Edge | IMPLEMENTED_NOT_VERIFIED | Manifest V3 code is complete and now site-agnostic; it was never loaded into a browser. The protocol it speaks is verified from the server side over a real socket. Real course-site DOM structure is assumed, not observed. |
-| Windows installer (.exe) | BLOCKED | electron-builder NSIS requires Windows/Wine. `npm run package:win` builds everything else and exits with an explicit "installer not created" message. CI has a `windows-latest` packaging job. |
+| Windows installer (.exe) | FIXED, now gated | `electron-builder` was never declared in `package.json`, so the CI packaging step asked npx to fetch a package that did not exist — the installer could never have been built from this repo. It is now a real devDependency (`^26.18.0`), `package-win.mjs` verifies the binary before running it, passes `--publish never`, and **fails** if no `.exe` lands in `dist/win`. Still unbuilt here (NSIS needs Windows/Wine), and nobody has run the resulting installer yet. |
+| App launching on Windows 11 | IMPLEMENTED_NOT_VERIFIED | A CI job (`Windows launch proof`) installs the app, launches the real `electron.exe`, and requires the renderer to report `{"mascot":true,…}`. The hook exists (`STUDDY_SMOKE_EXIT_MS`, inert by default) and the assertion fails the build rather than warning. **It has never run.** It also could not run from the original layout: the only workflow lived at `studdy-buddy/.github/`, which GitHub never reads. It now also exists at the repository root as `.github/workflows/studdy-buddy.yml` (same jobs, `working-directory: studdy-buddy`), so the next push either produces `evidence/` or a red job. |
 | Packet Tracer observation | BLOCKED | Packet Tracer is not installed; `.pkt`/`.pka` parsing via official interfaces was not implemented because no documented interface was verified. CLI parsing is fed from fixtures. |
 | NetAcad curriculum discovery on the live site | BLOCKED | No NetAcad account. Fixtures encode the *expected* DOM shape. **The real DOM may differ** — the extension reports what it can read and marks the rest inaccessible, which is the mitigation. |
 | DVA120 official syllabus mapping | BLOCKED | No authorised syllabus source was available. The exam coach maps onto our own concept graph and says so; it does not claim official scope. |
@@ -104,6 +109,7 @@ These are real and should not be papered over:
 
 ## Next actions, in priority order
 
+0. **Run the `Windows launch proof` job and attach `evidence/`.** This is the first thing that turns "it builds" into "it starts". Then work through `docs/WINDOWS_PROOF.md`.
 1. **Run `agent-desktop list-windows` / `snapshot` on Windows 11.** The contract is now verified; the mapping of real UI Automation windows and bounds is not. This is the highest-value remaining unknown.
 2. Load the extension in Chrome/Edge against a real Canvas or NetAcad course and compare the discovered graph with what the site actually shows. The generic DOM readers (nav/headings/completion) are guesses about structure until then.
 3. Make a real DeepSeek call with the student's key and fill in the capability table (`deepseek-flash` as the official id; third-party ids entered by hand).

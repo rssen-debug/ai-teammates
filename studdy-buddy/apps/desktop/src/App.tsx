@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatMessage, ModelCapabilities, PermissionKey, PermissionMode, ProviderConfig, ResponseMode, Settings } from '@studdy/shared';
 import { createId, DEFAULT_SETTINGS } from '@studdy/shared';
 import { Buddy, type MascotSignal } from '@studdy/mascot';
-import { ChatBubble, SettingsPanel, themeFor, type BridgePanelState } from '@studdy/chat-ui';
+import { ChatBubble, ProgressPanel, SettingsPanel, themeFor, type BridgePanelState } from '@studdy/chat-ui';
+import type { ReadinessScore } from '@studdy/learning-engine';
 import { getBridge } from './bridge.js';
 
 /**
@@ -18,7 +19,7 @@ import { getBridge } from './bridge.js';
  * clicks land on the application underneath. The mascot and bubble stay solid.
  */
 
-type View = 'chat' | 'settings';
+type View = 'chat' | 'settings' | 'progress';
 
 export function App() {
   const bridge = useMemo(() => getBridge(), []);
@@ -40,6 +41,12 @@ export function App() {
   const [greeting, setGreeting] = useState<string | null>(null);
   const [bridgeMissing, setBridgeMissing] = useState(false);
   const [bridgeState, setBridgeState] = useState<BridgePanelState | null>(null);
+  const [captureSources, setCaptureSources] = useState<{ id: string; name: string }[]>([]);
+  const [captureSourceId, setCaptureSourceId] = useState('');
+  const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
+  const [courseInfo, setCourseInfo] = useState<{ name: string; moduleCount: number } | null>(null);
+  const [platformProgress, setPlatformProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [position, setPosition] = useState<string[] | null>(null);
   const [systemDark, setSystemDark] = useState(true);
   const inactivity = useRef<ReturnType<typeof setTimeout> | null>(null);
   const theme = themeFor(settings.theme, systemDark);
@@ -49,6 +56,31 @@ export function App() {
     if (!bridge) return;
     const result = await bridge.bridge.status();
     if (result.ok) setBridgeState(result.data);
+  }, [bridge]);
+
+  /**
+   * Pulls the readiness score and the course facts it is measured against.
+   * The panel is never given a number without these.
+   */
+  const refreshProgress = useCallback(async () => {
+    if (!bridge) return;
+    const [snapshot, graphResult] = await Promise.all([bridge.learning.snapshot(), bridge.bridge.pageGraph()]);
+    if (snapshot.ok) {
+      const data = snapshot.data as {
+        readiness?: ReadinessScore;
+        course?: { name: string; moduleCount: number } | null;
+      };
+      if (data.readiness) setReadiness(data.readiness);
+      if (data.course) setCourseInfo(data.course);
+    }
+    if (graphResult.ok && graphResult.data) {
+      const graph = graphResult.data as { nodes?: { kind: string; title: string; platformCompleted?: boolean | null }[] };
+      const nodes = graph.nodes ?? [];
+      const withFlag = nodes.filter((n) => n.platformCompleted !== undefined && n.platformCompleted !== null);
+      if (withFlag.length) {
+        setPlatformProgress({ completed: withFlag.filter((n) => n.platformCompleted === true).length, total: withFlag.length });
+      }
+    }
   }, [bridge]);
 
   const addSite = async (site: string) => {
@@ -67,6 +99,28 @@ export function App() {
     await refreshBridge();
   };
 
+
+  // Capture is opt-in: no source is selected by default, and a source is
+  // photographed only when the student sends a question with it selected.
+  const captureAllowed = permissions.some((permission) => permission.key === 'screen.capture' && permission.granted);
+  const refreshCaptureSources = useCallback(async () => {
+    if (!bridge || !captureAllowed) {
+      setCaptureSources([]);
+      setCaptureSourceId('');
+      return;
+    }
+    const result = await bridge.observe.sources();
+    if (!result.ok) {
+      setNotice(result.error.message);
+      return;
+    }
+    setCaptureSources(result.data);
+    setCaptureSourceId((previous) => result.data.some((source) => source.id === previous) ? previous : '');
+  }, [bridge, captureAllowed]);
+
+  useEffect(() => {
+    if (bubbleOpen) void refreshCaptureSources();
+  }, [bubbleOpen, refreshCaptureSources]);
 
   // ---- boot -------------------------------------------------------------
   useEffect(() => {
@@ -129,6 +183,11 @@ export function App() {
       if (e.page?.url && e.page.url !== lastUrl) {
         lastUrl = e.page.url;
         void refreshBridge();
+        // The heading trail is what the student is actually looking at; the panel
+        // shows it so the readiness number can be judged against the context.
+        const page = e.page as { headings?: { level: number; text: string }[]; headingPath?: string[] };
+        if (Array.isArray(page.headingPath) && page.headingPath.length) setPosition(page.headingPath.slice(-3));
+        else if (Array.isArray(page.headings) && page.headings.length) setPosition(page.headings.slice(0, 3).map((h) => h.text));
       }
     });
     return off;
@@ -208,7 +267,7 @@ export function App() {
       setStreaming(true);
       setNotice(null);
 
-      const result = await bridge.chat.send({ text, mode });
+      const result = await bridge.chat.send({ text, mode, context: captureSourceId ? { captureSourceId } : undefined });
 
       setStreaming(false);
       if (!result.ok) {
@@ -232,7 +291,7 @@ export function App() {
         }
       }
     },
-    [bridge, mode],
+    [bridge, mode, captureSourceId],
   );
 
   const changeMode = useCallback(
@@ -362,6 +421,17 @@ export function App() {
         </div>
 
         <div className="studdy-mascot-tools">
+          <button
+            type="button"
+            aria-label="Framsteg och tentaberedskap"
+            onClick={() => {
+              if (view !== 'progress') void refreshProgress();
+              setView(view === 'progress' ? 'chat' : 'progress');
+            }}
+            title="Framsteg"
+          >
+            ◎
+          </button>
           <button type="button" aria-label="Inställningar" onClick={() => setView(view === 'settings' ? 'chat' : 'settings')} title="Inställningar">
             ⚙
           </button>
@@ -381,7 +451,25 @@ export function App() {
 
       {bubbleOpen && (
         <div className="studdy-bubble-zone" ref={bubbleRef}>
-          {view === 'settings' ? (
+          {view === 'progress' ? (
+            readiness ? (
+              <ProgressPanel
+                theme={theme}
+                readiness={readiness}
+                course={courseInfo}
+                currentPosition={position}
+                platform={platformProgress}
+                onClose={() => setView('chat')}
+              />
+            ) : (
+              <div className="studdy-progress-empty">
+                <p>Framstegen kunde inte läsas just nu.</p>
+                <button type="button" className="buddy-p-btn" onClick={() => void refreshProgress()}>
+                  Försök igen
+                </button>
+              </div>
+            )
+          ) : view === 'settings' ? (
             <SettingsPanelPlaceholder
               theme={theme}
               settings={settings}
@@ -405,6 +493,10 @@ export function App() {
           ) : (
             <ChatBubble
               messages={visibleMessages}
+              captureSources={captureSources}
+              captureSourceId={captureSourceId}
+              onCaptureSourceChange={captureAllowed ? setCaptureSourceId : undefined}
+              onRefreshCaptureSources={captureAllowed ? () => void refreshCaptureSources() : undefined}
               mode={mode}
               onModeChange={changeMode}
               onSend={(text) => void send(text)}

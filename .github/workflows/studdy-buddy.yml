@@ -1,0 +1,178 @@
+name: Studdy Buddy CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['studdy-buddy/**']
+  pull_request:
+    paths: ['studdy-buddy/**']
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: studdy-buddy
+
+jobs:
+  verify:
+    name: Typecheck, test, build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+          cache-dependency-path: studdy-buddy/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci || npm install
+        env:
+          # The Electron binary is only needed for packaging, not for verify.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build renderer
+        run: npm run build:ui
+
+      - name: Build electron bundles
+        run: node apps/desktop/scripts/build-electron.mjs
+
+      # The CLI must actually run and report. BLOCKED checks (no Windows desktop,
+      # no Packet Tracer, no provider key) are expected on a CI runner and are not
+      # failures - but a FAIL check is. So the exit code alone is not the gate.
+      - name: CLI smoke test
+        shell: bash
+        env:
+          STUDDY_DATA_DIR: ${{ runner.temp }}/studdy-ci
+        run: |
+          set -o pipefail
+          npx tsx packages/cli/src/bin.ts doctor --json > doctor.json || true
+          cat doctor.json
+          node -e "
+            const r = require('./doctor.json');
+            const s = r.summary;
+            console.log('OK', s.ok, 'varning', s.warn, 'fel', s.fail, 'blockerade', s.blocked);
+            if (s.fail > 0) { console.error('doctor reported '+s.fail+' hard failures'); process.exit(1); }
+            const names = r.checks.filter(c => c.status === 'FAIL').map(c => c.name);
+            if (names.length) { console.error(names.join(', ')); process.exit(1); }
+          "
+
+
+      - name: Upload build output
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: studdy-buddy-build-${{ matrix.os }}
+          path: |
+            studdy-buddy/apps/desktop/dist/electron
+            studdy-buddy/apps/desktop/dist/renderer
+          retention-days: 14
+
+  package:
+    name: Windows installer
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: npm
+          cache-dependency-path: studdy-buddy/package-lock.json
+
+      - name: Install dependencies (with Electron binary)
+        run: npm ci || npm install
+
+      - name: Package Windows installer
+        run: npm run package:win
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: studdy-buddy-windows-installer
+          path: |
+            studdy-buddy/apps/desktop/dist/win/*.exe
+            studdy-buddy/apps/desktop/dist/win/*.blockmap
+          retention-days: 30
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Install and smoke-test the REAL NSIS output. A successful source build or
+  # dev Electron run is not evidence that the student's installed app works.
+  # ---------------------------------------------------------------------------
+  proof:
+    name: Windows installed-app proof
+    needs: package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: studdy-buddy-windows-installer
+          path: studdy-buddy/apps/desktop/dist/win
+
+      - name: Install NSIS application silently
+        id: install
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem 'apps/desktop/dist/win' -Filter '*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Packaging did not produce an installer' }
+          $dest = Join-Path $env:RUNNER_TEMP 'studdy-installed'
+          $p = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$dest") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "NSIS installer returned $($p.ExitCode)" }
+          $installed = Join-Path $dest 'Studdy Buddy.exe'
+          if (-not (Test-Path $installed)) { throw "Installed executable missing: $installed" }
+          "installedExe=$installed" >> $env:GITHUB_OUTPUT
+          Write-Host "Installed: $installed ($([math]::Round((Get-Item $installed).Length/1MB,1)) MB)"
+
+      - name: Run installed application and verify real renderer
+        shell: pwsh
+        env:
+          STUDDY_SMOKE_EXIT_MS: '12000'
+          STUDDY_DATA_DIR: ${{ runner.temp }}\\studdy-proof
+        run: |
+          $binary = '${{ steps.install.outputs.installedExe }}'
+          $p = Start-Process -FilePath $binary -PassThru
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw 'Installed app failed to exit within 60 seconds' }
+          $proof = Join-Path $env:STUDDY_DATA_DIR 'smoke.json'
+          if (-not (Test-Path $proof)) { throw 'No smoke.json from installed application' }
+          $result = Get-Content $proof -Raw | ConvertFrom-Json
+          Write-Host (Get-Content $proof -Raw)
+          if (-not ($result.windowVisible -and $result.rendererReady -and $result.bridgeRunning -and $result.probe.mascot -and $result.probe.readinessButton -and $result.passed)) {
+            throw 'The installed application did not pass its live renderer and bridge checks'
+          }
+
+      - name: Collect evidence
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path evidence | Out-Null
+          $proof = Join-Path (Join-Path $env:RUNNER_TEMP 'studdy-proof') 'smoke.json'
+          Copy-Item $proof evidence/ -ErrorAction SilentlyContinue
+          $screenshot = Join-Path (Join-Path $env:RUNNER_TEMP 'studdy-proof') 'smoke.png'
+          Copy-Item $screenshot evidence/ -ErrorAction SilentlyContinue
+          Get-ChildItem 'apps/desktop/dist/win' -Filter '*.exe' | Select-Object Name,Length | ConvertTo-Json | Out-File evidence/installer-info.json -Encoding utf8
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studdy-buddy-windows-proof
+          path: studdy-buddy/evidence
+          retention-days: 30

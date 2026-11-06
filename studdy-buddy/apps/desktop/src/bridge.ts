@@ -49,6 +49,7 @@ export interface StuddyBridge {
     windows(): Promise<BridgeResult<unknown[]>>;
     snapshot(windowId: string): Promise<BridgeResult<unknown>>;
     capture(windowId: string): Promise<BridgeResult<{ id: string; name: string; png: string }>>;
+    sources(): Promise<BridgeResult<{ id: string; name: string }[]>>;
     cursorContext(): Promise<BridgeResult<{ point: { x: number; y: number }; displayId: string }>>;
   };
   bridge: {

@@ -1,8 +1,16 @@
 appId: se.studdybuddy.app
 productName: Studdy Buddy
+# Exact version matches package-lock.json; electron-builder cannot package a range such as ^37.10.3.
+electronVersion: 37.10.3
 copyright: Copyright © 2026 Studdy Buddy
 
 directories:
+  # The app directory is the *staged* dist folder (package.json + electron/ +
+  # renderer/), not the repo root. electron-builder resolves `files` and `output`
+  # relative to this, so it must be explicit or it looks for main.cjs in the
+  # wrong place. Paths are relative to the working directory used by
+  # package-win.mjs (apps/desktop).
+  app: dist
   output: dist/win
   buildResources: build
 

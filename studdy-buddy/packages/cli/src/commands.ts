@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { databaseHealth, schemaVersion, defaultDataDir, databasePath, type Database } from '@studdy/database';
-import { CONCEPTS } from '@studdy/learning-engine';
+import { CONCEPTS, computeReadiness, type ReadinessScore } from '@studdy/learning-engine';
 import { voiceAvailability } from '@studdy/voice-engine';
 
 /**
@@ -55,13 +55,14 @@ export function buildContext(openDb: (path: string) => Database, dataDir = defau
 export function doctor(ctx: CliContext): DoctorReport {
   const checks: CheckResult[] = [];
 
-  // 1. Node version - node:sqlite requires >= 22.5.
+  // 1. Node version - node:sqlite exists from 22.5 but needs no flag only from
+  // 22.13, and the app opens the database on every start.
   const major = Number(ctx.nodeVersion.replace('v', '').split('.')[0]);
   const minor = Number(ctx.nodeVersion.replace('v', '').split('.')[1] ?? '0');
   checks.push({
     name: 'Node-version',
-    status: major > 22 || (major === 22 && minor >= 5) ? 'OK' : 'FAIL',
-    detail: `${ctx.nodeVersion} (kräver >= 22.5 för node:sqlite)`,
+    status: major > 22 || (major === 22 && minor >= 13) ? 'OK' : 'FAIL',
+    detail: `${ctx.nodeVersion} (kräver >= 22.13 för node:sqlite utan flagga)`,
   });
 
   // 2. Database
@@ -235,6 +236,35 @@ export function progress(ctx: CliContext, learning: LearningLike | null): { conc
       .map((c) => ({ id: c.conceptId, label: c.label, state: c.state, probability: c.probability })),
     due: snap.dueForReview,
   };
+}
+
+/**
+ * Readiness for the CLI. The full snapshot carries confidence and overdue flags
+ * that the slim `LearningLike` interface does not, so this takes the concrete
+ * service shape when available and degrades to "cannot measure" when it is not.
+ */
+export function buildReadiness(
+  learning: LearningLike | null,
+  graph: import('@studdy/shared').CurriculumGraph | null,
+): ReadinessScore {
+  if (!learning) {
+    return computeReadiness({ concepts: [], graph: null });
+  }
+  const full = learning as unknown as {
+    snapshot(): {
+      concepts: {
+        conceptId: string;
+        label: string;
+        probability: number;
+        state: string;
+        confidence: number;
+        independentCorrect: number;
+        reviewDueAt: string | null;
+        overdue: boolean;
+      }[];
+    };
+  };
+  return computeReadiness({ concepts: full.snapshot().concepts, graph });
 }
 
 export interface LogTail {

@@ -2,7 +2,7 @@ import type { ChatMessage, CurriculumGraph, ProviderConfig, ResponseMode, Source
 import { createId, nowIso, ok, fail, type Result } from '@studdy/shared';
 import { openDatabase, type Database } from '@studdy/database';
 import { AiRouter, ExplanationEngine, ProviderError, type ChatMessagePayload } from '@studdy/ai-router';
-import { LearningService, conceptById } from '@studdy/learning-engine';
+import { LearningService, computeReadiness, conceptById } from '@studdy/learning-engine';
 import type { PromptStudyState } from '@studdy/ai-router';
 import { generateBridgeToken, normalizeSiteRule } from './browser-bridge.js';
 import { discoverCurriculum, locateCurrentNode, ancestorTitles, type RawPageSnapshot } from '@studdy/curriculum';
@@ -513,15 +513,40 @@ export class StuddyServices {
     const course = this.db.curriculum.latestCourse();
     const session = this.db.sessions.recent(1)[0] ?? null;
     const usage = this.db.usage.today(this.clock);
+
+    // The 0-100 number the student asked for. It is derived here, once, and the
+    // derivation travels with it, so the UI cannot show a percentage without also
+    // being able to show where it came from.
+    const readiness = computeReadiness({
+      concepts: snapshot.concepts.map((c) => ({
+        conceptId: c.conceptId,
+        label: c.label,
+        probability: c.probability,
+        state: c.state,
+        confidence: c.confidence,
+        independentCorrect: c.independentCorrect,
+        reviewDueAt: c.reviewDueAt,
+        overdue: c.overdue,
+      })),
+      graph: course,
+      now: new Date(this.clock()),
+    });
+
     return {
       course: course ? { id: course.courseId, name: course.courseName, moduleCount: course.nodes.filter((n) => n.kind === 'MODULE').length } : null,
       lastSession: session,
       concepts: snapshot.concepts,
       dueForReview: snapshot.dueForReview,
       totals: snapshot.totals,
+      readiness,
       usage,
       generatedAt: nowIso(this.clock),
     };
+  }
+
+  /** Readiness alone, for the progress panel and the CLI. */
+  readiness() {
+    return this.progress().readiness;
   }
 
   recordEvidence(input: { conceptId: string; kind: string; difficulty: number; hintsUsed: number; source: string; detail?: string }) {

@@ -16,9 +16,9 @@ cd studdy-buddy && npx vitest run
 Result:
 
 ```
- Test Files  16 passed (16)
-      Tests  280 passed (280)
-   Duration  ~4.3s
+ Test Files  19 passed (19)
+      Tests  300 passed (300)
+   Duration  ~4.5s
 ```
 
 ### Per file
@@ -40,6 +40,33 @@ Result:
 | `tests/integration/chat-flow.test.ts` | 11 | No provider → refuses with a reason and **zero HTTP calls**; data-sharing permission required; answer persisted with both messages and **only exposure recorded**; selected text reaches the model; graded quiz injects a "do not answer" instruction; provider failure reported honestly; state survives restart; diagnostics; insecure URL rejected; **API key absent from the database**; daily budget enforced across turns |
 | `tests/integration/any-subject-memory.test.ts` | 13 | Topic extraction is deterministic and subject-agnostic (Swedish/English stopwords, plural+definite stemming); a Canvas **biology** course is discovered, its topics registered, and the prompt contains the real page and **no** Cisco/DVA120 text; platform completion stays an honest 2-of-5 and never becomes mastery; the second request contains the previous question *and* previous answer; an empty profile is described as "no knowledge registered yet" and a real evidence row then appears in the prompt; the current question is sent exactly once; history budgets drop the oldest turns and disclose the drop |
 | `tests/integration/learning-loop.test.ts` | 10 | Curriculum discovered → stored → reloaded with real counts; different courses give different counts; current node located and grounded context built; observed practice answer becomes evidence **only after** the platform confirms; reading exposure ≠ demonstrated knowledge; mistakes steer the next question; prerequisite gap diagnosed; review scheduled and surfaced; everything needed to resume persists; platform completion never equals mastery |
+
+### Readiness, real CLI runs
+
+Empty profile — the honest case:
+
+```
+Tentaberedskap
+  Kan inte mätas ännu. Ingen kunskap är registrerad.
+  Säkerhet på underlaget: ingen
+  · Ingen kunskap är registrerad ännu, så siffran säger inget om dig.
+  · Kursstrukturen är inte läst ännu, så täckningen mäts mot begreppen vi följer i stället för mot kursen.
+```
+
+After recording real evidence (5 concepts × 3 independent correct answers, one
+hinted, one wrong, one reading exposure):
+
+```
+  Grunden börjar sitta (38/100). Fortsätt med de svagaste begreppen.
+  Täckning    40 / 100  (vikt 40)  8 begrepp har spår av arbete.
+  Kunskap     19 / 100  (vikt 40)  7 begrepp har svar bakom sig, viktade efter oberoende och säkerhet.
+  Retention   71 / 100  (vikt 20)  2 av 8 schemalagda repetitioner är försenade.
+  Säkerhet på underlaget: god
+  · 2 begrepp är dags att repetera och drar ner siffran tills du gör det.
+```
+
+The number moved from "cannot be measured" to `38` **only** because answers were
+recorded — and it carries its own arithmetic on screen.
 
 ## 2. Lint
 

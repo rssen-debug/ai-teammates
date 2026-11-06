@@ -26,7 +26,19 @@ export interface CommandRunner {
 export const defaultRunner: CommandRunner = {
   run(command, args, timeoutMs) {
     return new Promise((resolve) => {
-      execFile(command, args, { timeout: timeoutMs, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
+      // npm installs a .cmd shim for agent-desktop on Windows. Node's execFile
+      // cannot execute .cmd files directly. Resolve that shim through cmd.exe,
+      // but ONLY for the fixed agent-desktop command and shell-safe CLI args.
+      // Never interpolate arbitrary UI text into a Windows shell command.
+      const npmShim = process.platform === 'win32' && command === 'agent-desktop';
+      const safeArgs = args.every((arg) => /^[a-zA-Z0-9_@.:-]+$/.test(arg));
+      if (npmShim && !safeArgs) {
+        resolve({ code: 1, stdout: '', stderr: 'Unsafe agent-desktop CLI argument rejected.' });
+        return;
+      }
+      const executable = npmShim ? (process.env.ComSpec ?? 'cmd.exe') : command;
+      const argv = npmShim ? ['/d', '/s', '/c', `agent-desktop ${args.join(' ')}`] : args;
+      execFile(executable, argv, { timeout: timeoutMs, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
         const code = error && typeof (error as { code?: number }).code === 'number' ? ((error as { code?: number }).code as number) : error ? 1 : 0;
         resolve({ code, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') });
       });
