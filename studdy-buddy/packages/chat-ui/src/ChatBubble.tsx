@@ -35,6 +35,7 @@ export interface ChatBubbleProps {
   disabled?: boolean;
   captureSources?: { id: string; name: string }[];
   captureSourceId?: string;
+  captureActive?: boolean;
   onCaptureSourceChange?: (sourceId: string) => void;
   onRefreshCaptureSources?: () => void;
 }
@@ -135,7 +136,7 @@ export function ChatBubble(props: ChatBubbleProps) {
 
       {props.onCaptureSourceChange && (
         <div className="buddy-capture-row">
-          <label htmlFor="buddy-capture-source">Skärmkälla</label>
+          <label htmlFor="buddy-capture-source">{props.captureActive ? 'Fönster valt' : 'Skärmkälla'}</label>
           <select id="buddy-capture-source" aria-label="Välj fönster att dela med Buddy"
             value={props.captureSourceId ?? ''} onChange={(event) => props.onCaptureSourceChange?.(event.target.value)}>
             <option value="">Ingen skärmbild delas</option>
