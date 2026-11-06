@@ -67,6 +67,11 @@ const api = {
     sources: () => invoke(IPC.screenSources),
     selectWindow: (sourceId: string | null) => invoke(IPC.observeSelectWindow, sourceId),
     liveStatus: () => invoke(IPC.observeLiveStatus),
+    onCompanionHint: (listener: (event: unknown) => void) => {
+      const wrapped = (_e: unknown, event: unknown) => listener(event);
+      ipcRenderer.on(IPC.companionHintEvent, wrapped);
+      return () => ipcRenderer.removeListener(IPC.companionHintEvent, wrapped);
+    },
     cursorContext: () => invoke(IPC.cursorContext),
   },
 
