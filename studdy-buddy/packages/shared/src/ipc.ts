@@ -66,6 +66,9 @@ export const IPC = {
   voiceTest: 'voice:test',
   // diagnostics
   diagnosticsRun: 'diag:run',
+  debugSyncStatus: 'debug:sync-status',
+  debugSyncConfigure: 'debug:sync-configure',
+  debugSyncNow: 'debug:sync-now',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
