@@ -256,6 +256,7 @@ function registerIpc(svc: StuddyServices): void {
     return ok({
       message: result.data.message,
       degraded: result.data.degraded,
+      error: result.data.error,
       trimmed: result.data.trimmed,
       notice: result.data.notice,
     });
