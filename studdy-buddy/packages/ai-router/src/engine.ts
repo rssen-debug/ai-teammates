@@ -198,8 +198,8 @@ export class ExplanationEngine {
       const fallback: StructuredResponse = {
         directAnswer:
           request.language === 'sv-SE'
-            ? 'Jag kunde inte nå AI-providern just nu. Kontrollera providerinställningarna, eller fortsätt studera så försöker jag igen.'
-            : 'I could not reach the AI provider just now. Check the provider settings, or keep studying and I will try again.',
+            ? 'AI-anslutningen fungerar inte just nu. Kontrollera API-nyckel och modell i Inställningar.'
+            : 'AI is unavailable right now. Check the API key and model in Settings.',
         evidence: [],
         confidence: 'low',
       };
