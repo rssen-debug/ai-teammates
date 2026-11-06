@@ -161,7 +161,7 @@ export function SettingsPanel(props: SettingsPanelProps) {
           </div>
           {quickStatus && <p className="buddy-s-hint" role="status">{quickStatus}</p>}
           {props.provider?.hasApiKey && <p className="buddy-s-hint">En nyckel finns redan sparad. Den följer med vid uppdateringar.</p>}
-          <p className="buddy-s-hint">Buddy kan läsa ett valt studiefönster. Mikrofon och datoråtgärder kräver alltid separat aktivering eller bekräftelse.</p>
+          <p className="buddy-s-hint">När du sparar godkänner du att Buddy läser valt studiefönster och skickar relevant innehåll till AI-providern när du ställer en skärmfråga. Kilo Auto Free kan behandla indata hos underleverantörer. Mikrofon och datorklick kräver separat aktivering eller bekräftelse.</p>
         </section>
       </div>
     );
