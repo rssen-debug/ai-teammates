@@ -81,7 +81,7 @@ export async function checkAndInstallUpdate(): Promise<void> {
     if (release.draft || release.prerelease || !isNewer(release.tag_name, app.getVersion())) return;
 
     const installer = release.assets.find((asset) =>
-      /^Studdy Buddy-\d+\.\d+\.\d+-x64\.exe$/.test(asset.name),
+      /^Studdy-Buddy-\d+\.\d+\.\d+-x64\.exe$/.test(asset.name),
     );
     if (!installer || !trustedReleaseUrl(installer.browser_download_url)) {
       throw new Error('Release has no official x64 installer');
