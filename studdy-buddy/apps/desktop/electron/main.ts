@@ -1129,16 +1129,16 @@ app.whenReady().then(async () => {
       const windowVisible = mascotWindow?.isVisible?.() ?? false;
       const rendererReady = mascotWindow?.webContents.isLoading?.() === false;
       const bridgeRunning = bridge?.status().running ?? false;
-      let probe: { title?: string; mascot?: boolean; readinessButton?: boolean } | null = null;
+      let probe: { title?: string; mascot?: boolean; readinessButton?: boolean; proofDots?: boolean; levelLabel?: string } | null = null;
       let error: string | null = null;
       try {
         probe = await mascotWindow?.webContents.executeJavaScript?.(
-          "({ title: document.title, mascot: !!document.querySelector('.studdy-mascot-btn'), readinessButton: !!document.querySelector('[aria-label=\"Framsteg och tentaberedskap\"]') })",
+          "({ title: document.title, mascot: !!document.querySelector('.studdy-mascot-btn'), readinessButton: !!document.querySelector('[aria-label=\"Framsteg och tentaberedskap\"]'), proofDots: !!document.querySelector('.buddy-proof-dots'), levelLabel: document.querySelector('.buddy-proof-skills')?.textContent ?? '' })",
         ) ?? null;
       } catch (err) {
         error = err instanceof Error ? err.message : String(err);
       }
-      let navigationProbe: { chat: boolean; settings: boolean; progress: boolean } | null = null;
+      let navigationProbe: { chat: boolean; settings: boolean; progress: boolean; simpleChat: boolean } | null = null;
       try {
         navigationProbe = await mascotWindow?.webContents.executeJavaScript?.(`
           (async () => {
@@ -1147,6 +1147,8 @@ app.whenReady().then(async () => {
             mascot?.click();
             await pause();
             const chat = Boolean(document.querySelector('[aria-label="Samtal med Buddy"]'));
+            const simpleChat = chat && !document.querySelector('[aria-label="Byt svarsläge"]') &&
+              !document.querySelector('.buddy-mode-row') && !document.querySelector('.buddy-capture-row');
             const settingsButton = document.querySelector('[aria-label="Inställningar"]');
             settingsButton?.click();
             await pause();
@@ -1155,7 +1157,7 @@ app.whenReady().then(async () => {
             progressButton?.click();
             await pause();
             const progress = Boolean(document.querySelector('.studdy-progress-empty, .buddy-progress'));
-            return { chat, settings, progress };
+            return { chat, settings, progress, simpleChat };
           })()
         `) ?? null;
       } catch (err) {
@@ -1174,7 +1176,7 @@ app.whenReady().then(async () => {
       const pixelIconLoaded = Boolean(tray && existsSync(join(__dirname, 'buddy-tray.png')) && existsSync(join(__dirname, 'buddy-icon.png')));
       const greenIconsLoaded = existsSync(join(__dirname, 'buddy-live.png')) && existsSync(join(__dirname, 'buddy-live-blink.png'));
       const studyVaultReady = existsSync(join(dataDir(), 'Obsidian-Vault', 'Buddy – Studieläge.md'));
-      const passed = Boolean(windowVisible && rendererReady && bridgeRunning && probe?.mascot && probe?.readinessButton && pixelIconLoaded && greenIconsLoaded && studyVaultReady && navigationProbe?.chat && navigationProbe?.settings && navigationProbe?.progress);
+      const passed = Boolean(windowVisible && rendererReady && bridgeRunning && probe?.mascot && probe?.proofDots && /^Lv\\s+\\d+\\/100/.test(probe.levelLabel ?? '') && probe?.readinessButton && pixelIconLoaded && greenIconsLoaded && studyVaultReady && navigationProbe?.chat && navigationProbe?.simpleChat && navigationProbe?.settings && navigationProbe?.progress);
       const result = { windowVisible, rendererReady, bridgeRunning, pixelIconLoaded, greenIconsLoaded, studyVaultReady, probe, navigationProbe, screenshotSaved, passed, error };
       console.log(`[smoke] result: ${JSON.stringify(result)}`);
       try {
