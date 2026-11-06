@@ -660,7 +660,11 @@ app.whenReady().then(async () => {
       console.warn('[startup] Login startup not available:', String(error));
     }
   }
-  adapter = new DesktopAccessibilityAdapter({ platform: process.platform });
+  const bundledAccessibility = join(process.resourcesPath, 'bin', 'agent-desktop.exe');
+  adapter = new DesktopAccessibilityAdapter({
+    platform: process.platform,
+    binary: app.isPackaged && existsSync(bundledAccessibility) ? bundledAccessibility : 'agent-desktop',
+  });
   speech = new SpeechPlayer(process.platform);
 
   services.db.sessions.closeStale(new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString());
