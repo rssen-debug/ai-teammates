@@ -512,7 +512,7 @@ export function App() {
             setSignal('user-typing');
           }}
         >
-          <Buddy size={116} signal={signal} lookAt={mascotGaze} reducedMotion={settings.reducedMotion} />
+          <Buddy size={116} signal={signal} studyLive={Boolean(provider?.hasApiKey && (captureSourceId || liveContext.startsWith('Studieflik')))} lookAt={mascotGaze} reducedMotion={settings.reducedMotion} />
         </button>
 
         <div className="studdy-mascot-hint" aria-hidden={bubbleOpen}>
