@@ -63,7 +63,7 @@ step('Runtime manifest', () => {
     productName: 'Studdy Buddy',
     // Unique semver per green CI run, allowing installed clients to discover
     // newer builds. Developer builds keep the local package version.
-    version: /^\\d+\\.\\d+\\.\\d+$/.test(process.env.STUDDY_BUILD_VERSION ?? '')
+    version: /^\d+\.\d+\.\d+$/.test(process.env.STUDDY_BUILD_VERSION ?? '')
       ? process.env.STUDDY_BUILD_VERSION
       : JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version,
     main: 'electron/main.cjs',
