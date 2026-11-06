@@ -825,6 +825,34 @@ app.whenReady().then(async () => {
       } catch (err) {
         error = err instanceof Error ? err.message : String(err);
       }
+      let navigationProbe: { chat: boolean; settings: boolean; progress: boolean } | null = null;
+      try {
+        navigationProbe = await mascotWindow?.webContents.executeJavaScript?.(`
+          (async () => {
+            const pause = () => new Promise(resolve => setTimeout(resolve, 120));
+            const mascot = document.querySelector('.studdy-mascot-btn');
+            if (!document.querySelector('[aria-label="Buddy navigering"]')) {
+              mascot?.click();
+              await pause();
+            }
+            const tabs = Array.from(document.querySelectorAll('[aria-label="Buddy navigering"] button'));
+            const clickTab = async (label) => {
+              const button = tabs.find(b => b.textContent?.includes(label));
+              button?.click();
+              await pause();
+              return Boolean(button?.getAttribute('aria-pressed') === 'true');
+            };
+            const chat = await clickTab('Chatt') &&
+              Boolean(document.querySelector('[aria-label="Samtal med Buddy"]'));
+            const settings = await clickTab('Inställningar') &&
+              Boolean(document.querySelector('[aria-label="Enkel inställning"]'));
+            const progress = await clickTab('Minne & framsteg');
+            return { chat, settings, progress };
+          })()
+        `) ?? null;
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       let screenshotSaved = false;
       try {
         const image = await mascotWindow?.webContents.capturePage();
@@ -838,8 +866,8 @@ app.whenReady().then(async () => {
       const pixelIconLoaded = Boolean(tray && existsSync(join(__dirname, 'buddy-tray.png')) && existsSync(join(__dirname, 'buddy-icon.png')));
       const greenIconsLoaded = existsSync(join(__dirname, 'buddy-live.png')) && existsSync(join(__dirname, 'buddy-live-blink.png'));
       const studyVaultReady = existsSync(join(dataDir(), 'Obsidian-Vault', 'Buddy – Studieläge.md'));
-      const passed = Boolean(windowVisible && rendererReady && bridgeRunning && probe?.mascot && probe?.readinessButton && pixelIconLoaded && greenIconsLoaded && studyVaultReady);
-      const result = { windowVisible, rendererReady, bridgeRunning, pixelIconLoaded, greenIconsLoaded, studyVaultReady, probe, screenshotSaved, passed, error };
+      const passed = Boolean(windowVisible && rendererReady && bridgeRunning && probe?.mascot && probe?.readinessButton && pixelIconLoaded && greenIconsLoaded && studyVaultReady && navigationProbe?.chat && navigationProbe?.settings && navigationProbe?.progress);
+      const result = { windowVisible, rendererReady, bridgeRunning, pixelIconLoaded, greenIconsLoaded, studyVaultReady, probe, navigationProbe, screenshotSaved, passed, error };
       console.log(`[smoke] result: ${JSON.stringify(result)}`);
       try {
         writeFileSync(join(dataDir(), 'smoke.json'), JSON.stringify(result, null, 2));
