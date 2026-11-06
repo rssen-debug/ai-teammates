@@ -32,7 +32,6 @@ let mascotWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let blinkTimer: ReturnType<typeof setInterval> | null = null;
-let blinkReset: ReturnType<typeof setTimeout> | null = null;
 let services: StuddyServices | null = null;
 let adapter: DesktopAccessibilityAdapter | null = null;
 let speech: SpeechPlayer | null = null;
@@ -736,7 +735,6 @@ app.on('before-quit', () => {
   if (observationTimer) clearInterval(observationTimer);
   if (vaultTimer) clearInterval(vaultTimer);
   syncStudyVault();
-  if (blinkReset) clearTimeout(blinkReset);
   speech?.stop();
   void bridge?.stop();
   bridge = null;
