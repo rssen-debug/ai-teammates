@@ -23,7 +23,7 @@ export interface StuddyBridge {
   };
   chat: {
     send(payload: { text: string; mode?: string; context?: Record<string, unknown> }): Promise<
-      BridgeResult<{ message: ChatMessage; degraded: boolean; trimmed: boolean; notice: string | null }>
+      BridgeResult<{ message: ChatMessage; degraded: boolean; error: string | null; trimmed: boolean; notice: string | null }>
     >;
     cancel(): Promise<BridgeResult<boolean>>;
     history(): Promise<BridgeResult<ChatMessage[]>>;
