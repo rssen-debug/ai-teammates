@@ -10,6 +10,7 @@ import { redact } from './log.js';
 import { SpeechPlayer } from './speech.js';
 import { BrowserBridgeServer } from './bridge-server.js';
 import { startAutomaticUpdates } from './auto-update.js';
+import { DebugJournal } from './debug-journal.js';
 import { writeStudyVault } from './study-vault.js';
 
 /**
@@ -38,6 +39,11 @@ let adapter: DesktopAccessibilityAdapter | null = null;
 let speech: SpeechPlayer | null = null;
 let bridge: BrowserBridgeServer | null = null;
 let quitting = false;
+let diagnosticJournal: DebugJournal | null = null;
+function diagnostic(source: string, error: unknown, severity: 'warn' | 'error' = 'error'): void {
+  diagnosticJournal?.record(source, error, severity);
+}
+
 let lastStudySeen = 0;
 let authorizedWindowTitle: string | null = null;
 let mascotExpanded = false;
@@ -423,7 +429,11 @@ function registerIpc(svc: StuddyServices): void {
       selectedText: selectedText || undefined,
       assessmentMode: typeof p.context?.assessmentMode === 'string' ? p.context.assessmentMode : undefined,
     });
-    if (!result.ok) return result;
+    if (!result.ok) {
+      diagnostic('chat.request', result.error?.code ?? 'UNKNOWN');
+      return result;
+    }
+    if (result.data.error) diagnostic('chat.provider', result.data.error, 'warn');
 
     // Stream the finished answer into the bubble as one final event; the engine
     // already produced validated text.
@@ -775,6 +785,22 @@ function safeHost(url: string): string | null {
 }
 
 app.whenReady().then(async () => {
+  diagnosticJournal = new DebugJournal(dataDir());
+  // Retain concise redacted operational failures on the student's own disk.
+  // No screenshots, prompts, browser URLs, clipboard or tokens go to debugger.md.
+  const previousError = console.error.bind(console);
+  const previousWarn = console.warn.bind(console);
+  console.error = (...args: unknown[]) => {
+    diagnostic('console.error', args.map(x => x instanceof Error ? x.message : String(x)).join(' '));
+    previousError(...args);
+  };
+  console.warn = (...args: unknown[]) => {
+    diagnostic('console.warn', args.map(x => x instanceof Error ? x.message : String(x)).join(' '), 'warn');
+    previousWarn(...args);
+  };
+  process.on('unhandledRejection', (reason) => {
+    diagnostic('node.unhandledRejection', reason);
+  });
   services = new StuddyServices({ dataDir: dataDir() });
   // The student requested an always-available companion. Configure Windows
   // login startup once (never overwrite a subsequent Windows/user choice).
@@ -798,6 +824,12 @@ app.whenReady().then(async () => {
 
   registerIpc(services);
   mascotWindow = createMascotWindow();
+  mascotWindow.webContents.on('render-process-gone', (_event, details) => {
+    diagnostic('renderer.crash', details.reason);
+  });
+  mascotWindow.webContents.on('did-fail-load', (_event, code) => {
+    diagnostic('renderer.load', 'Navigation error ' + code);
+  });
   createTray();
   await startBridge(services);
   syncStudyVault();
@@ -882,6 +914,7 @@ app.whenReady().then(async () => {
   }
 
   process.on('uncaughtException', (err) => {
+    diagnostic('node.uncaughtException', err);
     console.error('[studdy] uncaught', redact(String(err?.stack ?? err)));
   });
 });
