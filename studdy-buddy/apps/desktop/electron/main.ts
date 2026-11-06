@@ -92,18 +92,26 @@ function startStudyObservation(): void {
       const selected = authorizedWindowTitle
         ? result.windows.filter((w) => !w.minimized && w.title === authorizedWindowTitle)
         : [];
+      // Universal, consented companion: observe the actual focused window
+      // instead of silently pretending only networking lessons exist.
+      // Explicitly selected source still takes precedence. Private app titles
+      // and the Buddy overlay itself are excluded.
       const active = selected.length === 1 ? selected[0] :
         authorizedWindowTitle ? null :
+        result.windows.find(w => !w.minimized && w.focused && allowedObservationTitle(w.title) &&
+          !/studdy.buddy/i.test(w.title)) ??
         result.windows.find(w => !w.minimized && w.appKind === 'PACKET_TRACER') ??
         result.windows.find(w => !w.minimized && w.appKind === 'NETACAD' && /netacad|networking academy/i.test(w.title));
-      if (!active || !allowedObservationTitle(active.title)) return;
-      markStudySeen();
+      if (!active || !allowedObservationTitle(active.title) || /studdy.buddy/i.test(active.title)) return;
       if (Date.now() - lastUiSnapshot > 12_000) {
         lastUiSnapshot = Date.now();
         const snapshot = await adapter.snapshot(active.id);
-        if (snapshot.accessible) svc.db.observations.record('agent.uia.heartbeat', {
+        if (snapshot.accessible) {
+          markStudySeen();
+          svc.db.observations.record('agent.uia.heartbeat', {
           kind: active.appKind, elementCount: snapshot.elements.length,
-        });
+          });
+        }
         const hint = detectCompanionHint(snapshot, active.title);
         if (hint && !proactiveBusy && !companionSignatures.has(hint.signature) &&
             Date.now() - lastCompanionHintAt > 3 * 60_000) {
