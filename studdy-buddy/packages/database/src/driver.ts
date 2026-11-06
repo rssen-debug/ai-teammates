@@ -1,7 +1,9 @@
 /**
  * SQLite access with no native compilation step.
  *
- * We use Node's built-in `node:sqlite` (stable enough from Node 22.5+, unflagged
+ * We use Node's built-in `node:sqlite` (usable without a flag from Node 22.13+; the
+ * Electron build must therefore bundle Node 22.13 or newer - Electron 33 bundled
+ * Node 20, where the module does not exist at all
  * in current 22.x/23+ releases). That removes the better-sqlite3/node-gyp
  * dependency that breaks on machines without a C++ toolchain, which matters
  * because this ships as a Windows installer.
@@ -40,8 +42,9 @@ interface NodeSqliteDatabase {
 export class SqliteUnavailableError extends Error {
   constructor(detail: string) {
     super(
-      `SQLite is not available in this runtime (${detail}). Studdy Buddy needs Node 22.5+ ` +
-        `with the built-in node:sqlite module. On Electron this requires a build that bundles Node 22+.`,
+      `SQLite is not available in this runtime (${detail}). Studdy Buddy needs Node 22.13+ ` +
+        `with the built-in node:sqlite module, and an Electron build that bundles Node 22.13+ ` +
+        `(Electron 37 or newer). On Electron 33 (Node 20) the module does not exist.`,
     );
     this.name = 'SqliteUnavailableError';
   }

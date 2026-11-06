@@ -16,8 +16,8 @@ cd studdy-buddy && npx vitest run
 Result:
 
 ```
- Test Files  18 passed (18)
-      Tests  297 passed (297)
+ Test Files  19 passed (19)
+      Tests  300 passed (300)
    Duration  ~4.5s
 ```
 

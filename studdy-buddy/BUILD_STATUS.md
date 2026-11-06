@@ -23,7 +23,8 @@ Legend
 | Area | Status | Evidence |
 | --- | --- | --- |
 | TypeScript typecheck (whole repo, strict) | VERIFIED | `npm run typecheck` → 0 errors |
-| Automated test suite | VERIFIED | `npm test` → **297 tests, 18 files, all passing** (see TEST_RESULTS.md) |
+| Node/Electron runtime floor | VERIFIED (and a real bug fixed) | CI failed on pinned Node **22.12**, where `node:sqlite` still needs `--experimental-sqlite`; `package.json` claimed `>=22.5.0`. Electron 33 bundles Node **20**, where the module does not exist at all, so the packaged app could never have opened its own database. Floor is now `>=22.13`, Electron `^37`, CI pins 22.13, and `tests/unit/runtime-floor.test.ts` fails if either regresses |
+| Automated test suite | VERIFIED | `npm test` → **300 tests, 19 files, all passing** (see TEST_RESULTS.md) |
 | SQLite persistence + versioned migrations | VERIFIED | Fresh DB creates 19 tables, schema v4; migration idempotency test; WAL mode |
 | Settings/provider persistence | VERIFIED | Survives reopen; API key never present in the `provider_config` table (asserted) |
 | Bayesian Knowledge Tracing | VERIFIED | `tests/unit/learning-engine.test.ts` (13 tests) |
