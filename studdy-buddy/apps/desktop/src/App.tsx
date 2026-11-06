@@ -742,8 +742,8 @@ html, body, #root { margin:0; padding:0; background: transparent; overflow: hidd
   position: absolute; right: -6px; top: 4px; display: flex; flex-direction: column; gap: 4px;
   opacity: 0; transition: opacity 140ms ease; -webkit-app-region: no-drag;
 }
-.studdy-mascot-tools { opacity: .95; }
-.studdy-mascot-zone:hover .studdy-mascot-tools { opacity: 1; }
+.studdy-mascot-tools { opacity: 0; pointer-events: none; }
+.studdy-mascot-zone:hover .studdy-mascot-tools, .studdy-mascot-zone:focus-within .studdy-mascot-tools { opacity: 1; pointer-events: auto; }
 .studdy-mascot-tools button {
   width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.16);
   background: rgba(24,26,31,0.82); color: rgba(255,255,255,0.8); font-size: 11px; cursor: pointer;
