@@ -44,6 +44,7 @@ export function App() {
   const [bridgeState, setBridgeState] = useState<BridgePanelState | null>(null);
   const [captureSources, setCaptureSources] = useState<{ id: string; name: string }[]>([]);
   const [captureSourceId, setCaptureSourceId] = useState('');
+  const [liveContext, setLiveContext] = useState('Redo när du börjar plugga');
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
   const [courseInfo, setCourseInfo] = useState<{ name: string; moduleCount: number } | null>(null);
   const [platformProgress, setPlatformProgress] = useState<{ completed: number; total: number } | null>(null);
@@ -121,14 +122,24 @@ export function App() {
     // visible Packet Tracer source. Never auto-select a generic browser window
     // because unrelated private tabs may be open there.
     const packetTracer = result.data.filter((source) => /packet\s*tracer/i.test(source.name));
+    if (packetTracer.length === 1) setLiveContext('Packet Tracer upptäckt · bild vid fråga');
     setCaptureSourceId((previous) => result.data.some((source) => source.id === previous)
       ? previous
       : packetTracer.length === 1 ? packetTracer[0]!.id : '');
   }, [bridge, captureAllowed]);
 
   useEffect(() => {
-    if (bubbleOpen) void refreshCaptureSources();
-  }, [bubbleOpen, refreshCaptureSources]);
+    if (!captureAllowed || !provider?.hasApiKey) return;
+    // Always-ready study observation: a scoped, low-frequency window title
+    // check. No screenshots or cloud calls are made by this loop.
+    void refreshCaptureSources();
+    const interval = window.setInterval(() => void refreshCaptureSources(), 10_000);
+    return () => window.clearInterval(interval);
+  }, [captureAllowed, provider?.hasApiKey, refreshCaptureSources]);
+
+  useEffect(() => {
+    if (bubbleOpen && !captureAllowed) setLiveContext('Redo när du börjar plugga');
+  }, [bubbleOpen, captureAllowed]);
 
   // ---- boot -------------------------------------------------------------
   useEffect(() => {
@@ -195,6 +206,9 @@ export function App() {
         return;
       }
       if (e.page?.url && e.page.url !== lastUrl) {
+        setLiveContext('Studieflik upptäckt · följer lektionen');
+        setSignal('hint-shown');
+        void refreshProgress();
         lastUrl = e.page.url;
         void refreshBridge();
         // The heading trail is what the student is actually looking at; the panel
@@ -205,7 +219,7 @@ export function App() {
       }
     });
     return off;
-  }, [bridge, refreshBridge]);
+  }, [bridge, refreshBridge, refreshProgress]);
 
   // Greeting appears once, as a Buddy message, only when it is evidence-based.
   useEffect(() => {
@@ -288,7 +302,7 @@ export function App() {
     const reset = () => {
       setSignal('app-idle');
       if (inactivity.current) clearTimeout(inactivity.current);
-      inactivity.current = setTimeout(() => setSignal('long-inactivity'), 5 * 60_000);
+      inactivity.current = setTimeout(() => setSignal(captureSourceId ? 'app-idle' : 'long-inactivity'), 5 * 60_000);
     };
     window.addEventListener('mousemove', reset);
     window.addEventListener('keydown', reset);
@@ -298,7 +312,7 @@ export function App() {
       window.removeEventListener('keydown', reset);
       if (inactivity.current) clearTimeout(inactivity.current);
     };
-  }, []);
+  }, [captureSourceId]);
 
   // ---- chat -------------------------------------------------------------
   const send = useCallback(
@@ -571,6 +585,7 @@ export function App() {
               captureSources={captureSources}
               captureSourceId={captureSourceId}
               captureActive={Boolean(captureSourceId)}
+              studyPresence={liveContext}
               onCaptureSourceChange={captureAllowed ? setCaptureSourceId : undefined}
               onRefreshCaptureSources={captureAllowed ? () => void refreshCaptureSources() : undefined}
               mode={mode}
