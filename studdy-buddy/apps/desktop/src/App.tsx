@@ -38,6 +38,7 @@ export function App() {
   const [view, setView] = useState<View>('chat');
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [signal, setSignal] = useState<MascotSignal>('app-idle');
+  const [mascotGaze, setMascotGaze] = useState<{ x: number; y: number } | null>(null);
   const [greeting, setGreeting] = useState<string | null>(null);
   const [bridgeMissing, setBridgeMissing] = useState(false);
   const [bridgeState, setBridgeState] = useState<BridgePanelState | null>(null);
@@ -225,6 +226,10 @@ export function App() {
     if (!bridge) return;
     const onMove = (event: MouseEvent) => {
       const overMascot = isInside(mascotRef.current, event.clientX, event.clientY);
+      if (overMascot && mascotRef.current) {
+        const r = mascotRef.current.getBoundingClientRect();
+        setMascotGaze({ x: (event.clientX - r.left - r.width / 2) / (r.width / 2), y: (event.clientY - r.top - r.height / 2) / (r.height / 2) });
+      }
       const overBubble = bubbleOpen && isInside(bubbleRef.current, event.clientX, event.clientY);
       const ignore = !dragRef.current && !(overMascot || overBubble);
       void bridge.window.setIgnoreMouse(ignore);
@@ -452,7 +457,7 @@ export function App() {
           }}
           onDoubleClick={() => setView('settings')}
         >
-          <Buddy size={116} signal={signal} reducedMotion={settings.reducedMotion} />
+          <Buddy size={116} signal={signal} lookAt={mascotGaze} reducedMotion={settings.reducedMotion} />
         </button>
 
         <div className="studdy-mascot-hint" aria-hidden={bubbleOpen}>
