@@ -179,7 +179,7 @@ export class DesktopAccessibilityAdapter {
       // Official agent-desktop accepts --compact / -i; --interactive-only
       // is not a supported flag and silently prevented all live snapshots.
       // Keep static text (no -i) so the companion can detect UI error text.
-      ['snapshot', '--window-id', windowId, '--compact', '--max-depth', '7', '--timeout-ms', '7000'],
+      ['snapshot', '--window-id', windowId, '--compact'],
       this.timeoutMs,
     );
     const envelope = readEnvelope(result.stdout);
