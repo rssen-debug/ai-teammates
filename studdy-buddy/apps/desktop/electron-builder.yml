@@ -31,6 +31,7 @@ win:
   artifactName: ${productName}-${version}-${arch}.${ext}
   # Windows UI Automation and the SAPI voice bridge are the reason this is
   # x64-only: the native tooling we integrate with is not published for arm64.
+  icon: build/buddy.ico
   requestedExecutionLevel: asInvoker
 
 nsis:
@@ -43,6 +44,6 @@ nsis:
   deleteAppDataOnUninstall: false
   runAfterFinish: true
 
-# Auto-update is intentionally NOT configured: it would need a signed feed and
-# a pinned update policy. See SECURITY.md.
+# Auto-update is handled by the SHA-256-verified release updater in Electron.
+# This packaged icon is the original Buddy pixel monkey, not Electron's default.
 publish: null
