@@ -387,8 +387,7 @@ function registerIpc(svc: StuddyServices): void {
             // Windows App Paths / ShellExecute resolves installed Edge without
             // accepting user-controlled executable names. Wait for launch
             // confirmation, not merely a language-model claim.
-            const error = await shell.openExternal('microsoft-edge:');
-            if (error) throw new Error(String(error));
+            await shell.openExternal('microsoft-edge:');
             responseText = 'Jag öppnade Microsoft Edge.';
           } else {
             await new Promise<void>((resolve, reject) => {
