@@ -46,7 +46,7 @@ export function App() {
   const [bridgeMissing, setBridgeMissing] = useState(false);
   const [bridgeState, setBridgeState] = useState<BridgePanelState | null>(null);
   const [, setLiveContext] = useState('Redo');
-  const [observation, setObservation] = useState<{ connected: boolean; observing: boolean; windowTitle: string | null; lastObservedAt: number | null; state: 'starting' | 'active' | 'off' | 'private' | 'unavailable' | 'no-window' }>({ connected: false, observing: false, windowTitle: null, lastObservedAt: null, state: 'starting' });
+  const [observation, setObservation] = useState<{ connected: boolean; observing: boolean; windowTitle: string | null; lastObservedAt: number | null; state: 'starting' | 'active' | 'off' | 'private' | 'unavailable' | 'no-window'; capability?: { score: number; maximum: 100; proofCount: number; observedApps: number; launchedApps: number; helpfulInterventions: number } }>({ connected: false, observing: false, windowTitle: null, lastObservedAt: null, state: 'starting' });
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
   const [courseInfo, setCourseInfo] = useState<{ name: string; moduleCount: number } | null>(null);
   const [platformProgress, setPlatformProgress] = useState<{ completed: number; total: number } | null>(null);
