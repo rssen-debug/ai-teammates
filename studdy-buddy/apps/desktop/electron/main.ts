@@ -38,6 +38,7 @@ let speech: SpeechPlayer | null = null;
 let bridge: BrowserBridgeServer | null = null;
 let quitting = false;
 let lastStudySeen = 0;
+let authorizedWindowTitle: string | null = null;
 let observationBusy = false;
 let lastUiSnapshot = 0;
 let observationTimer: ReturnType<typeof setInterval> | null = null;
@@ -66,7 +67,15 @@ function startStudyObservation(): void {
     observationBusy = true;
     try {
       const result = await adapter.listWindows();
-      const active = result.windows.find(w => !w.minimized && w.appKind === 'PACKET_TRACER') ??
+      // A user-selected window takes precedence over study-specific defaults.
+      // Matching is exact, and duplicate titles are rejected to avoid reading
+      // a different program with a coincidentally identical title.
+      const selected = authorizedWindowTitle
+        ? result.windows.filter((w) => !w.minimized && w.title === authorizedWindowTitle)
+        : [];
+      const active = selected.length === 1 ? selected[0] :
+        authorizedWindowTitle ? null :
+        result.windows.find(w => !w.minimized && w.appKind === 'PACKET_TRACER') ??
         result.windows.find(w => !w.minimized && w.appKind === 'NETACAD' && /netacad|networking academy/i.test(w.title));
       if (!active) return;
       markStudySeen();
@@ -75,7 +84,7 @@ function startStudyObservation(): void {
         const snapshot = await adapter.snapshot(active.id);
         // Only store counts and a coarse app kind. UIA snapshots may contain
         // private text; do not persist or send them anywhere automatically.
-        if (snapshot.accessible) svc.db.observations.record('study.uia.heartbeat', {
+        if (snapshot.accessible) svc.db.observations.record('agent.uia.heartbeat', {
           kind: active.appKind, elementCount: snapshot.elements.length,
         });
       }
@@ -448,6 +457,28 @@ function registerIpc(svc: StuddyServices): void {
       const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 } });
       return ok(sources.filter((source) => source.name && !/^Studdy Buddy$/i.test(source.name))
         .map((source) => ({ id: source.id, name: source.name })));
+    } catch (err) {
+      return fail('WINDOW_LIST_FAILED', err instanceof Error ? err.message : String(err));
+    }
+  });
+
+  ipcMain.handle(IPC.observeSelectWindow, async (_e, sourceId: unknown) => {
+    if (sourceId === null || sourceId === '') {
+      authorizedWindowTitle = null;
+      return ok({ title: null });
+    }
+    const gate = svc.permissions.check('observe', ['screen.capture', 'application.observe']);
+    if (!gate.allowed) return fail('PERMISSION_DENIED', gate.reason);
+    if (typeof sourceId !== 'string' || sourceId.length > 160) return fail('BAD_SOURCE', 'Ogiltigt fönster-id.');
+    try {
+      const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 } });
+      const selected = sources.find((source) => source.id === sourceId && source.name && !/^Studdy Buddy$/i.test(source.name));
+      if (!selected) {
+        authorizedWindowTitle = null;
+        return fail('CAPTURE_NOT_FOUND', 'Fönstret finns inte längre. Välj ett nytt.');
+      }
+      authorizedWindowTitle = selected.name;
+      return ok({ title: selected.name });
     } catch (err) {
       return fail('WINDOW_LIST_FAILED', err instanceof Error ? err.message : String(err));
     }
