@@ -377,7 +377,7 @@ function registerIpc(svc: StuddyServices): void {
     const text = p.text.trim();
     // A deterministic, read-only Gmail tool that requires an explicit user
     // request. The model never sees credentials or the OAuth refresh token.
-    const inboxRequest = /^(?:visa|kolla|läs|hämta|show|check|read)(?:\\s+(?:mina|min|my|the))?\\s+(?:senaste\\s+)?(?:gmail|mejl|mail|emails|inbox|inkorgen)(?:\\s+(?:senaste|latest))?[.!?]*$/i.test(text);
+    const inboxRequest = /^(?:visa|kolla|läs|hämta|show|check|read)(?:\s+(?:mina|min|my|the))?\s+(?:senaste\s+)?(?:gmail|mejl|mail|emails|inbox|inkorgen)(?:\s+(?:senaste|latest))?[.!?]*$/i.test(text);
     if (inboxRequest) {
       const session = svc.ensureSession();
       svc.db.messages.append({ sessionId: session.id, role: 'user', text, mode });
@@ -396,6 +396,27 @@ function registerIpc(svc: StuddyServices): void {
         responseText = 'Gmail kunde inte läsas: ' + (error instanceof Error ? error.message : 'okänt fel');
       }
       const message = svc.db.messages.append({ sessionId: session.id, role: 'buddy', text: responseText, mode });
+      return ok({ message, degraded: false, error: null, trimmed: false, notice: null });
+    }
+
+    // Answer questions about Buddy's OWN real access deterministically.
+    // A green badge describes a successful UIA snapshot, never "full control".
+    const accessQuestion = /(?:full(?:a)?\s+(?:permission|behörighet|access|åtkomst)|vilka\s+(?:behörigheter|permissions)|kan\s+du\s+(?:styra|öppna\s+program)|vad\s+(?:kan|får)\s+du\s+göra)/i.test(text);
+    const liveQuestion = /(?:vad\s+(?:betyder|innebär).*(?:grön|live)|vad\s+(?:läser|ser|observerar|gör)\s+du\s+(?:just\s+)?nu|vad\s+(?:står|är)\s+det\s+att\s+du\s+läser)/i.test(text);
+    if (accessQuestion || liveQuestion) {
+      const session = svc.ensureSession();
+      svc.db.messages.append({ sessionId: session.id, role: 'user', text, mode });
+      const live = isStudyLive();
+      const checks = svc.permissions.getAll();
+      const allowed = checks.filter(p => p.granted).map(p => p.key);
+      const answer = liveQuestion
+        ? live
+          ? 'Jag har nyligen läst tillgänglighetsinformation i "' + (lastObservedWindowTitle ?? 'ett tillåtet fönster') +
+            '". Det betyder att jag observerar UI-element, inte att jag läser varje pixel, chatt eller privat uppgift. Jag analyserar inte automatiskt allt du skriver.'
+          : 'Jag har ingen bekräftad aktiv fönsterobservation just nu (' + observationState + '). Den gröna lampan ska bara visas efter en lyckad Windows-observation.'
+        : 'Det här är min verkliga åtkomst: ' + (allowed.join(', ') || 'inga godkända behörigheter') +
+          '. Jag kan försöka öppna program genom agent-desktop när du ber mig, men det kräver att verktyget lyckas. Jag har inte obegränsad datorkontroll eller automatisk åtkomst till privata konton.';
+      const message = svc.db.messages.append({ sessionId: session.id, role: 'buddy', text: answer, mode });
       return ok({ message, degraded: false, error: null, trimmed: false, notice: null });
     }
 
