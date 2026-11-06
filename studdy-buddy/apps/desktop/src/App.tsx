@@ -226,7 +226,7 @@ export function App() {
     const onMove = (event: MouseEvent) => {
       const overMascot = isInside(mascotRef.current, event.clientX, event.clientY);
       const overBubble = bubbleOpen && isInside(bubbleRef.current, event.clientX, event.clientY);
-      const ignore = !(overMascot || overBubble);
+      const ignore = !dragRef.current && !(overMascot || overBubble);
       void bridge.window.setIgnoreMouse(ignore);
     };
     window.addEventListener('mousemove', onMove);
