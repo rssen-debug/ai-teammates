@@ -8,7 +8,7 @@
  * was produced when it was not.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,7 +41,9 @@ step('Runtime manifest', () => {
     version: JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version,
     main: 'electron/main.cjs',
     private: true,
-    description: 'Autonom AI-studiekompis för NetAcad och Packet Tracer',
+    author: { name: 'Studdy Buddy' },
+    // Deliberately not "for NetAcad": the app has to work for any course site.
+    description: 'AI-studiekompis som hjälper dig plugga på valfri kursplattform',
   };
   writeFileSync(join(distDir, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
   process.stdout.write(`wrote ${join(distDir, 'package.json')}\n`);
@@ -71,13 +73,41 @@ if (!isWindows) {
   process.exit(0);
 }
 
+step('Verify electron-builder is installed', () => {
+  // This used to be missing from package.json entirely, so CI reached this step
+  // and npx tried to fetch a package that was never declared. Fail with a
+  // sentence a human can act on instead of a stack trace.
+  const bin = join(repoRoot, 'node_modules', '.bin', isWindows ? 'electron-builder.cmd' : 'electron-builder');
+  if (!existsSync(bin)) {
+    process.stdout.write(`electron-builder saknas i node_modules. Kör: npm install\n`);
+    process.exit(1);
+  }
+  process.stdout.write(`electron-builder hittad: ${bin}\n`);
+});
+
 step('Windows installer (electron-builder)', () => {
   const configPath = join(appRoot, 'electron-builder.yml');
   if (!existsSync(configPath)) {
     process.stdout.write(`saknar ${configPath}\n`);
     process.exit(1);
   }
-  run('npx', ['electron-builder', '--win', 'nsis', '--config', configPath], repoRoot);
+  // --publish never: a build must never upload anything implicitly.
+  run('npx', ['electron-builder', '--win', 'nsis', '--config', configPath, '--publish', 'never'], repoRoot);
+});
+
+step('Confirm the installer exists', () => {
+  const winDir = join(appRoot, 'dist', 'win');
+  const exe = existsSync(winDir)
+    ? readdirSync(winDir).filter((f) => f.endsWith('.exe'))
+    : [];
+  if (exe.length === 0) {
+    process.stdout.write(`Ingen .exe skapades i ${winDir}. Det här är ett fel, inte en varning.\n`);
+    process.exit(1);
+  }
+  for (const f of exe) {
+    const size = (statSync(join(winDir, f)).size / (1024 * 1024)).toFixed(1);
+    process.stdout.write(`  ${f} (${size} MB)\n`);
+  }
 });
 
 process.stdout.write(`\nKlart på ${((Date.now() - started) / 1000).toFixed(1)} s\n`);
