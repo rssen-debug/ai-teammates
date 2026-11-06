@@ -9,6 +9,7 @@ import { redact } from './log.js';
 import { SpeechPlayer } from './speech.js';
 import { BrowserBridgeServer } from './bridge-server.js';
 import { startAutomaticUpdates } from './auto-update.js';
+import { writeStudyVault } from './study-vault.js';
 
 /**
  * Electron main process.
@@ -37,6 +38,57 @@ let adapter: DesktopAccessibilityAdapter | null = null;
 let speech: SpeechPlayer | null = null;
 let bridge: BrowserBridgeServer | null = null;
 let quitting = false;
+let lastStudySeen = 0;
+let observationBusy = false;
+let lastUiSnapshot = 0;
+let observationTimer: ReturnType<typeof setInterval> | null = null;
+let vaultTimer: ReturnType<typeof setInterval> | null = null;
+
+function markStudySeen(): void { lastStudySeen = Date.now(); }
+function isStudyLive(): boolean {
+  return Boolean(services?.activeProvider()?.hasApiKey && Date.now() - lastStudySeen < 35_000);
+}
+function syncStudyVault(): void {
+  if (!services) return;
+  try { writeStudyVault(services.db, dataDir()); }
+  catch (error) { console.warn('[study-vault] local sync failed:', String(error)); }
+}
+
+/** Background UIA observation is scoped to recognizable study applications.
+ * No global screen capture, raw text storage or idle cloud LLM requests.
+ */
+function startStudyObservation(): void {
+  if (!adapter) return;
+  const tick = async () => {
+    const svc = services;
+    if (!svc || !adapter || observationBusy ||
+        !svc.permissions.check('observe', ['application.observe']).allowed ||
+        !svc.activeProvider()?.hasApiKey) return;
+    observationBusy = true;
+    try {
+      const result = await adapter.listWindows();
+      const active = result.windows.find(w => !w.minimized && w.appKind === 'PACKET_TRACER') ??
+        result.windows.find(w => !w.minimized && w.appKind === 'NETACAD' && /netacad|networking academy/i.test(w.title));
+      if (!active) return;
+      markStudySeen();
+      if (Date.now() - lastUiSnapshot > 60_000) {
+        lastUiSnapshot = Date.now();
+        const snapshot = await adapter.snapshot(active.id);
+        // Only store counts and a coarse app kind. UIA snapshots may contain
+        // private text; do not persist or send them anywhere automatically.
+        if (snapshot.accessible) svc.db.observations.record('study.uia.heartbeat', {
+          kind: active.appKind, elementCount: snapshot.elements.length,
+        });
+      }
+    } catch (error) {
+      console.warn('[study-observer] not available:', String(error));
+    } finally { observationBusy = false; }
+  };
+  observationTimer = setInterval(() => { void tick(); }, 12_000);
+  observationTimer.unref();
+  void tick();
+}
+
 
 app.setName('Studdy Buddy');
 
@@ -120,17 +172,17 @@ function createOverlayWindow(): BrowserWindow | null {
 }
 
 function createTray(): void {
-  // Icons are generated from the SAME original pixel monkey as the desktop
-  // mascot and bundled into the installed app. No placeholder icon remains.
-  const iconPath = join(__dirname, 'buddy-tray.png');
-  const blinkPath = join(__dirname, 'buddy-blink.png');
-  const icon = existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
-  if (icon.isEmpty()) {
-    console.warn('[tray] No bundled Buddy icon; tray disabled rather than showing a stock symbol.');
-    return;
-  }
-  tray = new Tray(icon);
-  tray.setToolTip('Studdy Buddy • redo att hjälpa');
+  const load = (name: string) => {
+    const file = join(__dirname, name);
+    return existsSync(file) ? nativeImage.createFromPath(file) : nativeImage.createEmpty();
+  };
+  const idle = load('buddy-tray.png');
+  const idleBlink = load('buddy-blink.png');
+  const live = load('buddy-live.png');
+  const liveBlink = load('buddy-live-blink.png');
+  if (idle.isEmpty()) return;
+  tray = new Tray(idle);
+  tray.setToolTip('Studdy Buddy • redo');
   const menu = Menu.buildFromTemplate([
     { label: 'Visa Buddy', click: () => mascotWindow?.show() },
     { label: 'Göm Buddy', click: () => mascotWindow?.hide() },
@@ -140,18 +192,24 @@ function createTray(): void {
   tray.setContextMenu(menu);
   tray.on('click', () => mascotWindow?.show());
 
-  // Calm, low-cost blink animation in Windows notification area.
-  // This is a genuine changing icon, not repeated AI requests.
-  if (existsSync(blinkPath)) {
-    const blink = nativeImage.createFromPath(blinkPath);
-    blinkTimer = setInterval(() => {
-      if (!tray || blink.isEmpty()) return;
-      tray.setImage(blink);
-      if (blinkReset) clearTimeout(blinkReset);
-      blinkReset = setTimeout(() => tray?.setImage(icon), 175);
-    }, 5100);
-    blinkTimer.unref();
-  }
+  let frame = 0;
+  let wasLive = false;
+  blinkTimer = setInterval(() => {
+    if (!tray) return;
+    const active = isStudyLive();
+    if (active !== wasLive) {
+      tray.setToolTip(active ? 'Studdy Buddy • GRÖN: följer godkänt studiefönster' : 'Studdy Buddy • redo, ingen aktiv studieobservation');
+      wasLive = active;
+    }
+    // Bright green heartbeat only with recent verified study-app observation.
+    // Idle still blinks occasionally but NEVER glows green.
+    const icon = active
+      ? (frame % 2 === 0 ? live : liveBlink)
+      : (frame % 6 === 0 ? idleBlink : idle);
+    if (!icon.isEmpty()) tray.setImage(icon);
+    frame += 1;
+  }, 1250);
+  blinkTimer.unref();
 }
 
 function registerIpc(svc: StuddyServices): void {
@@ -441,16 +499,16 @@ function registerIpc(svc: StuddyServices): void {
   ipcMain.handle(IPC.learningEvidence, (_e, input: unknown) => {
     const p = (input ?? {}) as Record<string, unknown>;
     if (typeof p.conceptId !== 'string' || typeof p.kind !== 'string') return fail('BAD_ARGS', 'conceptId och kind krävs.');
-    return ok(
-      svc.recordEvidence({
-        conceptId: p.conceptId,
-        kind: p.kind,
-        difficulty: typeof p.difficulty === 'number' ? p.difficulty : 3,
-        hintsUsed: typeof p.hintsUsed === 'number' ? p.hintsUsed : 0,
-        source: typeof p.source === 'string' ? p.source : 'CHAT',
-        detail: typeof p.detail === 'string' ? p.detail : undefined,
-      }),
-    );
+    const estimate = svc.recordEvidence({
+      conceptId: p.conceptId,
+      kind: p.kind,
+      difficulty: typeof p.difficulty === 'number' ? p.difficulty : 3,
+      hintsUsed: typeof p.hintsUsed === 'number' ? p.hintsUsed : 0,
+      source: typeof p.source === 'string' ? p.source : 'CHAT',
+      detail: typeof p.detail === 'string' ? p.detail : undefined,
+    });
+    syncStudyVault();
+    return ok(estimate);
   });
   ipcMain.handle(IPC.sessionResume, () => ok(svc.resume()));
 
@@ -523,6 +581,8 @@ async function startBridge(svc: StuddyServices): Promise<void> {
       if (!snapshot) return;
       if (!svc.permissions.check('observe', ['browser.read']).allowed) return;
       const result = svc.observePage(snapshot, page);
+      markStudySeen();
+      syncStudyVault();
       console.log(`[bridge] ${redact(page.url)} -> ${result.graph.nodes.length} noder, ${result.newTopics} begrepp`);
       mascotWindow?.webContents.send(IPC.pageContext, {
         page,
@@ -610,6 +670,10 @@ app.whenReady().then(async () => {
   mascotWindow = createMascotWindow();
   createTray();
   await startBridge(services);
+  syncStudyVault();
+  startStudyObservation();
+  vaultTimer = setInterval(syncStudyVault, 90_000);
+  vaultTimer.unref();
   // Update only from verified official release artifacts. No extra setup.
   startAutomaticUpdates();
 
@@ -669,6 +733,9 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   quitting = true;
   if (blinkTimer) clearInterval(blinkTimer);
+  if (observationTimer) clearInterval(observationTimer);
+  if (vaultTimer) clearInterval(vaultTimer);
+  syncStudyVault();
   if (blinkReset) clearTimeout(blinkReset);
   speech?.stop();
   void bridge?.stop();
