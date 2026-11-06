@@ -36,6 +36,7 @@ export interface ChatBubbleProps {
   captureSources?: { id: string; name: string }[];
   captureSourceId?: string;
   captureActive?: boolean;
+  studyPresence?: string;
   onCaptureSourceChange?: (sourceId: string) => void;
   onRefreshCaptureSources?: () => void;
 }
@@ -96,7 +97,8 @@ export function ChatBubble(props: ChatBubbleProps) {
         <div className="buddy-bubble-title">
           <span className="buddy-bubble-dot" aria-hidden="true" />
           Buddy
-          {props.streaming && <span className="buddy-bubble-status">tänker…</span>}
+          {props.streaming ? <span className="buddy-bubble-status">tänker…</span> :
+            props.studyPresence ? <span className="buddy-bubble-status" title="Buddy observerar bara tillåtna studiesammanhang; inga bilder skickas förrän du frågar.">{props.studyPresence}</span> : null}
         </div>
         <div className="buddy-bubble-actions">
           <button
