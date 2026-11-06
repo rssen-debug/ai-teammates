@@ -16,6 +16,7 @@ import { GitHubDebugSync } from './debug-sync.js';
 import { GmailConnector } from './gmail-connector.js';
 import { writeStudyVault } from './study-vault.js';
 import { calculateCapabilityProof } from './capability-proof.js';
+import { VerifiedSkillLedger } from './verified-skills.js';
 
 /**
  * Electron main process.
@@ -128,6 +129,7 @@ function startStudyObservation(): void {
           svc.db.observations.record('agent.uia.heartbeat', {
             kind: active.appKind, proof, elementCount: snapshot.elements.length,
           });
+          new VerifiedSkillLedger(svc.db.checkpoints).record('observe:' + proof, true);
         }
         const hint = detectCompanionHint(snapshot, active.title);
         if (hint && !proactiveBusy && !companionSignatures.has(hint.signature) &&
@@ -145,6 +147,7 @@ function startStudyObservation(): void {
                 // This proves an unsolicited explanation was generated and
                 // displayed; it does NOT prove the user's issue was resolved.
                 svc.db.observations.record('agent.capability.intervention', { proof: hint.signature });
+                new VerifiedSkillLedger(svc.db.checkpoints).record('model:' + hint.signature, true);
                 mascotWindow?.webContents.send(IPC.companionHintEvent, {
                   kind: 'answer', text: answer.data.message.text.slice(0, 190),
                 });
@@ -474,9 +477,9 @@ function registerIpc(svc: StuddyServices): void {
           if (!result.ok) throw new Error(result.detail);
           // A successful native CLI result is evidence of process launch.
           // Never count a model's self-reported action as proof.
-          svc.db.observations.record('agent.capability.launch', {
-            proof: createHash('sha256').update(resolvedName.toLowerCase()).digest('hex').slice(0, 20),
-          });
+          const launchProof = createHash('sha256').update(resolvedName.toLowerCase()).digest('hex').slice(0, 20);
+          svc.db.observations.record('agent.capability.launch', { proof: launchProof });
+          new VerifiedSkillLedger(svc.db.checkpoints).record('launch:' + launchProof, true);
           responseText = 'Jag startade ' + result.detail + '.';
         }
       } catch (error) {
@@ -782,7 +785,12 @@ function registerIpc(svc: StuddyServices): void {
       windowTitle: observing ? (authorizedWindowTitle ?? lastObservedWindowTitle) : null,
       lastObservedAt: lastStudySeen > 0 ? lastStudySeen : null,
       state: observing ? 'active' : observationState,
-      capability: calculateCapabilityProof(svc.db.observations.recent(2000)),
+      capability: {
+        ...calculateCapabilityProof(svc.db.observations.recent(2000)),
+        // Persistent 1-100 evidence level. Repeated tasks, failed tool calls
+        // and model claims never increase this number.
+        score: new VerifiedSkillLedger(svc.db.checkpoints).level(),
+      },
     });
   });
 
