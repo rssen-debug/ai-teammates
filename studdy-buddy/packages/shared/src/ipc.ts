@@ -37,6 +37,7 @@ export const IPC = {
   windowsList: 'observe:windows',
   snapshotTake: 'observe:snapshot',
   screenCapture: 'observe:capture',
+  screenSources: 'observe:sources',
   cursorContext: 'observe:cursor-context',
   // browser bridge (extension -> main). Site-agnostic: any allowed study site.
   bridgeStatus: 'bridge:status',
