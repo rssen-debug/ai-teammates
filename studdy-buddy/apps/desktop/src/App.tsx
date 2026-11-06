@@ -46,7 +46,7 @@ export function App() {
   const [bridgeMissing, setBridgeMissing] = useState(false);
   const [bridgeState, setBridgeState] = useState<BridgePanelState | null>(null);
   const [, setLiveContext] = useState('Redo');
-  const [observation, setObservation] = useState<{ connected: boolean; observing: boolean; windowTitle: string | null; lastObservedAt: number | null }>({ connected: false, observing: false, windowTitle: null, lastObservedAt: null });
+  const [observation, setObservation] = useState<{ connected: boolean; observing: boolean; windowTitle: string | null; lastObservedAt: number | null; state: 'starting' | 'active' | 'off' | 'private' | 'unavailable' | 'no-window' }>({ connected: false, observing: false, windowTitle: null, lastObservedAt: null, state: 'starting' });
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
   const [courseInfo, setCourseInfo] = useState<{ name: string; moduleCount: number } | null>(null);
   const [platformProgress, setPlatformProgress] = useState<{ completed: number; total: number } | null>(null);
@@ -657,7 +657,7 @@ export function App() {
             <ChatBubble
               messages={visibleMessages}
               observing={observation.observing}
-              studyPresence={streaming ? 'Svarar…' : observation.observing ? 'GRÖN · läser valt fönster' : provider?.hasApiKey ? 'REDO · ingen skärm läses' : 'Anslut AI-nyckel'}
+              studyPresence={streaming ? 'Svarar…' : observation.observing ? 'LIVE · observerar' : observation.state === 'off' ? 'Observation behöver aktiveras' : observation.state === 'unavailable' ? 'Agent-desktop ej tillgänglig' : observation.state === 'private' ? 'Privat fönster · pausad' : observation.state === 'no-window' ? 'Inget tillåtet fönster' : observation.state === 'starting' ? 'Startar observation…' : provider?.hasApiKey ? 'REDO · ingen skärm läses' : 'Anslut AI-nyckel'}
 
               mode={mode}
               onModeChange={changeMode}
