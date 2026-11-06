@@ -111,6 +111,13 @@ const api = {
     test: () => invoke(IPC.voiceTest),
   },
 
+  gmail: {
+    status: () => invoke(IPC.gmailStatus),
+    connect: (clientId: string) => invoke(IPC.gmailConnect, clientId),
+    disconnect: () => invoke(IPC.gmailDisconnect),
+    list: (query: string) => invoke(IPC.gmailList, query),
+  },
+
   diagnostics: {
     run: () => invoke(IPC.diagnosticsRun),
     githubStatus: () => invoke(IPC.debugSyncStatus),
