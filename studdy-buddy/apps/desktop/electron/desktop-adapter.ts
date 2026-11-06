@@ -181,6 +181,8 @@ export class DesktopAccessibilityAdapter {
    * the UI changes, so callers must do this before acting on one.
    */
   async revalidate(windowId: string, ref: string): Promise<UiElementInfo | null> {
+    // Only qualified agent-desktop refs may ever be used for actions.
+    if (!/^@[^:]+:e\d+$/i.test(ref)) return null;
     const snapshot = await this.snapshot(windowId);
     const found = snapshot.elements.find((e) => e.ref === ref);
     if (!found) return null;
@@ -255,7 +257,9 @@ export function parseSnapshot(stdout: string, windowId: string): UiSnapshot {
   for (const raw of elementsRaw) {
     if (!isRecord(raw)) continue;
     const ref = String(raw.ref ?? raw.id ?? raw.path ?? '');
-    if (!ref) continue;
+    // Read-only text nodes often have no interactive ref. Keep them for
+    // contextual understanding, but NEVER turn them into actionable targets.
+    if (!ref && !String(raw.name ?? raw.label ?? raw.value ?? '').trim()) continue;
     elements.push({
       ref,
       role: String(raw.role ?? raw.controlType ?? 'unknown'),
@@ -374,12 +378,16 @@ function readSuggestion(data: Record<string, unknown> | undefined): string {
 export function flattenTree(tree: Record<string, unknown>, depth = 0, out: UiElementInfo[] = []): UiElementInfo[] {
   if (depth > 60) return out;
   const ref = typeof tree.ref_id === 'string' ? tree.ref_id : typeof tree.ref === 'string' ? tree.ref : null;
-  if (ref) {
+  // Static text and status messages rarely have action refs but are vital
+  // for detecting errors. Empty ref signifies read-only, never clickable.
+  const nodeName = typeof tree.name === 'string' ? tree.name : '';
+  const nodeValue = typeof tree.value === 'string' ? tree.value : null;
+  if (ref || (nodeName.trim() && /text|static|status|alert|label|document|window/i.test(String(tree.role ?? '')))) {
     out.push({
-      ref,
+      ref: ref ?? '',
       role: typeof tree.role === 'string' ? tree.role : 'unknown',
-      name: typeof tree.name === 'string' ? tree.name : '',
-      value: typeof tree.value === 'string' ? tree.value : null,
+      name: nodeName,
+      value: nodeValue,
       bounds: readRect(tree),
       enabled: tree.enabled !== false && tree.disabled !== true,
       stale: false,
