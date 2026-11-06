@@ -187,7 +187,7 @@ export function Buddy({ signal, state: forcedState, size = 132, reducedMotion = 
             <rect x="141" y="11" width="4" height="4" fill="#F1CB72"/>
           </g>
         )}
-      </svg></svg>
+      </svg>
       <span className="sr-only" role="status" aria-live="polite">
         {STATE_LABEL[effectiveState]}
       </span>
