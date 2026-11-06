@@ -206,6 +206,7 @@ export function parseWindows(stdout: string): WindowInfo[] {
       bounds: readRect(row) ?? { x: 0, y: 0, width: 0, height: 0 },
       displayId: row.displayId !== undefined ? String(row.displayId) : null,
       minimized: Boolean(row.minimized ?? row.isMinimized ?? false),
+      focused: row.is_focused === true || row.focused === true || row.isFocused === true,
     });
   }
   return out;
