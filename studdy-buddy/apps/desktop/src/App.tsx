@@ -30,6 +30,7 @@ export function App() {
   const [, setCapabilities] = useState<ModelCapabilities | null>(null);
   const [usage, setUsage] = useState<{ requests: number; estimatedCostUsd: number; limitUsd: number } | null>(null);
   const [githubDebug, setGithubDebug] = useState<{ repository: string; enabled: boolean; hasToken: boolean; target: string } | null>(null);
+  const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; configured: boolean; connecting: boolean } | null>(null);
   const [permissions, setPermissions] = useState<{ key: PermissionKey; granted: boolean }[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [mode, setMode] = useState<ResponseMode>('NORMAL');
@@ -88,6 +89,26 @@ export function App() {
       }
     }
   }, [bridge]);
+
+  const refreshGmail = useCallback(async () => {
+    if (!bridge) return;
+    const result = await bridge.gmail.status();
+    if (result.ok) setGmailStatus(result.data);
+  }, [bridge]);
+
+  const connectGmail = useCallback(async (clientId: string) => {
+    if (!bridge) return { ok: false, message: 'Appkoppling saknas.' };
+    const result = await bridge.gmail.connect(clientId);
+    await refreshGmail();
+    return result.ok ? { ok: true, message: result.data.detail } : { ok: false, message: result.error.message };
+  }, [bridge, refreshGmail]);
+
+  const disconnectGmail = useCallback(async () => {
+    if (!bridge) return { ok: false, message: 'Appkoppling saknas.' };
+    const result = await bridge.gmail.disconnect();
+    await refreshGmail();
+    return result.ok ? { ok: true, message: 'Gmail frånkopplat.' } : { ok: false, message: result.error.message };
+  }, [bridge, refreshGmail]);
 
   const refreshGitHubDebug = useCallback(async () => {
     if (!bridge) return;
@@ -229,6 +250,7 @@ export function App() {
       ]);
       if (s.ok) setSettings(s.data);
       void refreshGitHubDebug();
+      void refreshGmail();
       if (p.ok && p.data.length > 0) setProvider(p.data[0] ?? null);
       // First launch needs only a provider key; open the compact onboarding
       // automatically rather than forcing the student through settings tabs.
@@ -256,7 +278,7 @@ export function App() {
     })();
 
     return () => mql?.removeEventListener?.('change', onChange);
-  }, [bridge, refreshGitHubDebug]);
+  }, [bridge, refreshGitHubDebug, refreshGmail]);
 
   // A page the extension reports changes what Buddy knows: refresh the bridge
   // state so the settings panel shows the current course, and tell the student
@@ -683,6 +705,9 @@ export function App() {
               onAddSite={addSite}
               onRemoveSite={removeSite}
               onRotateBridgeToken={rotateBridgeToken}
+              gmailStatus={gmailStatus}
+              onGmailConnect={connectGmail}
+              onGmailDisconnect={disconnectGmail}
               githubDebug={githubDebug}
               onGitHubConfigure={configureGitHub}
               onGitHubSyncNow={syncGitHubNow}
