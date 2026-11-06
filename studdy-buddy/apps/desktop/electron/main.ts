@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, nativeImage, shell } from 'electron';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
 import { IPC, fail, ok, mergeSettings, type PermissionKey, type PermissionMode, type ResponseMode } from '@studdy/shared';
 import { StuddyServices } from './services.js';
@@ -276,6 +277,38 @@ function registerIpc(svc: StuddyServices): void {
     if (typeof p.text !== 'string' || !p.text.trim()) return fail('EMPTY', 'Skriv en fråga först.');
     if (p.text.length > 4000) return fail('TOO_LONG', 'Frågan är för lång.');
     const mode = (typeof p.mode === 'string' ? p.mode : 'NORMAL') as ResponseMode;
+
+    // Universal agent's first two local tools: explicitly requested, fixed
+    // commands. There is no arbitrary shell execution and no cloud call.
+    const text = p.text.trim();
+    const calculatorRequest = /^(?:öppna|starta|visa|open|launch)(?:s+(?:upp|the|en|min))?s+(?:miniräknaren|miniräknare|calculator|calc)(?:s*(?:åt mig|please))?[.!?]*$/i.test(text);
+    const memoryRequest = /^(?:öppna|visa|open|show)s+(?:mitts+)?(?:minne|minnet|obsidian(?:s+vault)?|memory)(?:s+mapp(?:en)?)?[.!?]*$/i.test(text);
+    if (calculatorRequest || memoryRequest) {
+      const session = svc.ensureSession();
+      svc.db.messages.append({ sessionId: session.id, role: 'user', text, mode });
+      let responseText: string;
+      try {
+        if (calculatorRequest) {
+          if (process.platform !== 'win32') throw new Error('Miniräknarverktyget stöds just nu på Windows.');
+          await new Promise<void>((resolve, reject) => {
+            const child = spawn('calc.exe', [], { detached: true, stdio: 'ignore', windowsHide: false });
+            child.once('error', reject);
+            child.once('spawn', () => { child.unref(); resolve(); });
+          });
+          responseText = 'Miniräknaren startades. Säg till om du vill ha hjälp med en beräkning.';
+        } else {
+          const folder = svc.memory?.path;
+          if (!folder) throw new Error('Minnesvalvet är inte tillgängligt.');
+          const error = await shell.openPath(folder);
+          if (error) throw new Error(error);
+          responseText = 'Jag öppnade din lokala Obsidian-minnesmapp. Du kan lägga till den som ett vault i Obsidian.';
+        }
+      } catch (err) {
+        responseText = 'Jag kunde inte öppna verktyget: ' + (err instanceof Error ? err.message : String(err));
+      }
+      const message = svc.db.messages.append({ sessionId: session.id, role: 'buddy', text: responseText, mode });
+      return ok({ message, degraded: responseText.startsWith('Jag kunde inte'), error: null, trimmed: false, notice: null });
+    }
 
     let selectedText = typeof p.context?.selectedText === 'string' ? p.context.selectedText : '';
     // User-selected, per-question screen grounding. A UIA window id is NOT a
