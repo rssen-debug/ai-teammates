@@ -46,6 +46,7 @@ export function App() {
   const [captureSources, setCaptureSources] = useState<{ id: string; name: string }[]>([]);
   const [captureSourceId, setCaptureSourceId] = useState('');
   const [liveContext, setLiveContext] = useState('Redo');
+  const [observation, setObservation] = useState<{ connected: boolean; observing: boolean; windowTitle: string | null; lastObservedAt: number | null }>({ connected: false, observing: false, windowTitle: null, lastObservedAt: null });
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
   const [courseInfo, setCourseInfo] = useState<{ name: string; moduleCount: number } | null>(null);
   const [platformProgress, setPlatformProgress] = useState<{ completed: number; total: number } | null>(null);
@@ -171,6 +172,20 @@ export function App() {
   useEffect(() => {
     if (bubbleOpen && !captureAllowed) setLiveContext('Redo');
   }, [bubbleOpen, captureAllowed]);
+
+  // Display *actual* native-observer activity. API connection alone is not
+  // evidence Buddy can read the user's screen.
+  useEffect(() => {
+    if (!bridge) return;
+    let active = true;
+    const read = async () => {
+      const result = await bridge.observe.liveStatus();
+      if (active && result.ok) setObservation(result.data);
+    };
+    void read();
+    const timer = window.setInterval(() => void read(), 4000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [bridge]);
 
   // ---- boot -------------------------------------------------------------
   useEffect(() => {
@@ -573,7 +588,7 @@ export function App() {
             setSignal('user-typing');
           }}
         >
-          <Buddy size={116} signal={signal} studyLive={Boolean(provider?.hasApiKey)} lookAt={mascotGaze} reducedMotion={settings.reducedMotion} />
+          <Buddy size={116} signal={signal} studyLive={observation.observing} lookAt={mascotGaze} reducedMotion={settings.reducedMotion} />
         </button>
 
         <div className="studdy-mascot-hint" aria-hidden={bubbleOpen}>
@@ -610,11 +625,7 @@ export function App() {
 
       {bubbleOpen && (
         <div className="studdy-bubble-zone" ref={bubbleRef}>
-          <nav className="studdy-views" aria-label="Buddy navigering">
-            <button type="button" aria-pressed={view === 'chat'} className={view === 'chat' ? 'selected' : ''} onClick={() => openView('chat')}>Chatt</button>
-            <button type="button" aria-pressed={view === 'progress'} className={view === 'progress' ? 'selected' : ''} onClick={() => openView('progress')}>Minne & framsteg</button>
-            <button type="button" aria-pressed={view === 'settings'} className={view === 'settings' ? 'selected' : ''} onClick={() => openView('settings')}>Inställningar</button>
-          </nav>
+
           {view === 'progress' ? (
             readiness ? (
               <ProgressPanel
@@ -663,7 +674,7 @@ export function App() {
               captureSources={captureSources}
               captureSourceId={captureSourceId}
               captureActive={Boolean(captureSourceId)}
-              studyPresence={provider?.hasApiKey ? (streaming ? 'Bearbetar…' : liveContext === 'Redo' ? 'AI ansluten · redo' : liveContext) : 'Anslut AI-nyckel'}
+              studyPresence={streaming ? 'Svarar…' : observation.observing ? 'GRÖN · läser valt fönster' : provider?.hasApiKey ? 'REDO · ingen skärm läses' : 'Anslut AI-nyckel'}
               onCaptureSourceChange={captureAllowed ? (sourceId) => {
                 setCaptureSourceId(sourceId);
                 setLiveContext(sourceId ? 'Universell agent · valt fönster aktivt' : 'Redo när du behöver hjälp');
