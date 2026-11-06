@@ -373,7 +373,9 @@ const bubbleCss = `
 .buddy-capture-row :focus-visible { outline:2px solid var(--buddy-accent); }
 .buddy-bubble-header { display:flex; align-items:center; justify-content:space-between; padding: 10px 12px 8px; }
 .buddy-bubble-title { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; letter-spacing:0.01em; }
-.buddy-bubble-dot { width:8px; height:8px; border-radius:50%; background: var(--buddy-accent); box-shadow: 0 0 0 3px var(--buddy-accent-soft); }
+.buddy-bubble-dot { width:8px; height:8px; border-radius:50%; background:#68717c; box-shadow:0 0 0 3px rgba(104,113,124,.15); transition:background 160ms; }
+.buddy-bubble-dot.is-observing { background:#39F080; box-shadow:0 0 0 3px rgba(57,240,128,.14), 0 0 10px rgba(57,240,128,.7); animation:buddy-observation-pulse 1.4s ease-in-out infinite; }
+@keyframes buddy-observation-pulse { 0%,100% { opacity:.45 } 50% { opacity:1 } }
 .buddy-bubble-status { font-weight:400; color: var(--buddy-text-faint); font-size:11.5px; }
 .buddy-bubble-actions { display:flex; gap:6px; }
 .buddy-icon-btn {
