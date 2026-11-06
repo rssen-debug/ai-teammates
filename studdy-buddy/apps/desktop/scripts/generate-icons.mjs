@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Original orange pixel-companion brand icons, generated offline and deterministically.
+ * Minimal five-dot active/idle desktop brand icons, generated offline and deterministically.
  * No stock images, network, fonts, package downloads or secrets are required.
  * Produce Windows icon, Electron window icon and breathing/blinking tray frames.
  */
@@ -42,32 +42,16 @@ function portrait(size, expression = 'awake') {
       if(nx*nx+ny*ny<=1)plot(xx,yy,color);
     }
   }
-  // Original orange pixel companion. No monkey ears, fur or stock emoji.
-  // The same pixel design is used on the desktop, in the taskbar and tray.
-  rect(12,9,24,4,COLORS.ink);
-  rect(8,13,32,5,COLORS.ink);
-  rect(5,18,38,23,COLORS.ink);
-  rect(9,41,7,5,COLORS.ink);rect(32,41,7,5,COLORS.ink);
-  rect(12,44,5,4,COLORS.ink);rect(23,44,5,4,COLORS.ink);rect(32,44,5,4,COLORS.ink);
-  rect(13,12,22,4,'#ED9466');
-  rect(9,16,30,6,'#ED9466');
-  rect(6,21,36,19,'#E7784D');
-  rect(10,40,28,4,'#E7784D');
-  rect(14,44,3,3,'#E7784D');rect(24,44,3,3,'#E7784D');rect(33,44,3,3,'#E7784D');
-  rect(32,20,8,3,'#CE6042');
-  if (expression === 'blink' || expression === 'live-blink') {
-    rect(13,27,7,2,COLORS.ink);rect(29,27,7,2,COLORS.ink);
-  } else {
-    const look = expression === 'curious' ? 2 : 0;
-    rect(14+look,25,6,7,COLORS.ink);rect(29+look,25,6,7,COLORS.ink);
-    rect(15+look,26,2,2,'#FFF4E8');rect(30+look,26,2,2,'#FFF4E8');
+  // Five-dot identity across Windows, taskbar and tray; no mascot.
+  // Native tray frames indicate ACTIVE OBSERVATION rather than fake AI sentience.
+  const live = expression === 'live' || expression === 'live-blink' || expression === 'active';
+  const points = [[24,8],[12,21],[36,21],[17,36],[31,36]];
+  for (const [x,y] of points) {
+    ellipse(x-5,y-5,10,10,live?'#48FA9B':'#F5F7F7');
+    if (live) ellipse(x-2,y-2,4,4,'#B1FFD7');
   }
-  rect(22,35,5,2,COLORS.ink);
-  if (expression === 'live' || expression === 'live-blink' || expression === 'active') {
-    rect(36,36,11,11,COLORS.ink);
-    rect(38,38,7,7,expression === 'live-blink' ? '#B2FFC3' : '#34EF7A');
-    rect(39,39,2,2,'#E6FFEE');
-  }
+  if (expression === 'curious') ellipse(20,31,8,8,'#72EFC1');
+  if (expression === 'blink' || expression === 'live-blink') rect(18,34,6,3,live?'#A1FFD1':'#C3CECA');
   const rgba=Buffer.alloc(size*size*4);
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
     const sx=Math.floor(x*n/size),sy=Math.floor(y*n/size);
@@ -127,4 +111,4 @@ writeFileSync(join(runtime,'buddy-active.png'),portrait(32,'active'));
 writeFileSync(join(runtime,'buddy-live.png'),portrait(32,'live'));
 writeFileSync(join(runtime,'buddy-live-blink.png'),portrait(32,'live-blink'));
 
-console.log('Original pixel monkey desktop, taskbar, tray and animation frames generated.');
+console.log('Minimal five-dot desktop, taskbar and activity tray frames generated.');
