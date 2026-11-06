@@ -387,7 +387,8 @@ function registerIpc(svc: StuddyServices): void {
     const gate = svc.permissions.check('observe', ['screen.capture']);
     if (!gate.allowed) return fail('PERMISSION_DENIED', gate.reason);
     try {
-      const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 64, height: 64 } });
+      // Enumerate window titles without capturing thumbnails during live idle monitoring.
+      const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 } });
       return ok(sources.filter((source) => source.name && !/^Studdy Buddy$/i.test(source.name))
         .map((source) => ({ id: source.id, name: source.name })));
     } catch (err) {
