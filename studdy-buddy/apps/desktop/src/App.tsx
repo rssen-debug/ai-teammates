@@ -45,8 +45,6 @@ export function App() {
   const [greeting, setGreeting] = useState<string | null>(null);
   const [bridgeMissing, setBridgeMissing] = useState(false);
   const [bridgeState, setBridgeState] = useState<BridgePanelState | null>(null);
-  const [captureSources, setCaptureSources] = useState<{ id: string; name: string }[]>([]);
-  const [captureSourceId, setCaptureSourceId] = useState('');
   const [, setLiveContext] = useState('Redo');
   const [observation, setObservation] = useState<{ connected: boolean; observing: boolean; windowTitle: string | null; lastObservedAt: number | null }>({ connected: false, observing: false, windowTitle: null, lastObservedAt: null });
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
@@ -148,52 +146,7 @@ export function App() {
   };
 
 
-  // Capture is opt-in: no source is selected by default, and a source is
-  // photographed only when the student sends a question with it selected.
-  const captureAllowed = permissions.some((permission) => permission.key === 'screen.capture' && permission.granted);
   const dataSharingAllowed = permissions.some((permission) => permission.key === 'provider.dataShare' && permission.granted);
-  const refreshCaptureSources = useCallback(async () => {
-    if (!bridge || !captureAllowed) {
-      setCaptureSources([]);
-      setCaptureSourceId('');
-      return;
-    }
-    const result = await bridge.observe.sources();
-    if (!result.ok) {
-      setNotice(result.error.message);
-      return;
-    }
-    setCaptureSources(result.data);
-    // Within an authorized study session, automatically reuse the single
-    // visible Packet Tracer source. Never auto-select a generic browser window
-    // because unrelated private tabs may be open there.
-    const packetTracer = result.data.filter((source) => /packet\s*tracer/i.test(source.name));
-    if (packetTracer.length === 1) setLiveContext('Packet Tracer ansluten');
-    setCaptureSourceId((previous) => result.data.some((source) => source.id === previous)
-      ? previous
-      : packetTracer.length === 1 ? packetTracer[0]!.id : '');
-  }, [bridge, captureAllowed]);
-
-  // The selected app, not the entire desktop, is the persistent universal
-  // context source. Electron IDs are checked again in the main process.
-  useEffect(() => {
-    if (!bridge) return;
-    void bridge.observe.selectWindow(captureAllowed ? captureSourceId || null : null)
-      .then((result) => { if (!result.ok && captureSourceId) setNotice(result.error.message); });
-  }, [bridge, captureAllowed, captureSourceId]);
-
-  useEffect(() => {
-    if (!captureAllowed || !provider?.hasApiKey) return;
-    // Always-ready study observation: a scoped, low-frequency window title
-    // check. No screenshots or cloud calls are made by this loop.
-    void refreshCaptureSources();
-    const interval = window.setInterval(() => void refreshCaptureSources(), 10_000);
-    return () => window.clearInterval(interval);
-  }, [captureAllowed, provider?.hasApiKey, refreshCaptureSources]);
-
-  useEffect(() => {
-    if (bubbleOpen && !captureAllowed) setLiveContext('Redo');
-  }, [bubbleOpen, captureAllowed]);
 
   // Display *actual* native-observer activity. API connection alone is not
   // evidence Buddy can read the user's screen.
@@ -389,7 +342,7 @@ export function App() {
     const reset = () => {
       setSignal('app-idle');
       if (inactivity.current) clearTimeout(inactivity.current);
-      inactivity.current = setTimeout(() => setSignal(captureSourceId ? 'app-idle' : 'long-inactivity'), 5 * 60_000);
+      inactivity.current = setTimeout(() => setSignal('long-inactivity'), 5 * 60_000);
     };
     window.addEventListener('mousemove', reset);
     window.addEventListener('keydown', reset);
@@ -399,7 +352,7 @@ export function App() {
       window.removeEventListener('keydown', reset);
       if (inactivity.current) clearTimeout(inactivity.current);
     };
-  }, [captureSourceId]);
+  }, []);
 
   // ---- chat -------------------------------------------------------------
   const send = useCallback(
