@@ -53,7 +53,7 @@ function portrait(size, expression = 'awake') {
   ellipse(12,17,24,24,COLORS.face);
   ellipse(16,27,17,12,COLORS.muzzle);
   // Two crisp expressive eyes. Blink frame uses flat eyelids.
-  if(expression === 'blink') {
+  if(expression === 'blink' || expression === 'live-blink') {
     rect(16,24,7,2,COLORS.ink);rect(27,24,7,2,COLORS.ink);
   } else {
     rect(16,22,8,10,COLORS.ink);rect(27,22,8,10,COLORS.ink);
@@ -67,6 +67,12 @@ function portrait(size, expression = 'awake') {
   rect(12,35,3,2,COLORS.blush);rect(34,35,3,2,COLORS.blush);
   // Distinct mint glint at upper right.
   rect(39,7,3,7,COLORS.sparkle);rect(37,9,7,3,COLORS.sparkle);
+  if (expression === 'live' || expression === 'live-blink') {
+    // Crisp green status LED, visible even as a 16px tray icon.
+    rect(34,34,12,12,COLORS.ink);
+    rect(36,36,9,9,expression === 'live-blink' ? '#A9FFB1' : '#35E77D');
+    rect(38,37,3,3,'#E6FFE8');
+  }
   const rgba=Buffer.alloc(size*size*4);
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
     const sx=Math.floor(x*n/size),sy=Math.floor(y*n/size);
@@ -122,4 +128,7 @@ writeFileSync(join(runtime,'buddy-icon.png'),portrait(256));
 writeFileSync(join(runtime,'buddy-tray.png'),portrait(32));
 writeFileSync(join(runtime,'buddy-blink.png'),portrait(32,'blink'));
 writeFileSync(join(runtime,'buddy-curious.png'),portrait(32,'curious'));
+writeFileSync(join(runtime,'buddy-live.png'),portrait(32,'live'));
+writeFileSync(join(runtime,'buddy-live-blink.png'),portrait(32,'live-blink'));
+
 console.log('Original pixel monkey desktop, taskbar, tray and animation frames generated.');
