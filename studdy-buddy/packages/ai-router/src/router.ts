@@ -193,7 +193,7 @@ export class AiRouter {
       if (
         err instanceof ProviderError &&
         err.status === 402 &&
-        /(^|\\.)kilo\\.ai$/i.test(new URL(provider.baseUrl).hostname) &&
+        /(^|\.)kilo\.ai$/i.test(new URL(provider.baseUrl).hostname) &&
         request.task !== 'vision' &&
         model !== 'kilo-auto/free'
       ) {
