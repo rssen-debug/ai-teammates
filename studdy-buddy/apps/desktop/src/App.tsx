@@ -41,6 +41,8 @@ export function App() {
   const [greeting, setGreeting] = useState<string | null>(null);
   const [bridgeMissing, setBridgeMissing] = useState(false);
   const [bridgeState, setBridgeState] = useState<BridgePanelState | null>(null);
+  const [captureSources, setCaptureSources] = useState<{ id: string; name: string }[]>([]);
+  const [captureSourceId, setCaptureSourceId] = useState('');
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
   const [courseInfo, setCourseInfo] = useState<{ name: string; moduleCount: number } | null>(null);
   const [platformProgress, setPlatformProgress] = useState<{ completed: number; total: number } | null>(null);
@@ -97,6 +99,28 @@ export function App() {
     await refreshBridge();
   };
 
+
+  // Capture is opt-in: no source is selected by default, and a source is
+  // photographed only when the student sends a question with it selected.
+  const captureAllowed = permissions.some((permission) => permission.key === 'screen.capture' && permission.granted);
+  const refreshCaptureSources = useCallback(async () => {
+    if (!bridge || !captureAllowed) {
+      setCaptureSources([]);
+      setCaptureSourceId('');
+      return;
+    }
+    const result = await bridge.observe.sources();
+    if (!result.ok) {
+      setNotice(result.error.message);
+      return;
+    }
+    setCaptureSources(result.data);
+    setCaptureSourceId((previous) => result.data.some((source) => source.id === previous) ? previous : '');
+  }, [bridge, captureAllowed]);
+
+  useEffect(() => {
+    if (bubbleOpen) void refreshCaptureSources();
+  }, [bubbleOpen, refreshCaptureSources]);
 
   // ---- boot -------------------------------------------------------------
   useEffect(() => {
@@ -243,7 +267,7 @@ export function App() {
       setStreaming(true);
       setNotice(null);
 
-      const result = await bridge.chat.send({ text, mode });
+      const result = await bridge.chat.send({ text, mode, context: captureSourceId ? { captureSourceId } : undefined });
 
       setStreaming(false);
       if (!result.ok) {
@@ -267,7 +291,7 @@ export function App() {
         }
       }
     },
-    [bridge, mode],
+    [bridge, mode, captureSourceId],
   );
 
   const changeMode = useCallback(
@@ -469,6 +493,10 @@ export function App() {
           ) : (
             <ChatBubble
               messages={visibleMessages}
+              captureSources={captureSources}
+              captureSourceId={captureSourceId}
+              onCaptureSourceChange={captureAllowed ? setCaptureSourceId : undefined}
+              onRefreshCaptureSources={captureAllowed ? () => void refreshCaptureSources() : undefined}
               mode={mode}
               onModeChange={changeMode}
               onSend={(text) => void send(text)}
