@@ -107,6 +107,9 @@ const api = {
 
   diagnostics: {
     run: () => invoke(IPC.diagnosticsRun),
+    githubStatus: () => invoke(IPC.debugSyncStatus),
+    githubConfigure: (config: unknown) => invoke(IPC.debugSyncConfigure, config),
+    githubSyncNow: () => invoke(IPC.debugSyncNow),
   },
 };
 
