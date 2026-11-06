@@ -1,0 +1,51 @@
+{
+  "name": "studdy-buddy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Studdy Buddy - an autonomous, evidence-grounded AI study companion for Cisco NetAcad and Packet Tracer",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "build": "node apps/desktop/scripts/dev.mjs",
+    "build:ui": "vite build --config apps/desktop/vite.config.ts",
+    "build:electron": "node apps/desktop/scripts/build-electron.mjs",
+    "dev": "node apps/desktop/scripts/dev.mjs --watch",
+    "start": "node apps/desktop/scripts/dev.mjs",
+    "package:win": "node apps/desktop/scripts/package-win.mjs",
+    "studdy": "tsx packages/cli/src/bin.ts",
+    "doctor": "tsx packages/cli/src/bin.ts doctor"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.1",
+    "esbuild": "^0.24.2",
+    "eslint": "^9.39.5",
+    "jsdom": "^26.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^6.0.5",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "ws": "^8.22.1",
+    "zod": "^3.24.1"
+  }
+}

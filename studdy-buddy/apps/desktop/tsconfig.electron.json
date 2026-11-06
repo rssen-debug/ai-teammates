@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist/electron",
+    "rootDir": "../..",
+    "baseUrl": "../..",
+    "types": ["node"],
+    "sourceMap": false,
+    "declaration": false,
+    "paths": {
+      "@studdy/shared": ["packages/shared/src/index.ts"],
+      "@studdy/database": ["packages/database/src/index.ts"],
+      "@studdy/ai-router": ["packages/ai-router/src/index.ts"],
+      "@studdy/learning-engine": ["packages/learning-engine/src/index.ts"],
+      "@studdy/agent-core": ["packages/agent-core/src/index.ts"],
+      "@studdy/curriculum": ["packages/curriculum/src/index.ts"],
+      "@studdy/packet-tracer": ["packages/packet-tracer/src/index.ts"],
+      "@studdy/voice-engine": ["packages/voice-engine/src/index.ts"]
+    }
+  },
+  "include": ["electron/**/*.ts", "../../packages/*/src/**/*.ts", "../../apps/desktop/electron/**/*.d.ts"],
+  "exclude": ["../../packages/*/src/**/*.tsx", "../../packages/mascot/**", "../../packages/chat-ui/**", "../../packages/screen-overlay/**"]
+}
