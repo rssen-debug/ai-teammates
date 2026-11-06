@@ -153,6 +153,12 @@ export function App() {
       ]);
       if (s.ok) setSettings(s.data);
       if (p.ok && p.data.length > 0) setProvider(p.data[0] ?? null);
+      // First launch needs only a provider key; open the compact onboarding
+      // automatically rather than forcing the student through settings tabs.
+      if (!p.ok || !p.data[0]?.hasApiKey) {
+        setBubbleOpen(true);
+        setView('settings');
+      }
       if (perms.ok) setPermissions(perms.data.map((x) => ({ key: x.key, granted: x.granted })));
       if (history.ok) setMessages(history.data);
       if (resume.ok) setGreeting(resume.data.greeting);
