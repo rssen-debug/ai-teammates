@@ -100,6 +100,8 @@ export interface WindowInfo {
   /** Display the window lives on, for DPI-aware coordinate mapping. */
   displayId: string | null;
   minimized: boolean;
+  /** Windows foreground state from agent-desktop; optional for older fixtures. */
+  focused?: boolean;
 }
 
 export interface UiElementInfo {
