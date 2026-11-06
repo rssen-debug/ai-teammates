@@ -8,6 +8,7 @@ import { mascotWindowOptions, overlayWindowOptions, initialMascotBounds, MASCOT_
 import { redact } from './log.js';
 import { SpeechPlayer } from './speech.js';
 import { BrowserBridgeServer } from './bridge-server.js';
+import { startAutomaticUpdates } from './auto-update.js';
 
 /**
  * Electron main process.
@@ -579,6 +580,8 @@ app.whenReady().then(async () => {
   mascotWindow = createMascotWindow();
   createTray();
   await startBridge(services);
+  // Update only from verified official release artifacts. No extra setup.
+  startAutomaticUpdates();
 
   // Opt-in launch probe: record machine-readable evidence under STUDDY_DATA_DIR.
   // Packaged GUI processes on Windows do not reliably expose stdout, so CI must
