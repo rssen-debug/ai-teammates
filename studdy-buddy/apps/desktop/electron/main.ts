@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, nativeImage, shell } from 'electron';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
 import { IPC, fail, ok, mergeSettings, type PermissionKey, type PermissionMode, type ResponseMode } from '@studdy/shared';
 import { StuddyServices } from './services.js';
