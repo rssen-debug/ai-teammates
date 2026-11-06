@@ -40,6 +40,9 @@ let bridge: BrowserBridgeServer | null = null;
 let quitting = false;
 let lastStudySeen = 0;
 let authorizedWindowTitle: string | null = null;
+let mascotExpanded = false;
+let mouseRegionTimer: ReturnType<typeof setInterval> | null = null;
+let mouseIgnored = true;
 let observationBusy = false;
 let lastUiSnapshot = 0;
 let observationTimer: ReturnType<typeof setInterval> | null = null;
@@ -147,6 +150,25 @@ function createMascotWindow(): BrowserWindow {
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true } as never);
   win.setIgnoreMouseEvents(true, { forward: true });
+  mouseIgnored = true;
+  // Poll the REAL OS cursor rather than relying on React mousemove events:
+  // ignored transparent Electron windows may not receive the first pointer
+  // movement, causing the infamous multiple-click chat/settings bug.
+  mouseRegionTimer = setInterval(() => {
+    if (win.isDestroyed()) return;
+    const cursor = screen.getCursorScreenPoint();
+    const b = win.getBounds();
+    const x = cursor.x - b.x;
+    const y = cursor.y - b.y;
+    const mascotHit = x >= 6 && x < 148 && y >= 4 && y < 145;
+    const panelHit = mascotExpanded && x >= 6 && x <= 356 && y >= 142 && y <= b.height - 4;
+    const ignore = !(mascotHit || panelHit);
+    if (ignore !== mouseIgnored) {
+      mouseIgnored = ignore;
+      win.setIgnoreMouseEvents(ignore, { forward: true });
+    }
+  }, 70);
+  mouseRegionTimer.unref();
   win.once('ready-to-show', () => win.show());
 
   // Remember where the student parked Buddy.
@@ -159,6 +181,8 @@ function createMascotWindow(): BrowserWindow {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   win.on('closed', () => {
+    if (mouseRegionTimer) clearInterval(mouseRegionTimer);
+    mouseRegionTimer = null;
     mascotWindow = null;
     if (!quitting) app.quit();
   });
@@ -260,9 +284,7 @@ function registerIpc(svc: StuddyServices): void {
     ),
   );
   ipcMain.handle(IPC.windowSetExpanded, (_e, expanded: unknown) => {
-    // The window is fixed-size by design (see windows.ts); expansion is handled
-    // inside the renderer so the always-on-top window never resizes.
-    void expanded;
+    mascotExpanded = expanded === true;
     return ok(true);
   });
 
