@@ -45,6 +45,14 @@ describe('runtime floor', () => {
     expect(electronMajor(pkg.devDependencies?.electron)).toBeGreaterThanOrEqual(35);
   });
 
+  it('pins Electron exactly, because electron-builder refuses a range', () => {
+    // Real CI failure: "Electron version "^37.10.3" is a range, not a fixed
+    // version." electron-builder downloads binaries for one specific release, so
+    // a caret here breaks Windows packaging even though dev and tests are fine.
+    const range = pkg.devDependencies?.electron ?? '';
+    expect(range).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
   it('the driver can report the floor instead of crashing when it is unmet', () => {
     const source = readFileSync(resolve(root, 'packages/database/src/driver.ts'), 'utf8');
     expect(source).toContain('22.13');
