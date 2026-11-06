@@ -128,6 +128,14 @@ export function App() {
       : packetTracer.length === 1 ? packetTracer[0]!.id : '');
   }, [bridge, captureAllowed]);
 
+  // The selected app, not the entire desktop, is the persistent universal
+  // context source. Electron IDs are checked again in the main process.
+  useEffect(() => {
+    if (!bridge) return;
+    void bridge.observe.selectWindow(captureAllowed ? captureSourceId || null : null)
+      .then((result) => { if (!result.ok && captureSourceId) setNotice(result.error.message); });
+  }, [bridge, captureAllowed, captureSourceId]);
+
   useEffect(() => {
     if (!captureAllowed || !provider?.hasApiKey) return;
     // Always-ready study observation: a scoped, low-frequency window title
@@ -600,7 +608,10 @@ export function App() {
               captureSourceId={captureSourceId}
               captureActive={Boolean(captureSourceId)}
               studyPresence={liveContext}
-              onCaptureSourceChange={captureAllowed ? setCaptureSourceId : undefined}
+              onCaptureSourceChange={captureAllowed ? (sourceId) => {
+                setCaptureSourceId(sourceId);
+                setLiveContext(sourceId ? 'Universell agent · valt fönster aktivt' : 'Redo när du behöver hjälp');
+              } : undefined}
               onRefreshCaptureSources={captureAllowed ? () => void refreshCaptureSources() : undefined}
               mode={mode}
               onModeChange={changeMode}
