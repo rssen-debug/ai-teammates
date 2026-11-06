@@ -37,6 +37,7 @@ export interface ChatBubbleProps {
   captureSourceId?: string;
   captureActive?: boolean;
   studyPresence?: string;
+  observing?: boolean;
   onCaptureSourceChange?: (sourceId: string) => void;
   onRefreshCaptureSources?: () => void;
 }
@@ -95,7 +96,7 @@ export function ChatBubble(props: ChatBubbleProps) {
 
       <header className="buddy-bubble-header">
         <div className="buddy-bubble-title">
-          <span className="buddy-bubble-dot" aria-hidden="true" />
+          <span className={`buddy-bubble-dot ${props.observing ? 'is-observing' : ''}`} aria-hidden="true" title={props.observing ? 'Observerar tillåtet fönster' : 'Redo – ingen skärm observeras'} />
           Buddy
           {props.streaming ? <span className="buddy-bubble-status">tänker…</span> :
             props.studyPresence ? <span className="buddy-bubble-status" title="Buddy observerar bara tillåtna studiesammanhang; inga bilder skickas förrän du frågar.">{props.studyPresence}</span> : null}
