@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Original pixel-monkey brand icons, generated offline and deterministically.
+ * Original orange pixel-companion brand icons, generated offline and deterministically.
  * No stock images, network, fonts, package downloads or secrets are required.
  * Produce Windows icon, Electron window icon and breathing/blinking tray frames.
  */
@@ -42,42 +42,31 @@ function portrait(size, expression = 'awake') {
       if(nx*nx+ny*ny<=1)plot(xx,yy,color);
     }
   }
-  // Muted outline gives the desktop/tray mark contrast on both themes.
-  ellipse(2,16,16,23,COLORS.ink); ellipse(30,16,16,23,COLORS.ink);
-  ellipse(5,19,11,17,COLORS.fur); ellipse(32,19,11,17,COLORS.fur);
-  ellipse(8,23,7,9,COLORS.face); ellipse(33,23,7,9,COLORS.face);
-  ellipse(9,6,30,38,COLORS.ink);
-  ellipse(11,8,26,34,COLORS.fur);
-  ellipse(13,9,21,10,COLORS.lit);
-  ellipse(18,14,25,27,COLORS.shaded);
-  ellipse(12,17,24,24,COLORS.face);
-  ellipse(16,27,17,12,COLORS.muzzle);
-  // Two crisp expressive eyes. Blink frame uses flat eyelids.
-  if(expression === 'blink' || expression === 'live-blink') {
-    rect(16,24,7,2,COLORS.ink);rect(27,24,7,2,COLORS.ink);
+  // Original orange pixel companion. No monkey ears, fur or stock emoji.
+  // The same pixel design is used on the desktop, in the taskbar and tray.
+  rect(12,9,24,4,COLORS.ink);
+  rect(8,13,32,5,COLORS.ink);
+  rect(5,18,38,23,COLORS.ink);
+  rect(9,41,7,5,COLORS.ink);rect(32,41,7,5,COLORS.ink);
+  rect(12,44,5,4,COLORS.ink);rect(23,44,5,4,COLORS.ink);rect(32,44,5,4,COLORS.ink);
+  rect(13,12,22,4,'#ED9466');
+  rect(9,16,30,6,'#ED9466');
+  rect(6,21,36,19,'#E7784D');
+  rect(10,40,28,4,'#E7784D');
+  rect(14,44,3,3,'#E7784D');rect(24,44,3,3,'#E7784D');rect(33,44,3,3,'#E7784D');
+  rect(32,20,8,3,'#CE6042');
+  if (expression === 'blink' || expression === 'live-blink') {
+    rect(13,27,7,2,COLORS.ink);rect(29,27,7,2,COLORS.ink);
   } else {
-    rect(16,22,8,10,COLORS.ink);rect(27,22,8,10,COLORS.ink);
-    rect(17,23,6,8,COLORS.white);rect(28,23,6,8,COLORS.white);
-    const offset=expression==='curious'?2:0;
-    rect(19+offset,25,4,5,COLORS.pupil);rect(30+offset,25,4,5,COLORS.pupil);
-    rect(19+offset,25,2,2,COLORS.shine);rect(30+offset,25,2,2,COLORS.shine);
+    const look = expression === 'curious' ? 2 : 0;
+    rect(14+look,25,6,7,COLORS.ink);rect(29+look,25,6,7,COLORS.ink);
+    rect(15+look,26,2,2,'#FFF4E8');rect(30+look,26,2,2,'#FFF4E8');
   }
-  rect(22,33,5,3,COLORS.blush);
-  rect(21,38,9,2,COLORS.ink);rect(23,40,5,1,COLORS.shaded);
-  rect(12,35,3,2,COLORS.blush);rect(34,35,3,2,COLORS.blush);
-  if (expression === 'active') {
-    // Green online pulse in the original icon, visible at 16–32px in the tray.
-    ellipse(37,36,10,10,COLORS.ink);
-    ellipse(39,38,6,6,'#5CE39D');
-    rect(40,39,2,2,'#D7FFE7');
-  }
-  // Distinct mint glint at upper right.
-  rect(39,7,3,7,COLORS.sparkle);rect(37,9,7,3,COLORS.sparkle);
-  if (expression === 'live' || expression === 'live-blink') {
-    // Crisp green status LED, visible even as a 16px tray icon.
-    rect(34,34,12,12,COLORS.ink);
-    rect(36,36,9,9,expression === 'live-blink' ? '#A9FFB1' : '#35E77D');
-    rect(38,37,3,3,'#E6FFE8');
+  rect(22,35,5,2,COLORS.ink);
+  if (expression === 'live' || expression === 'live-blink' || expression === 'active') {
+    rect(36,36,11,11,COLORS.ink);
+    rect(38,38,7,7,expression === 'live-blink' ? '#B2FFC3' : '#34EF7A');
+    rect(39,39,2,2,'#E6FFEE');
   }
   const rgba=Buffer.alloc(size*size*4);
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
