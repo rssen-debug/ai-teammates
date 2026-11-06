@@ -31,7 +31,7 @@ export const defaultRunner: CommandRunner = {
       // but ONLY for the fixed agent-desktop command and shell-safe CLI args.
       // Never interpolate arbitrary UI text into a Windows shell command.
       const npmShim = process.platform === 'win32' && command === 'agent-desktop';
-      const safeArgs = args.every((arg) => /^[a-zA-Z0-9_@.:/\\-]+$/.test(arg));
+      const safeArgs = args.every((arg) => /^[a-zA-Z0-9_@.:-]+$/.test(arg));
       if (npmShim && !safeArgs) {
         resolve({ code: 1, stdout: '', stderr: 'Unsafe agent-desktop CLI argument rejected.' });
         return;
