@@ -28,7 +28,7 @@ win:
     - target: nsis
       arch:
         - x64
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: Studdy-Buddy-${version}-${arch}.${ext}
   # Windows UI Automation and the SAPI voice bridge are the reason this is
   # x64-only: the native tooling we integrate with is not published for arm64.
   icon: build/buddy.ico
