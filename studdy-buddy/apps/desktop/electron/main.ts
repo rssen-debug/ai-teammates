@@ -395,7 +395,7 @@ function registerIpc(svc: StuddyServices): void {
     // Universal application launcher: use the agent-desktop OS backend,
     // rather than hardcoding Edge, Chrome or any other app into the chat AI.
     // An explicit user request is required for each launch.
-    const launchMatch = text.match(/^(?:(?:kan du|could you|please)\s+)?(?:öppna|starta|kör|open|launch|start)\s+(?:(?:upp|min/mitt|the|my|en|ett)\s+)?(.+?)(?:\s+(?:åt mig|nu|please))?[.!?]*$/i);
+    const launchMatch = text.match(/^(?:(?:kan du|could you|please)\s+)?(?:öppna|starta|kör|open|launch|start)\s+(?:(?:upp|min|mitt|the|my|en|ett)\s+)?(.+?)(?:\s+(?:åt mig|nu|please))?[.!?]*$/i);
     const programName = launchMatch?.[1]?.trim() ?? '';
     const openMemory = /^(?:mitt\s+)?(?:minne|minnet|obsidian(?:\s+vault)?|memory)(?:\s+mapp(?:en)?)?$/i.test(programName);
     if (launchMatch && (openMemory || programName)) {
