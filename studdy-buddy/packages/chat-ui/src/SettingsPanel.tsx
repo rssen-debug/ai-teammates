@@ -84,6 +84,89 @@ export function SettingsPanel(props: SettingsPanelProps) {
     }
   };
 
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [quickProvider, setQuickProvider] = useState<'kilo' | 'deepseek'>(
+    props.provider?.baseUrl?.includes('kilo.ai') ? 'kilo' : props.provider?.baseUrl?.includes('deepseek.com') ? 'deepseek' : 'kilo',
+  );
+  const [quickKey, setQuickKey] = useState('');
+  const [quickBusy, setQuickBusy] = useState(false);
+  const [quickStatus, setQuickStatus] = useState<string | null>(null);
+
+  const saveQuick = async () => {
+    if (quickBusy || !quickKey.trim()) return;
+    setQuickBusy(true);
+    setQuickStatus(null);
+    try {
+      const result = await props.onSaveProvider({
+        name: quickProvider === 'kilo' ? 'Kilo Code' : 'DeepSeek',
+        baseUrl: quickProvider === 'kilo' ? 'https://ai-gateway.kilo.ai/api/v1' : 'https://api.deepseek.com/v1',
+        modelId: quickProvider === 'kilo' ? 'kilo-auto/free' : 'deepseek-flash',
+        visionModelId: null,
+        fallbackModelId: null,
+        apiKey: quickKey.trim(),
+        dailyCostLimitUsd: 2,
+      });
+      if (!result.ok) {
+        setQuickStatus(result.message);
+        return;
+      }
+      // Scoped study permissions are persisted; capture still needs an
+      // approved study window and the browser extension still needs its
+      // own browser permissions. Never enable unattended desktop clicks.
+      for (const key of ['screen.capture', 'application.observe', 'browser.read', 'provider.dataShare'] as PermissionKey[]) {
+        props.onPermission(key, true);
+      }
+      props.onModeChange('VISUAL_GUIDE');
+      setQuickKey('');
+      setQuickStatus('Sparat! Buddy är redo för textfrågor. Välj ett studiefönster för skärmhjälp.');
+    } catch (error) {
+      setQuickStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setQuickBusy(false);
+    }
+  };
+
+  if (!advancedOpen) {
+    return (
+      <div style={themeToCssVars(theme) as React.CSSProperties} className="buddy-settings" role="dialog" aria-label="Enkel inställning">
+        <style>{settingsCss}</style>
+        <header>
+          <h2>Buddy</h2>
+          <button type="button" className="buddy-s-btn" onClick={props.onClose} aria-label="Stäng inställningar">✕</button>
+        </header>
+        <section className="buddy-s-section" style={{ paddingTop: 16 }}>
+          <h3>{props.provider?.hasApiKey ? 'AI är ansluten' : 'Anslut din AI'}</h3>
+          <p className="buddy-s-hint">En gång: välj leverantör, klistra in nyckeln och spara. Buddy kommer ihåg den lokalt.</p>
+          <label>
+            AI-leverantör
+            <select value={quickProvider} onChange={(event) => setQuickProvider(event.target.value as 'kilo' | 'deepseek')}>
+              <option value="kilo">Kilo Code (gratis om modellen är tillgänglig)</option>
+              <option value="deepseek">DeepSeek API</option>
+            </select>
+          </label>
+          <label>
+            API-nyckel
+            <input type="password" value={quickKey}
+              onChange={(event) => setQuickKey(event.target.value)}
+              onKeyDown={(event) => { if (event.key === 'Enter') void saveQuick(); }}
+              onBlur={() => { if (quickKey.trim()) void saveQuick(); }}
+              autoComplete="off"
+              placeholder={props.provider?.hasApiKey ? 'Sparad – ange ny för att byta' : 'Klistra in API-nyckel'}
+            />
+          </label>
+          <div className="buddy-s-actions">
+            <button type="button" className="buddy-s-btn is-primary" disabled={quickBusy || !quickKey.trim()}
+              onClick={() => void saveQuick()}>{quickBusy ? 'Sparar…' : 'Spara och börja'}</button>
+            <button type="button" className="buddy-s-btn" onClick={() => setAdvancedOpen(true)}>Avancerat</button>
+          </div>
+          {quickStatus && <p className="buddy-s-hint" role="status">{quickStatus}</p>}
+          {props.provider?.hasApiKey && <p className="buddy-s-hint">En nyckel finns redan sparad. Den följer med vid uppdateringar.</p>}
+          <p className="buddy-s-hint">Buddy kan läsa ett valt studiefönster. Mikrofon och datoråtgärder kräver alltid separat aktivering eller bekräftelse.</p>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div style={themeToCssVars(theme) as React.CSSProperties} className="buddy-settings" role="dialog" aria-label="Inställningar">
       <style>{settingsCss}</style>
