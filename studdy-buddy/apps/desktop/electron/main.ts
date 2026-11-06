@@ -54,6 +54,8 @@ function diagnostic(source: string, error: unknown, severity: 'warn' | 'error' =
 
 let lastStudySeen = 0;
 let lastObservedWindowTitle: string | null = null;
+let lastObservedElementCount = 0;
+let lastNativeActivity = 'Startar';
 let authorizedWindowTitle: string | null = null;
 let mascotExpanded = false;
 let mouseRegionTimer: ReturnType<typeof setInterval> | null = null;
@@ -122,6 +124,8 @@ function startStudyObservation(): void {
         if (snapshot.accessible) {
           markStudySeen();
           lastObservedWindowTitle = active.title;
+          lastObservedElementCount = snapshot.elements.length;
+          lastNativeActivity = 'Läser ' + snapshot.elements.length + ' UI-element i ' + active.title.slice(0, 42);
           observationState = 'active';
           // Only a hashed app identity; no window title, screenshot or UI text
           // enters the capability ledger.
@@ -138,6 +142,7 @@ function startStudyObservation(): void {
           companionSignatures.add(hint.signature);
           // Bound memory growth in a session. Hashes only, no raw UI history.
           if (companionSignatures.size > 100) companionSignatures.clear();
+          lastNativeActivity = 'Undersöker ett upptäckt fel';
           mascotWindow?.webContents.send(IPC.companionHintEvent, { kind: 'thinking', text: hint.label });
           if (svc.permissions.isGranted('provider.dataShare') && svc.activeProvider()?.hasApiKey) {
             proactiveBusy = true;
@@ -791,6 +796,12 @@ function registerIpc(svc: StuddyServices): void {
         // and model claims never increase this number.
         score: new VerifiedSkillLedger(svc.db.checkpoints).level(),
       },
+      elementCount: observing ? lastObservedElementCount : 0,
+      activity: observing ? lastNativeActivity
+        : observationState === 'off' ? 'Observation avstängd'
+        : observationState === 'private' ? 'Privat fönster · pausad'
+        : observationState === 'unavailable' ? 'Windows-tillgänglighet saknas'
+        : 'Väntar på läsbart fönster',
     });
   });
 
