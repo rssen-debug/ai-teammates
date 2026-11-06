@@ -157,7 +157,10 @@ export class DesktopAccessibilityAdapter {
 
     const result = await this.runner.run(
       this.binary,
-      ['snapshot', '--window-id', windowId, '--include-bounds', '--interactive-only'],
+      // Official agent-desktop accepts --compact / -i; --interactive-only
+      // is not a supported flag and silently prevented all live snapshots.
+      // Keep static text (no -i) so the companion can detect UI error text.
+      ['snapshot', '--window-id', windowId, '--compact', '--max-depth', '7', '--timeout-ms', '7000'],
       this.timeoutMs,
     );
     const envelope = readEnvelope(result.stdout);
