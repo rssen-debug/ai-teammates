@@ -18,6 +18,18 @@ describe('Windows app discovery (no hardcoded Edge or Chrome launch)', () => {
       expect(findStartMenuApp('Nonexistent', [root])).toBeNull();
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
+  it('rejects duplicate exact shortcut labels across per-user and all-user menus', () => {
+    const user = mkdtempSync(join(tmpdir(), 'buddy-user-menu-'));
+    const global = mkdtempSync(join(tmpdir(), 'buddy-global-menu-'));
+    try {
+      writeFileSync(join(user, 'Google Chrome.lnk'), '');
+      writeFileSync(join(global, 'Google Chrome.lnk'), '');
+      expect(findStartMenuApp('Google Chrome', [user, global])).toBeNull();
+    } finally {
+      rmSync(user, { recursive: true, force: true });
+      rmSync(global, { recursive: true, force: true });
+    }
+  });
   it('rejects ambiguous application names and unrelated files', () => {
     const root = mkdtempSync(join(tmpdir(), 'buddy-menu-'));
     try {
