@@ -26,6 +26,8 @@ extraMetadata:
 extraResources:
   - from: build/agent-desktop.exe
     to: bin/agent-desktop.exe
+  - from: build/agent-desktop-LICENSE.txt
+    to: third-party/agent-desktop-LICENSE.txt
 
 win:
   target:
