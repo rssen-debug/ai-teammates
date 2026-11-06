@@ -187,6 +187,22 @@ export class AiRouter {
       if (cacheable) this.cache.set(key, result);
       return result;
     } catch (err) {
+      // Kilo's Auto Efficient is a paid tier. If it returns HTTP 402,
+      // retry text-only requests with the documented no-credit Auto Free.
+      // Never silently downgrade vision requests or spend credits.
+      if (
+        err instanceof ProviderError &&
+        err.status === 402 &&
+        /(^|\\.)kilo\\.ai$/i.test(new URL(provider.baseUrl).hostname) &&
+        request.task !== 'vision' &&
+        model !== 'kilo-auto/free'
+      ) {
+        const free: ChatRequest = { ...base, model: 'kilo-auto/free' };
+        const result = await client.chat(free);
+        this.recordUsage(provider, result.usage.inputTokens, result.usage.outputTokens);
+        this.deps.db.providers.save({ ...provider, modelId: 'kilo-auto/free' });
+        return result;
+      }
       const canFallback =
         provider.fallbackModelId &&
         model !== provider.fallbackModelId &&
