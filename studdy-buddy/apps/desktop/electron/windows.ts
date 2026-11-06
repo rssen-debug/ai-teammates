@@ -16,7 +16,7 @@ export interface Rect {
   height: number;
 }
 
-export const MASCOT_SIZE = { width: 360, height: 560 };
+export const MASCOT_SIZE = { width: 360, height: 690 };
 
 /**
  * The mascot window is intentionally larger than the monkey: it must have room
