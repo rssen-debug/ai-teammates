@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ChatMessage, ResponseMode, StructuredResponse } from '@studdy/shared';
-import { countWords } from '@studdy/shared';
+import type { ChatMessage, ResponseMode } from '@studdy/shared';
 import { darkTheme, themeToCssVars, type Theme } from './theme.js';
 
 /**
@@ -42,19 +41,9 @@ export interface ChatBubbleProps {
   onRefreshCaptureSources?: () => void;
 }
 
-const MODES: { id: ResponseMode; label: string; hint: string }[] = [
-  { id: 'QUICK', label: 'Snabb', hint: '1–2 meningar' },
-  { id: 'NORMAL', label: 'Normal', hint: '2–4 meningar' },
-  { id: 'TEACH', label: 'Lär', hint: 'Förklaring + exempel' },
-  { id: 'STEP_BY_STEP', label: 'Steg', hint: 'En åtgärd i taget' },
-  { id: 'DEBUG', label: 'Felsök', hint: 'En diagnos i taget' },
-  { id: 'DEEP', label: 'Djup', hint: 'Längre förklaring' },
-];
-
 export function ChatBubble(props: ChatBubbleProps) {
   const theme = props.theme ?? darkTheme;
   const [draft, setDraft] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -99,43 +88,14 @@ export function ChatBubble(props: ChatBubbleProps) {
           <span className={`buddy-bubble-dot ${props.observing ? 'is-observing' : ''}`} aria-hidden="true" title={props.observing ? 'Observerar tillåtet fönster' : 'Redo – ingen skärm observeras'} />
           Buddy
           {props.streaming ? <span className="buddy-bubble-status">tänker…</span> :
-            props.studyPresence ? <span className="buddy-bubble-status" title="Buddy observerar bara tillåtna studiesammanhang; inga bilder skickas förrän du frågar.">{props.studyPresence}</span> : null}
+            props.studyPresence ? <span className="buddy-bubble-status" title="Status från de faktiska verktygen, inte AI:ns påståenden.">{props.studyPresence}</span> : null}
         </div>
         <div className="buddy-bubble-actions">
-          <button
-            type="button"
-            className="buddy-icon-btn"
-            aria-label="Byt svarsläge"
-            aria-expanded={showSettings}
-            onClick={() => setShowSettings((s) => !s)}
-          >
-            {modeLabel(props.mode)}
-          </button>
           <button type="button" className="buddy-icon-btn" aria-label="Stäng samtalet" onClick={props.onClose}>
             ✕
           </button>
         </div>
       </header>
-
-      {showSettings && (
-        <div className="buddy-mode-row" role="group" aria-label="Svarsläge">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              className={`buddy-chip ${props.mode === m.id ? 'is-active' : ''}`}
-              title={m.hint}
-              aria-pressed={props.mode === m.id}
-              onClick={() => {
-                props.onModeChange(m.id);
-                setShowSettings(false);
-              }}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {props.onCaptureSourceChange && (
         <div className="buddy-capture-row">
@@ -160,20 +120,14 @@ export function ChatBubble(props: ChatBubbleProps) {
 
       <div className="buddy-bubble-scroll" ref={scrollRef} aria-live="polite" aria-relevant="additions text">
         {props.messages.length === 0 && (
-          <div className="buddy-empty">
-            <p>Buddy är din desktop-agent. Fråga om det du arbetar med, i vilket program som helst.</p>
-            <p className="buddy-empty-hint">Testa: ”Öppna miniräknaren”, ”Öppna mitt minne” eller välj ett fönster och fråga vad Buddy ser.</p>
-            <p className="buddy-empty-hint">Röst är av tills du begär den. Skärmen delas bara med tillåtelse.</p>
-          </div>
+          <div className="buddy-empty"><p>Vad vill du göra?</p></div>
         )}
         {props.messages.map((message) => (
           <MessageView
             key={message.id}
             message={message}
-            reducedMotion={props.reducedMotion ?? false}
             onSpeak={props.onSpeak}
             onStopSpeech={props.onStopSpeech}
-            onChip={(text) => props.onSend(text)}
             speaking={props.speaking ?? false}
           />
         ))}
@@ -205,29 +159,18 @@ export function ChatBubble(props: ChatBubbleProps) {
   );
 }
 
-function modeLabel(mode: ResponseMode): string {
-  return MODES.find((m) => m.id === mode)?.label ?? mode;
-}
-
 function MessageView({
   message,
-  reducedMotion,
   onSpeak,
   onStopSpeech,
-  onChip,
   speaking,
 }: {
   message: ChatMessage;
-  reducedMotion: boolean;
   onSpeak?: (text: string) => void;
   onStopSpeech?: () => void;
-  onChip?: (text: string) => void;
   speaking: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const structured = message.structured;
   const isUser = message.role === 'user';
-  const words = countWords(message.text);
 
   const segments = useMemo(() => splitCodeSegments(message.text), [message.text]);
 
@@ -254,57 +197,14 @@ function MessageView({
           ),
         )}
 
-        {structured && (
-          <StructuredView structured={structured} expanded={expanded} reducedMotion={reducedMotion} />
-        )}
-
-        <footer className="buddy-msg-footer">
-          {structured?.deeperExplanation && (
-            <button type="button" className="buddy-link" aria-expanded={expanded} onClick={() => setExpanded((e) => !e)}>
-              {expanded ? 'Visa mindre' : 'Visa mer'}
-            </button>
-          )}
-          {words > 90 && <span className="buddy-len-badge">{words} ord</span>}
-          {onSpeak && (
+        {onSpeak && (
+          <footer className="buddy-msg-footer">
             <button type="button" className="buddy-link" onClick={() => (speaking ? onStopSpeech?.() : onSpeak(message.text))}>
-              {speaking ? 'Stoppa rösten' : 'Läs upp'}
+              {speaking ? 'Stoppa uppläsning' : 'Läs upp'}
             </button>
-          )}
-        </footer>
-
-        {message.chips && message.chips.length > 0 && (
-          <div className="buddy-chips">
-            {message.chips.map((chip) => (
-              <button key={chip} type="button" className="buddy-chip buddy-chip-action" onClick={() => onChip?.(chip)}>
-                {chip}
-              </button>
-            ))}
-          </div>
+          </footer>
         )}
       </div>
-    </div>
-  );
-}
-
-function StructuredView({ structured, expanded, reducedMotion }: { structured: StructuredResponse; expanded: boolean; reducedMotion: boolean }) {
-  const hasExtra = Boolean(structured.example || structured.deeperExplanation || structured.nextAction);
-  if (!hasExtra) return null;
-  return (
-    <div className="buddy-struct">
-      {structured.example && (
-        <div className="buddy-example">
-          <span className="buddy-example-label">Exempel</span>
-          <span>{structured.example}</span>
-        </div>
-      )}
-      {structured.nextAction && (
-        <div className="buddy-next" style={{ animation: reducedMotion ? 'none' : undefined }}>
-          <span className="buddy-next-label">Nästa steg</span>
-          <span>{structured.nextAction}</span>
-        </div>
-      )}
-      {expanded && structured.deeperExplanation && <p className="buddy-text buddy-deeper">{structured.deeperExplanation}</p>}
-      {structured.confidence === 'low' && <div className="buddy-confidence">Låg säkerhet – kontrollera i kursmaterialet.</div>}
     </div>
   );
 }
