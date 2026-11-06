@@ -45,7 +45,7 @@ export function App() {
   const [bridgeState, setBridgeState] = useState<BridgePanelState | null>(null);
   const [captureSources, setCaptureSources] = useState<{ id: string; name: string }[]>([]);
   const [captureSourceId, setCaptureSourceId] = useState('');
-  const [liveContext, setLiveContext] = useState('Redo');
+  const [, setLiveContext] = useState('Redo');
   const [observation, setObservation] = useState<{ connected: boolean; observing: boolean; windowTitle: string | null; lastObservedAt: number | null }>({ connected: false, observing: false, windowTitle: null, lastObservedAt: null });
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
   const [courseInfo, setCourseInfo] = useState<{ name: string; moduleCount: number } | null>(null);
