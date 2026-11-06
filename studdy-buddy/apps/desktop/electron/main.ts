@@ -50,6 +50,7 @@ function diagnostic(source: string, error: unknown, severity: 'warn' | 'error' =
 }
 
 let lastStudySeen = 0;
+let lastObservedWindowTitle: string | null = null;
 let authorizedWindowTitle: string | null = null;
 let mascotExpanded = false;
 let mouseRegionTimer: ReturnType<typeof setInterval> | null = null;
@@ -117,6 +118,7 @@ function startStudyObservation(): void {
         const snapshot = await adapter.snapshot(active.id);
         if (snapshot.accessible) {
           markStudySeen();
+          lastObservedWindowTitle = active.title;
           observationState = 'active';
           svc.db.observations.record('agent.uia.heartbeat', {
           kind: active.appKind, elementCount: snapshot.elements.length,
@@ -445,8 +447,15 @@ function registerIpc(svc: StuddyServices): void {
         svc.permissions.isGranted('provider.dataShare')) {
       try {
         const windows = await adapter.listWindows();
-        const active = windows.windows.find(w => w.focused && !w.minimized &&
-          allowedObservationTitle(w.title) && !/studdy.buddy/i.test(w.title));
+        const focused = windows.windows.find(w => w.focused && !w.minimized);
+        const blocked = focused && !allowedObservationTitle(focused.title);
+        const active = !blocked ? (
+          windows.windows.find(w => w.focused && !w.minimized &&
+            allowedObservationTitle(w.title) && !/studdy.buddy/i.test(w.title)) ??
+          (lastObservedWindowTitle && Date.now() - lastStudySeen < 35_000
+            ? windows.windows.find(w => !w.minimized && w.title === lastObservedWindowTitle)
+            : undefined)
+        ) : undefined;
         if (active) {
           const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 } });
           const sameTitle = sources.filter(x => x.name === active.title && allowedObservationTitle(x.name));
@@ -718,7 +727,7 @@ function registerIpc(svc: StuddyServices): void {
     return ok({
       connected: Boolean(svc.activeProvider()?.hasApiKey),
       observing,
-      windowTitle: observing ? authorizedWindowTitle : null,
+      windowTitle: observing ? (authorizedWindowTitle ?? lastObservedWindowTitle) : null,
       lastObservedAt: lastStudySeen > 0 ? lastStudySeen : null,
       state: observing ? 'active' : observationState,
     });
