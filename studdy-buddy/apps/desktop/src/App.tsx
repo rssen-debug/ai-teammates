@@ -717,9 +717,10 @@ function ProofDots({ score, active, busy, gaze, reducedMotion }: {
   gaze: { x: number; y: number } | null;
   reducedMotion: boolean;
 }) {
-  const progress = Math.max(0, Math.min(100, score));
-  // Level 1 is the baseline. All higher levels require distinct verified tool evidence.
-  const level = Math.min(100, progress + 1);
+  // Main process supplies a persisted 1..100 level derived only from
+  // distinct verified operations. Do not add an extra point in the UI.
+  const level = Math.max(1, Math.min(100, score || 1));
+  const progress = level - 1;
   return (
     <div className={`buddy-proof-dots ${active ? 'is-live' : ''} ${busy ? 'is-busy' : ''} ${reducedMotion ? 'is-still' : ''}`}
       role="img"
