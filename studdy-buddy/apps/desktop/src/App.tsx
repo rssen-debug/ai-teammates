@@ -718,11 +718,13 @@ function ProofDots({ score, active, busy, gaze, reducedMotion }: {
   reducedMotion: boolean;
 }) {
   const progress = Math.max(0, Math.min(100, score));
+  // Level 1 is the baseline. All higher levels require distinct verified tool evidence.
+  const level = Math.min(100, progress + 1);
   return (
     <div className={`buddy-proof-dots ${active ? 'is-live' : ''} ${busy ? 'is-busy' : ''} ${reducedMotion ? 'is-still' : ''}`}
       role="img"
-      aria-label={active ? `Live observation · ${progress} verifierade unika uppgifter av 100` : `Pausad eller redo · ${progress} verifierade unika uppgifter av 100`}
-      title={`Skills ${progress}/100: antal unika, bekräftade uppgifter i lokalt loggade resultat. Inte ett IQ-test.`}
+      aria-label={active ? `Live · nivå ${level}/100 · ${progress} verifierade uppgifter` : `Nivå ${level}/100 · ${progress} verifierade uppgifter · ingen aktiv läsning`}
+      title={`Nivå ${level}/100 · ${progress} unika, verifierade verktygsfall. Nivån är ett förmågeregister, inte AI-IQ.`}
     >
       <div className="buddy-proof-orbit" style={{ transform: `translate(${(gaze?.x ?? 0) * 2}px, ${(gaze?.y ?? 0) * 2}px)` }}>
         {Array.from({ length: 5 }, (_, index) => (
@@ -730,7 +732,7 @@ function ProofDots({ score, active, busy, gaze, reducedMotion }: {
             style={{ ['--proof-glow' as string]: active ? Math.min(1, .38 + progress / 140) : 0 }}/>
         ))}
       </div>
-      <span className="buddy-proof-skills">Skills <strong>{progress}/100</strong></span>
+      <span className="buddy-proof-skills">Lv <strong>{level}/100</strong></span>
     </div>
   );
 }
