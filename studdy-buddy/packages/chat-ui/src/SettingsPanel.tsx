@@ -232,7 +232,10 @@ export function SettingsPanel(props: SettingsPanelProps) {
           <div className="buddy-s-actions">
             <button type="button" className="buddy-s-btn is-primary" disabled={quickBusy || !quickModel.trim() || (!quickKey.trim() && (!props.provider?.hasApiKey || props.provider?.baseUrl !== (quickProvider === 'custom' ? quickBaseUrl : defaults[quickProvider].url)))}
               onClick={() => void saveQuick()}>{quickBusy ? 'Sparar…' : 'Spara och börja'}</button>
-            <button type="button" className="buddy-s-btn" onClick={() => setAdvancedOpen(true)}>Avancerat</button>
+          </div>
+          <button type="button" className="buddy-s-btn" style={{ border: 'none', background: 'transparent', fontSize: 11, opacity: .65, marginTop: 8, padding: '4px 0' }}
+            onClick={() => setAdvancedOpen(true)}>Integritet och verktyg</button>
+          <div style={{ display: 'none' }}>
           </div>
           {quickStatus && <p className="buddy-s-hint" role="status">{quickStatus}</p>}
           {props.provider?.hasApiKey && <p className="buddy-s-hint">En nyckel finns redan sparad. Den följer med vid uppdateringar.</p>}
