@@ -7,7 +7,7 @@
  * the installer itself requires Windows (or Wine) - we never claim an installer
  * was produced when it was not.
  */
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +18,25 @@ const repoRoot = resolve(appRoot, '../..');
 
 function run(cmd, args, cwd) {
   process.stdout.write(`\n$ ${cmd} ${args.join(' ')}\n`);
-  execFileSync(cmd, args, { cwd, stdio: 'inherit' });
+  // Capture the output as well as showing it: CI log downloads are not always
+  // reachable, but check-run annotations are. On failure we re-emit the tail as
+  // ::error:: lines so the reason survives even when the raw log does not.
+  const result = spawnSync(cmd, args, { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
+  process.stdout.write(result.stdout ?? '');
+  process.stderr.write(result.stderr ?? '');
+  if (result.status !== 0) {
+    const tail = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .slice(-25)
+      .join('\n');
+    process.stdout.write(`\n--- sista 25 rader ---\n${tail}\n`);
+    for (const line of tail.split('\n')) {
+      // Annotations are capped, so trim each line to stay readable.
+      process.stdout.write(`::error title=package-win::${line.slice(0, 400).replace(/%/g, '%25').replace(/\r/g, '')}\n`);
+    }
+    process.exit(result.status ?? 1);
+  }
 }
 
 function step(label, fn) {
@@ -92,7 +110,7 @@ step('Windows installer (electron-builder)', () => {
     process.exit(1);
   }
   // --publish never: a build must never upload anything implicitly.
-  run('npx', ['electron-builder', '--win', 'nsis', '--config', configPath, '--publish', 'never'], repoRoot);
+  run('npx', ['electron-builder', '--win', 'nsis', '--config', configPath, '--publish', 'never'], appRoot);
 });
 
 step('Confirm the installer exists', () => {

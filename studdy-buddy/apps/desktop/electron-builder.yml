@@ -3,6 +3,12 @@ productName: Studdy Buddy
 copyright: Copyright © 2026 Studdy Buddy
 
 directories:
+  # The app directory is the *staged* dist folder (package.json + electron/ +
+  # renderer/), not the repo root. electron-builder resolves `files` and `output`
+  # relative to this, so it must be explicit or it looks for main.cjs in the
+  # wrong place. Paths are relative to the working directory used by
+  # package-win.mjs (apps/desktop).
+  app: dist
   output: dist/win
   buildResources: build
 
