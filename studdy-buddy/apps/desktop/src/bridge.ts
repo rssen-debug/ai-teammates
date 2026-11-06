@@ -94,6 +94,9 @@ export interface StuddyBridge {
   };
   diagnostics: {
     run(): Promise<BridgeResult<unknown>>;
+    githubStatus(): Promise<BridgeResult<{ repository: string; enabled: boolean; hasToken: boolean; target: string }>>;
+    githubConfigure(config: { repository: string; token?: string; enabled: boolean }): Promise<BridgeResult<{ repository: string; enabled: boolean; hasToken: boolean; target: string }>>;
+    githubSyncNow(): Promise<BridgeResult<{ ok: boolean; detail: string }>>;
   };
 }
 
