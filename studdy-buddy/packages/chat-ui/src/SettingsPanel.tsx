@@ -29,6 +29,9 @@ export interface SettingsPanelProps {
   onAddSite?: (site: string) => Promise<void>;
   onRemoveSite?: (site: string) => Promise<void>;
   onRotateBridgeToken?: () => Promise<void>;
+  githubDebug?: { repository: string; enabled: boolean; hasToken: boolean; target: string } | null;
+  onGitHubConfigure?: (config: { repository: string; token?: string; enabled: boolean }) => Promise<{ ok: boolean; message: string }>;
+  onGitHubSyncNow?: () => Promise<{ ok: boolean; message: string }>;
   theme?: Theme;
 }
 
@@ -91,6 +94,30 @@ export function SettingsPanel(props: SettingsPanelProps) {
   const [quickKey, setQuickKey] = useState('');
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickStatus, setQuickStatus] = useState<string | null>(null);
+  const [githubOpen, setGithubOpen] = useState(false);
+  const [githubRepo, setGithubRepo] = useState(props.githubDebug?.repository || 'rssen-debug/ai-teammates');
+  const [githubToken, setGithubToken] = useState('');
+  const [githubEnabled, setGithubEnabled] = useState(props.githubDebug?.enabled ?? false);
+  const [githubBusy, setGithubBusy] = useState(false);
+  const [githubFeedback, setGithubFeedback] = useState<string | null>(null);
+
+  const configureGitHub = async () => {
+    if (!props.onGitHubConfigure || githubBusy) return;
+    setGithubBusy(true);
+    try {
+      const result = await props.onGitHubConfigure({ repository: githubRepo.trim(),
+        ...(githubToken.trim() ? { token: githubToken.trim() } : {}),
+        enabled: githubEnabled });
+      setGithubFeedback(result.message);
+      if (result.ok) setGithubToken('');
+    } finally { setGithubBusy(false); }
+  };
+  const syncGitHub = async () => {
+    if (!props.onGitHubSyncNow || githubBusy) return;
+    setGithubBusy(true);
+    try { const result = await props.onGitHubSyncNow(); setGithubFeedback(result.message); }
+    finally { setGithubBusy(false); }
+  };
 
   const saveQuick = async () => {
     if (quickBusy || !quickKey.trim()) return;
@@ -515,6 +542,43 @@ export function SettingsPanel(props: SettingsPanelProps) {
             />
           </label>
           <p className="buddy-s-hint">Röst används bara när du klickar "Läs upp" eller startar röstläge.</p>
+        </section>
+      )}
+
+      {props.onGitHubConfigure && (
+        <section className="buddy-s-section" style={{ borderTop: '1px solid var(--buddy-border)' }}>
+          <button type="button" className="buddy-s-btn" onClick={() => setGithubOpen(open => !open)}
+            aria-expanded={githubOpen}>
+            {githubOpen ? 'Dölj GitHub-felsynk' : 'GitHub-felsynk (valfritt)'}
+          </button>
+          {githubOpen && (
+            <>
+              <p className="buddy-s-hint">
+                GitHub får endast en rensad rapport med felkoder. Den privata debugger.md,
+                skärmbilder, AI-nycklar och chattar laddas aldrig upp.
+              </p>
+              <label>Repository (owner/repo)
+                <input value={githubRepo} onChange={event => setGithubRepo(event.target.value)}
+                  placeholder="rssen-debug/ai-teammates"/>
+              </label>
+              <label>GitHub PAT (begränsa till Contents: read/write i endast detta repo)
+                <input type="password" autoComplete="off" value={githubToken}
+                  onChange={event => setGithubToken(event.target.value)}
+                  placeholder={props.githubDebug?.hasToken ? 'Nyckel sparad – lämna tom för att behålla' : 'Klistra in privat här, inte i chatten'}/>
+              </label>
+              <label className="buddy-s-check">
+                <input type="checkbox" checked={githubEnabled} onChange={event => setGithubEnabled(event.target.checked)}/>
+                Synka rensade felkoder automatiskt var 30:e minut
+              </label>
+              <div className="buddy-s-actions">
+                <button type="button" className="buddy-s-btn is-primary" disabled={githubBusy}
+                  onClick={() => void configureGitHub()}>Spara GitHub</button>
+                <button type="button" className="buddy-s-btn" disabled={githubBusy || !props.githubDebug?.enabled}
+                  onClick={() => void syncGitHub()}>Synka nu</button>
+              </div>
+              {githubFeedback && <p role="status" className="buddy-s-hint">{githubFeedback}</p>}
+            </>
+          )}
         </section>
       )}
 
