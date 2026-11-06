@@ -171,6 +171,29 @@ jobs:
           "installedExe=$installed" >> $env:GITHUB_OUTPUT
           Write-Host "Installed: $installed ($([math]::Round((Get-Item $installed).Length/1MB,1)) MB)"
 
+      - name: Native agent-desktop real Windows integration smoke
+        shell: pwsh
+        run: |
+          $agent = Join-Path $env:RUNNER_TEMP 'studdy-installed/resources/bin/agent-desktop.exe'
+          if (-not (Test-Path $agent)) { throw 'Native agent-desktop binary not installed' }
+          $statusText = & $agent status
+          if ($LASTEXITCODE -ne 0) { throw "Native status failed: $statusText" }
+          $status = $statusText | ConvertFrom-Json
+          if (-not $status.ok) { throw 'Native agent-desktop status not ok' }
+          $listText = & $agent list-windows
+          if ($LASTEXITCODE -ne 0) { throw "Native list-windows failed: $listText" }
+          $inventory = $listText | ConvertFrom-Json
+          if (-not $inventory.ok -or $null -eq $inventory.data) { throw 'Native windows response invalid' }
+          Write-Host "Native agent-desktop list-windows succeeded; entries: $(@($inventory.data).Count)"
+          # Validate launch against a real Windows app instead of only mocks.
+          $launchText = & $agent launch notepad --activate
+          $launch = $launchText | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $launch.ok) {
+            throw "Native Notepad launch failed: $launchText"
+          }
+          Write-Host 'Native Notepad launch confirmed.'
+          # Do not upload raw UIA trees, titles or sensitive content as CI artifacts.
+
       - name: Run installed application and verify real renderer
         shell: pwsh
         env:
