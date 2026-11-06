@@ -90,45 +90,45 @@ jobs:
       - run: npm run build
 
       - name: Prove native helper, generic launch, window list and snapshot through the real CLI
-        shell: pwsh
+        shell: bash
         env:
           STUDDY_DATA_DIR: ${{ runner.temp }}/studdy-proof
         run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $false
-          function Fail($msg) {
-            Write-Host "::error title=Windows native proof::$msg"
-            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "### Windows native proof failed`n`n$msg"
-            exit 1
-          }
-          function RunCli([string[]]$CliArgs, [string]$File) {
-            & node dist/cli/studdy.mjs @CliArgs --json --no-color | Tee-Object -FilePath $File
-            $code = $LASTEXITCODE
-            $raw = Get-Content $File -Raw
-            Write-Host "exit=$code args=$($CliArgs -join ' ')"
-            Write-Host $raw
-            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "#### $($CliArgs -join ' ') (exit $code)`n`n```json`n$raw`n```"
-            return @{ code = $code; raw = $raw; json = ($raw | ConvertFrom-Json) }
-          }
+          set -uo pipefail
           node dist/cli/studdy.mjs setup --no-color
-          $doctor = RunCli @('doctor') 'doctor.json'
-          $native = $doctor.json.checks | Where-Object { $_.name -eq 'Native helper' }
-          if (-not $native.ok) { Fail "Native helper not available: $($native.detail)" }
+          node dist/cli/studdy.mjs doctor --json --no-color > doctor.json || true
+          cat doctor.json
+          node -e "
+            const r = require('./doctor.json');
+            const native = r.checks.find(c => c.name === 'Native helper');
+            if (!native?.ok) { console.error('Native helper not available:', native?.detail); process.exit(1); }
+          " || exit 1
 
-          $launch = RunCli @('open', 'Google Chrome') 'launch.json'
-          if (-not $launch.json.ok) { Fail "Chrome launch failed: $($launch.json.detail)" }
-          Start-Sleep -Seconds 3
+          node dist/cli/studdy.mjs open "Google Chrome" --json --no-color > launch.json || true
+          cat launch.json
+          node -e "
+            const r = require('./launch.json');
+            if (!r.ok) { console.error('Chrome launch failed:', r.detail); process.exit(1); }
+          " || exit 1
+          sleep 3
 
-          $windows = RunCli @('windows') 'windows.json'
-          if ($windows.json.error) { Fail "list-windows failed: $($windows.json.error)" }
-          $chrome = $windows.json.windows | Where-Object { $_.processName -match 'chrome' } | Select-Object -First 1
-          if (-not $chrome) { Fail 'No Chrome window observed after verified launch' }
+          node dist/cli/studdy.mjs windows --json --no-color > windows.json || true
+          cat windows.json
+          WINDOW_ID=$(node -e "
+            const r = require('./windows.json');
+            if (r.error) { console.error(r.error); process.exit(1); }
+            const w = r.windows.find(w => /chrome/i.test(w.processName || ''));
+            if (!w) { console.error('No Chrome window observed after verified launch'); process.exit(1); }
+            console.log(w.id);
+          ") || exit 1
 
-          $snapshot = RunCli @('snapshot', $chrome.id) 'snapshot.json'
-          if (-not $snapshot.json.accessible) { Fail "Snapshot not accessible: $($snapshot.json.note)" }
-          Write-Host "Verified launch + window + $($snapshot.json.elements.Count) UI elements"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "### Verified`nLaunch + window + $($snapshot.json.elements.Count) UI elements"
-          exit 0
+          node dist/cli/studdy.mjs snapshot "$WINDOW_ID" --json --no-color > snapshot.json || true
+          cat snapshot.json
+          node -e "
+            const r = require('./snapshot.json');
+            if (!r.accessible) { console.error('Snapshot not accessible:', r.note); process.exit(1); }
+            console.log('Verified launch + window + ' + r.elements.length + ' UI elements');
+          " || exit 1
 
       - uses: actions/upload-artifact@v4
         if: always()
