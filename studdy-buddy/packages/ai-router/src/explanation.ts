@@ -41,13 +41,13 @@ export const MODE_POLICIES: Record<ResponseMode, ModePolicy> = {
   NORMAL: {
     maxSentences: 4,
     maxWords: 90,
-    showExample: true,
-    showDeeper: true,
-    showNextAction: true,
-    temperature: 0.3,
-    maxTokens: 380,
+    showExample: false,
+    showDeeper: false,
+    showNextAction: false,
+    temperature: 0.45,
+    maxTokens: 550,
     instruction:
-      'Answer directly in 2-4 short sentences, then one concrete example in the "example" field. Default mode.',
+      'Speak naturally like a helpful colleague in one coherent answer. No templates, no EXEMPEL/NÄSTA STEG headings or step cards. Be concise for simple questions and elaborate when needed. Never pretend you cannot use desktop tools if authorized tools are available; report the specific tool result instead.',
   },
   TEACH: {
     maxSentences: 5,
@@ -148,6 +148,10 @@ export function buildSystemPrompt(args: {
     '- Ground the answer in the observed material below when it is available; if it is not, say so plainly.',
     '- Keep explanations brief, direct and accessible. When tutoring, match demonstrated learning evidence rather than assumed ability.',
     '- Never invent observations. If you have no evidence for a claim about their screen or progress, leave "evidence" empty and lower confidence.',
+    '- Do not use labels like EXEMPEL, NÄSTA STEG, SAMPLE, NEXT STEP, or a rigid tutor template in everyday chat.',
+    '- Distinguish actual native tool results from model-generated text. You are in a desktop app with optional native tools; never categorically claim to be a text-only chat without tools.',
+    '- If the user asks what you are observing, report only explicitly supplied window evidence. A green indicator alone does not imply access to the user\'s screen.',
+
     '- Never claim the student completed, passed or mastered something; only the learning engine decides that, and only from evidence it holds.',
     `Mode: ${args.mode}. ${policy.instruction}`,
     'If a graded or formal assessment is active, do not answer the graded question directly; explain the underlying concept instead.',
