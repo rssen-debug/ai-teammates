@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, nativeImage, shell } from 'electron';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { existsSync, writeFileSync } from 'node:fs';
 import { IPC, fail, ok, mergeSettings, type PermissionKey, type PermissionMode, type ResponseMode } from '@studdy/shared';
 import { StuddyServices } from './services.js';
@@ -14,6 +15,7 @@ import { DebugJournal } from './debug-journal.js';
 import { GitHubDebugSync } from './debug-sync.js';
 import { GmailConnector } from './gmail-connector.js';
 import { writeStudyVault } from './study-vault.js';
+import { calculateCapabilityProof } from './capability-proof.js';
 
 /**
  * Electron main process.
@@ -120,8 +122,11 @@ function startStudyObservation(): void {
           markStudySeen();
           lastObservedWindowTitle = active.title;
           observationState = 'active';
+          // Only a hashed app identity; no window title, screenshot or UI text
+          // enters the capability ledger.
+          const proof = createHash('sha256').update(active.processName || active.appKind).digest('hex').slice(0, 20);
           svc.db.observations.record('agent.uia.heartbeat', {
-          kind: active.appKind, elementCount: snapshot.elements.length,
+            kind: active.appKind, proof, elementCount: snapshot.elements.length,
           });
         }
         const hint = detectCompanionHint(snapshot, active.title);
@@ -137,6 +142,9 @@ function startStudyObservation(): void {
             try {
               const answer = await svc.ask({ text: hint.question, mode: 'QUICK' });
               if (answer.ok && !answer.data.degraded) {
+                // This proves an unsolicited explanation was generated and
+                // displayed; it does NOT prove the user's issue was resolved.
+                svc.db.observations.record('agent.capability.intervention', { proof: hint.signature });
                 mascotWindow?.webContents.send(IPC.companionHintEvent, {
                   kind: 'answer', text: answer.data.message.text.slice(0, 190),
                 });
@@ -443,6 +451,11 @@ function registerIpc(svc: StuddyServices): void {
           const resolvedName = aliases[programName.toLowerCase()] ?? programName;
           const result = await adapter.launchApp(resolvedName);
           if (!result.ok) throw new Error(result.detail);
+          // A successful native CLI result is evidence of process launch.
+          // Never count a model's self-reported action as proof.
+          svc.db.observations.record('agent.capability.launch', {
+            proof: createHash('sha256').update(resolvedName.toLowerCase()).digest('hex').slice(0, 20),
+          });
           responseText = 'Jag startade ' + result.detail + '.';
         }
       } catch (error) {
@@ -748,6 +761,7 @@ function registerIpc(svc: StuddyServices): void {
       windowTitle: observing ? (authorizedWindowTitle ?? lastObservedWindowTitle) : null,
       lastObservedAt: lastStudySeen > 0 ? lastStudySeen : null,
       state: observing ? 'active' : observationState,
+      capability: calculateCapabilityProof(svc.db.observations.recent(2000)),
     });
   });
 
