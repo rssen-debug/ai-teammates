@@ -46,7 +46,12 @@ function step(label, fn) {
 
 const started = Date.now();
 
-// Launch the installed CLI through Node directly. On Windows, npm's `npx` is a\n// .cmd shim and execFileSync('npx') fails with spawnSync ENOENT. Avoid shells.\nconst viteCli = join(repoRoot, 'node_modules', 'vite', 'bin', 'vite.js');\nconst builderCli = join(repoRoot, 'node_modules', 'electron-builder', 'cli.js');\nstep('Renderer (vite)', () => run(process.execPath, [viteCli, 'build', '--config', 'apps/desktop/vite.config.ts'], repoRoot));
+// Launch the installed CLIs through Node directly. On Windows, `npx` is a .cmd
+// shim and spawning it without a shell fails with ENOENT - and a shell wrapper
+// would hide the exit code this script gates the build on.
+const viteCli = join(repoRoot, 'node_modules', 'vite', 'bin', 'vite.js');
+const builderCli = join(repoRoot, 'node_modules', 'electron-builder', 'cli.js');
+step('Renderer (vite)', () => run(process.execPath, [viteCli, 'build', '--config', 'apps/desktop/vite.config.ts'], repoRoot));
 step('Electron bundles (esbuild)', () => run(process.execPath, ['apps/desktop/scripts/build-electron.mjs'], repoRoot));
 
 // Write a runtime package.json into dist so Electron resolves the entry point.
