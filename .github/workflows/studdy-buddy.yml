@@ -108,6 +108,19 @@ jobs:
       - name: Install dependencies (with Electron binary)
         run: npm ci || npm install
 
+      - name: Bundle verified agent-desktop for Windows UI Automation
+        shell: pwsh
+        run: |
+          npm install --global agent-desktop@1.2.0
+          if ($LASTEXITCODE -ne 0) { throw "agent-desktop npm install failed" }
+          $npmGlobal = (& npm root -g).Trim()
+          $binary = Join-Path $npmGlobal 'agent-desktop/bin/agent-desktop-win32-x64.exe'
+          if (-not (Test-Path $binary)) { throw "Native agent-desktop binary missing: $binary" }
+          & $binary version
+          if ($LASTEXITCODE -ne 0) { throw "Native agent-desktop self-check failed" }
+          New-Item -ItemType Directory -Force -Path 'apps/desktop/build' | Out-Null
+          Copy-Item $binary 'apps/desktop/build/agent-desktop.exe' -Force
+
       - name: Package Windows installer
         run: npm run package:win
         env:
@@ -151,6 +164,10 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "NSIS installer returned $($p.ExitCode)" }
           $installed = Join-Path $dest 'Studdy Buddy.exe'
           if (-not (Test-Path $installed)) { throw "Installed executable missing: $installed" }
+          $accessibility = Join-Path $dest 'resources/bin/agent-desktop.exe'
+          if (-not (Test-Path $accessibility)) { throw "Bundled agent-desktop missing: $accessibility" }
+          & $accessibility version
+          if ($LASTEXITCODE -ne 0) { throw "Bundled agent-desktop failed version check" }
           "installedExe=$installed" >> $env:GITHUB_OUTPUT
           Write-Host "Installed: $installed ($([math]::Round((Get-Item $installed).Length/1MB,1)) MB)"
 
