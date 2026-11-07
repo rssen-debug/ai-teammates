@@ -7,6 +7,7 @@ import { liveLines, compactLivePrompt } from './live-ui.js';
 import { configureLoginAutostart } from './login-autostart.js';
 import { runVoiceMode } from './voice-mode.js';
 import { runContinuousVoice, listInstalledWindowsVoices } from './continuous-voice.js';
+import { naturalDesktopGoal } from './natural-action.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -312,11 +313,20 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(h.status.running ? `ws://${h.status.host}:${h.status.port}\nToken: ${h.token}` : h.status.detail);
       } else if (text.startsWith('/')) log('Okänt kommando. /help');
       else {
-        log(p.dim('○ Buddy arbetar · tolkar förfrågan och inväntar verifierat svar...'));
-        const result = await runtime.chat(text);
-        if (result.ok) log(p.violet('studdy › ') + result.data.message.text);
-        else log(p.red(result.error.message));
-        if (!result.ok || result.data.degraded) runtime.journal.record('cli.chat', result.ok ? result.data.error ?? 'provider failed' : result.error.message, 'warn');
+        const goal = naturalDesktopGoal(text);
+        if (goal) {
+          log(p.dim('● Buddy · Kilo planerar ett verkligt datorsteg'));
+          const report = await runtime.runDesktopGoal(goal, event =>
+            log((event.ok ? p.mint('● ') : p.amber('○ ')) +
+              event.step + ' · ' + event.action + ' · ' + event.detail));
+          log((report.complete ? p.mint('Verifierat: ') : p.amber('Inte slutfört: ')) + report.summary);
+        } else {
+          log(p.dim('○ Buddy arbetar · tolkar förfrågan och inväntar verifierat svar...'));
+          const result = await runtime.chatWithScreen(text);
+          if (result.ok) log(p.violet('studdy › ') + result.data.message.text);
+          else log(p.red(result.error.message));
+          if (!result.ok || result.data.degraded) runtime.journal.record('cli.chat', result.ok ? result.data.error ?? 'provider failed' : result.error.message, 'warn');
+        }
       }
     } catch (error) {
       runtime.journal.record('cli.interactive', error);
