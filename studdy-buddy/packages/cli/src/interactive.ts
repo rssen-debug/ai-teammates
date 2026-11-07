@@ -97,7 +97,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
     try {
       if (text === '/help') {
         log('Skriv / för en väljbar meny, Tab för komplettering, eller prata naturligt.\n' + SLASH_COMMANDS.map(item => item.command.padEnd(12) + item.description).join('\n'));
-      } else if (text === '/status' || text === '/live' || text === '/activity') {
+      } else if (text === '/status' || text === '/live') {
         await runtime.observer.tick();
         const s = runtime.liveStatus();
         const metrics = runtime.liveMetrics();
