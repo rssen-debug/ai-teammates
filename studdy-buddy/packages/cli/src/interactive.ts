@@ -243,9 +243,16 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text.startsWith('/open ')) {
         const r = await runtime.launchApp(text.slice(6));
         log(r.ok ? p.mint('✓ ' + r.detail) : p.amber('○ ' + r.detail));
-      } else if (text === '/windows') {
-        const r = await runtime.adapter.listWindows();
-        log(r.error ?? r.windows.map(w => `${w.id}  ${w.title}`).join('\n'));
+      } else if (text === '/windows' || text === '/apps') {
+        await runtime.observer.tick();
+        const live = runtime.liveStatus();
+        log(box('Öppna fönster · ' + (live.openWindowCount ?? 0), [
+          'Aktivt i Windows: ' + (live.foregroundWindow ?? 'okänt'),
+          ...(live.openWindows?.length ? live.openWindows.map((name, i) => '  ' + (i + 1) + '. ' + name) : ['Inga andra programfönster identifierade.']),
+          'Läser: ' + (live.observing ? (live.windowTitle ?? 'okänt') +
+            (live.observationScope === 'background' ? ' (bakom terminalen)' : ' (förgrund)') : 'ingen UI-avläsning bekräftad'),
+          'Tryck /live för verifierade detaljer. Listan visar fönster, inte alla processer.',
+        ], color));
       } else if (text.startsWith('/snapshot ')) {
         const snap = await runtime.adapter.snapshot(text.slice(10).trim());
         log(snap.accessible ? snap.elements.filter(e => e.name || e.value).slice(0, 30).map(e => `${e.ref} ${e.role}: ${e.name || e.value}`).join('\n') : snap.note ?? 'Ingen tillgänglig snapshot.');
