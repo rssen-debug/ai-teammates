@@ -392,7 +392,7 @@ export class StuddyRuntime {
    * Never read password/edit fields or private web conversations into the model.
    * The user explicitly enters /voice, but observation still requires its scope.
    */
-  voiceScreenContext(): { label: string; text: string | null; proof: string } {
+  voiceScreenContext(question = ''): { label: string; text: string | null; proof: string } {
     const live = this.liveStatus();
     if (!this.services.permissions.isGranted('application.observe') || !live.observing) {
       return { label: 'Ingen bekräftad UI-observation', text: null, proof: 'unavailable' };
@@ -412,6 +412,18 @@ export class StuddyRuntime {
       .slice(0, 24)
       .map(e => (e.name || e.value || '').replace(/\s+/g, ' ').trim().slice(0, 95))
       .filter(Boolean);
+    // Search terms are user-provided input: share only on an explicit question
+    // asking what was searched, not during general background observation.
+    const asksForSearch = /(?:vad|what).{0,55}(?:sökt|sökte|search(?:ed)?|googl)|(?:sökning|search query)/i.test(question);
+    if (asksForSearch && /Webbläsare/i.test(label)) {
+      const searchFields = snapshot.elements.filter(e =>
+        /^(?:edit|textbox|text ?field|text ?area|combobox)$/i.test(e.role) &&
+        /(?:^sök$|^search$|search google|sök på google|search the web|google search)/i.test(e.name) &&
+        typeof e.value === 'string' && e.value.trim().length > 0 &&
+        e.value.length <= 180 &&
+        !sensitive.test(e.name + ' ' + e.value));
+      for (const field of searchFields.slice(0, 1)) lines.unshift('Current visible search query: ' + field.value!.slice(0, 180));
+    }
     return { label, text: lines.length ? lines.join(' | ').slice(0, 1200) : null,
       proof: lines.length ? 'verified-accessible-ui' : 'no-shareable-ui-text' };
   }
@@ -429,7 +441,7 @@ export class StuddyRuntime {
         parseLaunchIntent(text) || isInboxRequest(text)) return this.chat(text);
     if (!this.services.permissions.isGranted('provider.dataShare')) return this.chat(text);
     const live = this.liveStatus();
-    const context = this.voiceScreenContext();
+    const context = this.voiceScreenContext(text);
     const evidence = live.observing
       ? 'Verified desktop accessibility observation: ' +
         (live.openWindowCount ?? 0) + ' windows enumerated, ' +
