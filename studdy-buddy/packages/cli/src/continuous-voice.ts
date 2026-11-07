@@ -26,7 +26,7 @@ const SCRIPT = [
   'if ($installed.Count -eq 0) { Write-Output "ERROR:NO_RECOGNIZER"; exit 3 }',
   '$en=$installed | Where-Object { $_.Culture.Name -eq "en-US" } | Select-Object -First 1',
   'if ($null -eq $en) { $en=$installed[0] }',
-  '$r=New-Object System.Speech.Recognition.SpeechRecognitionEngine($en)',
+  '$r=[System.Speech.Recognition.SpeechRecognitionEngine]::new($en)',
   'try {',
   '  $r.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))',
   '  $r.SetInputToDefaultAudioDevice()',
@@ -88,6 +88,8 @@ export interface VoiceHealth {
   microphone: 'ready' | 'unavailable' | 'not-tested';
   recognizer: string | null;
   detail: string;
+  errorCode?: string;
+  stage?: string;
 }
 /** Probe the actual configured Windows microphone and installed recognizer.
  * This does not record any audio and cannot test the user's sound quality.
@@ -99,19 +101,28 @@ export async function probeWindowsVoice(platform=process.platform): Promise<Voic
     return {microphone:'not-tested',recognizer:null,detail:'Windows talmotor kan bara testas på Windows.'};
   const code=[
     '$ErrorActionPreference="Stop"',
+    '$stage="SYSTEM_SPEECH"',
     'try {',
     'Add-Type -AssemblyName System.Speech',
+    '$stage="RECOGNIZER_ENUM"',
     '$rec=[System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers()',
-    'if($rec.Count -eq 0){Write-Output "ERROR:NO_RECOGNIZER";exit 3}',
+    'if($rec.Count -eq 0){Write-Output "ERROR:NO_RECOGNIZER:RECOGNIZER_ENUM";exit 3}',
     '$en=$rec | Where-Object {$_.Culture.Name -eq "en-US"} | Select-Object -First 1',
     'if($null -eq $en){$en=$rec[0]}',
-    '$engine=New-Object System.Speech.Recognition.SpeechRecognitionEngine($en)',
+    '$stage="ENGINE_CONSTRUCT"',
+    '$engine=[System.Speech.Recognition.SpeechRecognitionEngine]::new($en)',
     'try {',
+    ' $stage="GRAMMAR"',
     ' $engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))',
+    ' $stage="AUDIO_DEVICE"',
     ' $engine.SetInputToDefaultAudioDevice()',
     ' Write-Output ("READY:"+$en.Culture.Name)',
-    '} finally {$engine.Dispose()}',
-    '} catch { Write-Output ("ERROR:"+$_.Exception.GetType().Name);exit 4 }',
+    '} finally {if($null -ne $engine){$engine.Dispose()}}',
+    '} catch {',
+    ' $kind=$_.Exception.GetType().Name',
+    ' Write-Output ("ERROR:"+$kind+":"+$stage)',
+    ' exit 4',
+    '}',
   ].join('\n');
   const encoded=Buffer.from(code,'utf16le').toString('base64');
   return new Promise(resolve=>{
@@ -133,12 +144,22 @@ export async function probeWindowsVoice(platform=process.platform): Promise<Voic
       const ready=lines.find(line=>line.startsWith('READY:'));
       if(ready)return finish({microphone:'ready',recognizer:ready.slice(6),
         detail:'Windows System.Speech kunde öppna standardmikrofonen och en installerad taligenkännare.'});
-      const code=lines.find(line=>line.startsWith('ERROR:'))?.slice(6);
-      finish({microphone:'unavailable',recognizer:null,
-        detail:code==='NO_RECOGNIZER'
-          ? 'Ingen Windows System.Speech-taligenkännare är installerad. Installera engelskt talstöd i Windows.'
-          : 'Windows kunde inte öppna mikrofonen ('+(code||stderr.trim()||'okänt fel')+
-            '). Kontrollera standardmikrofon, Windows mikrofonsekretess och att en annan app inte låser enheten.'});
+      const failure=lines.find(line=>line.startsWith('ERROR:'))?.slice(6) ?? '';
+      const [kind, stage='UNKNOWN'] = failure.split(':');
+      let detail: string;
+      if(kind==='NO_RECOGNIZER')
+        detail='Ingen kompatibel Windows System.Speech-taligenkännare finns. Kontrollera Windows språk/talfunktioner.';
+      else if(stage==='AUDIO_DEVICE')
+        detail='Taligenkännaren finns, men standardmikrofonen kunde inte öppnas ('+(kind||'okänt fel')+
+          '). Kontrollera Windows ljudingång och sekretess för skrivbordsappar.';
+      else if(stage==='GRAMMAR' || stage==='ENGINE_CONSTRUCT')
+        detail='Windows taligenkänningsmotor kunde inte initieras ('+stage+': '+(kind||'okänt fel')+').';
+      else if(stage==='SYSTEM_SPEECH')
+        detail='Windows System.Speech saknas eller kunde inte laddas ('+(kind||'okänt fel')+').';
+      else
+        detail='Taltest misslyckades ('+(kind||stderr.trim().slice(0,80)||'okänt fel')+', steg '+stage+').';
+      finish({microphone:'unavailable',recognizer:null,detail,
+        errorCode: kind || 'MIC_UNKNOWN',stage});
     });
   });
 }
