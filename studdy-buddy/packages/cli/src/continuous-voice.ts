@@ -98,6 +98,24 @@ export async function listInstalledWindowsVoices(platform=process.platform):Prom
     child.once('close',code=>finish(code===0?body.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,25):[]));
   });
 }
+/** Prefer an installed neural narrator if available. Never invent voices or
+ * silently install an unsigned binary into the user's Windows account. */
+export function chooseEnglishNarrator(available:string[],preferred=''):string {
+  if(preferred && available.includes(preferred))return preferred;
+  const priorities=[
+    /kokoro michael/i,
+    /kokoro.*(?:male|english)/i,
+    /(?:neural|natural).*(?:male|english|en-us)/i,
+    /microsoft david/i,
+    /microsoft mark/i,
+    /english/i,
+  ];
+  for(const pattern of priorities){
+    const match=available.find(voice=>pattern.test(voice));
+    if(match)return match;
+  }
+  return available[0]??'';
+}
 export const isVoiceStop=(text:string)=>/^(?:stop|stop voice|exit voice|end voice|avsluta|avsluta röst|stopp|stopp röst)$/i.test(text.trim());
 const normalize=(s:string)=>s.toLocaleLowerCase('en-US').replace(/[^\p{L}\p{N} ]/gu,'').trim();
 /** Heuristic acoustic-echo guard, not a claim to perfect echo cancellation. */
@@ -113,12 +131,18 @@ export async function runContinuousVoice(
 ):Promise<void>{
   const input=options.input??new WindowsContinuousInput();
   const player=options.playback??new SpeechPlayer();
+  // This is an English-first voice product. The text model receives the same
+  // English preference; local CPU voices are selected from actual SAPI inventory.
+  runtime.services.db.checkpoints.set('buddy.chat.language.v1','en-US');
+  const installed=options.playback ? [] : await listInstalledWindowsVoices();
+  const preferred=runtime.services.db.checkpoints.get<string>('buddy.voice.voiceId.v1')??'';
+  const voiceId=options.playback ? preferred : chooseEnglishNarrator(installed,preferred);
   const settings=voiceSettingsSchema.parse({
-    enabled:true,provider:'windows-native',
-    language:runtime.services.db.checkpoints.get<string>('buddy.chat.language.v1')==='en-US'?'en-US':'sv-SE',
-    speed:runtime.services.db.checkpoints.get<string>('buddy.voice.style.v1')==='documentary'?0.92:1.04,
-    voiceId:runtime.services.db.checkpoints.get<string>('buddy.voice.voiceId.v1')??'',
+    enabled:true,provider:'windows-native',language:'en-US',
+    speed:runtime.services.db.checkpoints.get<string>('buddy.voice.style.v1')==='normal'?1.04:0.92,
+    voiceId,
   });
+  status(voiceId ? '● English narrator: '+voiceId : '○ English Windows voice fallback; premium neural narrator not installed.');
   const speaking=options.playback??{
     stop:()=>player.stop(),
     speak:async(text:string)=>{
