@@ -63,6 +63,14 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
           statusLine('AI', Boolean(runtime.services.activeProvider()?.hasApiKey), color),
           `Nivå ${ledger.level} · ${ledger.verified} verifierade skills`,
         ], color));
+      } else if (text === '/profile') {
+        const facts = runtime.services.memory?.profileFacts() ?? [];
+        log(facts.length ? 'Dina sparade minnen:\n' + facts.map(fact => '• ' + fact).join('\n') : 'Inga personliga minnen ännu. Skriv /remember <fakta> eller ”kom ihåg att …”.');
+      } else if (text.startsWith('/remember ') || /^kom ihåg att /i.test(text)) {
+        const fact = text.startsWith('/remember ') ? text.slice(10).trim() : text.replace(/^kom ihåg att /i, '').trim();
+        log(runtime.services.memory?.rememberProfile(fact)
+          ? p.mint('Sparat i ditt personliga minne. Det används som kontext i framtida samtal.')
+          : p.amber('Kunde inte spara. Lägg inte API-nycklar eller lösenord i personliga minnen.'));
       } else if (text === '/models') {
         const active = runtime.services.activeProvider();
         log(active ? `Aktiv: ${active.name} · ${active.modelId} · ${active.hasApiKey ? 'API-nyckel sparad' : 'saknar nyckel'}\nByt: /model <modell-id> · Byt tjänst/nyckel: /api` : 'Ingen AI ansluten. Skriv /api och välj en tjänst.');
