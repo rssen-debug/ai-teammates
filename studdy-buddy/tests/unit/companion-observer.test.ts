@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowedObservationTitle, detectCompanionHint, detectContextHint } from '../../packages/core/src/companion-observer.js';
+import { allowedObservationTitle, safeWindowLabel, detectCompanionHint, detectContextHint } from '../../packages/core/src/companion-observer.js';
 import type { UiSnapshot } from '@studdy/shared';
 
 function snapshot(text: string): UiSnapshot {
@@ -21,10 +21,24 @@ describe('proactive companion guardrails', () => {
   });
 
   it('ignores sensitive and private windows', () => {
-    expect(allowedObservationTitle('Bitwarden Password Manager')).toBe(false);
-    expect(allowedObservationTitle('ChatGPT - Chrome')).toBe(false);
+    expect(allowedObservationTitle('Bitwarden Password Manager')).toBe(true);
+    expect(safeWindowLabel('Bitwarden Password Manager')).toBe('Privat fönster');
+    expect(allowedObservationTitle('ChatGPT - Chrome')).toBe(true);
+    expect(safeWindowLabel('ChatGPT - Google Chrome', 'chrome.exe')).toBe('Webbläsare · AI-chatt');
     expect(detectCompanionHint(snapshot('Error: access denied'), 'Bank login')).toBeNull();
     expect(detectCompanionHint(snapshot('No issues here'), 'Packet Tracer')).toBeNull();
+  });
+
+  it('does not print intimate browser tab titles or make suggestions about them', () => {
+    const title = 'Private video - EroMe - Google Chrome';
+    expect(allowedObservationTitle(title)).toBe(true);
+    expect(safeWindowLabel(title, 'chrome.exe')).toBe('Privat fönster');
+    expect(detectContextHint(snapshot('Video player controls'), title)).toBeNull();
+    expect(detectCompanionHint(snapshot('Error occurred'), title)).toBeNull();
+  });
+  it('can read a ChatGPT tab without intrusive unsolicited suggestions', () => {
+    expect(allowedObservationTitle('ChatGPT - Google Chrome')).toBe(true);
+    expect(detectContextHint(snapshot('OSI networking quiz'), 'ChatGPT - Google Chrome')).toBeNull();
   });
 
   it('suggests study help from actual non-private accessibility text', () => {

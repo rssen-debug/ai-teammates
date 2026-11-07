@@ -34,3 +34,15 @@ export function liveLines(
     '  Status är mätningar. Ingen dold tankekedja eller påhittad aktivitet visas.',
   ];
 }
+
+/** Bounded prompt prefix redrawn in-place by Node readline. Never print a new
+ * output line per poll; typed user input is preserved by rl.prompt(true).
+ */
+export function compactLivePrompt(live: LiveStatus, level: number): string {
+  const label = live.observing
+    ? (live.windowTitle ?? 'Program').replace(/\s+/g, ' ').replaceAll(String.fromCharCode(27), '').slice(0, 28)
+    : live.state === 'private' ? 'Privat fönster' : live.state === 'starting' ? 'Startar' : live.state === 'no-window' ? 'Väntar' : live.state === 'off' ? 'Pausad' : 'Ej tillgänglig';
+  const count = live.observing ? Math.max(0, live.elementCount) : 0;
+  return (live.observing ? '● LIVE' : '○ ' + live.state.toUpperCase()) +
+    ' · ' + label + ' · ' + count + ' UI · LVL ' + level + '/100';
+}

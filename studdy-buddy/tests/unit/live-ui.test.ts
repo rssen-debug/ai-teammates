@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { liveLines } from '../../packages/cli/src/live-ui.js';
+import { liveLines, compactLivePrompt } from '../../packages/cli/src/live-ui.js';
 import { dots } from '../../packages/cli/src/theme.js';
 import type { LiveStatus } from '@studdy/core';
 
@@ -29,6 +29,12 @@ describe('evidence-backed CLI live panel', () => {
     expect(lines.join(' ')).toContain('UI: AKTIV');
     expect(lines.join(' ')).toContain('UI-element: 42 · senast: 3 s sedan');
     expect(lines.join(' ')).toContain('Fönster: Browser');
+  });
+  it('renders a compact live prompt that does not depend on the last poll time', () => {
+    const now = { ...base, state: 'active' as const, observing: true, windowTitle: 'Webbläsare · AI-chatt', elementCount: 393, lastObservedAt: 1 };
+    expect(compactLivePrompt(now, 4)).toBe('● LIVE · Webbläsare · AI-chatt · 393 UI · LVL 4/100');
+    expect(compactLivePrompt({ ...now, lastObservedAt: 999 }, 4)).toBe(compactLivePrompt(now, 4));
+    expect(compactLivePrompt(base, 1)).toContain('0 UI');
   });
   it('never displays fake all-green dots for idle state', () => {
     expect(dots(false, 100, false)).toBe('○ ○ ○ ○ ○');

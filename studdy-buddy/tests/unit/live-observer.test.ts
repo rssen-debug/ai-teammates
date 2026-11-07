@@ -26,12 +26,28 @@ describe('LiveObserver', () => {
     expect(observer.status().level).toBeGreaterThanOrEqual(2);
     services.close();
   });
-  it('pauses on private windows and never claims live', async () => {
+  it('observes permitted Gmail foreground UI but anonymizes sensitive status and offers no hints', async () => {
     const services = new StuddyServices({ dataDir: ':memory:' });
     services.permissions.grant('application.observe');
     const observer = new LiveObserver({ services, adapter: fakeAdapter([win({ title: 'Gmail - Inbox' })], snap(true)) });
     await observer.tick();
-    expect(observer.status().observing).toBe(false);
+    expect(observer.status().observing).toBe(true);
+    expect(observer.status().windowTitle).toBe('Privat fönster');
+    expect(observer.status().activity).not.toContain('Gmail');
+    services.close();
+  });
+  it('observes Chrome ChatGPT UI while showing only a safe browser label', async () => {
+    const services = new StuddyServices({ dataDir: ':memory:' });
+    services.permissions.grant('application.observe');
+    const hints: string[] = [];
+    const observer = new LiveObserver({
+      services, adapter: fakeAdapter([win({ title: 'ChatGPT - Google Chrome', processName: 'chrome.exe' })], snap(true)),
+      onHint: hint => hints.push(hint.kind ?? 'unknown'),
+    });
+    await observer.tick();
+    expect(observer.status().observing).toBe(true);
+    expect(observer.status().windowTitle).toBe('Webbläsare · AI-chatt');
+    expect(hints).toEqual([]);
     services.close();
   });
   it('reports unavailable honestly when adapter fails', async () => {
