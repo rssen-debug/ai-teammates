@@ -15,6 +15,7 @@ export function extractChatGPTMessage(input: string): string | null {
   const command=/^(?:(?:hey\s+)?buddy[,! ]+\s*)?(?:(?:kan du|skulle du kunna|snälla|please|can you|could you)\s+)?(?:skriv|skriva|skicka|säg|write|send|say)\s+(.+)$/i.exec(text);
   if (!command) return null;
   const content=command[1]!.trim();
+  if (/^(?:(?:till|to|i|in)\s+)?(?:chat\s*gpt|chatgpt|chatten|chat)$/i.test(content)) return null;
   // "skriv till chat gpt hej" / "send to ChatGPT: hello"
   const receiverFirst=/^(?:(?:till|to|i|in)\s+)?(?:chat\s*gpt|chatgpt|chatten|chat)\s*(?::|-|\s+att|\s+that)?\s+(.+)$/i.exec(content);
   // "skriv hej till chat" / "write hello to ChatGPT".
