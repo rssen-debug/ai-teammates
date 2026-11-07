@@ -211,15 +211,15 @@ describe('built CLI in a real OS process, real HTTP and real native helper', () 
       `master,slave=pty.openpty()\n` +
       `env=dict(os.environ, STUDDY_DATA_DIR=data_dir, NO_COLOR='1')\n` +
       `p=subprocess.Popen([${JSON.stringify(process.execPath)},${JSON.stringify(bundle)}],stdin=slave,stdout=slave,stderr=slave,env=env,close_fds=True)\n` +
-      `os.close(slave); out=b''; state=0; end=time.time()+16\n` +
+      `os.close(slave); out=b''; pending=b''; state=0; end=time.time()+16\n` +
       `checks=[('du › '.encode(),'/api'),('Välj tjänst'.encode(),'1'),('API-nyckel (dold): '.encode(),secret),('du › '.encode(),'/models'),('du › '.encode(),'/exit')]\n` +
       `while time.time()<end and p.poll() is None:\n` +
       ` r,_,_=select.select([master],[],[],0.1)\n` +
       ` if r:\n` +
-      `  try: out+=os.read(master,65536)\n` +
+      `  try:\n   chunk=os.read(master,65536);out+=chunk;pending+=chunk\n` +
       `  except OSError: break\n` +
-      ` if state < len(checks) and checks[state][0] in out:\n` +
-      `  os.write(master,(checks[state][1]+'\\r').encode()); state+=1; out+=b' [STEP_SENT] ' ;time.sleep(.2)\n` +
+      ` if state < len(checks) and checks[state][0] in pending:\n` +
+      `  os.write(master,(checks[state][1]+'\\r').encode()); state+=1; pending=b'';time.sleep(.2)\n` +
       `try: p.wait(timeout=3)\n` +
       `except subprocess.TimeoutExpired: p.kill(); p.wait()\n` +
       `print('SECRET_LEAK' if secret.encode() in out else 'SECRET_MASKED'); print('EXIT',p.returncode);print('STEPS',state);print('CONNECTED' if b'API-nyckel sparad' in out or b'AI-anslutning sparad' in out else 'NOT_CONNECTED')\n` +
