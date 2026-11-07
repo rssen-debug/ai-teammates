@@ -26,9 +26,9 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   const native = await runtime.nativeStatus();
   log(box(`${dots(color)}  Studdy Buddy`, [
     statusLine('Full åtkomst', true, color, changed ? 'beviljad' : 'tidigare konfigurerad'),
-    statusLine('AI', Boolean(provider?.hasApiKey), color, provider?.hasApiKey ? provider.name : '/setup för att lägga nyckel'),
+    statusLine('AI', Boolean(provider?.hasApiKey), color, provider?.hasApiKey ? `${provider.name} · ${provider.modelId}` : 'Anslut med /api'),
     statusLine('Native helper', native.available, color, native.detail),
-    '', p.dim('Skriv naturligt. /help visar kommandon. Live-status skrivs bara vid faktisk växling.'),
+    '', p.dim('Skriv ett meddelande eller /api · /models · /status · /help'),
   ], color));
   if (runtime.services.permissions.isGranted('application.observe')) runtime.observer.start();
   let lastState = runtime.liveStatus().state;
@@ -53,8 +53,9 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
     if (text === '/exit' || text === '/quit') break;
     try {
       if (text === '/help') {
-        log('/status /setup /open <app> /windows /snapshot <id> /memory /progress /bridge /exit');
+        log('Chatt: skriv som vanligt.\n/api  Anslut AI-nyckel\n/models  Se provider och modell\n/model <modell-id>  Byt modell utan att skriva in nyckeln igen\n/status  Live-status\n/prove  Testa datorstyrning i Anteckningar\n/open <app>  Öppna program\n/windows  Lista fönster\n/snapshot <id>  Läs fönster\n/progress  Skills\n/memory  Minne\n/bridge  Webbläsarkoppling\n/exit  Avsluta');
       } else if (text === '/status') {
+        await runtime.observer.tick();
         const s = runtime.liveStatus();
         const ledger = runtime.ledger().details();
         log(box('Status', [
@@ -62,12 +63,56 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
           statusLine('AI', Boolean(runtime.services.activeProvider()?.hasApiKey), color),
           `Nivå ${ledger.level} · ${ledger.verified} verifierade skills`,
         ], color));
-      } else if (text === '/setup') {
-        output.write('Provider (kilo/deepseek/openrouter/opencode): ');
+      } else if (text === '/profile') {
+        const facts = runtime.services.memory?.profileFacts() ?? [];
+        log(facts.length ? 'Dina sparade minnen:\n' + facts.map(fact => '• ' + fact).join('\n') : 'Inga personliga minnen ännu. Skriv /remember <fakta> eller ”kom ihåg att …”.');
+      } else if (text.startsWith('/remember ') || /^kom ihåg att /i.test(text)) {
+        const fact = text.startsWith('/remember ') ? text.slice(10).trim() : text.replace(/^kom ihåg att /i, '').trim();
+        log(runtime.services.memory?.rememberProfile(fact)
+          ? p.mint('Sparat i ditt personliga minne. Det används som kontext i framtida samtal.')
+          : p.amber('Kunde inte spara. Lägg inte API-nycklar eller lösenord i personliga minnen.'));
+      } else if (text === '/models') {
+        const active = runtime.services.activeProvider();
+        log(active ? `Aktiv: ${active.name} · ${active.modelId} · ${active.hasApiKey ? 'API-nyckel sparad' : 'saknar nyckel'}\nByt: /model <modell-id> · Byt tjänst/nyckel: /api` : 'Ingen AI ansluten. Skriv /api och välj en tjänst.');
+      } else if (text.startsWith('/model ')) {
+        const modelId = text.slice(7).trim();
+        if (!modelId || /[\\r\\n]/.test(modelId) || modelId.length > 180) { log(p.amber('Ange ett giltigt modell-id.')); }
+        else {
+          const active = runtime.services.activeProvider();
+          if (!active) log(p.amber('Anslut AI först med /api.'));
+          else {
+            const updated = runtime.services.saveProvider({ id: active.id, modelId });
+            log(updated.ok ? p.mint(`Modell vald: ${modelId}. Använd /api om du behöver byta nyckel.`) : p.red(updated.error.message));
+          }
+        }
+      } else if (text === '/api' || text === '/setup') {
+        log('Välj tjänst: kilo / deepseek / openrouter / opencode (eller skriv avbryt)');
+        output.write('Tjänst › ');
         const preset = ((await nextLine()) ?? '').trim().toLowerCase();
-        const key = await secret(rl, nextLine, 'API-nyckel (dold): ', output, terminal);
-        const { runCli } = await import('./cli.js');
-        await runCli(['provider', 'set', preset, '--key-stdin', '--no-color'], { out: log, err: log, color: false, stdin: Readable.from([key]) }, options);
+        if (preset === 'avbryt' || !preset) { log('Avbrutet.'); }
+        else if (!['kilo', 'deepseek', 'openrouter', 'opencode'].includes(preset)) log(p.amber('Okänd tjänst. Skriv /api och välj från listan.'));
+        else {
+          const key = await secret(rl, nextLine, 'API-nyckel (dold): ', output, terminal);
+          if (!key.trim()) log('Ingen nyckel sparades.');
+          else {
+            const { runCli } = await import('./cli.js');
+            const code = await runCli(['provider', 'set', preset, '--key-stdin', '--no-color'], { out: log, err: log, color: false, stdin: Readable.from([key]) }, options);
+            if (code === 0) log(p.mint('AI-anslutning sparad. Testa den genom att skriva ett meddelande.'));
+          }
+        }
+      } else if (text === '/prove') {
+        const proof = await (await import('@studdy/core')).proveLive(runtime, { app: process.platform === 'win32' ? 'Notepad' : undefined });
+        log(box('Datorstyrning', [...proof.steps.map(step => `${step.status === 'pass' ? '●' : '○'} ${step.name}: ${step.detail}`), proof.ok ? p.mint('Verifierad') : p.amber('Inte verifierad – se status ovan')], color));
+      } else if (modelRequest(text)) {
+        const modelId = modelRequest(text)!;
+        const active = runtime.services.activeProvider();
+        if (!active) log(p.amber('Anslut en AI-tjänst med /api först.'));
+        else {
+          const updated = runtime.services.saveProvider({ id: active.id, modelId });
+          log(updated.ok
+            ? p.mint(`Bytte till ${modelId}. Valet är sparat och används nästa meddelande.`)
+            : p.red(updated.error.message));
+        }
       } else if (text.startsWith('/open ')) {
         const r = await runtime.launchApp(text.slice(6));
         log(r.ok ? p.mint('✓ ' + r.detail) : p.amber('○ ' + r.detail));
@@ -117,4 +162,13 @@ function secret(rl: readline.Interface, nextLine: () => Promise<string | null>, 
       resolve(answer);
     });
   });
+}
+
+/** Recognise explicit natural-language model requests without hijacking ordinary chat.
+ * Model ids must be a single token. Never guess a provider/model from a loose phrase.
+ */
+export function modelRequest(text: string): string | null {
+  const value = text.trim();
+  const match = /^(?:byt(?:\s+nu)?\s+modell(?:en)?\s+till|växla\s+modell(?:en)?\s+till|använd\s+modellen)\s+([a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,179})[.!]?$/i.exec(value);
+  return match?.[1] ?? null;
 }

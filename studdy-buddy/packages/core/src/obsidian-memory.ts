@@ -54,6 +54,31 @@ export class ObsidianMemory {
       'utf8');
   }
 
+  /** Explicitly approved profile facts survive a restart and are not counted as mastery. */
+  rememberProfile(fact: string): boolean {
+    const safe = this.scrub(fact).slice(0, 180);
+    if (!safe || safe.includes('[REDACTED') || /[\r\n]/.test(safe)) return false;
+    const path = join(this.path, 'Profile.md');
+    const existing = this.profileFacts();
+    if (existing.some(item => item.toLocaleLowerCase('sv-SE') === safe.toLocaleLowerCase('sv-SE'))) return true;
+    const next = [...existing, safe].slice(-30);
+    writeFileSync(path, '# Mina valda minnen\n\n' + next.map(item => '- ' + item).join('\n') + '\n', 'utf8');
+    return true;
+  }
+
+  /** Read a small bounded set of user-selected facts, never credentials. */
+  profileFacts(): string[] {
+    const path = join(this.path, 'Profile.md');
+    if (!existsSync(path)) return [];
+    try {
+      return readFileSync(path, 'utf8').split('\n')
+        .filter(line => line.startsWith('- '))
+        .map(line => this.scrub(line.slice(2)).slice(0, 180))
+        .filter(line => line.length > 0 && !line.includes('[REDACTED'))
+        .slice(-30);
+    } catch { return []; }
+  }
+
   /** Retrieve a tiny, relevant subset from prior days for better continuity. */
   recall(question: string, maxChars = 1300): string[] {
     const query = new Set(this.scrub(question).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []);
