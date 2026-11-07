@@ -2,7 +2,7 @@ import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
 import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
-import { SLASH_COMMANDS, slashMatches, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
+import { SLASH_COMMANDS, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
 import { liveLines, compactLivePrompt } from './live-ui.js';
 import { configureLoginAutostart } from './login-autostart.js';
 import { runVoiceMode } from './voice-mode.js';
