@@ -172,6 +172,8 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(box('Obsidian-minne', [
           'Valv: ' + (info.vaultPath ?? 'otillgängligt'),
           'Personliga minnen: ' + info.memoryFacts,
+          'Observerade arbetsmönster: ' + (runtime.services.memory?.observedPatterns().map(row =>
+            row.kind + ' ' + row.periods + ' observationsperioder') .join(' · ') || 'inga ännu'),
           'Dagliga samtalsanteckningar sparas efter lyckade AI-svar.',
           'Debugger: ' + info.debuggerPath,
           'Minnet är lokalt och kan granskas av dig.',
@@ -188,6 +190,9 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text === '/profile') {
         const facts = runtime.services.memory?.profileFacts() ?? [];
         log(facts.length ? 'Dina sparade minnen:\n' + facts.map(fact => '• ' + fact).join('\n') : 'Inga personliga minnen ännu. Skriv /remember <fakta> eller ”kom ihåg att …”.');
+        const patterns = runtime.services.memory?.observedPatterns() ?? [];
+        if (patterns.length) log('Observerade mönster (inte arbetade timmar):\n' + patterns.map(p =>
+          '• ' + p.kind + ': ' + p.periods + ' tidsperioder').join('\n'));
       } else if (text.startsWith('/remember ') || /^kom ihåg att /i.test(text)) {
         const fact = text.startsWith('/remember ') ? text.slice(10).trim() : text.replace(/^kom ihåg att /i, '').trim();
         log(runtime.services.memory?.rememberProfile(fact)
