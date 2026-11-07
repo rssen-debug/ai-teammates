@@ -5,6 +5,7 @@ import { box, dots, palette, statusLine, supportsColor } from './theme.js';
 import { SLASH_COMMANDS, slashMatches, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
 import { liveLines, compactLivePrompt } from './live-ui.js';
 import { configureLoginAutostart } from './login-autostart.js';
+import { runVoiceMode } from './voice-mode.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -110,6 +111,21 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(box(dots(color, metrics.level, s.observing) + '  BUDDY LIVE · mätt aktivitet', liveLines(s, metrics, {
           providerConnected: Boolean(active?.hasApiKey), issues: issues.count,
         }), color));
+      } else if (text === '/voice') {
+        log(p.mint('Voice använder Windows taligenkänning + din redan sparade Kilo-modell och lokal uppläsning.'));
+        log(p.dim('QwenAudio kräver en separat kompatibel realtidsröstfrontend. /voice ger inte Qwens full-duplex-läge.'));
+        await runVoiceMode(runtime, log);
+      } else if (text === '/do' || text.startsWith('/do ')) {
+        const goal = text.slice(3).trim();
+        if (!goal) log(p.amber('Beskriv uppgiften: /do öppna ett fönster och kontrollera ...'));
+        else {
+          log(p.dim('● Kilo-agent startad · högst 8 verifierade datorsteg'));
+          const report = await runtime.runDesktopGoal(goal, event => {
+            log((event.ok ? p.mint('● ') : p.amber('○ ')) +
+              event.step + ' · ' + event.action + ' · ' + event.detail);
+          });
+          log((report.complete ? p.mint('Verifierat: ') : p.amber('Inte slutfört: ')) + report.summary);
+        }
       } else if (text === '/autostart' || text.startsWith('/autostart ')) {
         const arg = text.slice('/autostart'.length).trim().toLowerCase();
         const mode = arg === 'on' ? true : arg === 'off' ? false : null;
