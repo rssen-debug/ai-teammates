@@ -47,9 +47,23 @@ jobs:
             exit 1
           }
           Write-Host "Script parses with no errors under $($PSVersionTable.PSVersion)."
-          # Den måste också gå att ladda med parametrar och ge rätt tidig avslutning utanför Windows.
-          $first = (Get-Content $path -TotalCount 1)
-          if ($first -notmatch '^#') { Write-Host 'Saknar inledande kommentar/kommentarshuvud.'; exit 1 }
+
+          # UTF-8 med BOM: annars läser Windows PowerShell 5.1 filen som ANSI och
+          # alla svenska tecken blir skräp. Det är ett verkligt fel, inte kosmetika.
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $path))
+          $hasBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+          if (-not $hasBom) { Write-Host 'FILEN SAKNAR UTF-8 BOM — 5.1 kommer visa fel tecken.'; exit 1 }
+          Write-Host 'UTF-8 BOM finns.'
+
+          # Stegen användaren bad om måste finnas i filen, annars är den inte det vi säger.
+          $text = Get-Content $path -Raw
+          foreach ($needle in @('voice-check', 'doctor', 'prove', 'setup', '/access', 'windows')) {
+            if ($text -notmatch [regex]::Escape($needle)) {
+              Write-Host "Saknar steget: $needle"
+              exit 1
+            }
+          }
+          Write-Host 'Alla förväntade steg finns i skriptet.'
 
       - name: Built CLI smoke test
         shell: bash
