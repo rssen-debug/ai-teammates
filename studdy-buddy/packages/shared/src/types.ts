@@ -112,6 +112,8 @@ export interface UiElementInfo {
   value: string | null;
   bounds: { x: number; y: number; width: number; height: number } | null;
   enabled: boolean;
+  /** Actions the element actually advertises (`available_actions`), when reported. */
+  availableActions?: string[];
   /** True when a fresh snapshot must be taken before acting on it. */
   stale: boolean;
 }

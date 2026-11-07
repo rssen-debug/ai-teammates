@@ -4,7 +4,7 @@
 
 - `npm run lint` ✅
 - `npm run typecheck` ✅
-- `npm test` ✅ **319 tester / 31 filer**
+- `npm test` ✅ **326 tester / 31 filer**
 - `npm run build` ✅
 - `npm run package:cli` ✅
 - Tarball installerad i temporär npm-prefix; `studdy --version` och `studdy status` ✅
@@ -49,6 +49,26 @@ UI-träd läst → **slumpad text skriven och tillbakaläst** → skärmbild ver
 - Kärs headless i sandboxen: `prove` ger exitkod 1 och `BLOCKED` på native helper. ✅
 - Windows-CI kör nu `studdy prove --app "Notepad"` som ett hårt grindsteg.
 - Guide: `docs/TESTA_LIVE.md`.
+
+## Windows leveranspolicy — hittad av riktig CI
+
+Första `prove`-körningen i Windows-CI gav `Skrivtest: fail` med
+`Target is not actionable: supported_action`. Den officiella kapabilitetstabellen
+för agent-desktop Windows förklarar varför: **`type` kräver `--headed` och ger
+`POLICY_DENIED` headless**, medan `set-value` fungerar semantiskt.
+
+Fixat på riktigt:
+- `available_actions` parsas nu ur snapshots, så mål väljs från vad elementet
+  faktiskt erbjuder i stället för att gissas från rollnamn.
+- `adapter.type(ref, text, { headed })` — fysisk leverans är uttryckligt opt-in
+  eftersom den kan flytta fokus och pekare.
+- `adapter.setValue()` som semantisk headless-väg (`set-value --stdin`).
+- Headless `POLICY_DENIED` ger nu en actionable hint om `--headed`.
+- `prove` förhandlar: `set-value` → `type --headed`, och kräver **tillbakaläsning**
+  ur UI-trädet för pass. Vilken metod som verifierades skrivs ut.
+- CLI: `studdy set-value <ref> "text"` och `studdy type <ref> "text" --headed`.
+
+14 nya regressionstester täcker leveranspolitiken och bevisförhandlingen.
 
 ## CI-fix
 

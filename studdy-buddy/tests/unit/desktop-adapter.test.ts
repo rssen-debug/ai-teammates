@@ -286,6 +286,53 @@ describe('Linux/native transport regressions', () => {
   });
 });
 
+describe('Windows delivery policy (observed in CI, not assumed)', () => {
+  function recordingRunner(response: { code: number; stdout: string; stderr: string } = { code: 0, stdout: JSON.stringify({ ok: true }), stderr: '' }) {
+    const calls: { args: string[]; input?: string }[] = [];
+    return {
+      calls,
+      runner: { run: async (_cmd: string, args: string[], _timeout: number, input?: string) => { calls.push({ args, input }); return response; } },
+    };
+  }
+
+  it('keeps type headless by default and only adds --headed on explicit opt-in', async () => {
+    const rec = recordingRunner();
+    const adapter = new DesktopAccessibilityAdapter({ platform: 'win32', runner: rec.runner });
+    await adapter.type('@s1:e2', 'hej');
+    expect(rec.calls[0]!.args).toEqual(['type', '@s1:e2', '--stdin']);
+    await adapter.type('@s1:e2', 'hej', { headed: true });
+    expect(rec.calls[1]!.args).toEqual(['type', '@s1:e2', '--stdin', '--headed']);
+    expect(rec.calls[1]!.input).toBe('hej');
+  });
+
+  it('uses set-value as the semantic headless write path', async () => {
+    const rec = recordingRunner();
+    const adapter = new DesktopAccessibilityAdapter({ platform: 'win32', runner: rec.runner });
+    expect((await adapter.setValue('@s1:e2', 'text via stdin')).ok).toBe(true);
+    expect(rec.calls[0]!.args).toEqual(['set-value', '@s1:e2', '--stdin']);
+    expect(rec.calls[0]!.input).toBe('text via stdin');
+  });
+
+  it('turns a headless POLICY_DENIED into an actionable --headed hint', async () => {
+    const rec = recordingRunner({ code: 1, stdout: JSON.stringify({ ok: false, error: { code: 'POLICY_DENIED', message: 'type requires headed delivery' } }), stderr: '' });
+    const adapter = new DesktopAccessibilityAdapter({ platform: 'win32', runner: rec.runner });
+    const result = await adapter.type('@s1:e2', 'hej');
+    expect(result.ok).toBe(false);
+    expect(result.detail).toContain('--headed');
+  });
+
+  it('parses advertised available_actions instead of guessing actionable targets', () => {
+    const elements = flattenTree({
+      role: 'window', name: 'Notepad', children: [
+        { role: 'edit', name: 'Text', ref_id: '@s1:e1', available_actions: ['SetValue', 'Scroll'] },
+        { role: 'button', name: 'Stäng', ref_id: '@s1:e2', available_actions: [] },
+      ],
+    });
+    expect(elements.find(e => e.ref === '@s1:e1')!.availableActions).toEqual(['SetValue', 'Scroll']);
+    expect(elements.find(e => e.ref === '@s1:e2')!.availableActions).toBeUndefined();
+  });
+});
+
 describe('app classification', () => {
   it('recognises Packet Tracer and browsers', () => {
     expect(classifyApp('PacketTracer.exe', '')).toBe('PACKET_TRACER');

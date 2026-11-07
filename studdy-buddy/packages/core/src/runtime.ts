@@ -94,11 +94,16 @@ export class StuddyRuntime {
     return result;
   }
 
-  async computerAction(action: 'click' | 'type' | 'press' | 'focus', args: string[]): Promise<{ ok: boolean; detail: string }> {
+  async computerAction(
+    action: 'click' | 'type' | 'set-value' | 'press' | 'focus',
+    args: string[],
+    options: { headed?: boolean } = {},
+  ): Promise<{ ok: boolean; detail: string }> {
     const gate = this.services.permissions.check('act', ['computer.actions']);
     if (!gate.allowed) return { ok: false, detail: gate.reason };
     if (action === 'click') return this.adapter.click(args[0] ?? '');
-    if (action === 'type') return this.adapter.type(args[0] ?? '', args.slice(1).join(' '));
+    if (action === 'type') return this.adapter.type(args[0] ?? '', args.slice(1).join(' '), options);
+    if (action === 'set-value') return this.adapter.setValue(args[0] ?? '', args.slice(1).join(' '));
     if (action === 'press') return this.adapter.press(args[0] ?? '', args[1]);
     return this.adapter.focusWindow(args[0] ?? '');
   }

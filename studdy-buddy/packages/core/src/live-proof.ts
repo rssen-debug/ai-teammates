@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { StuddyRuntime } from './runtime.js';
+import type { UiSnapshot } from '@studdy/shared';
 
 /**
  * End-to-end live proof on the user's own machine.
@@ -29,6 +30,13 @@ const SCRATCH_APPS: Record<string, string[]> = {
 };
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/** Prefer an element that advertises a value/text action; fall back to role. */
+function pickWriteTarget(elements: UiSnapshot['elements']): UiSnapshot['elements'][number] | undefined {
+  const usable = elements.filter(e => e.ref && e.enabled);
+  const advertised = usable.find(e => (e.availableActions ?? []).some(a => /value|text|type|insert|edit/i.test(a)));
+  return advertised ?? usable.find(e => /^(edit|document|textarea|text|input)/i.test(e.role));
+}
 
 export interface ProveOptions {
   /** Override the scratch app. It must be a plain app name, not a command. */
@@ -114,23 +122,34 @@ export async function proveLive(runtime: StuddyRuntime, options: ProveOptions = 
   if (options.noWrite) {
     add('Skrivtest', 'skipped', 'Hoppat över (--no-write).');
   } else {
-    const target = snapshot.elements.find(e => e.ref && e.enabled && /^(edit|document|text|textarea|input)/i.test(e.role));
+    const target = pickWriteTarget(snapshot.elements);
     if (!target) {
       add('Skrivtest', 'blocked', 'Inget skrivbart UI-element med ref hittades i scratch-appen.');
     } else {
       const marker = 'Studdy proof ' + randomBytes(4).toString('hex');
-      const typed = await runtime.computerAction('type', [target.ref, marker]);
-      if (!typed.ok) {
-        add('Skrivtest', 'fail', typed.detail);
-      } else {
+      // Delivery is negotiated with the helper, not assumed. On Windows `type`
+      // refuses headless (POLICY_DENIED) while `set-value` is semantic; the
+      // physical fallback is explicit because it may move focus/cursor.
+      const strategies = [
+        { label: 'set-value (semantisk)', run: () => runtime.computerAction('set-value', [target.ref, marker]) },
+        { label: 'type --headed (fysisk)', run: () => runtime.computerAction('type', [target.ref, marker], { headed: true }) },
+      ];
+      let verified = false;
+      let lastDetail = '';
+      for (const strategy of strategies) {
+        const attempt = await strategy.run();
+        if (!attempt.ok) { lastDetail = `${strategy.label}: ${attempt.detail}`; continue; }
         await sleep(400);
         const after = await runtime.adapter.snapshot(windowId);
-        const seen = after.elements.some(e => `${e.name} ${e.value ?? ''}`.includes(marker));
-        result.marker = seen ? marker : null;
-        add('Skrivtest', seen ? 'pass' : 'fail',
-          seen ? `Texten "${marker}" skrevs och lästes tillbaka ur UI-trädet.`
-            : 'Texten skickades men kunde inte läsas tillbaka — inte bevisat.');
+        if (after.elements.some(e => `${e.name} ${e.value ?? ''}`.includes(marker))) {
+          result.marker = marker;
+          add('Skrivtest', 'pass', `Texten "${marker}" skrevs via ${strategy.label} och lästes tillbaka ur UI-trädet.`);
+          verified = true;
+          break;
+        }
+        lastDetail = `${strategy.label}: text skickades men kunde inte läsas tillbaka.`;
       }
+      if (!verified) add('Skrivtest', 'fail', lastDetail || 'Ingen leveransmetod kunde verifieras.');
     }
   }
 

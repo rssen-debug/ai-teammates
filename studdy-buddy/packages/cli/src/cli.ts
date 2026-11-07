@@ -23,6 +23,7 @@ const CLI_FLAGS = {
   name: { type: 'string' as const }, duration: { type: 'string' as const },
   once: { type: 'boolean' as const }, stdin: { type: 'boolean' as const },
   app: { type: 'string' as const }, 'no-write': { type: 'boolean' as const },
+  headed: { type: 'boolean' as const },
   version: { type: 'boolean' as const, short: 'v' }, help: { type: 'boolean' as const, short: 'h' },
 };
 
@@ -51,7 +52,8 @@ Användning:
   studdy screenshot <id> <fil>   Spara skärmbild (med permission)
   studdy see <id> "fråga"        Skärmbild + UIA + visionmodell
   studdy click <ref>             Klicka observerad UI-ref
-  studdy type <ref> "text"       Skriv i observerat fält
+  studdy type <ref> "text" [--headed]  Skriv i fält (Windows kräver --headed)
+  studdy set-value <ref> "text"  Sätt värde semantiskt (headless)
   studdy press <combo> [id]      Tangenttryck, t.ex. ctrl+s
   studdy focus <window-id>       Fokusera fönster
   studdy watch [--once --duration S]  Live-dashboard, uppdateras på plats
@@ -203,8 +205,8 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
         const r = await runtime.see(positional[1] ?? '', positional.slice(2).join(' ') || 'Vad ser du?');
         out(r); return r.ok ? 0 : 1;
       }
-      case 'click': case 'type': case 'press': case 'focus': {
-        const r = await runtime.computerAction(command, positional.slice(1));
+      case 'click': case 'type': case 'set-value': case 'press': case 'focus': {
+        const r = await runtime.computerAction(command, positional.slice(1), { headed: flags.headed === true });
         out(r); return r.ok ? 0 : 1;
       }
       case 'repl': {

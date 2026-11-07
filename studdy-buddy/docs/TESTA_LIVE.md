@@ -59,7 +59,7 @@ Detta är det viktigaste kommandot. Det kör hela kedjan mot din riktiga dator:
 | Appstart | En scratch-app (Notepad/TextEdit/gedit) startas på riktigt |
 | Fönsterobservation | Fönstret **hittas i den riktiga fönsterlistan** — ett lyckat startanrop räcker inte |
 | UI-träd | Tillgänglighetsträdet läses och innehåller element |
-| Skrivtest | En slumpad markör skrivs i fältet **och läses tillbaka** ur UI-trädet |
+| Skrivtest | En slumpad markör skrivs i fältet **och läses tillbaka** ur UI-trädet. `set-value` provas först (semantiskt), sedan `type --headed` (fysiskt) |
 | Skärmbild | En PNG skrivs till disk och verifieras ha innehåll (raderas direkt) |
 
 Skrivtestet sker **bara i scratch-appen som kommandot självt startade**, aldrig
@@ -170,6 +170,7 @@ verktygsfall**. Upprepa samma launch höjer inte nivån; ett nytt slags bevis g�
 | `UI-träd` BLOCKED | Appen exponerar inget tillgänglighetsträd | Testa med Anteckningar/TextEdit först |
 | `Skärmbild` BLOCKED | Skärminspelningsbehörighet nekad | Bevilja i OS-inställningar |
 | `Skrivtest` fail | Text skickades men kunde inte läsas tillbaka | Rapportera som fel — det är inte bevisat |
+| `type` ger `POLICY_DENIED` | Windows kräver fysisk leverans för `type` | Använd `studdy type <ref> "text" --headed` eller `studdy set-value <ref> "text"` |
 | `provider test` fel | Nätverk, nyckel eller modell-id | Kontrollera nyckel och `--base-url`/`--model` |
 
 Skicka med detta när du rapporterar fel:

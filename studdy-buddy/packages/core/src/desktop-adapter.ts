@@ -147,12 +147,33 @@ export class DesktopAccessibilityAdapter {
     return result.code === 0 && envelope.ok ? { ok: true, detail: 'click ' + ref } : { ok: false, detail: describeFailure(result, envelope) };
   }
 
-  async type(ref: string, text: string): Promise<{ ok: boolean; detail: string }> {
+  /**
+   * `type` is physical on Windows: the official capability table states it needs
+   * `--headed` and returns POLICY_DENIED headless. Callers must opt in explicitly
+   * because headed delivery may move focus and the cursor.
+   */
+  async type(ref: string, text: string, options: { headed?: boolean } = {}): Promise<{ ok: boolean; detail: string }> {
     if (!/^@[^:]+:e\d+$/i.test(ref)) return { ok: false, detail: 'Ogiltig agent-desktop-ref.' };
     if (Buffer.byteLength(text, 'utf8') > 10_000) return { ok: false, detail: 'Texten är för lång (max 10 000 UTF-8-byte).' };
-    const result = await this.runner.run(this.binary, ['type', ref, '--stdin'], Math.max(this.timeoutMs, 8000 + text.length * 30), text);
+    const args = ['type', ref, '--stdin'];
+    if (options.headed) args.push('--headed');
+    const result = await this.runner.run(this.binary, args, Math.max(this.timeoutMs, 8000 + text.length * 30), text);
     const envelope = readEnvelope(result.stdout);
-    return result.code === 0 && envelope.ok ? { ok: true, detail: 'Text skickad till ' + ref } : { ok: false, detail: describeFailure(result, envelope) };
+    if (result.code === 0 && envelope.ok) return { ok: true, detail: `Text skickad till ${ref} (${options.headed ? 'headed/fysisk' : 'headless/semantisk'}).` };
+    const hint = !options.headed && /POLICY_DENIED|not actionable|supported_action/i.test(envelope.error?.code ?? '' + (envelope.error?.message ?? ''))
+      ? ' På Windows kräver type fysisk leverans: kör med --headed.' : '';
+    return { ok: false, detail: describeFailure(result, envelope) + hint };
+  }
+
+  /** Semantic value write. Works headless on Windows where `type` refuses. */
+  async setValue(ref: string, text: string): Promise<{ ok: boolean; detail: string }> {
+    if (!/^@[^:]+:e\d+$/i.test(ref)) return { ok: false, detail: 'Ogiltig agent-desktop-ref.' };
+    if (Buffer.byteLength(text, 'utf8') > 128 * 1024) return { ok: false, detail: 'Texten är för lång (max 128 KiB).' };
+    const result = await this.runner.run(this.binary, ['set-value', ref, '--stdin'], Math.max(this.timeoutMs, 8000), text);
+    const envelope = readEnvelope(result.stdout);
+    return result.code === 0 && envelope.ok
+      ? { ok: true, detail: `Värde satt semantiskt på ${ref}.` }
+      : { ok: false, detail: describeFailure(result, envelope) };
   }
 
   async press(combo: string, windowId?: string): Promise<{ ok: boolean; detail: string }> {
@@ -299,6 +320,7 @@ export function parseSnapshot(stdout: string, windowId: string): UiSnapshot {
       value: raw.value !== undefined && raw.value !== null ? String(raw.value) : null,
       bounds: readRect(raw),
       enabled: raw.enabled !== false && raw.disabled !== true,
+      availableActions: readActions(raw.available_actions),
       stale: false,
     });
   }
@@ -423,6 +445,7 @@ export function flattenTree(tree: Record<string, unknown>, depth = 0, out: UiEle
       value: nodeValue,
       bounds: readRect(tree),
       enabled: tree.enabled !== false && tree.disabled !== true,
+      availableActions: readActions(tree.available_actions),
       stale: false,
     });
   }
@@ -431,6 +454,13 @@ export function flattenTree(tree: Record<string, unknown>, depth = 0, out: UiEle
     if (isRecord(child)) flattenTree(child, depth + 1, out);
   }
   return out;
+}
+
+/** Only string action names are kept; anything else is ignored, never guessed. */
+function readActions(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const actions = value.filter((a): a is string => typeof a === 'string' && a.length > 0).slice(0, 20);
+  return actions.length ? actions : undefined;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
