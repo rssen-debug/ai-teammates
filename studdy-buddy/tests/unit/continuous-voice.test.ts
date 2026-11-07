@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runContinuousVoice, isVoiceStop, likelySpeakerEcho, WindowsContinuousInput, listInstalledWindowsVoices, chooseEnglishNarrator } from '../../packages/cli/src/continuous-voice.js';
+import { runContinuousVoice, isVoiceStop, likelySpeakerEcho, WindowsContinuousInput, listInstalledWindowsVoices, chooseEnglishNarrator, probeWindowsVoice } from '../../packages/cli/src/continuous-voice.js';
 import { WindowsNativeProvider } from '../../packages/voice-engine/src/providers.js';
 import { voiceSettingsSchema } from '@studdy/shared';
 
@@ -61,6 +61,21 @@ describe('continuous CPU voice through Kilo',()=>{
     expect(isVoiceStop('start studying')).toBe(false);
     expect(likelySpeakerEcho('This is the explanation','This is the explanation you need')).toBe(true);
     expect(likelySpeakerEcho('Please go back','I think we should continue studying')).toBe(false);
+  });
+  it('reports microphone untested on non-Windows, never fake healthy',async()=>{
+    const health=await probeWindowsVoice('linux');
+    expect(health.microphone).toBe('not-tested');
+    expect(health.recognizer).toBeNull();
+  });
+  it('does not falsely say microphone is active before native recognizer emits ready',async()=>{
+    const rt=runtime(),lines:string[]=[];
+    const mic={ close:vi.fn(),async *listen(){ throw new Error('Audio device denied');yield 'never'; } };
+    await runContinuousVoice(rt as never,line=>lines.push(line),{
+      input:mic,playback:{speak:async()=>{},stop:vi.fn()},maxTurns:1,
+    });
+    expect(lines.join(' ')).toContain('ännu inte verifierad');
+    expect(lines.join(' ')).toContain('Audio device denied');
+    expect(lines.join(' ')).not.toContain('mikrofon aktiv');
   });
   it('does not pretend microphone is usable on Linux or Windows voices exist without checking',async()=>{
     expect(await listInstalledWindowsVoices('linux')).toEqual([]);
