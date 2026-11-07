@@ -56,7 +56,7 @@ describe('LiveObserver', () => {
     const windows = [
       win({ id: 'console', title: 'Administrator: CMD', processName: 'cmd.exe', focused: true }),
       win({ id: 'chrome', title: 'ChatGPT - Google Chrome', processName: 'chrome.exe', focused: false }),
-      win({ id: 'editor', title: 'Visual Studio Code', processName: 'Code.exe', focused: false }),
+      win({ id: 'editor', title: 'Visual Studio Code', processName: 'Code.exe', focused: false, minimized: true }),
     ];
     const read: string[] = [];
     const adapter = {
@@ -69,6 +69,7 @@ describe('LiveObserver', () => {
     expect(observer.status().observationScope).toBe('background');
     expect(observer.status().openWindowCount).toBe(2);
     expect(observer.status().openWindows).toContain('Webbläsare · AI-chatt');
+    expect(observer.status().openWindows).toContain('Visual Studio Code (minimerad)');
     expect(observer.status().windowTitle).toBe('Webbläsare · AI-chatt');
     expect(read).toEqual(['chrome']);
     services.close();
