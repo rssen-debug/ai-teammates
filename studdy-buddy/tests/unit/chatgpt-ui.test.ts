@@ -23,7 +23,18 @@ describe('ChatGPT native UI message workflow',()=>{
     expect(extractChatGPTMessage('skriv till chat gpt hej')).toBe('hej');
     expect(extractChatGPTMessage('skicka till ChatGPT: Vad är OSI?')).toBe('Vad är OSI?');
     expect(extractChatGPTMessage('write to ChatGPT hello')).toBe('hello');
+    expect(extractChatGPTMessage('skriv hej till chat')).toBe('hej');
+    expect(extractChatGPTMessage('skriv hej till ChatGPT')).toBe('hej');
+    expect(extractChatGPTMessage('skriv hej i chatten')).toBe('hej');
+    expect(extractChatGPTMessage('skriv till chat hej')).toBe('hej');
+    expect(extractChatGPTMessage('skicka hej till chat gpt')).toBe('hej');
+    expect(extractChatGPTMessage('Buddy, skriv hej till chat')).toBe('hej');
+    expect(extractChatGPTMessage('kan du skriva hej till chat')).toBe('hej');
+    expect(extractChatGPTMessage('write hello to chat')).toBe('hello');
+    expect(extractChatGPTMessage('send hello to ChatGPT')).toBe('hello');
+    expect(extractChatGPTMessage('skriv till chat gpt')).toBeNull();
     expect(extractChatGPTMessage('skriv en dikt om chat gpt')).toBeNull();
+    expect(extractChatGPTMessage('skriv hej till min kompis')).toBeNull();
   });
   it('recognizes natural conversation invitation without fabricating a message',()=>{
     expect(isChatGPTConversationRequest('snacka med chat')).toBe(true);
