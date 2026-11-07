@@ -67,6 +67,20 @@ describe('screen-grounded live voice',()=>{
       expect(sent.selectedText).toContain('OSI Layer 3 Router');
     } finally {await rt.close();}
   });
+  it('tells Kilo the measured screen state without leaking private ChatGPT text',async()=>{
+    const rt=runtime();
+    try {
+      setScreen(rt,'Webbläsare · AI-chatt',[{name:'Private ChatGPT dialogue'}]);
+      const ask=vi.spyOn(rt.services,'ask').mockResolvedValue({ok:true,data:{message:{text:'I see browser UI.',id:'1'}}} as never);
+      await rt.chatWithScreen('What can you do on my screen?');
+      const sent=ask.mock.calls[0]![0];
+      expect(sent.text).toBe('What can you do on my screen?');
+      expect(sent.selectedText).toContain('1 UI elements');
+      expect(sent.selectedText).toContain('Webbläsare · AI-chatt');
+      expect(sent.selectedText).not.toContain('Private ChatGPT dialogue');
+      expect(sent.selectedText).toContain('NOT full pixel vision');
+    } finally {await rt.close();}
+  });
   it('does not send private page or ChatGPT conversation contents to Kilo',async()=>{
     const rt=runtime();
     try {
