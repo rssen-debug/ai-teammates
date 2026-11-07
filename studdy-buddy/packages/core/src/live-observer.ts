@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { UiSnapshot, WindowInfo } from '@studdy/shared';
 import type { StuddyServices } from './services.js';
 import type { DesktopAccessibilityAdapter } from './desktop-adapter.js';
-import { allowedObservationTitle, detectCompanionHint, detectContextHint, type CompanionHint } from './companion-observer.js';
+import { allowedObservationTitle, safeWindowLabel, detectCompanionHint, detectContextHint, type CompanionHint } from './companion-observer.js';
 import { VerifiedSkillLedger } from './verified-skills.js';
 
 export type ObservationState = 'starting' | 'active' | 'off' | 'private' | 'unavailable' | 'no-window';
@@ -49,7 +49,7 @@ export class LiveObserver {
   start(): void {
     this.stopped = false;
     if (this.timer) return;
-    this.timer = setInterval(() => { void this.tick(); }, this.options.intervalMs ?? 12_000);
+    this.timer = setInterval(() => { void this.tick(); }, this.options.intervalMs ?? 5_000);
     this.timer.unref?.();
     void this.tick();
   }
@@ -131,12 +131,14 @@ export class LiveObserver {
       const active = focused;
       const snapshot = await adapter.snapshot(active.id);
       if (this.stopped) return this.status();
-      this.window = active;
+      // Never forward arbitrary Chrome tab titles to CLI, logs or status.
+      const label = safeWindowLabel(active.title, active.processName);
+      this.window = { ...active, title: label };
       this.snapshot = snapshot;
       if (snapshot.accessible) {
         this.state = 'active';
         this.lastObservedAt = this.clock();
-        this.activity = `Läser ${snapshot.elements.length} UI-element i ${active.title.slice(0, 60)}`;
+        this.activity = `Läser ${snapshot.elements.length} UI-element i ${label}`;
         const proof = createHash('sha256').update(active.processName || active.appKind).digest('hex').slice(0, 20);
         services.db.observations.record('agent.uia.heartbeat', { kind: active.appKind, proof, elementCount: snapshot.elements.length });
         const count = services.db.checkpoints.get<number>('buddy.live.verified-observations.v1') ?? 0;
