@@ -1,8 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const dirs:string[]=[];
+afterEach(()=>{for(const dir of dirs.splice(0)) rmSync(dir,{recursive:true,force:true});});
 import { StuddyRuntime } from '@studdy/core';
 
 function runtime() {
-  const rt=new StuddyRuntime({dataDir:':memory:',platform:'win32'});
+  const dir=mkdtempSync(join(tmpdir(),'buddy-voice-screen-test-'));dirs.push(dir);
+  const rt=new StuddyRuntime({dataDir:dir,platform:'win32'});
   rt.services.permissions.grant('application.observe');
   rt.services.permissions.grant('provider.dataShare');
   return rt;
