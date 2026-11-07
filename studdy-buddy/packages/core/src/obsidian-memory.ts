@@ -79,6 +79,39 @@ export class ObsidianMemory {
     } catch { return []; }
   }
 
+  /** Coarse user-authorized activity patterns. Store neither screenshots,
+   * page titles nor raw UI text; each type counts at most once per UTC hour.
+   * These are observation periods, NOT hours worked or a personality score.
+   */
+  observedPatterns(): Array<{ kind: 'study' | 'code' | 'creative'; periods: number; lastHour: string }> {
+    const file = join(this.path, 'Activity.md');
+    if (!existsSync(file)) return [];
+    try {
+      const entries = readFileSync(file, 'utf8').split(/\r?\n/);
+      return entries.flatMap(line => {
+        const m = /^- (study|code|creative): ([0-9]{1,7}) periods; last ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2})Z$/.exec(line);
+        return m ? [{ kind: m[1] as 'study'|'code'|'creative',
+          periods: Math.min(9999999, Number(m[2])), lastHour: m[3]! }] : [];
+      }).slice(0, 3);
+    } catch { return []; }
+  }
+
+  recordObservedPattern(kind: 'study' | 'code' | 'creative', now = new Date()): boolean {
+    const hour = now.toISOString().slice(0, 13);
+    const existing = this.observedPatterns();
+    if (existing.some(row => row.kind === kind && row.lastHour === hour)) return false;
+    const old = existing.find(row => row.kind === kind);
+    const next = [...existing.filter(row => row.kind !== kind),
+      { kind, periods: Math.min(9999999, (old?.periods ?? 0) + 1), lastHour: hour }]
+      .sort((a, b) => a.kind.localeCompare(b.kind));
+    writeFileSync(join(this.path, 'Activity.md'),
+      '# Coarse observed work patterns\n\n' +
+      'These describe verified on-screen activity categories, not personal traits, proficiency, time worked, or surveillance recordings.\n' +
+      'No window titles or UI text are saved. Max one observation period per UTC hour and category.\n\n' +
+      next.map(row => '- ' + row.kind + ': ' + row.periods + ' periods; last ' + row.lastHour + 'Z').join('\n') + '\n', 'utf8');
+    return true;
+  }
+
   /** Retrieve a tiny, relevant subset from prior days for better continuity. */
   recall(question: string, maxChars = 1300): string[] {
     const query = new Set(this.scrub(question).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []);
