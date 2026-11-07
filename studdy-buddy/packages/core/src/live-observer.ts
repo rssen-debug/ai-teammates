@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { UiSnapshot, WindowInfo } from '@studdy/shared';
 import type { StuddyServices } from './services.js';
 import type { DesktopAccessibilityAdapter } from './desktop-adapter.js';
-import { allowedObservationTitle, safeWindowLabel, detectCompanionHint, detectContextHint, type CompanionHint } from './companion-observer.js';
+import { safeWindowLabel, detectCompanionHint, detectContextHint, type CompanionHint } from './companion-observer.js';
 import { VerifiedSkillLedger } from './verified-skills.js';
 
 export type ObservationState = 'starting' | 'active' | 'off' | 'private' | 'unavailable' | 'no-window';
