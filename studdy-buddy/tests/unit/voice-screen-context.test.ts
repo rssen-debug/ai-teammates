@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const dirs:string[]=[];
 afterEach(()=>{for(const dir of dirs.splice(0)) rmSync(dir,{recursive:true,force:true});});
-import { StuddyRuntime } from '@studdy/core';
+import { ObsidianMemory, StuddyRuntime } from '@studdy/core';
+import { readFileSync } from 'node:fs';
 
 function runtime() {
   const dir=mkdtempSync(join(tmpdir(),'buddy-voice-screen-test-'));dirs.push(dir);
@@ -25,6 +26,22 @@ function setScreen(rt:StuddyRuntime,label:string,elements:Array<{name:string;val
       value:e.value??'',enabled:true,stale:false,bounds:null})),
   });
 }
+describe('privacy-bounded long-term work patterns',()=>{
+  it('counts verified types at most once per hour and never writes UI text',()=>{
+    const dir=mkdtempSync(join(tmpdir(),'buddy-activity-pattern-test-'));dirs.push(dir);
+    const memory=new ObsidianMemory(dir);
+    expect(memory.recordObservedPattern('study',new Date('2026-11-07T12:10:00Z'))).toBe(true);
+    expect(memory.recordObservedPattern('study',new Date('2026-11-07T12:42:00Z'))).toBe(false);
+    expect(memory.recordObservedPattern('study',new Date('2026-11-07T13:01:00Z'))).toBe(true);
+    expect(memory.recordObservedPattern('code',new Date('2026-11-07T13:02:00Z'))).toBe(true);
+    const saved=new ObsidianMemory(dir).observedPatterns();
+    expect(saved.find(p=>p.kind==='study')?.periods).toBe(2);
+    expect(saved.find(p=>p.kind==='code')?.periods).toBe(1);
+    const content=readFileSync(join(dir,'Obsidian-Vault','Activity.md'),'utf8');
+    expect(content).not.toContain('Password');
+    expect(content).toContain('observation periods');
+  });
+});
 describe('screen-grounded live voice',()=>{
   it('uses actual UIA study observations in Kilo model context, not in user message',async()=>{
     const rt=runtime();
