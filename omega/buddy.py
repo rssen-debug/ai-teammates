@@ -4919,6 +4919,150 @@ def set_autostart(on: bool) -> tuple[bool, str]:
 # ════════════════════════════════════════════════════════════════════════════
 # THE APP
 # ════════════════════════════════════════════════════════════════════════════
+class CompanionSubsystem:
+    """The always-on layer (omega/companion.py), loaded lazily like every sibling.
+
+    Behind sibling() so a missing or broken companion module degrades to BLOCKED
+    with the real reason instead of taking the whole product down at import.
+    """
+
+    def __init__(self, app: "Buddy") -> None:
+        self.app = app
+        self._mod: Any = None
+        self._trust: Any = None
+        self._obs: Any = None
+        self._model: Any = None
+        self._loop: Any = None
+
+    @property
+    def mod(self) -> Any:
+        if self._mod is None and "companion" not in _SIBLING_ERRORS:
+            self._mod = sibling("companion")
+        return self._mod
+
+    def present(self) -> tuple[bool, str]:
+        if self.mod is None:
+            return False, _SIBLING_ERRORS.get("companion", "omega/companion.py could not be loaded")
+        return True, ""
+
+    def need(self) -> Any:
+        ok, why = self.present()
+        if not ok:
+            raise ToolError(why, "dependency_missing")
+        return self.mod
+
+    @property
+    def trust(self) -> Any:
+        m = self.need()
+        if self._trust is None:
+            self._trust = m.TrustPolicy(self.app.settings, self.app.perms)
+        return self._trust
+
+    @property
+    def observation(self) -> Any:
+        m = self.need()
+        if self._obs is None:
+            self._obs = m.ObservationPolicy(self.app.settings, self.app.privacy,
+                                            backend=self._backend(m))
+        return self._obs
+
+    def _backend(self, m: Any) -> Any:
+        """Real screen reading, through the tool layer so it is gated and audited.
+
+        `screen_describe` already returns text from the vision model, so one call
+        covers capture-and-read and the pixels are never stored — which is what
+        observation.store_text_only promises. It is Windows-only and needs a key,
+        so anywhere else this reports unavailable with the reason and the loop says
+        BLOCKED instead of pretending to have looked at the screen.
+        """
+        spec = self.app.registry.get("screen_describe")
+        if spec is None:
+            return m.ScreenBackend(why_unavailable="the screen_describe tool is not registered")
+        ok, why = spec.status()
+        if not ok:
+            return m.ScreenBackend(why_unavailable=f"screen_describe: {why}")
+        if not self.app.gateway.key():
+            return m.ScreenBackend(why_unavailable="reading the screen needs a vision model, and no API key is set")
+
+        async def acapture() -> Any:
+            res = await exec_tool(self.app, "screen_describe", {})
+            if not res.ok:
+                raise ToolError(res.error or "screen_describe failed", res.category or "os_error")
+            d = res.data if isinstance(res.data, dict) else {"text": str(res.data)}
+            return d.get("description") or d.get("text") or ""
+
+        async def aread(text: Any) -> str:
+            return text if isinstance(text, str) else str(text or "")
+
+        return m.ScreenBackend(acapture=acapture, aread_text=aread)
+
+    @property
+    def model(self) -> Any:
+        m = self.need()
+        if self._model is None:
+            self._model = m.UserModel(self.app.store)
+        return self._model
+
+    def idle_seconds(self) -> float:
+        """How long the owner has been away. Used to decide when to think.
+
+        On Windows this is the real input-idle time. Elsewhere it falls back to the
+        activity monitor's last sample — and when observation is off there is no way
+        to know, so it returns 0.0, which means "assume the owner is present". Guessing
+        idle would spend the reflection budget while the user is actually at the keyboard.
+        """
+        if IS_WIN:
+            try:
+                class _LII(ctypes.Structure):
+                    _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+                lii = _LII()
+                lii.cbSize = ctypes.sizeof(_LII)
+                if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(lii)):
+                    return max(0.0, (ctypes.windll.kernel32.GetTickCount() - lii.dwTime) / 1000.0)
+            except Exception as e:
+                log("idle_probe_failed", err=str(e))
+        if self.app.activity.enabled:
+            r = self.app.store.one("SELECT MAX(end) AS last FROM activity")
+            if r and r["last"]:
+                return max(0.0, now() - float(r["last"]))
+        return 0.0
+
+    def _pending(self) -> bool:
+        """True when the owner is waiting on an answer, which always outranks thinking."""
+        return bool(self.app.current_run) or bool(self.app.current_task) or self.app.stop.requested()
+
+    async def _chat(self, prompt: str, **kw: Any) -> dict:
+        role = str(kw.get("role") or "chat")
+        model = self.app.router.resolve(role)
+        r = await self.app.gateway.chat(
+            model,
+            [{"role": "system", "content": "You are the background reflection of a personal assistant. "
+                                           "Be brief, factual, and never invent evidence."},
+             {"role": "user", "content": prompt}],
+            max_tokens=int(kw.get("max_tokens") or 800))
+        msg = (r or {}).get("message", {}) if isinstance(r, dict) else {}
+        usage = (r or {}).get("usage", {}) if isinstance(r, dict) else {}
+        return {"content": msg.get("content", "") if isinstance(msg, dict) else str(msg),
+                "tokens": int(usage.get("total_tokens") or usage.get("tokens") or 0)}
+
+    @property
+    def loop(self) -> Any:
+        m = self.need()
+        if self._loop is None:
+            self._loop = m.CompanionLoop(
+                self.app.settings, observation=self.observation, model=self.model,
+                store=self.app.store, memory=self.app.memory,
+                chat=self._chat, idle_probe=self.idle_seconds, pending_input=self._pending,
+                log_fn=lambda ev, **kw: log(ev, **kw))
+        return self._loop
+
+    def status(self) -> dict:
+        ok, why = self.present()
+        if not ok:
+            return {"available": False, "reason": why}
+        return {"available": True, **self.loop.status()}
+
+
 class Buddy:
     def __init__(self, headless: bool = False) -> None:
         ensure_dirs()
@@ -4942,6 +5086,7 @@ class Buddy:
         self.voice = Voice(self)
         self.doctor = Doctor(self)
         self.majin = MajinSubsystem(self)
+        self.companion = CompanionSubsystem(self)
         self.ui: Any = NullUI() if headless else CLI(self)
         self.perms.confirm_fn = lambda p, al: self.ui.confirm(p, al)
         self.loop: Optional[asyncio.AbstractEventLoop] = None
@@ -6595,6 +6740,186 @@ def _shutdown(app: Any) -> None:
         asyncio.run(app.close())
 
 
+def cmd_trust(rest: list[str]) -> int:
+    """Full-trust autonomy. An owner decision, made out loud, revocable, audited."""
+    app = Buddy(headless=True)
+    try:
+        ok, why = app.companion.present()
+        if not ok:
+            print(C.c(C.R, f"  BLOCKED: {why}"))
+            return 1
+        trust = app.companion.trust
+        action = (rest[0] if rest else "status").lower()
+
+        if action in ("status", "show"):
+            st = trust.state()
+            mark = C.c(C.G, "● FULL") if st["mode"] == "full" else C.c(C.DIM, "○ normal")
+            print(f"  trust mode   {mark}")
+            print("  standing grants: " + (", ".join(f"{k}={v}" for k, v in sorted(st["grants"].items()))
+                                          or "none — everything asks"))
+            print("\n  always confirms, in every mode:")
+            for i in range(0, len(st["always_confirms"]), 4):
+                print("    " + ", ".join(st["always_confirms"][i:i + 4]))
+            print("  redirected instead of refused (full trust): "
+                  + ", ".join(f"{k}→{v}" for k, v in sorted(st["redirects_when_full"].items())))
+            print(C.c(C.DIM, "\n  These reach other people or their money. Autonomy over your own"))
+            print(C.c(C.DIM, "  machine does not extend to them, and that is not a setting."))
+            return 0
+
+        if action == "on":
+            print("  Full trust means Buddy acts on your machine without asking you first.")
+            print("  Permanent deletion is redirected to the trash. Anything that reaches another")
+            print("  person — messages, payments, applications — still confirms, always.")
+            print(f"\n  To accept, type exactly: {trust.CONFIRM_PHRASE}")
+            try:
+                phrase = input("  > ")
+            except EOFError:
+                print(C.c(C.R, "\n  no input available. Pipe the phrase in instead:"))
+                print(f'    echo "{trust.CONFIRM_PHRASE}" | buddy trust on')
+                return 2
+            ok, msg = trust.activate(phrase.rstrip("\n"))
+            print(("  " + C.c(C.G, msg)) if ok else ("  " + C.c(C.R, msg)))
+            return 0 if ok else 2
+
+        if action == "off":
+            ok, msg = trust.deactivate("turned off with `buddy trust off`")
+            print("  " + msg)
+            return 0
+
+        print("usage: buddy trust [status | on | off]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_companion(rest: list[str]) -> int:
+    """The always-on layer: observation, the model of you, and budgeted thinking."""
+    usage = ("usage: buddy companion [status | on | off | observe DEPTH | profile [--days N] |\n"
+             "                            reflect | budget [TOKENS] | ask QUESTION | set KEY VALUE]\n"
+             "  DEPTH: off | titles | capture | continuous")
+    app = Buddy(headless=True)
+    try:
+        ok, why = app.companion.present()
+        if not ok:
+            print(C.c(C.R, f"  BLOCKED: {why}"))
+            return 1
+        comp = app.companion
+        action = (rest[0] if rest else "status").lower()
+        args = rest[1:]
+
+        if action in ("status", "show"):
+            st = comp.status()
+            lp = st
+            print(f"  loop        {'ON' if lp['enabled'] else 'off'}   ticks run: {lp['ticks']}")
+            print(f"  can think now  {'yes' if lp['can_reflect_now'] else 'no — ' + lp['why_not']}")
+            print(f"  idle        {lp['idle_seconds']:.0f}s (reflects at {lp['idle_threshold']:.0f}s)")
+            b = lp["budget"]
+            print(f"  budget      {b['spent_today']:,} / {b['max_tokens_per_day']:,} tokens today "
+                  f"({b['remaining_today']:,} left)")
+            o = lp["observation"]
+            ind = o["indicator"]
+            print(f"  observation depth={o['depth']}  {ind['label']}")
+            print(f"  backend     {'available' if o['backend_available'] else 'BLOCKED: ' + o['backend_note']}")
+            print(f"  exclusions  {len(o['exclusions'])} (banking, password managers, private browsing, …)")
+            print(f"  retention   {o['retention_days']} days · store_text_only={o['store_text_only']}")
+            if o["depth"] in ("capture", "continuous") and not o["backend_available"]:
+                print(C.c(C.Y, "\n  capture is asked for but impossible here, so nothing is being watched."))
+            return 0 if (o["depth"] == "off" or o["backend_available"]
+                         or o["depth"] == "titles") else 1
+
+        if action in ("on", "off"):
+            ok, msg = comp.loop.enable(action == "on")
+            print("  " + msg)
+            return 0 if ok else 1
+
+        if action == "observe":
+            if not args:
+                print(usage)
+                return 2
+            depth = args[0].lower()
+            ok, msg = comp.observation.set_depth(depth)
+            print(("  " + C.c(C.G, msg)) if ok else ("  " + C.c(C.R, msg)))
+            if ok and depth in ("capture", "continuous"):
+                print(C.c(C.Y, "  ● screen capture is now on. The indicator is part of the product:"))
+                print(C.c(C.Y, "    capture nobody can see is capture nobody consented to."))
+            if ok:
+                return 0
+            # An unknown depth is a usage error; a known depth this host cannot
+            # honour is a capability failure. Different exit codes, same honesty.
+            return 2 if depth not in comp.observation.DEPTHS else 1
+
+        if action == "profile":
+            days = float(_flag(args, "--days", "30"))
+            prof = comp.model.build(days=days)
+            print(comp.model.render(prof))
+            if prof.get("errors"):
+                print(C.c(C.R, "\n  read failures: " + "; ".join(prof["errors"][:3])))
+                return 1
+            return 0
+
+        if action == "reflect":
+            rep = asyncio.run(comp.loop.reflect())
+            d = rep.to_dict()
+            if d["blocked"]:
+                for b in d["blocked"]:
+                    print(C.c(C.Y, f"  BLOCKED: {b}"))
+            if d["reflected"]:
+                print("  thought: " + clip(d["reflection"], 600))
+                print(f"  stored as unverified episodic memory: {d['stored']}")
+            elif not d["blocked"]:
+                print("  nothing new to record")
+            print(f"  tokens used: {d['tokens_used']} · {d['duration_s']}s")
+            return 0 if not d["blocked"] else 1
+
+        if action == "budget":
+            if args:
+                try:
+                    n = int(args[0])
+                except ValueError:
+                    print("  budget takes a whole number of tokens per day")
+                    return 2
+                ok, msg = comp.loop.set_option("max_tokens_per_day", n)
+                print("  " + msg)
+                return 0 if ok else 2
+            print("  " + jdump(comp.loop.budget.state()))
+            return 0
+
+        if action == "ask":
+            q = " ".join(a for a in args if not a.startswith("--")).strip()
+            if not q:
+                print("usage: buddy companion ask QUESTION")
+                return 2
+            ok, text = comp.loop.consult(q)
+            if not ok:
+                print(C.c(C.R, f"  BLOCKED: {text}"))
+                print(C.c(C.DIM, "  This asks another model through the gateway. It does not drive"))
+                print(C.c(C.DIM, "  claude.ai or chatgpt.com in a browser: that breaks their terms and"))
+                print(C.c(C.DIM, "  breaks again at every redeploy, for nothing this cannot already do."))
+                return 1
+            print("  " + text)
+            return 0
+
+        if action == "set":
+            if len(args) < 2:
+                print("usage: buddy companion set KEY VALUE")
+                return 2
+            try:
+                val: Any = int(args[1])
+            except ValueError:
+                try:
+                    val = float(args[1])
+                except ValueError:
+                    val = args[1]
+            ok, msg = comp.loop.set_option(args[0], val)
+            print("  " + msg)
+            return 0 if ok else 2
+
+        print(usage)
+        return 2
+    finally:
+        _shutdown(app)
+
+
 def cmd_memory(rest: list[str]) -> int:
     """Long-term memory from the CLI, not only from inside a conversation.
 
@@ -7125,6 +7450,24 @@ Work, permissions and models
                             tested, approved skills. They run through the same permission
                             gate as every other tool.
 
+Always-on companion
+  buddy companion status    the loop, the budget, what it is watching and what it cannot do
+  buddy companion on|off    start or stop the 24/7 loop
+  buddy companion observe off|titles|capture|continuous
+                            how much it may see. capture needs a working screen backend
+                            and a visible recording indicator — it will not run without one.
+  buddy companion profile [--days N]
+                            what it has learned about you, with observed facts kept
+                            separate from inferences and every claim carrying its evidence
+  buddy companion reflect   one thinking cycle now; reports BLOCKED with the reason if it cannot
+  buddy companion budget [TOKENS_PER_DAY]
+                            hard daily ceiling on autonomous thinking (enforced, not advisory)
+  buddy companion ask Q     a second opinion from another model through the gateway
+  buddy trust status        current autonomy level and the floor that cannot be removed
+  buddy trust on            full trust on your own machine. Typed confirmation required;
+                            recorded in the audit log. Third-party actions still confirm.
+  buddy trust off           back to asking, according to your grants
+
 MAJIN V6 subsystem
   buddy majin status        is MAJIN connected, and with which owner grants
   buddy majin search QUERY  search MAJIN's real authorized tool catalog
@@ -7173,6 +7516,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             "models": cmd_models,
             "skills": cmd_skills,
             "key": cmd_key,
+            "trust": cmd_trust,
+            "companion": cmd_companion,
             "help": lambda r: (print(USAGE), 0)[1],
             "--help": lambda r: (print(USAGE), 0)[1],
             "version": lambda r: (print(f"Studdy Buddy Omega {APP_VERSION}"), 0)[1],
