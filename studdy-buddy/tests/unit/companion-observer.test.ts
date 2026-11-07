@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowedObservationTitle, detectCompanionHint } from '../../packages/core/src/companion-observer.js';
+import { allowedObservationTitle, detectCompanionHint, detectContextHint } from '../../packages/core/src/companion-observer.js';
 import type { UiSnapshot } from '@studdy/shared';
 
 function snapshot(text: string): UiSnapshot {
@@ -25,6 +25,23 @@ describe('proactive companion guardrails', () => {
     expect(allowedObservationTitle('ChatGPT - Chrome')).toBe(false);
     expect(detectCompanionHint(snapshot('Error: access denied'), 'Bank login')).toBeNull();
     expect(detectCompanionHint(snapshot('No issues here'), 'Packet Tracer')).toBeNull();
+  });
+
+  it('suggests study help from actual non-private accessibility text', () => {
+    const hint = detectContextHint(snapshot('Module 3: OSI and TCP/IP protocols'), 'Cisco Networking Academy');
+    expect(hint?.kind).toBe('study');
+    expect(hint?.question).toContain('quiz');
+    expect(hint?.question).not.toContain('Module 3');
+  });
+  it('recognizes coding and creative tools with matching accessible UI evidence', () => {
+    expect(detectContextHint(snapshot('Problems: TypeScript compilation'), 'VS Code')?.kind).toBe('code');
+    expect(detectContextHint(snapshot('CapCut video editing timeline'), 'Editor')?.kind).toBe('creative');
+  });
+  it('does not infer intent from only an app name, private window or credential content', () => {
+    expect(detectContextHint(snapshot('Welcome'), 'Cisco Packet Tracer')).toBeNull();
+    expect(detectContextHint(snapshot('OSI and subnetting'), 'Gmail Inbox')).toBeNull();
+    expect(detectContextHint(snapshot('Password: OSI'), 'Notes')).toBeNull();
+    expect(detectContextHint({ ...snapshot('OSI'), accessible: false }, 'Cisco')).toBeNull();
   });
 
   it('does not treat empty accessibility results as evidence', () => {
