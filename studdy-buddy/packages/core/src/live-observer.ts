@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { UiSnapshot, WindowInfo } from '@studdy/shared';
 import type { StuddyServices } from './services.js';
 import type { DesktopAccessibilityAdapter } from './desktop-adapter.js';
-import { allowedObservationTitle, detectCompanionHint, type CompanionHint } from './companion-observer.js';
+import { allowedObservationTitle, detectCompanionHint, detectContextHint, type CompanionHint } from './companion-observer.js';
 import { VerifiedSkillLedger } from './verified-skills.js';
 
 export type ObservationState = 'starting' | 'active' | 'off' | 'private' | 'unavailable' | 'no-window';
@@ -142,10 +142,15 @@ export class LiveObserver {
         const count = services.db.checkpoints.get<number>('buddy.live.verified-observations.v1') ?? 0;
         services.db.checkpoints.set('buddy.live.verified-observations.v1', Math.min(999999999, count + 1));
         new VerifiedSkillLedger(services.db.checkpoints).record('observe:' + proof, true);
-        const hint = detectCompanionHint(snapshot, active.title);
+        // Failures are prioritized over optional context suggestions.
+        const hint = detectCompanionHint(snapshot, active.title)
+          ?? detectContextHint(snapshot, active.title);
         if (hint && !this.signatures.has(hint.signature)) {
           this.signatures.add(hint.signature);
-          if (this.signatures.size > 100) this.signatures.clear();
+          if (this.signatures.size > 100) {
+            const oldest = this.signatures.values().next().value;
+            if (oldest) this.signatures.delete(oldest);
+          }
           this.options.onHint?.(hint);
         }
       } else {
