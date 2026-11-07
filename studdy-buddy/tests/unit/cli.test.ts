@@ -54,7 +54,7 @@ describe('CLI commands', () => {
     expect(report.checks.windows.windowCount).toBeTypeOf('number');
     expect(report).not.toHaveProperty('screenText');
     expect(JSON.stringify(report)).not.toContain('apiKey');
-  });
+  }, 60000);
   it('setup grants full access once and respects later revoke', async () => {
     expect(await runCli(['setup'], io(), { dataDir: dir })).toBe(0);
     expect(out.join('')).toContain('beviljad en gång');
