@@ -12,7 +12,7 @@ export type ChatUiAdapter = Pick<DesktopAccessibilityAdapter,'listWindows'|'snap
 /** User intent parsing, not a claim that a message was transmitted. */
 export function extractChatGPTMessage(input: string): string | null {
   const text=input.trim().replace(/[.!]$/,'').trim();
-  const command=/^(?:(?:hey\s+)?buddy[,! ]+\s*)?(?:(?:kan du|skulle du kunna|snälla|please|can you|could you)\s+)?(?:skriv|skicka|säg|write|send|say)\s+(.+)$/i.exec(text);
+  const command=/^(?:(?:hey\s+)?buddy[,! ]+\s*)?(?:(?:kan du|skulle du kunna|snälla|please|can you|could you)\s+)?(?:skriv|skriva|skicka|säg|write|send|say)\s+(.+)$/i.exec(text);
   if (!command) return null;
   const content=command[1]!.trim();
   // "skriv till chat gpt hej" / "send to ChatGPT: hello"
