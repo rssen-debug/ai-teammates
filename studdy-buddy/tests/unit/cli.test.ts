@@ -43,6 +43,18 @@ describe('CLI commands', () => {
     expect(JSON.parse(out[0]!)).toEqual({ version: '9.9.9' });
   });
 
+  it('selftest writes a local privacy-bounded report with real probe statuses', async () => {
+    const code = await runCli(['selftest'], io(), { dataDir: dir });
+    expect(code).toBe(0);
+    const reportPath=join(dir,'diagnostics','selftest.json');
+    expect(existsSync(reportPath)).toBe(true);
+    const report=JSON.parse(readFileSync(reportPath,'utf8'));
+    expect(report.schema).toBe('studdy-selftest-v1');
+    expect(report.checks.kilo.key).toBe('never-exported');
+    expect(report.checks.windows.windowCount).toBeTypeOf('number');
+    expect(report).not.toHaveProperty('screenText');
+    expect(JSON.stringify(report)).not.toContain('apiKey');
+  });
   it('setup grants full access once and respects later revoke', async () => {
     expect(await runCli(['setup'], io(), { dataDir: dir })).toBe(0);
     expect(out.join('')).toContain('beviljad en gång');
