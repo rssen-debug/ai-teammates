@@ -3,6 +3,7 @@ import { Readable } from 'node:stream';
 import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
 import { SLASH_COMMANDS, slashMatches, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
+import { liveLines } from './live-ui.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -52,12 +53,30 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   ], color));
   if (runtime.services.permissions.isGranted('application.observe')) runtime.observer.start();
   let lastState = runtime.liveStatus().state;
+  let lastObservedAt: number | null = null;
+  let lastStatusLine = '';
   const timer = setInterval(() => {
     const s = runtime.liveStatus();
-    if (s.state !== lastState) {
-      lastState = s.state;
-      log(p.dim(`● live: ${s.observing ? s.windowTitle : s.activity}`));
+    const changed = s.state !== lastState || (s.observing && s.lastObservedAt !== lastObservedAt);
+    lastState = s.state;
+    lastObservedAt = s.lastObservedAt;
+    if (changed) {
+      const observation = s.observing
+        ? '● LIVE · ' + s.elementCount + ' UI-element · ' + (s.windowTitle ?? 'fönster') +
+          ' · Skills ' + runtime.ledger().level() + '/100'
+        : '○ ' + s.state.toUpperCase() + ' · ' + s.activity;
+      if (observation !== lastStatusLine) {
+        lastStatusLine = observation;
+        log(p.dim(observation));
+        rl.prompt(true);
+      }
+    }
+    for (const hint of runtime.takeProactiveHints()) {
+      // This message is based on a measured UI error, not AI speculation.
+      log(p.mint('● Buddy upptäckte ett fel i ett tillåtet fönster.') +
+        ' Vill du att jag hjälper dig felsöka? Jag ändrar inget utan att du ber mig.');
       rl.prompt(true);
+      void hint; // The raw error text is deliberately not printed.
     }
   }, 1000);
   rl.setPrompt(p.mint('du › '));
@@ -84,14 +103,29 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
     try {
       if (text === '/help') {
         log('Skriv / för en väljbar meny, Tab för komplettering, eller prata naturligt.\n' + SLASH_COMMANDS.map(item => item.command.padEnd(12) + item.description).join('\n'));
-      } else if (text === '/status') {
+      } else if (text === '/status' || text === '/live' || text === '/activity') {
         await runtime.observer.tick();
         const s = runtime.liveStatus();
-        const ledger = runtime.ledger().details();
-        log(box('Status', [
-          statusLine('Live', s.observing, color, s.windowTitle ?? s.activity),
-          statusLine('AI', Boolean(runtime.services.activeProvider()?.hasApiKey), color),
-          `Nivå ${ledger.level} · ${ledger.verified} verifierade skills`,
+        const metrics = runtime.liveMetrics();
+        const issues = runtime.journal.summary();
+        const active = runtime.services.activeProvider();
+        log(box('BUDDY LIVE · mätt aktivitet', liveLines(s, metrics, {
+          providerConnected: Boolean(active?.hasApiKey), issues: issues.count,
+        }), color));
+      } else if (text === '/debug') {
+        const info = runtime.journal.summary(6);
+        log(box('Lokal debugger · ' + info.count + ' händelser',
+          [...(info.recent.length ? info.recent : ['Inga registrerade fel.']),
+            'Filen finns i Obsidian-valvet; ingen automatisk GitHub-uppladdning.',
+            'Debuggning innebär inte automatisk kodreparation.'], color));
+      } else if (text === '/memory' || text === '/obsidian') {
+        const info = runtime.liveMetrics();
+        log(box('Obsidian-minne', [
+          'Valv: ' + (info.vaultPath ?? 'otillgängligt'),
+          'Personliga minnen: ' + info.memoryFacts,
+          'Dagliga samtalsanteckningar sparas efter lyckade AI-svar.',
+          'Debugger: ' + info.debuggerPath,
+          'Minnet är lokalt och kan granskas av dig.',
         ], color));
       } else if (text === '/profile') {
         const facts = runtime.services.memory?.profileFacts() ?? [];
@@ -201,13 +235,14 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text.startsWith('/snapshot ')) {
         const snap = await runtime.adapter.snapshot(text.slice(10).trim());
         log(snap.accessible ? snap.elements.filter(e => e.name || e.value).slice(0, 30).map(e => `${e.ref} ${e.role}: ${e.name || e.value}`).join('\n') : snap.note ?? 'Ingen tillgänglig snapshot.');
-      } else if (text === '/memory') log(runtime.syncMemory());
+      } else if (text === '/sync-memory') log(runtime.syncMemory());
       else if (text === '/progress') log(JSON.stringify(runtime.services.progress(), null, 2));
       else if (text === '/bridge') {
         const h = await runtime.startBridge();
         log(h.status.running ? `ws://${h.status.host}:${h.status.port}\nToken: ${h.token}` : h.status.detail);
       } else if (text.startsWith('/')) log('Okänt kommando. /help');
       else {
+        log(p.dim('○ Buddy arbetar · tolkar förfrågan och inväntar verifierat svar...'));
         const result = await runtime.chat(text);
         if (result.ok) log(p.violet('studdy › ') + result.data.message.text);
         else log(p.red(result.error.message));
