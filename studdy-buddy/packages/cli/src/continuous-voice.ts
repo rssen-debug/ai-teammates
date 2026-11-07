@@ -29,15 +29,20 @@ const SCRIPT = [
   '  $r.SetInputToDefaultAudioDevice()',
   '  Write-Output "READY"',
   '  [Console]::Out.Flush()',
+  '  Register-ObjectEvent -InputObject $r -EventName SpeechRecognized -SourceIdentifier BuddySpeech | Out-Null',
+  '  $r.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)',
   '  while ($true) {',
-  '    $heard=$r.Recognize([TimeSpan]::FromMilliseconds(900))',
+  '    $event=Wait-Event -SourceIdentifier BuddySpeech -Timeout 1',
+  '    if ($null -eq $event) { continue }',
+  '    $heard=$event.SourceEventArgs.Result',
+  '    Remove-Event -EventIdentifier $event.EventIdentifier',
   '    if ($null -ne $heard -and $heard.Confidence -ge 0.42 -and $heard.Text) {',
   '      $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($heard.Text))',
   '      Write-Output ("HEARD:"+$encoded)',
   '      [Console]::Out.Flush()',
   '    }',
   '  }',
-  '} finally { $r.Dispose() }',
+  '} finally { try { $r.RecognizeAsyncCancel() } catch {}; Unregister-Event -SourceIdentifier BuddySpeech -ErrorAction SilentlyContinue; $r.Dispose() }',
 ].join('\n');
 
 export class WindowsContinuousInput implements VoiceInput {
