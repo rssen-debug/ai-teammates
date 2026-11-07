@@ -633,6 +633,7 @@ class TickReport:
     reflected: bool = False
     reflection: str = ""
     stored: bool = False
+    store_note: str = ""
     tokens_used: int = 0
     consulted: list[str] = field(default_factory=list)
     blocked: list[str] = field(default_factory=list)
@@ -641,6 +642,7 @@ class TickReport:
     def to_dict(self) -> dict:
         return {"observed": self.observed, "observation_note": self.observation_note,
                 "reflected": self.reflected, "reflection": self.reflection, "stored": self.stored,
+                "store_note": self.store_note,
                 "tokens_used": self.tokens_used, "consulted": self.consulted,
                 "blocked": self.blocked, "duration_s": round(self.duration_s, 3)}
 
@@ -666,6 +668,11 @@ class CompanionLoop:
         "max_tokens_per_day": 250_000,
         "consult_role": "deep",     # which model role gives the second opinion
         "window_days": 30,          # how far back the user model looks
+        # At most one STORED reflection per cooldown. Without this a loop ticking
+        # every 30s would write ~2900 memories a day, which is noise that buries
+        # the ones that matter. The loop still thinks every tick; it just does not
+        # write down every single thought.
+        "store_cooldown_seconds": 900.0,
     }
 
     def __init__(self, settings: Any, *, observation: ObservationPolicy, model: UserModel,
@@ -688,6 +695,7 @@ class CompanionLoop:
         self._stop = threading.Event()
         self.last: Optional[TickReport] = None
         self.ticks = 0
+        self.errors: list[str] = []
 
     def options(self) -> dict:
         v = self.cfg.get(self.SETTING, None)
@@ -720,6 +728,22 @@ class CompanionLoop:
             return True, ("companion loop ON, but observation depth is 'off' so there is nothing to "
                           "think about. Set a depth: buddy companion observe titles|capture|continuous")
         return True, f"companion loop {'ON' if on else 'OFF'}"
+
+    def store_cooldown_ok(self) -> tuple[bool, str]:
+        """Has enough time passed since the last stored reflection?"""
+        cd = float(self.options().get("store_cooldown_seconds", 900.0))
+        if cd <= 0:
+            return True, ""
+        row = None
+        with contextlib.suppress(Exception):
+            row = self.store.one("SELECT MAX(updated) AS u FROM memories "
+                                 "WHERE kind='episodic' AND tags LIKE '%companion%'")
+        if row and row["u"]:
+            age = _now() - float(row["u"])
+            if age < cd:
+                return False, (f"a reflection was stored {int(age)}s ago and the cooldown is "
+                               f"{int(cd)}s — thought kept, not written down")
+        return True, ""
 
     def idle_seconds(self) -> float:
         if self._idle_probe is not None:
@@ -830,12 +854,22 @@ class CompanionLoop:
             # a hard error, not a silent no-op — and it is reported rather than
             # swallowed, because "I thought about it but stored nothing" and "I
             # stored nothing worth storing" are different claims.
-            try:
-                self.memory.save("episodic", f"reflection {time.strftime('%Y-%m-%d %H:%M')}",
-                                 text, tags="companion,reflection", status="unverified")
-                rep.stored = True
-            except Exception as e:
-                rep.blocked.append(f"reflection could not be stored: {type(e).__name__}: {e}")
+            #
+            # The title carries seconds on purpose. Memory.save upserts on
+            # (kind, lower(title)), so a minute-granularity title made every
+            # reflection inside the same minute overwrite the one before it: a
+            # loop ticking every 30s produced seven thoughts and one memory.
+            ok, why = self.store_cooldown_ok()
+            if not ok:
+                rep.store_note = why
+            else:
+                try:
+                    self.memory.save("episodic",
+                                     f"reflection {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                                     text, tags="companion,reflection", status="unverified")
+                    rep.stored = True
+                except Exception as e:
+                    rep.blocked.append(f"reflection could not be stored: {type(e).__name__}: {e}")
         rep.duration_s = _now() - t0
         self.last = rep
         self._log("companion_reflect", tokens=used, stored=rep.reflected)
@@ -905,6 +939,7 @@ class CompanionLoop:
                 "budget": self.budget.state(), "can_reflect_now": ok,
                 "why_not": "" if ok else why,
                 "observation": self.obs.state(),
+                "errors": list(self.errors[-5:]),
                 "last": self.last.to_dict() if self.last else None}
 
     def request_stop(self) -> None:
@@ -915,7 +950,17 @@ class CompanionLoop:
         out: list[TickReport] = []
         o = self.options()
         while not self._stop.is_set():
-            rep = await self.reflect()
+            try:
+                rep = await self.reflect()
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                # A loop that runs for weeks will hit something nobody predicted.
+                # Dying silently would leave the owner believing it was still
+                # thinking, so the failure is recorded and the loop carries on.
+                rep = TickReport(blocked=[f"tick failed: {type(e).__name__}: {e}"])
+                self.errors.append(str(e))
+                self._log("companion_tick_error", err=str(e))
             out.append(rep)
             self.ticks += 1
             if max_ticks is not None and self.ticks >= max_ticks:

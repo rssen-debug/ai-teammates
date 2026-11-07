@@ -21,6 +21,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from typing import Any, Callable
 
 _SCRATCH = tempfile.mkdtemp(prefix="omega-companion-test-")
 os.environ["BUDDY_HOME"] = _SCRATCH
@@ -524,6 +525,102 @@ class TestCompanionLoop(CompanionCase):
         self.assertTrue(st["why_not"])
         self.assertEqual(st["budget"]["max_tokens_per_day"], 10_000)
         self.assertIn("depth", st["observation"])
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Living with the loop: storage, cooldown, resilience, session integration
+# ════════════════════════════════════════════════════════════════════════════
+class TestReflectionStorage(CompanionCase):
+    def insight(self, n: int = 1) -> Callable[..., dict]:
+        def chat(prompt: str, **kw: Any) -> dict:
+            return {"content": f"insight number {n}", "tokens": 25}
+        return chat
+
+    def test_reflection_titles_are_second_granular_not_minute_granular(self) -> None:
+        """Memory.save upserts on (kind, lower(title)). A minute-granular title made
+        every reflection in the same minute overwrite the one before it, so a loop
+        ticking every 30s produced seven thoughts and a single memory. Real data
+        loss, invisible from the outside."""
+        lp = self.loop(chat=self.insight(), idle=999.0, store_cooldown_seconds=0)
+        rep = asyncio.run(lp.reflect())
+        self.assertTrue(rep.stored)
+        row = self.app.store.one("SELECT title FROM memories WHERE kind='episodic'")
+        self.assertIsNotNone(row)
+        self.assertRegex(row["title"], r"^reflection \d{4}-\d\d-\d\d \d\d:\d\d:\d\d$",
+                         "the title must carry seconds or reflections clobber each other")
+
+    def test_the_cooldown_stops_a_thought_per_tick_becoming_a_memory_per_tick(self) -> None:
+        lp = self.loop(chat=self.insight(), idle=999.0, store_cooldown_seconds=900)
+        first = asyncio.run(lp.reflect())
+        self.assertTrue(first.stored)
+        second = asyncio.run(lp.reflect())
+        self.assertTrue(second.reflected, "it still thinks every tick…")
+        self.assertFalse(second.stored, "…it just does not write down every thought")
+        self.assertIn("cooldown", second.store_note)
+        n = self.app.store.one("SELECT COUNT(*) AS n FROM memories WHERE kind='episodic'")["n"]
+        self.assertEqual(n, 1)
+
+    def test_a_zero_cooldown_disables_the_throttle(self) -> None:
+        lp = self.loop(chat=self.insight(), idle=999.0, store_cooldown_seconds=0)
+        asyncio.run(lp.reflect())
+        self.assertTrue(lp.store_cooldown_ok()[0])
+
+    def test_a_failing_tick_does_not_kill_the_loop(self) -> None:
+        """A loop meant to run for weeks will hit something nobody predicted. Dying
+        silently would leave the owner believing it was still thinking."""
+        class BrokenModel:
+            def build(self, days: float = 30) -> dict:
+                raise RuntimeError("database is locked")
+
+        lp = self.loop(chat=self.insight(), idle=999.0, tick_seconds=0.0)
+        lp.model = BrokenModel()
+        reports = asyncio.run(lp.run(max_ticks=3))
+        self.assertEqual(len(reports), 3, "the loop must carry on after a bad tick")
+        self.assertEqual(lp.ticks, 3)
+        self.assertTrue(all(r.blocked for r in reports))
+        self.assertIn("database is locked", reports[0].blocked[0])
+        self.assertTrue(lp.status()["errors"], "and the failure must be visible in status")
+
+
+class TestSessionIntegration(CompanionCase):
+    def test_a_disabled_loop_is_not_started(self) -> None:
+        async def go():
+            self.assertIsNone(self.app.start_companion())
+            self.assertIsNone(self.app.companion_task)
+        asyncio.run(go())
+
+    def test_an_enabled_loop_starts_and_is_stopped_by_close(self) -> None:
+        async def go():
+            self.app.settings.set(cm.CompanionLoop.SETTING,
+                                  {**cm.CompanionLoop.DEFAULTS, "enabled": True,
+                                   "tick_seconds": 0.05, "idle_seconds": 0})
+            lp = self.app.companion.loop
+            lp._chat = lambda p, **k: {"content": "insight", "tokens": 5}
+            lp._idle_probe = lambda: 999.0
+            events = []
+            self.app.ui.event = lambda s: events.append(s)
+            task = self.app.start_companion()
+            self.assertIsNotNone(task)
+            await asyncio.sleep(0.25)
+            self.assertGreater(lp.ticks, 0, "the loop must actually tick while a session is open")
+            self.assertTrue(any("companion loop ON" in e for e in events))
+            await self.app.close()
+            self.assertTrue(task.cancelled() or task.done())
+            self.assertIsNone(self.app.companion_task)
+        asyncio.run(go())
+
+    def test_startup_says_when_the_loop_cannot_actually_think(self) -> None:
+        """A loop that is on but cannot reflect must not look alive for a week."""
+        async def go():
+            self.app.settings.set(cm.CompanionLoop.SETTING,
+                                  {**cm.CompanionLoop.DEFAULTS, "enabled": True, "tick_seconds": 60})
+            events = []
+            self.app.ui.event = lambda s: events.append(s)
+            self.app.start_companion()
+            self.assertTrue(any("no API key" in e for e in events),
+                            "with no key, reflection is impossible and startup must say so")
+            await self.app.close()
+        asyncio.run(go())
 
 
 # ════════════════════════════════════════════════════════════════════════════

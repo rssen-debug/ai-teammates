@@ -5091,8 +5091,10 @@ class Buddy:
         self.perms.confirm_fn = lambda p, al: self.ui.confirm(p, al)
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.shutting_down = False
+        self._closed = False
         self.current_run: Optional[AgentRun] = None
         self.current_task: Optional[asyncio.Task] = None
+        self.companion_task: Optional[asyncio.Task] = None
         self.ai_state: tuple[bool, str] = (False, "not checked")
         self.lock = InstanceLock()
         self.stop = StopSignal()
@@ -5100,6 +5102,48 @@ class Buddy:
         self.skills.load_active()
         if not IS_WIN:
             self.caps.report("desktop", "blocked", "not Windows")
+
+    # ── the always-on layer ──
+    def start_companion(self) -> Optional[asyncio.Task]:
+        """Start the companion loop if the owner turned it on. Never raises.
+
+        Announces what it will and will not be able to do, up front. A loop that is
+        on but cannot reflect — no key, no display, owner never idle — must say so
+        at startup rather than looking alive for a week while doing nothing.
+        """
+        ok, why = self.companion.present()
+        if not ok:
+            self.ui.event(f"companion unavailable: {why}")
+            return None
+        try:
+            lp = self.companion.loop
+            if not lp.enabled:
+                return None
+            st = lp.status()
+            obs = st["observation"]
+            self.ui.event(f"companion loop ON — observation={obs['depth']} ({obs['indicator']['label']}), "
+                          f"thinks when idle {int(st['idle_threshold'])}s, "
+                          f"budget {st['budget']['max_tokens_per_day']:,} tokens/day")
+            if not self.gateway.key():
+                self.ui.event("companion can observe and remember but cannot reflect: no API key "
+                              "(`buddy key set`)")
+            elif not obs["backend_available"] and obs["depth"] in ("capture", "continuous"):
+                self.ui.event(f"companion cannot capture the screen here: {obs['backend_note']}")
+            self.companion_task = asyncio.ensure_future(lp.run())
+            return self.companion_task
+        except Exception as e:
+            self.ui.event(f"companion loop could not start: {type(e).__name__}: {e}")
+            log("companion_start_failed", err=str(e))
+            return None
+
+    def stop_companion(self) -> None:
+        """Stop the loop before anything else shuts down."""
+        with contextlib.suppress(Exception):
+            if self.companion.present()[0]:
+                self.companion.loop.request_stop()
+        if self.companion_task is not None:
+            self.companion_task.cancel()
+            self.companion_task = None
 
     # ── prompt assembly: capability manifest, never generic disclaimers ──
     def manifest(self) -> dict:
@@ -5414,7 +5458,18 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
         self.measure_level(record=True)
 
     async def close(self) -> None:
+        if self._closed:
+            # Shutdown must be idempotent. It is reachable from a session's finally
+            # block, from a signal handler and from a caller that closes explicitly,
+            # and those overlap. A second pass used to raise "Cannot operate on a
+            # closed database" from Voice.stop(), which turned a clean exit into a
+            # traceback at exactly the moment the owner was leaving.
+            return
+        self._closed = True
         self.shutting_down = True
+        # First, because the loop reads the store, memory and gateway: stopping it
+        # after those are gone would turn a clean shutdown into a logged error.
+        self.stop_companion()
         self.voice.stop()
         self.activity.stop()
         self.tasks.cancel_all()
@@ -5506,6 +5561,7 @@ async def main_async(app: Buddy) -> None:
         app.stop.clear()
         app.ui.event(f"cleared a stop request left at {iso(detail.get('requested_at')) if detail.get('requested_at') else 'an earlier run'}")
     app.activity.start()
+    app.start_companion()
     worker = asyncio.ensure_future(app.tasks.worker())
     recovered = app.tasks.recover(stale_after=0)
     if recovered:
