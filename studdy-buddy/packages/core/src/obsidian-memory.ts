@@ -57,12 +57,12 @@ export class ObsidianMemory {
   /** Explicitly approved profile facts survive a restart and are not counted as mastery. */
   rememberProfile(fact: string): boolean {
     const safe = this.scrub(fact).slice(0, 180);
-    if (!safe || safe.includes('[REDACTED') || /[\\r\\n]/.test(safe)) return false;
+    if (!safe || safe.includes('[REDACTED') || /[\r\n]/.test(safe)) return false;
     const path = join(this.path, 'Profile.md');
     const existing = this.profileFacts();
     if (existing.some(item => item.toLocaleLowerCase('sv-SE') === safe.toLocaleLowerCase('sv-SE'))) return true;
     const next = [...existing, safe].slice(-30);
-    writeFileSync(path, '# Mina valda minnen\\n\\n' + next.map(item => '- ' + item).join('\\n') + '\\n', 'utf8');
+    writeFileSync(path, '# Mina valda minnen\n\n' + next.map(item => '- ' + item).join('\n') + '\n', 'utf8');
     return true;
   }
 
@@ -71,7 +71,7 @@ export class ObsidianMemory {
     const path = join(this.path, 'Profile.md');
     if (!existsSync(path)) return [];
     try {
-      return readFileSync(path, 'utf8').split('\\n')
+      return readFileSync(path, 'utf8').split('\n')
         .filter(line => line.startsWith('- '))
         .map(line => this.scrub(line.slice(2)).slice(0, 180))
         .filter(line => line.length > 0 && !line.includes('[REDACTED'))
