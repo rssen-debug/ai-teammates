@@ -461,6 +461,45 @@ class InstanceLock:
                 self.f.close()
 
 
+# ── cross-process stop ──────────────────────────────────────────────────────
+class StopSignal:
+    """A file marker that lets `buddy stop` reach a running instance.
+
+    The interactive process owns the microphone, the task queue and any MAJIN
+    worker it started, so stopping it from another process has to be explicit
+    and safe: write a marker, let the running loops notice it at their next safe
+    point, cancel cleanly, and clear the marker. No signal numbers, no PID
+    guessing, no killing a process that may be mid-write.
+    """
+
+    def __init__(self, path: Optional[Path] = None) -> None:
+        self.path = Path(path) if path else (HOME / "STOP")
+
+    def request(self, reason: str = "buddy stop") -> bool:
+        try:
+            ensure_dirs()
+            self.path.write_text(jdump({"requested_at": now(), "reason": reason, "pid": os.getpid()}), encoding="utf-8")
+            return True
+        except OSError:
+            return False
+
+    def requested(self) -> bool:
+        try:
+            return self.path.is_file()
+        except OSError:
+            return False
+
+    def detail(self) -> dict:
+        try:
+            return json.loads(self.path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+    def clear(self) -> None:
+        with contextlib.suppress(OSError):
+            self.path.unlink()
+
+
 # ── dependencies ────────────────────────────────────────────────────────────
 DEPS: dict[str, dict[str, Any]] = {
     "uiautomation": {"pip": "uiautomation", "win_only": True, "required": True, "why": "Windows UI Automation (accessibility tree, controls)"},
@@ -548,6 +587,36 @@ class Privacy:
 
 
 PROTECTED_READ = ["login data", "cookies", "web data", ".ssh", "id_rsa", ".secret", "buddy.db", "ntuser.dat", "sam", "credentials"]
+
+
+def advance_mtime(p: Path, before_ns: int) -> bool:
+    """Guarantee a cache-visible timestamp change after an in-place edit.
+
+    Python's bytecode cache — and make, webpack, ccache and friends — invalidate
+    on mtime with **one-second granularity**. An edit that lands in the same second
+    as the previous compile, which is exactly what happens when the agent patches a
+    source file and immediately runs the tests, leaves the stale cache in place.
+    The edit is on disk and correct, but the next run still executes the OLD code,
+    so the agent silently observes the pre-fix behaviour and draws the wrong
+    conclusion ("my fix did not work") or loops on it. If the file size is unchanged
+    too, a same-length edit is invisible to every timestamp+size cache.
+
+    Bumping the timestamp forward one second makes invalidation deterministic.
+    Returns True when a bump was needed and applied.
+    """
+    try:
+        st = p.stat()
+    except OSError:
+        return False
+    sec_before, sec_after = before_ns // 1_000_000_000, st.st_mtime_ns // 1_000_000_000
+    if sec_after > sec_before:
+        return False
+    try:
+        os.utime(p, ns=(st.st_atime_ns, (sec_before + 1) * 1_000_000_000))
+        return True
+    except OSError as e:
+        log("advance_mtime_failed", path=str(p), err=f"{type(e).__name__}: {e}")
+        return False
 
 
 def is_protected_path(p: Path, write: bool) -> Optional[str]:
@@ -2155,15 +2224,48 @@ class TaskEngine:
                 return self.s.one("SELECT * FROM tasks WHERE id=?", (r["id"],))
         return None
 
+    @staticmethod
+    def _plan_kind(plan: Any) -> Optional[str]:
+        """Resolve which runner a plan belongs to, tolerating a missing `kind`.
+
+        A durable worker must not die with a bare `KeyError: 'goal'` because a
+        caller wrote `{"steps": [...]}` instead of
+        `{"kind": "steps", "steps": [...]}`. The shape is unambiguous, so infer
+        it. Only a genuinely malformed plan fails — and then it fails with a
+        message that says what is actually wrong, so the owner and the agent can
+        act on it instead of guessing.
+        """
+        if not isinstance(plan, dict):
+            return None
+        kind = str(plan.get("kind") or "").strip().lower()
+        if kind in ("steps", "agent"):
+            return kind
+        if isinstance(plan.get("steps"), list) and plan["steps"]:
+            return "steps"
+        if isinstance(plan.get("goal"), str) and plan["goal"].strip():
+            return "agent"
+        return None
+
     async def run_one(self, task: dict) -> str:
         tid = task["id"]
-        plan = json.loads(task["plan"])
+        try:
+            plan = json.loads(task["plan"])
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            self._finish(tid, "failed", error=f"the stored plan is not valid JSON: {e}", cls="invalid_args")
+            return "failed"
+        kind = self._plan_kind(plan)
+        if kind is None:
+            self._finish(tid, "failed", cls="invalid_args",
+                         error="the plan has neither 'steps' (deterministic tool steps) nor 'goal' (an agent task); "
+                               f"got keys {sorted(plan) if isinstance(plan, dict) else type(plan).__name__}")
+            return "failed"
         cancel = threading.Event()
         self.cancels[tid] = cancel
         self.current[tid] = task
         hb = asyncio.ensure_future(self._heartbeat(tid))
+        watch = asyncio.ensure_future(self._stop_watch(cancel))
         try:
-            if plan.get("kind") == "steps":
+            if kind == "steps":
                 return await self._run_steps(task, plan, cancel)
             return await self._run_agent(task, plan, cancel)
         except Exception as e:
@@ -2172,8 +2274,27 @@ class TaskEngine:
             return "failed"
         finally:
             hb.cancel()
+            watch.cancel()
             self.cancels.pop(tid, None)
             self.current.pop(tid, None)
+
+    async def _stop_watch(self, cancel: threading.Event) -> None:
+        """Bridge a cross-process emergency stop into this task's cancel event.
+
+        The stop marker file is the only channel a second process has, and the
+        worker is blocked inside `run_one` while a task is in flight — so without
+        this bridge `buddy stop` would not reach active work until it finished on
+        its own. Setting the shared event is enough because both runners already
+        poll it at their safe points (`_run_steps` between steps, `AgentRun`
+        between its own), which keeps cancellation cooperative: effects already
+        applied stay checkpointed and are never replayed on resume.
+        """
+        while not cancel.is_set():
+            if self.app.stop.requested():
+                cancel.set()
+                log("stop_signal_reached_inflight_task")
+                return
+            await asyncio.sleep(0.25)
 
     async def _heartbeat(self, tid: str) -> None:
         while True:
@@ -2221,6 +2342,16 @@ class TaskEngine:
                 if res.category == "permission_denied":
                     self._finish(tid, "blocked", error=res.error, cls=res.category)
                     return "blocked"
+                if cancel.is_set() or res.category == "cancelled":
+                    # A stop is not a failure. The executor reports an interrupted
+                    # step as category "cancelled", which is not in TRANSIENT, so
+                    # without this branch a user-requested stop was recorded as a
+                    # failed task — wrong for the owner reading `buddy status`,
+                    # wrong for the retry policy, and it dragged down the verified
+                    # success rate that drives the capability level.
+                    self._finish(tid, "cancelled", error=res.error or "cancelled by user", cls="cancelled")
+                    log("task_cancelled", id=tid, step=i, reason=res.error or "cancel requested")
+                    return "cancelled"
                 if res.category not in TRANSIENT or attempt > 2:
                     self._finish(tid, "failed", error=f"step {i} {st['tool']}: {res.error}", cls=res.category)
                     return "failed"
@@ -2255,6 +2386,13 @@ class TaskEngine:
                 if now() - last_recover > 15:
                     self.recover()
                     last_recover = now()
+                # `buddy stop` from another process: cancel queued work and stop
+                # claiming. In-flight work finishes at its next safe point.
+                if self.app.stop.requested() and not self.paused:
+                    n = self.cancel_all()
+                    self.paused = True
+                    log("stop_signal honoured by autopilot worker", cancelled=n)
+                    self.app.ui.event(f"■ stop requested — {n} queued task(s) cancelled; autopilot paused (/resume to continue)")
                 if not self.paused and not self.current and not self.app.shutting_down:
                     t = self.claim()
                     if t:
@@ -3040,8 +3178,11 @@ def build_tools(app: "Buddy") -> None:
             raise ToolError("file exists; pass overwrite=true to replace (a backup is kept)", "invalid_args")
         b = backup(p)
         p.parent.mkdir(parents=True, exist_ok=True)
+        before = p.stat().st_mtime_ns if p.exists() else 0
         p.write_text(a["content"], encoding="utf-8", newline="")
-        return {"written": str(p), "chars": len(a["content"]), "backup": b, "verify_hint": "file_read it back"}
+        bumped = advance_mtime(p, before)
+        return {"written": str(p), "chars": len(a["content"]), "backup": b, "mtime_advanced": bumped,
+                "verify_hint": "file_read it back"}
 
     reg(name="file_write", category="file", risk=Risk.WRITE, effect=True, once=True, progress="Writing file", confirm=lambda a, c: outside_home(a),
         description="Create a file (or overwrite with overwrite=true; previous version is backed up).",
@@ -3050,9 +3191,12 @@ def build_tools(app: "Buddy") -> None:
     def h_append(a: dict, ctx: ToolContext) -> dict:
         p = wr(_abs(a["path"]))
         p.parent.mkdir(parents=True, exist_ok=True)
+        before = p.stat().st_mtime_ns if p.exists() else 0
         with open(p, "a", encoding="utf-8", newline="") as f:
             f.write(a["content"])
-        return {"appended": str(p), "chars": len(a["content"]), "size_now": p.stat().st_size}
+        bumped = advance_mtime(p, before)
+        return {"appended": str(p), "chars": len(a["content"]), "size_now": p.stat().st_size,
+                "mtime_advanced": bumped}
 
     reg(name="file_append", category="file", risk=Risk.WRITE, effect=True, once=True, progress="Appending to file", confirm=lambda a, c: outside_home(a),
         description="Append text to a file (created if missing).",
@@ -3066,8 +3210,13 @@ def build_tools(app: "Buddy") -> None:
         if n != want:
             raise ToolError(f"'find' text occurs {n} times, expected {want}. Read the file again and use an exact, unique snippet.", "invalid_args")
         b = backup(p)
+        before = p.stat().st_mtime_ns
         p.write_text(txt.replace(a["find"], a["replace"]), encoding="utf-8", newline="")
-        return {"patched": str(p), "replacements": n, "backup": b, "verify_hint": "run tests / file_read"}
+        # A patch is usually followed immediately by a test run; without this the
+        # stale bytecode cache can make the fix look like it did not work.
+        bumped = advance_mtime(p, before)
+        return {"patched": str(p), "replacements": n, "backup": b, "mtime_advanced": bumped,
+                "verify_hint": "run tests / file_read"}
 
     reg(name="file_patch", category="file", risk=Risk.WRITE, effect=True, once=True, progress="Editing file", confirm=lambda a, c: outside_home(a),
         description="Exact find/replace edit in a text file (find must occur expected_count times, default 1). Backup is kept.",
@@ -4544,6 +4693,70 @@ class Doctor:
             q = a.store.q("SELECT state, COUNT(*) c FROM tasks GROUP BY state")
             add("autopilot queue", "PASS", ", ".join(f"{r['state']}={r['c']}" for r in q) or "empty", cap="autopilot")
             add("Windows autostart", "PASS" if autostart_state() else "NOT TESTED", "enabled" if autostart_state() else "off (/autostart on)")
+        if want("majin"):
+            # MAJIN V6 is an optional subsystem. Absent is BLOCKED with the real
+            # reason and the real fix — never FAIL (it is not a defect) and never
+            # silently omitted (the owner needs to know it is not working).
+            maj = a.majin
+            if not maj.present:
+                add("majin: bridge module", "BLOCKED", _SIBLING_ERRORS.get("majin_bridge", "majin_bridge.py not found"),
+                    "restore omega/majin_bridge.py next to buddy.py")
+            else:
+                mb = maj.mod
+                root, node = mb.find_majin_root(), mb.find_node()
+                add("majin: checkout", "PASS" if root else "BLOCKED", str(root or "not found"),
+                    "" if root else "set MAJIN_ROOT to the MAJINCLI checkout")
+                major = mb.node_major(node) if node else None
+                add("majin: node runtime", "PASS" if (node and major and major >= 22) else "BLOCKED",
+                    f"{node} (v{major})" if node else "node not on PATH",
+                    "" if (node and major and major >= 22) else "install Node.js 22+ (MAJIN V6 requirement)")
+                if root:
+                    deps = (root / "node_modules").is_dir()
+                    add("majin: dependencies", "PASS" if deps else "BLOCKED", "installed" if deps else "node_modules missing",
+                        "" if deps else f"cd {root} && npm install")
+                v5 = mb.default_v5_data_dir()
+                grants = (v5 / "owner-mode.json").is_file()
+                add("majin: owner grants", "PASS" if grants else "BLOCKED",
+                    str(v5 / "owner-mode.json") if grants else f"no owner-mode.json under {v5}",
+                    "" if grants else "buddy majin init --lane files --lane jobs  (owner decision; MAJIN will not invent grants)")
+                tools = sum(1 for t in a.registry.tools.values() if t.category == "majin")
+                add("majin: tools registered", "PASS" if tools else "FAIL", f"{tools} MAJIN tools in the Omega registry")
+                if root and node and (root / "node_modules").is_dir() and grants:
+                    try:
+                        st = maj.status()
+                        if st.get("available"):
+                            add("majin: live MCP session", "PASS",
+                                f"{st.get('mcpTools')} MCP tools, {st.get('registered')} registered, "
+                                f"{st.get('authorized')} authorized, lanes={st.get('grantedLanes')}", cap="majin")
+                        else:
+                            add("majin: live MCP session", "BLOCKED", str(st.get("reason"))[:300],
+                                "buddy doctor majin shows the cause above")
+                    except Exception as e:
+                        add("majin: live MCP session", "BLOCKED", f"{type(e).__name__}: {e}")
+                else:
+                    add("majin: live MCP session", "NOT TESTED", "prerequisites above are not met on this machine")
+        if want("level"):
+            lvm = sibling("level")
+            if lvm is None:
+                add("capability level", "BLOCKED", _SIBLING_ERRORS.get("level", "level.py not found"))
+            else:
+                res = a.measure_level(record=False)
+                if isinstance(res, dict):
+                    add("capability level", "BLOCKED", str(res.get("reason", "unavailable")))
+                else:
+                    measured = [x for x in res.axes if x.measured]
+                    add("capability level", "PASS",
+                        f"level {res.level}/100 ({res.tier}), score {res.score:.3f}, "
+                        f"{res.measured_events}/{lvm.EVIDENCE_FULL} measured events, "
+                        f"{len(measured)}/6 axes measured", cap="level")
+                    unmeasured = [x.key for x in res.axes if not x.measured]
+                    if unmeasured:
+                        add("level: unmeasured axes", "NOT TESTED",
+                            ", ".join(f"{k} ({lvm.AXIS_NAMES[k]})" for k in unmeasured),
+                            "excluded from the weighted mean, not scored as zero. `buddy bench` measures axis E.")
+        if want("subsystems"):
+            for name, state in sibling_state().items():
+                add(f"subsystem: {name}", "PASS" if state == "loaded" else "BLOCKED", state)
         return items
 
 
@@ -4622,6 +4835,7 @@ class Buddy:
         self.current_task: Optional[asyncio.Task] = None
         self.ai_state: tuple[bool, str] = (False, "not checked")
         self.lock = InstanceLock()
+        self.stop = StopSignal()
         build_tools(self)
         self.skills.load_active()
         if not IS_WIN:
@@ -5025,6 +5239,12 @@ async def main_async(app: Buddy) -> None:
         signal.signal(signal.SIGINT, on_sigint)
     if app.gateway.key():
         await asyncio.to_thread(app.doctor.run, "gateway")
+    if app.stop.requested():
+        # A marker left by an earlier `buddy stop` must not silently paralyse a
+        # session the owner just started on purpose.
+        detail = app.stop.detail()
+        app.stop.clear()
+        app.ui.event(f"cleared a stop request left at {iso(detail.get('requested_at')) if detail.get('requested_at') else 'an earlier run'}")
     app.activity.start()
     worker = asyncio.ensure_future(app.tasks.worker())
     recovered = app.tasks.recover(stale_after=0)
@@ -5041,6 +5261,10 @@ async def main_async(app: Buddy) -> None:
                 line = await asyncio.to_thread(input, "")
             except EOFError:
                 break
+            if app.stop.requested():
+                app.stop.clear()
+                app.emergency_stop()
+                continue
             if not line.strip():
                 app.ui.prompt()
                 continue
@@ -5866,6 +6090,16 @@ def child_main(kind: str) -> int:
     if kind == "memory-read":
         print(jdump([m["content"] for m in app.memory.search("favorite editor", touch=False)]))
         return 0
+    if kind == "memory-find":
+        # A genuinely separate process searching for an arbitrary marker, so a
+        # restart test can prove *this* record survived rather than a fixed one.
+        query = os.environ.get("BUDDY_MEMORY_QUERY", "")
+        if not query:
+            print("BUDDY_MEMORY_QUERY is not set")
+            return 2
+        hits = app.memory.search(query, limit=int(os.environ.get("BUDDY_MEMORY_LIMIT", "5")), touch=False)
+        print(jdump([{"kind": m["kind"], "title": m["title"], "content": m["content"]} for m in hits]))
+        return 0
     if kind == "crash-task":
         app.perms.set("write", "always")
 
@@ -5876,6 +6110,21 @@ def child_main(kind: str) -> int:
                 await app.tasks.run_one(t)
         asyncio.run(go())
         return 0
+    if kind == "resume-crashed":
+        # The recovery half of a crash test, in a genuinely separate process:
+        # pick up the orphaned lease the dead owner left behind and run it to
+        # completion from its checkpoint. Prints the verdict as JSON so the
+        # caller can prove *what* was recovered instead of trusting an exit code.
+        app.perms.set("write", "always")
+
+        async def go() -> int:
+            app.loop = asyncio.get_running_loop()
+            recovered = app.tasks.recover(stale_after=float(os.environ.get("BUDDY_STALE_AFTER", "1e9")))
+            t = app.tasks.claim()
+            state = await app.tasks.run_one(t) if t else "none"
+            print(jdump({"recovered": recovered, "claimed": t["id"] if t else None, "state": state}))
+            return 0 if state == "done" else 1
+        return asyncio.run(go())
     return 2
 
 
@@ -5892,37 +6141,453 @@ def launch_isolated(mode: str) -> int:
     return p.returncode
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(prog="buddy.py", description="Studdy Buddy Omega — personal AI companion")
-    ap.add_argument("--doctor", action="store_true", help="real diagnostics for every subsystem")
-    ap.add_argument("--self-test", action="store_true", help="automated acceptance tests (isolated data dir)")
-    ap.add_argument("--prove", action="store_true", help="self-test + interactive live Windows/AI scenarios")
-    ap.add_argument("--voice-test", action="store_true", help="real microphone + speaker test")
-    ap.add_argument("--resume", action="store_true", help=argparse.SUPPRESS)
-    ap.add_argument("--_suite", default="", help=argparse.SUPPRESS)
-    ap.add_argument("--_child", default="", help=argparse.SUPPRESS)
-    a = ap.parse_args()
-    if a._child:
-        return child_main(a._child)
-    if a._suite:
-        return asyncio.run(run_suite(a._suite == "prove"))
+# ════════════════════════════════════════════════════════════════════════════
+# 10. ONE COMMAND: `buddy`
+# ════════════════════════════════════════════════════════════════════════════
+def cmd_doctor(rest: list[str]) -> int:
+    sub = rest[0] if rest else "all"
+    valid = ("all", "runtime", "gateway", "desktop", "voice", "browser", "memory", "autopilot", "tasks",
+             "majin", "level", "subsystems")
+    if sub not in valid:
+        print(f"unknown doctor section '{sub}'. One of: {', '.join(valid)}")
+        return 2
+    app = Buddy(headless=True)
+    try:
+        print(C.c(C.B, f"\nSTUDDY BUDDY OMEGA — doctor ({APP_VERSION})\n"))
+        bad = print_report(app.doctor.run(sub))
+        if sub == "all":
+            lv = app.measure_level(record=False)
+            if not isinstance(lv, dict):
+                print("\n" + lv.render() + "\n")
+        return 1 if bad else 0
+    finally:
+        with contextlib.suppress(Exception):
+            app.majin.close()
+
+
+def cmd_status(rest: list[str]) -> int:
+    """Real operational state, read from the database and the live subsystems."""
+    as_json = "--json" in rest
+    app = Buddy(headless=True)
+    try:
+        running = not InstanceLock().acquire()          # someone else holds it
+        st: dict[str, Any] = {
+            "product": f"Studdy Buddy Omega {APP_VERSION}",
+            "platform": sys.platform, "python": sys.version.split()[0],
+            "home": str(HOME), "interactive_running": running,
+            "stop_requested": app.stop.requested(),
+        }
+        if app.stop.requested():
+            st["stop_request"] = app.stop.detail()
+        st["ai_key"] = "configured" if app.gateway.key() else "MISSING (buddy, then paste your Kilo key)"
+        st["models"] = app.router.snapshot() if hasattr(app.router, "snapshot") else app.settings.get("models")
+        st["usage"] = dict(app.gateway.usage)
+        mem = app.memory.stats()
+        st["memory"] = mem
+        st["tasks"] = {r["state"]: r["c"] for r in app.store.q("SELECT state, COUNT(*) c FROM tasks GROUP BY state")}
+        st["runs"] = {r["status"]: r["c"] for r in
+                      app.store.q("SELECT coalesce(status,'?') status, COUNT(*) c FROM runs GROUP BY status")}
+        st["grants"] = app.perms.all() or "none yet"
+        st["voice"] = app.voice.state_label()
+        st["private_mode"] = app.privacy.private
+        st["observation"] = app.activity.enabled
+        st["majin"] = app.majin.status()
+        lv = app.measure_level(record=False)
+        st["level"] = lv.to_dict() if hasattr(lv, "to_dict") else lv
+        st["subsystems"] = sibling_state()
+        if as_json:
+            print(jdump(st))
+            return 0
+        dot = C.c(C.G, "●") if st["ai_key"] == "configured" else C.c(C.RED, "●")
+        print(C.c(C.B, f"\n{dot} {st['product']}") + C.c(C.DIM, f"  ·  {st['platform']} · python {st['python']}\n"))
+        print(f"  interactive session   {'running (another process holds the lock)' if running else 'not running'}")
+        print(f"  api key               {st['ai_key']}")
+        print(f"  home                  {st['home']}")
+        print(f"  voice                 {st['voice']}")
+        print(f"  private mode          {'ON' if st['private_mode'] else 'off'}   observation {'ON' if st['observation'] else 'off'}")
+        print(f"  tokens this process   prompt={st['usage'].get('prompt', 0)} completion={st['usage'].get('completion', 0)} calls={st['usage'].get('calls', 0)}")
+        print(f"  memory                {mem.get('total', 0)} records"
+              + (f" ({', '.join(f'{k}={v}' for k, v in sorted(mem.get('by_kind', {}).items()))})" if mem.get("by_kind") else ""))
+        print(f"  retrieval             {mem.get('searches', 0)} searches, {mem.get('hits', 0)} hits")
+        if st["tasks"]:
+            print(f"  autopilot tasks       {st['tasks']}")
+        if st["runs"]:
+            print(f"  run outcomes          {st['runs']}")
+        grants = st["grants"]
+        print(f"  standing grants       {grants if isinstance(grants, str) else ', '.join(f'{k}={v}' for k, v in grants.items()) or 'none'}")
+        mj = st["majin"]
+        print(f"  majin v6              {'connected' if mj.get('available') else 'unavailable'}"
+              + (f" — {mj.get('authorized')}/{mj.get('registered')} tools authorized, lanes={mj.get('grantedLanes')}"
+                 if mj.get("available") else f" — {clip(mj.get('reason', ''), 150)}"))
+        # `measure_level` returns a LevelResult (or a dict explaining why it
+        # could not measure). Both shapes must surface a level line — hiding it
+        # because the payload happens to carry an axis breakdown would leave the
+        # owner without the one number they asked to see.
+        l = st["level"]
+        if isinstance(l, dict):
+            if l.get("level") is not None:
+                measured = len([x for x in (l.get("axes") or []) if x.get("measured")])
+                print(f"  capability level      {l['level']}/100 ({l.get('tier')}) · score {l.get('score')} · "
+                      f"{measured}/6 axes measured · {l.get('measured_events')} events — `buddy level` for the breakdown")
+            else:
+                print(C.c(C.Y, f"  capability level      not measured — {l.get('reason', 'unavailable')}"))
+        bad = [k for k, v in st["subsystems"].items() if v != "loaded"]
+        if bad:
+            print(C.c(C.Y, f"  subsystems unavailable {bad}"))
+        if st["stop_requested"]:
+            print(C.c(C.Y, "\n  A stop request is pending. Start `buddy` to clear it, or it will be honoured by the running session."))
+        print()
+        return 0
+    finally:
+        with contextlib.suppress(Exception):
+            app.majin.close()
+
+
+def cmd_stop(rest: list[str]) -> int:
+    """Stop active execution safely — no kill, no lost state."""
+    sig = StopSignal()
+    detail = sig.detail() if sig.requested() else {}
+    if sig.requested():
+        print(f"A stop request is already pending (asked at {iso(detail.get('requested_at')) if detail.get('requested_at') else '?'}).")
+        return 0
+    reason = " ".join(rest) or "buddy stop"
+    if not sig.request(reason):
+        print(f"could not write the stop marker to {sig.path}")
+        return 1
+    print(C.c(C.Y, "■ stop requested."))
+    print("  The running session will cancel the current run and all queued autopilot work at its next safe point,")
+    print("  silence speech, and keep every checkpoint — resumable tasks are not lost.")
+    if not InstanceLock().acquire():
+        print(C.c(C.DIM, "  (an interactive session is running and will honour this)"))
+    else:
+        print(C.c(C.DIM, "  (no interactive session is running; the marker will be cleared on next start)"))
+    # MAJIN workers have their own STOP marker — write it too, so detached
+    # background work stops as well instead of outliving the request.
+    mb = sibling("majin_bridge")
+    if mb:
+        with contextlib.suppress(Exception):
+            home = mb.default_v6_home()
+            if home.is_dir():
+                (home / "STOP").write_text(jdump({"at": now(), "by": "buddy stop"}), encoding="utf-8")
+                print(C.c(C.DIM, f"  MAJIN workers: STOP marker written to {home}"))
+    return 0
+
+
+def cmd_migrate(rest: list[str]) -> int:
+    mm = sibling("memory_migration")
+    if mm is None:
+        print("memory migration is unavailable: " + _SIBLING_ERRORS.get("memory_migration", "?"))
+        return 1
+    actions = ("scan", "plan", "run", "verify", "rollback")
+    action = rest[0] if rest and rest[0] in actions else "scan"
+    flags = [r for r in rest if r != action] if rest and rest[0] in actions else list(rest)
+    if action == "run" and "--yes" not in flags:
+        print("`buddy migrate run` is a dry run unless you add --yes. Read the plan first; it writes nothing without it.")
+    return mm.main([action, *flags])
+
+
+def cmd_level(rest: list[str]) -> int:
+    lvm = sibling("level")
+    if lvm is None:
+        print("the level system is unavailable: " + _SIBLING_ERRORS.get("level", "?"))
+        return 1
+    return lvm.main(rest)
+
+
+def cmd_majin(rest: list[str]) -> int:
+    """Direct access to the MAJIN subsystem. The agent can also just use it."""
+    mb = sibling("majin_bridge")
+    if mb is None:
+        print("MAJIN integration is unavailable: " + _SIBLING_ERRORS.get("majin_bridge", "?"))
+        return 1
+    action = rest[0] if rest else "status"
+    as_json = "--json" in rest
+    args = [r for r in rest[1:] if not r.startswith("--")]
+
+    if action == "init":
+        lanes = [rest[i + 1] for i, x in enumerate(rest) if x == "--lane" and i + 1 < len(rest)]
+        folders = [rest[i + 1] for i, x in enumerate(rest) if x == "--folder" and i + 1 < len(rest)]
+        if not lanes:
+            print("usage: buddy majin init --lane files [--lane jobs] [--folder C:\\path]")
+            print("  lanes: files shell sys web research jobs github browser desktop screen computer mcp …")
+            print("  This is an owner decision: it creates the grants MAJIN V6 refuses to invent for itself.")
+            return 2
+        b = mb.MajinBridge(workspace=Path(os.environ.get("MAJIN_WORKSPACE") or DIRS["workspace"]),
+                           redact=redact, autostart=False)
+        try:
+            out = b.init_profile(lanes, folders or None, reason="buddy majin init")
+            print(C.c(C.G, "✓ MAJIN owner grants written") + f" → {out['path']}")
+            print(f"  lanes   {', '.join(out['lanes'])}")
+            print(f"  folders {', '.join(out['folders']) or '(none)'}")
+            if out.get("backup"):
+                print(f"  backup  {out['backup']}")
+            return 0
+        except mb.MajinError as e:
+            print(f"{e.kind}: {e.message}")
+            return 1
+
+    b = mb.MajinBridge(workspace=Path(os.environ.get("MAJIN_WORKSPACE") or DIRS["workspace"]),
+                       redact=redact, log=lambda ev, payload=None: log(ev, **(payload or {})), autostart=False)
+    try:
+        if action == "status":
+            ok, why = b.availability()
+            if not ok:
+                print(C.c(C.Y, "MAJIN V6 is not available here.") + f"\n  {why}")
+                return 0 if "V5_DATA_MISSING" in why or "owner grants" in why else 1
+            b.start()
+            snap = b.snapshot()
+            if as_json:
+                print(jdump(snap))
+            else:
+                print(C.c(C.B, "\nMAJIN V6 — connected\n"))
+                print(f"  checkout      {snap.get('majinRoot')}")
+                print(f"  node          {snap.get('node')}")
+                print(f"  mcp tools     {snap.get('mcpTools')} (protocol {snap.get('protocol')})")
+                print(f"  catalog       {snap.get('authorized')}/{snap.get('registered')} authorized")
+                print(f"  owner lanes   {', '.join(snap.get('grantedLanes') or []) or 'none'}")
+                print(f"  v6 home       {snap.get('v6Home')}")
+                print()
+            return 0
+        if action == "doctor":
+            try:
+                doc = b.doctor()
+            except mb.MajinError as e:
+                print(f"MAJIN doctor could not run: {e.kind}: {e.message}")
+                return 1
+            checks = (doc.get("result") or {}).get("checks") or []
+            if as_json:
+                print(jdump(doc.get("result")))
+                return 0
+            print(C.c(C.B, "\nMAJIN V6 — its own diagnostics (passed through unchanged)\n"))
+            bad = print_report([{"name": c["name"], "status": str(c["status"]).replace("NOT_TESTED", "NOT TESTED")
+                                 .replace("NOT_IMPLEMENTED", "NOT TESTED"), "detail": str(c.get("detail", ""))} for c in checks])
+            return 1 if bad else 0
+        if action == "jobs":
+            try:
+                out = b.jobs_list(*(args[:1] if args else []))
+            except mb.MajinError as e:
+                print(f"MAJIN jobs could not be read: {e.kind}: {e.message}")
+                return 1
+            print(jdump(out.get("result")) if as_json else _render_majin(out))
+            return 0
+        if action == "queue":
+            b.start()
+            print(jdump(b.queue_list(limit=50)) if as_json else _render_majin({"result": b.queue_list(limit=50)}))
+            return 0
+        if action == "search":
+            b.start()
+            q = " ".join(args) or ""
+            out = b.search(q, 30)
+            matches = out.get("matches") or []
+            if as_json:
+                print(jdump(out))
+            else:
+                print(f"\n{len(matches)} authorized MAJIN tool(s) matching {q!r}\n")
+                for m in matches:
+                    print(f"  {m.get('name'):<28} [{m.get('lane')}] {clip(m.get('description', ''), 110)}")
+                print()
+            return 0
+        if action == "worker":
+            b.start()
+            out = b.work_start(max_tasks=int(args[0]) if args else 10)
+            print(jdump(out))
+            return 0
+        if action == "stop":
+            b.start()
+            print(jdump(b.work_stop()))
+            return 0
+        print("usage: buddy majin [status|doctor|jobs|queue|search QUERY|worker N|stop|init --lane LANE …]")
+        return 2
+    except mb.MajinError as e:
+        print(f"MAJIN {action} failed — {e.kind}: {e.message}")
+        return 1
+    finally:
+        with contextlib.suppress(Exception):
+            b.close(kill=True)
+
+
+def _render_majin(payload: dict, limit: int = 4000) -> str:
+    return clip(jdump(payload.get("result", payload)), limit)
+
+
+def cmd_test(rest: list[str]) -> int:
+    """Run every automated suite and report each one separately."""
+    runner = SOURCE_FILE.parent / "tests" / "run_all.py"
+    if not runner.is_file():
+        print(f"the test runner is missing: {runner}")
+        return 1
+    return subprocess.call([sys.executable, str(runner), *rest])
+
+
+def cmd_update(rest: list[str]) -> int:
+    """Safe update: check, back up, pull, verify, and roll back on failure."""
+    root = SOURCE_FILE.parent.parent
+    dry = "--check" in rest or not (root / ".git").is_dir()
+    print(C.c(C.B, "\nSTUDDY BUDDY OMEGA — update\n"))
+    if not (root / ".git").is_dir():
+        print(f"  This installation is not a git checkout ({root}).")
+        print("  Update by replacing the omega/ directory with the new release; your data in")
+        print(f"  {HOME} is never touched by an update.")
+        return 0
+    if dry:
+        print("  --check: not modifying anything.")
+    rc = subprocess.call(["git", "-C", str(root), "fetch", "--quiet", "origin"])
+    if rc != 0:
+        print("  could not reach the remote; nothing was changed.")
+        return 1
+    branch = subprocess.run(["git", "-C", str(root), "rev-parse", "--abbrev-ref", "HEAD"],
+                            capture_output=True, text=True).stdout.strip()
+    behind = subprocess.run(["git", "-C", str(root), "rev-list", "--count", f"HEAD..origin/{branch}"],
+                            capture_output=True, text=True).stdout.strip()
+    print(f"  branch {branch}: {behind or '0'} commit(s) available upstream")
+    if (behind or "0") == "0":
+        print("  already up to date.\n")
+        return 0
+    if dry:
+        print(f"  run `buddy update --apply` to install them.\n")
+        return 0
+    if "--apply" not in rest:
+        print("  refusing to modify the working tree without --apply.\n")
+        return 0
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    backup = DIRS["backups"] / f"omega-pre-update-{stamp}"
+    backup.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(SOURCE_FILE.parent, backup, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    print(f"  backup of the current runtime → {backup}")
+    before = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    rc = subprocess.call(["git", "-C", str(root), "merge", "--ff-only", f"origin/{branch}"])
+    if rc != 0:
+        print("  update did not fast-forward. Rolling back.")
+        subprocess.call(["git", "-C", str(root), "reset", "--hard", before])
+        return 1
+    # Verify before declaring success. A broken update is rolled back, not left.
+    print("  verifying the updated runtime…")
+    check = subprocess.run([sys.executable, str(SOURCE_FILE), "--self-test"], capture_output=True, text=True, timeout=1800)
+    m = re.search(r"SUMMARY\s+PASS=(\d+)\s+FAIL=(\d+)", check.stdout + check.stderr)
+    if check.returncode != 0 or not m or int(m.group(2)) > 0:
+        print(C.c(C.RED, "  the updated runtime failed its own self-test. Rolling back."))
+        subprocess.call(["git", "-C", str(root), "reset", "--hard", before])
+        print(clip(check.stdout + check.stderr, 1500))
+        return 1
+    print(C.c(C.G, f"  ✓ updated and verified (PASS={m.group(1)} FAIL={m.group(2)})."))
+
+    print(f"  rollback kept at {backup}; data in {HOME} was never touched.\n")
+    return 0
+
+
+USAGE = """
+STUDDY BUDDY OMEGA — one agent, one command
+
+  buddy                     start the conversation (setup runs once, on first use)
+  buddy <text>              ask one thing without entering the REPL
+
+Diagnostics and proof
+  buddy doctor [section]    real diagnostics. sections: runtime gateway desktop voice browser
+                            memory autopilot majin level subsystems
+  buddy status [--json]     operational state: key, models, memory, tasks, grants, MAJIN, level
+  buddy test [--quick]      every automated suite, each reported separately
+  buddy prove               self-test + live Windows/AI scenarios (needs Windows + a Kilo key)
+  buddy accept [N ...]      the 20 mandated end-to-end acceptance scenarios, for real, with
+                            evidence written to disk. Each reports PASS / FAIL / BLOCKED /
+                            NOT TESTED — BLOCKED means this machine cannot prove it, and it is
+                            never upgraded to a pass. --list shows them, --json is machine-readable.
+  buddy self-test           automated acceptance tests in an isolated data dir
+  buddy voice-test          real microphone + speaker test
+  buddy level [--history]   measured capability level 1–100 and the evidence behind it
+
+Control
+  buddy stop [reason]       stop active execution safely; checkpoints and memory are kept
+  buddy update [--apply]    check, back up, update, verify, roll back on failure
+
+Memory
+  buddy migrate scan        what legacy data actually exists on this machine
+  buddy migrate plan        dry-run import plan (default; writes nothing)
+  buddy migrate run --yes   import, with a verified backup first
+  buddy migrate rollback --backup PATH
+
+MAJIN V6 subsystem
+  buddy majin status        is MAJIN connected, and with which owner grants
+  buddy majin search QUERY  search MAJIN's real authorized tool catalog
+  buddy majin jobs          the owner's real application history
+  buddy majin queue         durable background work
+  buddy majin doctor        MAJIN's own diagnostics, passed through unchanged
+  buddy majin init --lane files [--lane jobs] [--folder PATH]
+                            owner decision: create the grants MAJIN refuses to invent
+
+The agent can also just use MAJIN, migration and its own level from inside a
+conversation — these commands exist so you can inspect and control it directly.
+"""
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    # ── internal entrypoints used by the isolated test harness ──
+    internal = argparse.ArgumentParser(add_help=False)
+    internal.add_argument("--_suite", default="")
+    internal.add_argument("--_child", default="")
+    internal.add_argument("--resume", action="store_true")
+    known, _ = internal.parse_known_args(argv)
+    if known._child:
+        return child_main(known._child)
+    if known._suite:
+        return asyncio.run(run_suite(known._suite == "prove"))
+
+    # ── subcommands ──
+    if argv and not argv[0].startswith("-"):
+        cmd, rest = argv[0], argv[1:]
+        table = {
+            "doctor": cmd_doctor, "status": cmd_status, "stop": cmd_stop, "migrate": cmd_migrate,
+            "level": cmd_level, "majin": cmd_majin, "test": cmd_test, "update": cmd_update,
+            "prove": lambda r: launch_isolated("prove"),
+            "self-test": lambda r: launch_isolated("selftest"),
+            "selftest": lambda r: launch_isolated("selftest"),
+            "voice-test": lambda r: _voice_test_cmd(),
+            "help": lambda r: (print(USAGE), 0)[1],
+            "--help": lambda r: (print(USAGE), 0)[1],
+            "version": lambda r: (print(f"Studdy Buddy Omega {APP_VERSION}"), 0)[1],
+        }
+        fn = table.get(cmd)
+        if fn is None:
+            # Not a subcommand: treat it as a one-shot question, so `buddy "what
+            # did I decide about the router?"` works without entering the REPL.
+            return _oneshot(" ".join(argv))
+        return fn(rest)
+
+    # ── legacy flags (kept working: existing scripts and habits must not break) ──
+    ap = argparse.ArgumentParser(prog="buddy", description="Studdy Buddy Omega — personal AI companion", add_help=False)
+    ap.add_argument("--doctor", action="store_true")
+    ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--prove", action="store_true")
+    ap.add_argument("--voice-test", action="store_true")
+    ap.add_argument("--status", action="store_true")
+    ap.add_argument("--stop", action="store_true")
+    ap.add_argument("--level", action="store_true")
+    ap.add_argument("-h", "--help", action="store_true")
+    a, extra = ap.parse_known_args(argv)
+    if a.help or (argv and argv[0] in ("-h", "--help")):
+        print(USAGE)
+        return 0
+    if a.doctor:
+        return cmd_doctor(extra)
     if a.self_test:
         return launch_isolated("selftest")
     if a.prove:
         return launch_isolated("prove")
-    if a.doctor:
-        app = Buddy(headless=True)
-        print(C.c(C.B, f"\nSTUDDY BUDDY — doctor ({APP_VERSION})\n"))
-        bad = print_report(app.doctor.run("all"))
-        return 1 if bad else 0
     if a.voice_test:
-        app = Buddy(headless=True)
-        voice_test(app)
-        return 0
-    # interactive
+        return _voice_test_cmd()
+    if a.status:
+        return cmd_status(extra)
+    if a.stop:
+        return cmd_stop(extra)
+    if a.level:
+        return cmd_level(extra)
+
+    # ── interactive ──
     app = Buddy()
     if not app.lock.acquire():
         print("Another Studdy Buddy is already running (it owns the microphone and the task queue). Close it first.")
+        print("Use `buddy status` to inspect it, or `buddy stop` to stop its work safely.")
         return 1
     try:
         if not app.settings.get("first_run_done") or not app.gateway.key():
@@ -5931,6 +6596,38 @@ def main() -> int:
     except KeyboardInterrupt:
         pass
     return 0
+
+
+def _voice_test_cmd() -> int:
+    app = Buddy(headless=True)
+    try:
+        voice_test(app)
+    finally:
+        with contextlib.suppress(Exception):
+            app.majin.close()
+    return 0
+
+
+def _oneshot(text: str) -> int:
+    """Answer one question and exit — no REPL, no lock contention."""
+    app = Buddy(headless=True)
+    try:
+        if not app.gateway.key():
+            print("No KiloCode key is configured yet. Run `buddy` once to set it up, or set KILO_API_KEY.")
+            return 1
+        out, run = asyncio.run(converse(app, text))
+        print()
+        print(out.summary)
+        if run.ledger:
+            print(C.c(C.DIM, f"\n[tools: {', '.join(sorted({l['tool'] for l in run.ledger}))} · "
+                             f"verified: {out.verified} · status: {out.status}]"))
+        if not out.verified:
+            print(C.c(C.Y, "This result is UNVERIFIED — the system state did not confirm it."))
+        print()
+        return 0 if out.status in ("complete", "answered") else 1
+    finally:
+        with contextlib.suppress(Exception):
+            app.majin.close()
 
 
 if __name__ == "__main__":

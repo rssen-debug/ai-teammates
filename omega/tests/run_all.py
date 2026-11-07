@@ -56,20 +56,29 @@ def suite_unittest(quick: bool) -> dict:
     """The omega/tests unittest suite, run in-process for real counts."""
     sys.path.insert(0, str(OMEGA))
     sys.path.insert(0, str(HERE))
-    names = ["test_memory_migration", "test_level"] + ([] if quick else ["test_majin_bridge"])
+    # Discover, do not enumerate. A hardcoded module list is how a newly added
+    # regression test gets silently skipped and the count stays reassuringly
+    # unchanged — that happened once already. `quick` only drops the slow MAJIN
+    # bridge module, which needs Node and its installed dependencies.
+    QUICK_SKIP = {"test_majin_bridge"}
+    modules = sorted(f.stem for f in HERE.glob("test_*.py"))
+    missing = []
+    if quick:
+        modules = [m for m in modules if m not in QUICK_SKIP]
     loader = unittest.TestLoader()
     tests = unittest.TestSuite()
-    missing = []
-    for n in names:
+    for n in modules:
         try:
             tests.addTests(loader.loadTestsFromName(n))
         except Exception as exc:  # pragma: no cover
             missing.append(f"{n}: {exc}")
+    if not modules:
+        missing.append("no test_*.py modules were discovered at all")
     result = unittest.TextTestRunner(verbosity=0, stream=open(os.devnull, "w")).run(tests)
     skipped = sum(1 for _case, _reason in result.skipped)
     status = "FAIL" if (result.failures or result.errors or missing) else "PASS"
-    detail = (f"{result.testsRun} run, {len(result.failures)} failed, {len(result.errors)} errors, "
-              f"{skipped} skipped")
+    detail = (f"{result.testsRun} run across {len(modules) - len(missing)} module(s), "
+              f"{len(result.failures)} failed, {len(result.errors)} errors, {skipped} skipped")
     if missing:
         detail += "; unloadable: " + "; ".join(missing)
     if skipped and status == "PASS":
