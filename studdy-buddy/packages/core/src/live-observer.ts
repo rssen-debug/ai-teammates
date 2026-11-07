@@ -125,15 +125,15 @@ export class LiveObserver {
       }
       // Inventory all top-level windows. Read one external window per tick,
       // including a background app while the terminal has focus.
-      const windows = result.windows.filter(w => !w.minimized && w.title.trim());
+      const windows = result.windows.filter(w => w.title.trim());
       const isTerminal = (w: WindowInfo) =>
         /(?:^|[\\/])(?:cmd|powershell|pwsh|windowsterminal|wt|node)(?:\\.exe)?$/i.test(w.processName.trim()) ||
         (!w.processName.trim() && /(?:cmd\.exe|powershell|studdy buddy)/i.test(w.title));
-      const foreground = windows.find(w => w.focused);
+      const foreground = windows.find(w => w.focused && !w.minimized);
       this.foregroundWindow = foreground ? safeWindowLabel(foreground.title, foreground.processName) : null;
       this.allOpenWindows = windows.filter(w => !isTerminal(w))
-        .map(w => safeWindowLabel(w.title, w.processName));
-      const candidates = windows.filter(w => !isTerminal(w));
+        .map(w => safeWindowLabel(w.title, w.processName) + (w.minimized ? ' (minimerad)' : ''));
+      const candidates = windows.filter(w => !isTerminal(w) && !w.minimized);
       const active = (foreground && !isTerminal(foreground) ? foreground : null)
         ?? (this.lastExternalId ? candidates.find(w => w.id === this.lastExternalId) : null)
         ?? candidates[0];
