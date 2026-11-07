@@ -1,6 +1,6 @@
 import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
-import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
+import { StuddyRuntime, ActivityTimeline, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
 import { SLASH_COMMANDS, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
 import { liveLines, compactLivePrompt } from './live-ui.js';
@@ -368,6 +368,18 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text.startsWith('/snapshot ')) {
         const snap = await runtime.adapter.snapshot(text.slice(10).trim());
         log(snap.accessible ? snap.elements.filter(e => e.name || e.value).slice(0, 30).map(e => `${e.ref} ${e.role}: ${e.name || e.value}`).join('\n') : snap.note ?? 'Ingen tillgänglig snapshot.');
+      } else if (text === '/activity') {
+        await runtime.observer.tick();
+        const timeline = new ActivityTimeline(runtime.services.db.checkpoints);
+        const rows = timeline.recent(12);
+        log(rows.length ? rows.map(item =>
+          new Date(item.startedAt).toLocaleTimeString('sv-SE') + ' · ' +
+          Math.round(item.elapsedMs / 1000) + ' s observerad förgrundstid · ' + item.label
+        ).join('\n') : 'Ingen verifierad aktivitet ännu. Observation kräver att Buddy körs med datoråtkomst.');
+        log(p.dim('Mäter fokuserade fönster, inte faktisk videouppspelning. /activity clear rensar historiken.'));
+      } else if (text === '/activity clear') {
+        new ActivityTimeline(runtime.services.db.checkpoints).clear();
+        log('Den lokala aktivitetshistoriken är rensad.');
       } else if (text === '/sync-memory') log(runtime.syncMemory());
       else if (text === '/progress') log(JSON.stringify(runtime.services.progress(), null, 2));
       else if (text === '/bridge') {
