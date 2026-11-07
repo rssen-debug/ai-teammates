@@ -62,11 +62,10 @@ export class WindowsContinuousInput implements VoiceInput {
       {windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']});
     this.child=child;
     child.stdin.end();
-    let errorText='', closed=false, ready=false;
+    let errorText='', ready=false;
     child.stderr.setEncoding('utf8');
     child.stderr.on('data',(chunk:string)=>{errorText=(errorText+chunk).slice(-500);});
-    child.once('error',(e)=>{closed=true;errorText='POWERHELL_START_FAILED: '+e.message;});
-    child.once('close',()=>{closed=true;});
+    child.once('error',(e)=>{errorText='POWERSHELL_START_FAILED: '+e.message;});
     const lineReader=createInterface({input:child.stdout,crlfDelay:Infinity});
     try {
       for await (const line of lineReader) {
