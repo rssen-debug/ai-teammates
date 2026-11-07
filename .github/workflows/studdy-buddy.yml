@@ -34,6 +34,23 @@ jobs:
       - run: npm test
       - run: npm run build
 
+      - name: PowerShell test script parses (Windows PowerShell 5.1)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          $path = 'scripts/test-on-my-pc.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Host "PARSE ERROR: $($_.Extent.StartLineNumber): $($_.Message)" }
+            exit 1
+          }
+          Write-Host "Script parses with no errors under $($PSVersionTable.PSVersion)."
+          # Den måste också gå att ladda med parametrar och ge rätt tidig avslutning utanför Windows.
+          $first = (Get-Content $path -TotalCount 1)
+          if ($first -notmatch '^#') { Write-Host 'Saknar inledande kommentar/kommentarshuvud.'; exit 1 }
+
       - name: Built CLI smoke test
         shell: bash
         env:
