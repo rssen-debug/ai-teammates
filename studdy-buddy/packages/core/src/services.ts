@@ -240,6 +240,15 @@ export class StuddyServices {
         }
       });
     }
+    const savedGoals = this.db.checkpoints.get<unknown>('buddy.user-goals.v1');
+    if (Array.isArray(savedGoals)) {
+      const active = savedGoals.filter((value): value is { title: string; done: boolean } =>
+        value !== null && typeof value === 'object' && typeof value.title === 'string' && value.done === false
+      ).slice(-5);
+      if (active.length) {
+        study.openTasks = [...(study.openTasks ?? []), ...active.map(goal => 'Användarens mål: ' + goal.title.slice(0, 220))].slice(-10);
+      }
+    }
     return study;
   }
 
@@ -362,7 +371,7 @@ export class StuddyServices {
       const message = this.db.messages.append({
         sessionId: session.id,
         role: 'buddy',
-        text: 'Ingen AI-provider är konfigurerad ännu. Öppna inställningarna och ange endpoint, modell-id och API-nyckel.',
+        text: 'Ingen AI är ansluten ännu. Skriv /api i chatten för att välja tjänst och lägga in din nyckel.',
         mode,
       });
       return ok({ message, degraded: true, error: 'NO_PROVIDER', trimmed: false, notice: null });
@@ -371,7 +380,7 @@ export class StuddyServices {
       const message = this.db.messages.append({
         sessionId: session.id,
         role: 'buddy',
-        text: 'API-nyckeln saknas för providern. Lägg till den i inställningarna så kan jag svara.',
+        text: 'API-nyckeln saknas. Skriv /api för att lägga till den direkt i chatten.',
         mode,
       });
       return ok({ message, degraded: true, error: 'NO_KEY', trimmed: false, notice: null });
