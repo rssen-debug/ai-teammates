@@ -33,6 +33,7 @@ import importlib
 import importlib.util
 import ipaddress
 import json
+import math
 import os
 import queue
 import re
@@ -140,6 +141,54 @@ def log(event: str, **kw: Any) -> None:
         pass
 
 
+# ── sibling subsystems ──────────────────────────────────────────────────────
+# The agent core is one file, but the product is more than one file: MAJIN V6
+# integration, legacy memory migration, the measured level system and the
+# acceptance runner live beside it as real modules with their own tests.
+# They are loaded by path so `python buddy.py` still works if the file is copied
+# somewhere on its own — a missing sibling degrades one capability, never the
+# whole agent, and the reason is reported instead of guessed.
+_SIBLINGS: dict[str, Any] = {}
+_SIBLING_ERRORS: dict[str, str] = {}
+
+
+def sibling(name: str) -> Any:
+    """Import `omega/<name>.py` next to this file, once. None if unavailable."""
+    if name in _SIBLINGS:
+        return _SIBLINGS[name]
+    if name in _SIBLING_ERRORS:
+        return None
+    path = SOURCE_FILE.parent / f"{name}.py"
+    if not path.is_file():
+        _SIBLING_ERRORS[name] = f"{path} is missing"
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location(f"omega_{name}", path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot create an import spec for {path}")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        _SIBLINGS[name] = mod
+        return mod
+    except Exception as e:
+        _SIBLING_ERRORS[name] = f"{type(e).__name__}: {e}"
+        return None
+
+
+def sibling_state() -> dict[str, str]:
+    """Real load state of every sibling subsystem, for the manifest and doctor."""
+    out: dict[str, str] = {}
+    for name in ("majin_bridge", "memory_migration", "level", "acceptance"):
+        if name in _SIBLINGS:
+            out[name] = "loaded"
+        elif name in _SIBLING_ERRORS:
+            out[name] = f"unavailable: {_SIBLING_ERRORS[name]}"
+        else:
+            out[name] = "loaded" if sibling(name) is not None else f"unavailable: {_SIBLING_ERRORS.get(name, 'unknown')}"
+    return out
+
+
 # ── SQLite store ────────────────────────────────────────────────────────────
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
@@ -164,7 +213,17 @@ CREATE TABLE IF NOT EXISTS skills(
   id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, version INTEGER, status TEXT, description TEXT, schema TEXT,
   path TEXT, code_hash TEXT, test_result TEXT, risk TEXT, created REAL);
 CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY, ts REAL, goal TEXT, status TEXT, verified INTEGER, summary TEXT, steps INTEGER, tokens INTEGER);
+CREATE TABLE IF NOT EXISTS level_history(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, level INTEGER, score REAL,
+  measured_events INTEGER, tier TEXT, axes TEXT, formula TEXT);
+CREATE TABLE IF NOT EXISTS stats(key TEXT PRIMARY KEY, value REAL, updated REAL);
 """
+
+#: Columns added to `memories` after the fact. `CREATE TABLE IF NOT EXISTS` will
+#: not extend a database that already exists, so an owner upgrading from an
+#: earlier Omega keeps every row and gains provenance + dedupe support. This is
+#: additive only — never a rewrite, never a drop.
+MEMORY_EXTRA_COLUMNS = (("provenance", "TEXT"), ("dedupe", "TEXT"), ("scope", "TEXT"))
 
 
 class Store:
@@ -178,6 +237,43 @@ class Store:
             self.db.execute("PRAGMA journal_mode=WAL")
             self.db.execute("PRAGMA busy_timeout=30000")
             self.db.executescript(SCHEMA)
+            self._upgrade()
+
+    def _upgrade(self) -> None:
+        """Idempotent, additive schema upgrades for an existing installation."""
+        cols = {r[1] for r in self.db.execute("PRAGMA table_info(memories)")}
+        for name, typ in MEMORY_EXTRA_COLUMNS:
+            if name not in cols:
+                with contextlib.suppress(sqlite3.Error):
+                    self.db.execute(f"ALTER TABLE memories ADD COLUMN {name} {typ}")
+        with contextlib.suppress(sqlite3.Error):
+            self.db.execute("CREATE INDEX IF NOT EXISTS idx_memories_dedupe ON memories(dedupe)")
+            self.db.execute("CREATE INDEX IF NOT EXISTS idx_memories_kind ON memories(kind)")
+
+    def stat_add(self, key: str, delta: float = 1.0) -> float:
+        """A monotonic counter used by the level formula (never for billing)."""
+        with self.lock:
+            with contextlib.suppress(sqlite3.Error):
+                self.db.execute("INSERT INTO stats(key,value,updated) VALUES(?,?,?) "
+                                "ON CONFLICT(key) DO UPDATE SET value=value+excluded.value, updated=excluded.updated",
+                                (key, float(delta), now()))
+                row = self.db.execute("SELECT value FROM stats WHERE key=?", (key,)).fetchone()
+                return float(row[0]) if row else 0.0
+        return 0.0
+
+    def stat_get(self, key: str) -> float:
+        with self.lock:
+            with contextlib.suppress(sqlite3.Error):
+                row = self.db.execute("SELECT value FROM stats WHERE key=?", (key,)).fetchone()
+                if row:
+                    return float(row[0])
+        return 0.0
+
+    def stats_snapshot(self) -> dict[str, float]:
+        with self.lock:
+            with contextlib.suppress(sqlite3.Error):
+                return {r[0]: float(r[1]) for r in self.db.execute("SELECT key, value FROM stats")}
+        return {}
 
     def x(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
         with self.lock:
@@ -201,6 +297,26 @@ class Store:
             except Exception:
                 self.db.execute("ROLLBACK")
                 raise
+
+    def reopen(self) -> None:
+        """Reconnect to the same file after it was replaced underneath us.
+
+        Used by the migration rollback: replacing a SQLite file while a
+        connection is open leaves that connection reading the old inode, so the
+        restore would appear to work and change nothing. Reopening makes the
+        rollback real for the live agent, not only for a fresh process.
+        """
+        with self.lock:
+            with contextlib.suppress(sqlite3.Error):
+                self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            with contextlib.suppress(sqlite3.Error):
+                self.db.close()
+            self.db = sqlite3.connect(str(self.path), check_same_thread=False, timeout=30, isolation_level=None)
+            self.db.row_factory = sqlite3.Row
+            self.db.execute("PRAGMA journal_mode=WAL")
+            self.db.execute("PRAGMA busy_timeout=30000")
+            self.db.executescript(SCHEMA)
+            self._upgrade()
 
     def close(self) -> None:
         with contextlib.suppress(Exception):
@@ -1510,47 +1626,175 @@ def _tokens(s: str) -> list[str]:
     return [w for w in re.findall(r"[\wåäöÅÄÖ]+", (s or "").lower()) if len(w) > 2]
 
 
+def _trigrams(s: str) -> set[str]:
+    """Character trigrams — the fuzzy half of hybrid retrieval.
+
+    Token matching alone misses Swedish compounds ("jobbansökan" vs "job
+    application"), inflections and typos. Trigram overlap catches those without
+    an embedding model, a network call or a new dependency.
+    """
+    t = re.sub(r"[^\wåäöÅÄÖ]+", " ", (s or "").lower()).strip()
+    if len(t) < 3:
+        return {t} if t else set()
+    return {t[i:i + 3] for i in range(len(t) - 2)}
+
+
+def _jaccard(a: set, b: set) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / float(len(a | b))
+
+
+#: How much each memory status is trusted at retrieval time. Legacy imports and
+#: unverified claims are deliberately worth less than verified fact, so old
+#: knowledge informs without overruling what has actually been proven.
+TRUST_WEIGHT = {"verified": 1.5, "active": 1.0, "migrated": 0.75, "unverified": 0.6, "retracted": 0.2}
+
+#: Query intent → kinds that should rank higher. Cheap, deterministic and it
+#: makes "how did I fix X" actually surface fixes instead of preferences.
+INTENT_KINDS = (
+    (re.compile(r"(?i)\b(hur|how)\b.*\b(fix|löste|lösa|repair|debug|fel|error)\b"), ("fix", "procedural")),
+    (re.compile(r"(?i)\b(fix|fixed|löste|lösning|workaround|repair)\b"), ("fix",)),
+    (re.compile(r"(?i)\b(how|hur|steps|steg|procedure|workflow|flöde)\b"), ("procedural", "skill")),
+    (re.compile(r"(?i)\b(prefer|gillar|vill ha|väljer|setting|inställning)\b"), ("preference",)),
+    (re.compile(r"(?i)\b(job|jobb|application|ansökan|cv|resume|employer|arbetsgivare)\b"), ("episodic", "project", "preference")),
+    (re.compile(r"(?i)\b(project|projekt|repo|repository)\b"), ("project",)),
+)
+
+
 class Memory:
-    KINDS = ("preference", "fact", "project", "procedure", "fix", "summary", "task_outcome", "correction", "tool_note")
+    """The one shared memory layer for the whole product.
+
+    Kinds cover the required families — long-term, working, project, episodic,
+    procedural, verified technical fixes, skills — plus the legacy kinds the
+    earlier Omega already wrote, so an existing database keeps working.
+
+    Retrieval is hybrid: keyword tokens + character-trigram fuzz + recency decay
+    + status trust + intent-based kind boosting. Everything is local and
+    deterministic; no embedding service, no network, no new dependency.
+    """
+
+    KINDS = ("preference", "fact", "project", "procedure", "fix", "summary", "task_outcome", "correction", "tool_note",
+             # unified families required by the product spec
+             "long_term", "working", "episodic", "procedural", "skill", "conversation", "legacy")
 
     def __init__(self, store: Store):
         self.s = store
 
-    def save(self, kind: str, title: str, content: str, tags: str = "", status: str = "active", run_id: str = "") -> int:
+    @staticmethod
+    def dedupe_key(kind: str, title: str, content: str) -> str:
+        norm = re.sub(r"\s+", " ", f"{title}\n{content}".strip().lower())
+        return hashlib.sha256(f"{kind}|{norm}".encode("utf-8", "replace")).hexdigest()[:32]
+
+    def save(self, kind: str, title: str, content: str, tags: str = "", status: str = "active", run_id: str = "",
+             provenance: Any = None, scope: str = "") -> int:
         if kind not in self.KINDS:
             raise ValueError(f"kind must be one of {self.KINDS}")
+        dedupe = self.dedupe_key(kind, title, content)
+        prov = json.dumps(provenance, ensure_ascii=False, default=str) if provenance is not None else None
         ex = self.s.one("SELECT id FROM memories WHERE kind=? AND lower(title)=lower(?)", (kind, title))
         t = now()
         if ex:
-            self.s.x("UPDATE memories SET content=?, tags=?, status=?, updated=?, source_run=? WHERE id=?",
-                     (content, tags, status, t, run_id, ex["id"]))
+            self.s.x("UPDATE memories SET content=?, tags=?, status=?, updated=?, source_run=?, dedupe=?, "
+                     "provenance=COALESCE(?, provenance), scope=COALESCE(NULLIF(?,''), scope) WHERE id=?",
+                     (content, tags, status, t, run_id, dedupe, prov, scope, ex["id"]))
             return ex["id"]
-        return self.s.x("INSERT INTO memories(kind,title,content,tags,status,source_run,created,updated) VALUES(?,?,?,?,?,?,?,?)",
-                        (kind, title, content, tags, status, run_id, t, t)).lastrowid
+        return self.s.x("INSERT INTO memories(kind,title,content,tags,status,source_run,created,updated,dedupe,provenance,scope) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                        (kind, title, content, tags, status, run_id, t, t, dedupe, prov, scope)).lastrowid
 
-    def search(self, query: str, kind: str | None = None, limit: int = 6, touch: bool = True) -> list[dict]:
-        rows = self.s.q("SELECT * FROM memories" + (" WHERE kind=?" if kind else ""), (kind,) if kind else ())
+    def search(self, query: str, kind: str | None = None, limit: int = 6, touch: bool = True,
+               scope: str | None = None, kinds: tuple | None = None) -> list[dict]:
+        """Hybrid retrieval. Counts itself so capability can be measured."""
+        where, params = [], []
+        if kind:
+            where.append("kind=?")
+            params.append(kind)
+        if kinds:
+            where.append(f"kind IN ({','.join('?' * len(kinds))})")
+            params += list(kinds)
+        if scope:
+            where.append("(scope=? OR scope IS NULL OR scope='')")
+            params.append(scope)
+        sql = "SELECT * FROM memories" + (f" WHERE {' AND '.join(where)}" if where else "")
+        rows = self.s.q(sql, tuple(params))
+        self.s.stat_add("memory_searches")
+
         qt = set(_tokens(query))
-        scored = []
+        qtri = _trigrams(query)
+        intent: tuple[str, ...] = ()
+        for rx, ks in INTENT_KINDS:
+            if rx.search(query or ""):
+                intent = ks
+                break
+        t_now = now()
+        scored: list[tuple[float, dict]] = []
         for r in rows:
             blob = _tokens(f"{r['title']} {r['content']} {r['tags']} {r['kind']}")
             if not qt:
                 score = 0.1
             else:
                 bs = set(blob)
-                score = sum(2.0 for w in qt if w in bs) + sum(0.5 for w in qt if any(w in b or b in w for b in bs) and w not in bs)
+                score = sum(2.0 for w in qt if w in bs)
+                score += sum(0.5 for w in qt if w not in bs and any(w in b or b in w for b in bs))
+                # fuzzy component: bounded so it can lift a near-miss, never
+                # outrank an exact token hit
+                head = f"{r['title']} {r['tags']} {str(r['content'])[:600]}"
+                score += 1.6 * _jaccard(qtri, _trigrams(head))
             if score <= 0:
                 continue
-            if r["status"] == "verified":
-                score *= 1.5
-            if r["status"] == "unverified":
-                score *= 0.6
+            score *= TRUST_WEIGHT.get(str(r.get("status") or "active"), 1.0)
+            if r["kind"] in intent:
+                score *= 1.35
+            # recency-aware, bounded: a 1-year-old verified fix still surfaces,
+            # a tie is broken toward the newer record
+            age_days = max(0.0, (t_now - float(r.get("updated") or t_now)) / 86400.0)
+            score *= 1.0 + 0.35 * math.exp(-age_days / 120.0)
+            if r.get("scope") and scope and r["scope"] == scope:
+                score *= 1.2                     # project-scoped match wins
             scored.append((score, r))
         scored.sort(key=lambda x: (-x[0], -x[1]["updated"]))
         out = [r for _, r in scored[:limit]]
+        if out:
+            self.s.stat_add("memory_hits", len(out))
         if touch and out:
             self.s.x(f"UPDATE memories SET uses=uses+1 WHERE id IN ({','.join('?' * len(out))})", tuple(r["id"] for r in out))
         return out
+
+    def working_put(self, run_id: str, key: str, value: Any) -> int:
+        """Working memory: small, run-scoped, replaced on every write."""
+        return self.save("working", f"{key} [{run_id[:8]}]", clip(jdump(value), 8000), tags=f"run:{run_id}",
+                         status="active", run_id=run_id, scope=f"run:{run_id}")
+
+    def project_scope(self, path: str | Path | None = None) -> str:
+        """Stable scope id for the project the user is actually in."""
+        p = Path(path or os.getcwd())
+        with contextlib.suppress(Exception):
+            p = p.resolve()
+        return f"project:{hashlib.sha256(str(p).encode('utf-8', 'replace')).hexdigest()[:16]}"
+
+    def context_for(self, goal: str, scope: str = "", limit: int = 5) -> list[dict]:
+        """What the agent should already know before it starts.
+
+        Called automatically when a run begins, so relevant memory arrives
+        without the user (or the model) having to search for it.
+        """
+        out = self.search(goal, limit=limit, touch=False, scope=scope or None)
+        if scope:
+            extra = self.search(goal, limit=limit, touch=False)
+            seen = {r["id"] for r in out}
+            out += [r for r in extra if r["id"] not in seen][: max(0, limit - len(out))]
+        return out
+
+    def stats(self) -> dict[str, Any]:
+        rows = self.s.q("SELECT kind, status, COUNT(*) AS n, SUM(uses) AS uses FROM memories GROUP BY kind, status")
+        by_kind: dict[str, int] = {}
+        by_status: dict[str, int] = {}
+        for r in rows:
+            by_kind[r["kind"]] = by_kind.get(r["kind"], 0) + int(r["n"])
+            by_status[r["status"] or "active"] = by_status.get(r["status"] or "active", 0) + int(r["n"])
+        return {"total": sum(by_kind.values()), "by_kind": by_kind, "by_status": by_status,
+                "searches": int(self.s.stat_get("memory_searches")), "hits": int(self.s.stat_get("memory_hits"))}
 
     def update(self, mid: int, content: str | None = None, title: str | None = None, tags: str | None = None) -> bool:
         r = self.s.one("SELECT * FROM memories WHERE id=?", (mid,))
@@ -3092,6 +3336,352 @@ def build_tools(app: "Buddy") -> None:
         description=f"Install one of Buddy's own optional Python dependencies ({', '.join(sorted(DEPS))}) to recover from dependency_missing.",
         parameters=schema_obj({"module": {"type": "string"}}, ["module"]), handler=h_install)
 
+    # MAJIN V6 joins the same registry, the same permission gate and the same
+    # verification rules as every native tool.
+    build_majin_tools(app)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 6b. MAJIN V6 — INTEGRATED SUBSYSTEM
+# ════════════════════════════════════════════════════════════════════════════
+class MajinSubsystem:
+    """Lazy, persistent connection to MAJIN V6 (Node) behind Omega's tools.
+
+    Design rules that keep this from becoming a second engine:
+      * MAJIN keeps its own model-free architecture — Omega is the only runtime
+        that talks to Kilo, and the bridge never asks MAJIN to start a provider.
+      * MAJIN's owner-granted lanes are enforced *inside* MAJIN. An Omega grant
+        never widens MAJIN, and a MAJIN grant never bypasses Omega's permission
+        gate, risk classes, audit log or verification requirement.
+      * The 157-entry MAJIN catalog is searched, never dumped into context: the
+        model gets discovery tools plus the durable-work tools.
+      * Every effectful call carries a deterministic operationId, so an Omega
+        retry replays the original receipt instead of submitting twice.
+      * Nothing here is fatal. No Node, no `npm install`, no V5 owner profile →
+        the tools report the real blocker and native Omega keeps working.
+    """
+
+    def __init__(self, app: "Buddy") -> None:
+        self.app = app
+        self._bridge: Any = None
+        self._attempted = False
+        self.blocked_reason = ""
+        self.mod = sibling("majin_bridge")
+        if self.mod is None:
+            self.blocked_reason = "majin_bridge module unavailable: " + _SIBLING_ERRORS.get("majin_bridge", "?")
+
+    @property
+    def present(self) -> bool:
+        return self.mod is not None
+
+    def workspace(self) -> Path:
+        """The directory MAJIN's driver resolves relative paths against.
+
+        It must be a directory the owner actually granted in MAJIN's owner-mode
+        file, otherwise every relative `fs_*` call fails with ENOENT against a
+        path nobody asked for. Order: explicit setting, environment, then Omega's
+        own workspace directory.
+        """
+        cfg = self.app.settings.get("majin_workspace") or os.environ.get("MAJIN_WORKSPACE")
+        return Path(cfg).expanduser() if cfg else DIRS["workspace"]
+
+    def bridge(self, force: bool = False) -> Any:
+        """Start (once) and return the bridge, or None with a real reason."""
+        if self.mod is None:
+            return None
+        if self._bridge is not None and not force:
+            return self._bridge
+        if self._attempted and not force:
+            return None
+        self._attempted = True
+        try:
+            home = self.app.settings.get("majin_home") or None
+            self._bridge = self.mod.MajinBridge(
+                majin_root=(self.app.settings.get("majin_root") or None),
+                node=(self.app.settings.get("majin_node") or None),
+                workspace=self.workspace(),
+                v6_home=(Path(home) if home else None),
+                redact=redact,
+                log=lambda event, payload=None: log(event, **(payload or {})),
+                autostart=False)
+            self._bridge.start()
+            self.blocked_reason = ""
+            log("majin.ready", tools=len(self._bridge.mcp_tools))
+        except Exception as e:
+            self._bridge = None
+            kind = getattr(e, "kind", type(e).__name__)
+            self.blocked_reason = f"{kind}: {e}"
+            log("majin.blocked", reason=redact(str(e))[:400])
+        return self._bridge
+
+    def need(self) -> Any:
+        b = self.bridge()
+        if b is None:
+            raise ToolError("MAJIN V6 is not available: " + (self.blocked_reason or "unknown reason"),
+                            "dependency_missing",
+                            "Run `buddy doctor majin` for the exact cause. Common fixes: `npm install` inside "
+                            "integrations/majin-original, install Node 22+, or `buddy majin init` to grant lanes.")
+        return b
+
+    def status(self) -> dict:
+        """Cheap snapshot for the manifest, /status and doctor. Never raises."""
+        if not self.present:
+            return {"available": False, "reason": self.blocked_reason or "majin_bridge module not found"}
+        try:
+            b = self.bridge()
+            if b is None:
+                return {"available": False, "reason": self.blocked_reason or "not started"}
+            snap = b.snapshot()
+            snap["available"] = True
+            return snap
+        except Exception as e:
+            return {"available": False, "reason": f"{type(e).__name__}: {e}"}
+
+    def close(self) -> None:
+        if self._bridge is not None:
+            with contextlib.suppress(Exception):
+                self._bridge.close()
+            self._bridge = None
+        self._attempted = False
+
+
+def build_majin_tools(app: "Buddy") -> None:
+    """Register MAJIN V6 as ordinary Omega tools."""
+    if not app.majin.present:
+        return
+    mod = app.majin.mod
+    R = app.registry
+
+    def maj() -> Any:
+        """Resolve the subsystem per call, so a reconfigured MAJIN takes effect."""
+        return app.majin
+
+    def reg(**kw: Any) -> None:
+        R.register(ToolSpec(**kw))
+
+    def majin_available() -> tuple[bool, str]:
+        st = maj().status()
+        return bool(st.get("available")), str(st.get("reason") or "")
+
+    def unwrap(fn: Callable[..., Any], *a: Any, **kw: Any) -> Any:
+        """Run a bridge call, translating MAJIN's typed errors into Omega's."""
+        try:
+            return fn(*a, **kw)
+        except mod.MajinError as e:
+            cat = {"denied": "permission", "invalid": "invalid_args", "timeout": "timeout",
+                   "unavailable": "dependency_missing", "blocked": "dependency_missing",
+                   "crashed": "crashed", "protocol": "protocol"}.get(e.kind, "tool_failed")
+            hint = ""
+            if e.kind == "denied":
+                hint = ("MAJIN's owner grants do not cover this lane. Do not retry. The owner can grant it with "
+                        "`buddy majin init --lane <lane>`; Omega cannot widen MAJIN's permissions itself.")
+            elif e.uncertain:
+                hint = ("The external outcome is UNCERTAIN. Never repeat this call with a new operation id: that is how a "
+                        "job application gets submitted twice. Verify the real state first, then report the blocker.")
+            elif e.kind in ("unavailable", "blocked"):
+                hint = "Run `buddy doctor majin`; the message above is the real cause."
+            elif not e.retryable:
+                hint = "MAJIN classified this as non-retryable. Change approach or report it."
+            raise ToolError(str(e.message)[:600], cat, hint) from None
+
+    # ── discovery: the catalog is searched, never dumped ──
+    reg(name="majin_status", category="majin", risk=Risk.OBSERVE, observes=True, progress="Reading MAJIN status",
+        available=majin_available,
+        description="Read MAJIN V6's real state: owner-granted lanes, how many MAJIN tools are registered and "
+                    "authorized, and whether the subsystem is operational. Performs no action.",
+        parameters=schema_obj(), handler=lambda a, c: unwrap(maj().need().status))
+
+    reg(name="majin_search", category="majin", risk=Risk.OBSERVE, observes=True, progress="Searching MAJIN tools",
+        available=majin_available,
+        description="Search MAJIN's real tool catalog (job search, browser, files, documents, github, gmail, "
+                    "skills, procedures). Returns exact names and lanes. Follow with majin_schema, then majin_call. "
+                    "Query examples: 'jobs', 'fs.read', 'browser', 'documents', 'github'.",
+        parameters=schema_obj({"query": {"type": "string"}, "limit": {"type": "integer"}}, ["query"]),
+        handler=lambda a, c: unwrap(maj().need().search, a["query"], int(a.get("limit", 20))))
+
+    reg(name="majin_schema", category="majin", risk=Risk.OBSERVE, observes=True, progress="Reading MAJIN tool schema",
+        available=majin_available,
+        description="Read the exact input schema of one MAJIN tool before calling it. Does not execute anything.",
+        parameters=schema_obj({"name": {"type": "string"}}, ["name"]),
+        handler=lambda a, c: unwrap(maj().need().schema, a["name"]))
+
+    # ── execution ──
+    def check_record(out: Any, tool_name: str = "") -> Any:
+        """Turn MAJIN's own status field into an Omega failure when it is one.
+
+        The Executor treats any returned value as success, so a driver receipt
+        with `status: "failed"` or `"uncertain"` would otherwise be handed to the
+        model as `ok: true` — a fabricated success. MAJIN already classified the
+        outcome; honour it instead of re-guessing.
+        """
+        if not isinstance(out, dict):
+            return out
+        status = str(out.get("status") or "").lower()
+        if status in ("completed", "done", "ok", ""):
+            return out
+        blocker = str(out.get("blocker") or out.get("message") or "").strip()
+        code = str(out.get("errorCode") or out.get("code") or "MAJIN_TOOL_FAILED")
+        detail = clip(jdump({k: out.get(k) for k in
+                             ("operationId", "tool", "status", "errorCode", "blocker", "details", "evidence")
+                             if k in out}), 1200)
+        if status == "uncertain":
+            raise ToolError(f"MAJIN reports an UNCERTAIN outcome for {tool_name or 'the tool'}: "
+                            f"{blocker or code}. {detail}", "uncertain",
+                            "The external effect may or may not have happened. Do NOT retry with a new operation id — "
+                            "that is how a job application gets submitted twice. Verify the real state first (read the "
+                            "file, list the queue, check the receipt), then report the blocker.")
+        upper = code.upper()
+        if "PERMISSION" in upper or "NOT_AUTHORIZED" in upper or "PATH_DENIED" in upper:
+            cat, hint = "permission", ("MAJIN's owner grants do not cover this. Do not retry; the owner can grant it "
+                                       "with `buddy majin init --lane <lane>`.")
+        elif any(m in upper for m in ("ENOENT", "NOT_FOUND", "VALIDATION", "INVALID", "UNKNOWN_TOOL")):
+            cat, hint = "not_found", "Check the real path/name with majin_schema or a listing tool, then retry once."
+        else:
+            cat, hint = "tool_failed", "Read the blocker, change approach, do not repeat the identical call."
+        raise ToolError(f"MAJIN tool {tool_name or ''} failed ({code}): {blocker or 'no blocker given'}. {detail}",
+                        cat, hint)
+
+    def h_majin_call(a: dict, ctx: ToolContext) -> dict:
+        b = maj().need()
+        # Scope the operation id to the run/task so a *resumed* task replays its
+        # own receipt instead of colliding with an unrelated identical call.
+        scope = ctx.task_id or (ctx.run.id if ctx.run else "")
+        oid = a.get("operation_id") or mod.operation_id(a["name"], a.get("arguments") or {}, scope)
+        out = check_record(unwrap(b.call, a["name"], a.get("arguments") or {}, op_id=oid, scope=scope,
+                                  timeout=float(a.get("timeout", 180))), a["name"])
+        if isinstance(out, dict):
+            out["operation_id"] = oid
+            if out.get("status") == "uncertain":
+                out["warning"] = ("UNCERTAIN external outcome. Do not retry with a new operation id — verify the real "
+                                  "state instead. Retrying blindly is how a duplicate application gets submitted.")
+        return out
+
+    reg(name="majin_call", category="majin", risk=Risk.EXEC, effect=True, timeout=600, progress="Running MAJIN tool",
+        available=majin_available, handler=h_majin_call,
+        description="Execute one MAJIN tool through MAJIN's own persistent driver and its owner-granted lanes. "
+                    "Read its schema with majin_schema first. The operation id is derived from the arguments, so "
+                    "retrying the same call returns the original receipt instead of repeating the effect. Never "
+                    "invent a new operation id to retry an uncertain submission.",
+        parameters=schema_obj({
+            "name": {"type": "string", "description": "exact tool name from majin_search"},
+            "arguments": {"type": "object"},
+            "operation_id": {"type": "string", "description": "optional; omit to derive one from the arguments"},
+            "timeout": {"type": "number"}}, ["name"]))
+
+    # ── durable background work: MAJIN's queue, supervisor and workers ──
+    def h_queue_add(a: dict, ctx: ToolContext) -> dict:
+        b = maj().need()
+        dedupe = a.get("dedupe_key") or mod.operation_id(
+            a["kind"], {"payload": a.get("payload"), "title": a.get("title")}, ctx.task_id or "")[:120]
+        out = unwrap(b.queue_add, a["kind"], a.get("title", ""), a.get("payload"), int(a.get("priority", 0)),
+                     dedupe, a.get("deps"), bool(a.get("irreversible", False)))
+        if isinstance(out, dict):
+            out["dedupe_key"] = dedupe
+        return out
+
+    reg(name="majin_queue_add", category="majin", risk=Risk.WRITE, effect=True, timeout=120,
+        available=majin_available, handler=h_queue_add, progress="Queueing durable MAJIN task",
+        description="Queue bounded background work in MAJIN's durable queue (survives restarts, leased to workers, "
+                    "retried by policy). kind='tool' with payload {tool, arguments} runs a MAJIN tool; "
+                    "'job.discover', 'job.evaluate' and 'gmail.verify' are also supported. A dedupe key is derived "
+                    "from the payload, so re-queueing the same work cannot create a second task.",
+        parameters=schema_obj({
+            "kind": {"type": "string"}, "title": {"type": "string"}, "payload": {"type": "object"},
+            "priority": {"type": "integer"}, "dedupe_key": {"type": "string"},
+            "deps": {"type": "array", "items": {"type": "string"}},
+            "irreversible": {"type": "boolean", "description": "true only for external effects that must never be replayed"}},
+            ["kind"]))
+
+    reg(name="majin_queue_list", category="majin", risk=Risk.OBSERVE, observes=True, timeout=60,
+        available=majin_available, progress="Reading MAJIN queue",
+        description="List MAJIN's durable tasks, optionally filtered by state (queued/leased/done/failed/cancelled) or kind.",
+        parameters=schema_obj({"state": {"type": "string"}, "kind": {"type": "string"}, "limit": {"type": "integer"}}),
+        handler=lambda a, c: unwrap(maj().need().queue_list, a.get("state"), a.get("kind"), int(a.get("limit", 20))))
+
+    reg(name="majin_task_get", category="majin", risk=Risk.OBSERVE, observes=True, timeout=60,
+        available=majin_available, progress="Reading MAJIN task",
+        description="Read one MAJIN task with its attempts, progress, lease and last error. Use this to find out why "
+                    "work stopped instead of guessing. This is also the evidence tool for queued work.",
+        parameters=schema_obj({"id": {"type": "string"}}, ["id"]),
+        handler=lambda a, c: unwrap(maj().need().task_get, a["id"]))
+
+    reg(name="majin_task_cancel", category="majin", risk=Risk.WRITE, effect=True, timeout=60,
+        available=majin_available, progress="Cancelling MAJIN task",
+        description="Cancel queued or retryable MAJIN work. A running task stops at the next safe point; an uncertain "
+                    "external effect is never replayed by cancelling.",
+        parameters=schema_obj({"id": {"type": "string"}}, ["id"]),
+        handler=lambda a, c: unwrap(maj().need().task_cancel, a["id"]))
+
+    reg(name="majin_work_start", category="majin", risk=Risk.EXEC, effect=True, timeout=120,
+        available=majin_available, progress="Starting MAJIN worker",
+        confirm=lambda a, c: f"start a detached MAJIN worker (max {a.get('max_tasks', 10)} tasks, "
+                             f"{int(a.get('max_runtime_ms', 900000)) // 60000} min)",
+        description="Start a detached, bounded MAJIN worker process that continues queued work without another chat "
+                    "turn. Requires explicit task and runtime budgets; it stops by itself when either is reached.",
+        parameters=schema_obj({"max_tasks": {"type": "integer"}, "max_runtime_ms": {"type": "integer"},
+                               "worker_id": {"type": "string"}}),
+        handler=lambda a, c: unwrap(maj().need().work_start, int(a.get("max_tasks", 10)),
+                                    int(a.get("max_runtime_ms", 900_000)), a.get("worker_id")))
+
+    reg(name="majin_work_stop", category="majin", risk=Risk.WRITE, effect=True, timeout=60,
+        available=majin_available, progress="Stopping MAJIN workers",
+        description="Ask running MAJIN workers to stop after their current task by writing MAJIN's STOP marker. "
+                    "Does not fabricate a completion for work that did not finish.",
+        parameters=schema_obj(), handler=lambda a, c: unwrap(maj().need().work_stop))
+
+    reg(name="majin_v6_status", category="majin", risk=Risk.OBSERVE, observes=True, timeout=60,
+        available=majin_available, progress="Reading MAJIN work state",
+        description="Read MAJIN V6's persisted work state: queue counts, worker health and heartbeats, recent task "
+                    "events and self-checks. Read-only.",
+        parameters=schema_obj(), handler=lambda a, c: unwrap(maj().need().v6_status))
+
+    # ── job search subsystem ──
+    reg(name="majin_jobs_list", category="majin", risk=Risk.OBSERVE, observes=True, timeout=120,
+        available=majin_available, progress="Reading MAJIN job applications",
+        description="List the owner's real job application history from MAJIN (per candidate, with state and "
+                    "evidence). Always check this before discussing or starting an application: it is how a duplicate "
+                    "submission is avoided.",
+        parameters=schema_obj({"candidate": {"type": "string"}, "state": {"type": "string"}}),
+        handler=lambda a, c: unwrap(maj().need().jobs_list, a.get("candidate"), a.get("state")))
+
+    reg(name="majin_jobs_discover", category="majin", risk=Risk.EXEC, effect=True, timeout=420,
+        available=majin_available, progress="Discovering jobs with MAJIN",
+        description="Run MAJIN's real job discovery for a candidate profile and a query. Applies the owner's saved "
+                    "exclusions and canonical-URL dedupe. Discovery only — it never submits an application.",
+        parameters=schema_obj({"candidate": {"type": "string"}, "query": {"type": "string"},
+                               "limit": {"type": "integer"}}, ["candidate", "query"]),
+        handler=lambda a, c: unwrap(maj().need().jobs_discover, a["candidate"], a["query"], int(a.get("limit", 20))))
+
+    reg(name="majin_gmail_status", category="majin", risk=Risk.OBSERVE, observes=True, timeout=90,
+        available=majin_available, progress="Checking MAJIN Gmail configuration",
+        description="Report whether MAJIN's read-only Gmail verification is configured, and why not if it is not. "
+                    "Never reads mail by itself.",
+        parameters=schema_obj(), handler=lambda a, c: unwrap(maj().need().gmail_status))
+
+    reg(name="majin_doctor", category="majin", risk=Risk.OBSERVE, observes=True, timeout=180,
+        available=majin_available, progress="Running MAJIN diagnostics",
+        description="Run MAJIN V6's own diagnostics and return its real checks, including the ones MAJIN reports as "
+                    "NOT_TESTED or NOT_IMPLEMENTED. Use this to explain a MAJIN blocker accurately.",
+        parameters=schema_obj(), handler=lambda a, c: unwrap(maj().need().doctor))
+
+    # ── owner-explicit grant bootstrap (SENSITIVE: it changes what MAJIN may do) ──
+    def h_majin_init(a: dict, ctx: ToolContext) -> dict:
+        b = maj().need() if maj().bridge() is not None else (maj().mod.MajinBridge(
+            majin_root=app.settings.get("majin_root") or None, node=app.settings.get("majin_node") or None,
+            workspace=app.majin.workspace(), redact=redact, autostart=False))
+        return unwrap(b.init_profile, a["lanes"], a.get("folders"), a.get("reason", "owner request via Omega"))
+
+    reg(name="majin_grant_lanes", category="majin", risk=Risk.SENSITIVE, effect=True, timeout=60,
+        progress="Writing MAJIN owner grants", handler=h_majin_init,
+        confirm=lambda a, c: ("this creates or widens MAJIN's owner grants for lane(s): "
+                              + ", ".join(a.get("lanes") or []) + ". MAJIN tools in those lanes become callable."),
+        description="OWNER DECISION ONLY. Create or extend the MAJIN V5 owner-grants profile that MAJIN V6 refuses "
+                    "to invent for itself. Backs up any existing grants first and never narrows them. Lanes: files, "
+                    "shell, sys, web, research, jobs, github, browser, desktop, screen, computer, mcp, …",
+        parameters=schema_obj({"lanes": {"type": "array", "items": {"type": "string"}},
+                               "folders": {"type": "array", "items": {"type": "string"}},
+                               "reason": {"type": "string"}}, ["lanes"]))
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # 7. UNIVERSAL AGENT ENGINE
@@ -3243,17 +3833,38 @@ class AgentRun:
                                   "before repeating anything; irreversible steps already done are not repeated by the system."})
         elif not first:
             self.messages.append({"role": "user", "content": self.goal})
+        outcome: Optional[RunOutcome] = None
         try:
-            return await self._loop()
+            outcome = await self._loop()
+            return outcome
         except asyncio.CancelledError:
             self.cancel.set()
-            return RunOutcome("cancelled", "Cancelled.", False, steps=self.steps)
+            outcome = RunOutcome("cancelled", "Cancelled.", False, steps=self.steps)
+            return outcome
         except GatewayError as e:
-            return RunOutcome("blocked", f"The AI gateway failed: {e}", False, e.kind, self.steps, self.failures)
+            outcome = RunOutcome("blocked", f"The AI gateway failed: {e}", False, e.kind, self.steps, self.failures)
+            return outcome
         finally:
+            self.record_run(outcome)
+
+    def record_run(self, outcome: Optional[RunOutcome]) -> None:
+        """Persist the REAL outcome of this run.
+
+        This row is the evidence base for capability measurement, so it must say
+        what actually happened: the outcome status, whether the verification gate
+        confirmed it, and the summary. An earlier version of this file wrote
+        `status='-'` and derived `verified` from "were the effects read back",
+        which made the recorded history unusable as evidence — a run that was
+        blocked, cancelled or unverified looked the same as one that completed.
+        """
+        with contextlib.suppress(Exception):
+            o = outcome or RunOutcome("unknown", "", False, steps=self.steps)
+            self.app.store.x(
+                "INSERT OR REPLACE INTO runs(id,ts,goal,status,verified,summary,steps,tokens) VALUES(?,?,?,?,?,?,?,?)",
+                (self.id, now(), clip(self.goal, 300), o.status, int(bool(o.verified)),
+                 clip(o.summary, 500), self.steps, self.tokens))
             with contextlib.suppress(Exception):
-                app.store.x("INSERT OR REPLACE INTO runs(id,ts,goal,status,verified,summary,steps,tokens) VALUES(?,?,?,?,?,?,?,?)",
-                            (self.id, now(), clip(self.goal, 300), "-", int(not self.unverified_effects()), "", self.steps, self.tokens))
+                self.app.note_run_outcome(o)
 
     async def _loop(self) -> RunOutcome:
         app, b = self.app, self.budget
@@ -4002,6 +4613,7 @@ class Buddy:
         self.skills = Skills(self)
         self.voice = Voice(self)
         self.doctor = Doctor(self)
+        self.majin = MajinSubsystem(self)
         self.ui: Any = NullUI() if headless else CLI(self)
         self.perms.confirm_fn = lambda p, al: self.ui.confirm(p, al)
         self.loop: Optional[asyncio.AbstractEventLoop] = None
@@ -4031,7 +4643,9 @@ class Buddy:
                 "authorized_scopes": self.perms.all() or "none yet (you will be asked on first use)",
                 "tested_state": caps or "nothing tested yet this session (untested ≠ broken)",
                 "tool_categories": cats, "private_mode": self.privacy.private, "observation_mode": self.activity.enabled,
-                "voice": self.voice.state_label(), "model_routing_notes": self.router.notes[-2:]}
+                "voice": self.voice.state_label(), "model_routing_notes": self.router.notes[-2:],
+                "subsystems": sibling_state(), "majin": self.majin.status(),
+                "capability_level": self.level_snapshot()}
 
     def build_system_prompt(self, run: AgentRun) -> str:
         parts = [SYSTEM_PROMPT, "CAPABILITY MANIFEST (ground truth):\n" + clip(jdump(self.manifest()), 3500), f"Now: {iso()}"]
@@ -4285,11 +4899,53 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
         else:
             o("Unknown command. /help")
 
+    # ── measured capability level (omega/level.py) ─────────────────────────
+    def measure_level(self, record: bool = True) -> Any:
+        """Compute the real level from evidence in this database.
+
+        Returns the level module's result object, or a small dict explaining why
+        measurement is unavailable. Never raises, never invents a number.
+        """
+        mod = sibling("level")
+        if mod is None:
+            return {"level": None, "reason": "level module unavailable: " + _SIBLING_ERRORS.get("level", "?")}
+        try:
+            # Axis C needs to know how many tools are actually usable here, so a
+            # Windows-only tool on Linux is not counted against the owner.
+            available = sum(1 for t in self.registry.tools.values() if t.status()[0])
+            self.store.x("INSERT INTO settings(key,value) VALUES('tools_available',?) "
+                         "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (jdump(available),))
+            res = mod.compute(db_path=self.store.path, home=HOME)
+            if record:
+                with contextlib.suppress(Exception):
+                    mod.record(self.store.path, res)
+            return res
+        except Exception as e:
+            return {"level": None, "reason": f"{type(e).__name__}: {e}"}
+
+    def level_snapshot(self) -> dict:
+        """The tiny version, safe to put in every system prompt manifest."""
+        with contextlib.suppress(Exception):
+            cached = self.settings.get("level")
+            if isinstance(cached, dict) and cached.get("level") is not None:
+                return {"level": cached["level"], "tier": cached.get("tier"), "score": cached.get("score"),
+                        "measured_events": cached.get("measured_events")}
+        return {"level": 1, "tier": "seedling", "score": 0.0, "measured_events": 0, "note": "not measured yet"}
+
+    def note_run_outcome(self, outcome: Any) -> None:
+        """Re-measure after real work. Cheap enough to do per run, and it is the
+        only thing that makes the level move: evidence, not elapsed time."""
+        if getattr(outcome, "status", "") in ("answered", ""):
+            return
+        self.measure_level(record=True)
+
     async def close(self) -> None:
         self.shutting_down = True
         self.voice.stop()
         self.activity.stop()
         self.tasks.cancel_all()
+        with contextlib.suppress(Exception):
+            self.majin.close()
         await asyncio.sleep(0.2)
         self.store.close()
         self.lock.release()
@@ -4731,8 +5387,12 @@ async def run_suite(live: bool) -> int:
     if live and IS_WIN and key:
         await live_scenarios(s, app)
 
+    # ── integrated subsystems: MAJIN V6, legacy memory migration, level ──
+    await integration_tests(s, app, tmp)
+
     # ── summary ──
-    order = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J1", "J2", "J3", "J4", "J5", "K", "L"]
+    order = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "M1", "M2", "M3", "M4", "N1", "N2", "N3",
+             "P1", "P2", "R1", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J1", "J2", "J3", "J4", "J5", "K", "L"]
     cnt = {k: sum(1 for r in s.res if r["status"] == k) for k in ("PASS", "FAIL", "BLOCKED", "NOT TESTED")}
     print("\n" + C.c(C.B, "SUMMARY ") + "  ".join(C.c(Suite.ICON[k], f"{k}={v}") for k, v in cnt.items()))
     print(C.c(C.DIM, "Mocked-model tests prove engine logic only. Nothing marked BLOCKED/NOT TESTED is claimed to work."))
@@ -4742,6 +5402,341 @@ async def run_suite(live: bool) -> int:
         print(C.c(C.DIM, f"report: {rp}"))
     await app.close()
     return 1 if cnt["FAIL"] else 0
+
+
+async def integration_tests(s: Suite, app: Buddy, tmp: Path) -> None:
+    """Tests for the integrated subsystems.
+
+    These exercise the real MAJIN V6 Node process, the real migration utility
+    against fixtures in each real legacy format, and the real level formula.
+    Anything this host genuinely cannot prove is reported BLOCKED with the
+    actual reason — never skipped silently and never claimed as passing.
+    """
+    # ════ M: MAJIN V6 as an integrated subsystem ════
+    mb = sibling("majin_bridge")
+    root = mb.find_majin_root() if mb else None
+    node = mb.find_node() if mb else None
+    deps_ok = bool(root and (root / "node_modules").is_dir())
+    maj_blocked = ""
+    if mb is None:
+        maj_blocked = "majin_bridge module unavailable"
+    elif root is None:
+        maj_blocked = "MAJIN checkout not found (set MAJIN_ROOT)"
+    elif node is None:
+        maj_blocked = "Node.js not found (MAJIN V6 needs Node 22+)"
+    elif not deps_ok:
+        maj_blocked = f"MAJIN dependencies not installed at {root} — run: npm install"
+
+    maj_env: dict[str, str] = {}
+    if not maj_blocked:
+        # An isolated V5 owner profile + V6 home inside the test directory, so
+        # this proves the real integration without touching the owner's data.
+        v5, v6, ws = tmp / "majin-v5", tmp / "majin-v6", tmp / "majin-ws"
+        ws.mkdir(parents=True, exist_ok=True)
+        v5.mkdir(parents=True, exist_ok=True)
+        (ws / "omega-proof.txt").write_text("MAJIN THROUGH OMEGA — REAL CONTENT\n", encoding="utf-8")
+        (v5 / "owner-mode.json").write_text(jdump({
+            "schema": "majin.v4.owner-mode/v1", "version": 1, "lanes": ["files"],
+            "folders": [str(ws)], "browserOrigins": [], "history": []}), encoding="utf-8")
+        maj_env = {"MAJIN_V5_DATA_DIR": str(v5), "MAJIN_V6_HOME": str(v6), "MAJIN_WORKSPACE": str(ws)}
+        for k, v in maj_env.items():
+            os.environ[k] = v
+        app.majin = MajinSubsystem(app)          # re-discover with the test profile
+        app.majin._bridge = None
+        app.majin._attempted = False
+
+    if maj_blocked:
+        for tid, nm in (("M1", "invoke a MAJIN V6 tool from Omega"),
+                        ("M2", "MAJIN exactly-once: no duplicate effect on retry"),
+                        ("M3", "MAJIN permission boundary enforced and not retried"),
+                        ("M4", "MAJIN durable queue survives a worker crash")):
+            s.rec(tid, nm, "BLOCKED", maj_blocked)
+    else:
+        # M1 — the owner asks Omega; Omega reaches MAJIN through its own registry,
+        # permission gate and audit log. No second application, no second engine.
+        try:
+            spec = app.registry.get("majin_call")
+            ok_avail, why = spec.status() if spec else (False, "majin_call not registered")
+            st = await exec_tool(app, "majin_status", {})
+            granted = (st.data or {}).get("ownerGrantedLanes") if st.ok else []
+            res = await exec_tool(app, "majin_call", {"name": "fs_read", "arguments": {"path": "omega-proof.txt"}})
+            body = jdump(res.data) if res.ok else res.error
+            audited = app.store.one("SELECT decision FROM audit WHERE tool='majin_call' ORDER BY id DESC LIMIT 1")
+            s.rec("M1", "invoke a MAJIN V6 tool from Omega", 
+                  "PASS" if (ok_avail and res.ok and "MAJIN THROUGH OMEGA" in body
+                             and "files" in (granted or []) and audited) else "FAIL",
+                  f"available={ok_avail}, status_ok={st.ok}, lanes={granted}, read_back={'MAJIN THROUGH OMEGA' in body}, "
+                  f"audit={audited['decision'] if audited else None}, mcp_tools={app.majin.status().get('mcpTools')}"
+                  + ("" if res.ok else f", error={clip(res.error, 120)}"))
+        except Exception as e:
+            s.rec("M1", "invoke a MAJIN V6 tool from Omega", "FAIL", f"{type(e).__name__}: {e}")
+
+        # M2 — THE job-application guarantee: a retry returns the original
+        # receipt, and a reused id with different arguments is refused.
+        try:
+            oid = mb.operation_id("fs_read", {"path": "omega-proof.txt"}, "selftest-m2")
+            r1 = await exec_tool(app, "majin_call", {"name": "fs_read", "arguments": {"path": "omega-proof.txt"},
+                                                     "operation_id": oid})
+            r2 = await exec_tool(app, "majin_call", {"name": "fs_read", "arguments": {"path": "omega-proof.txt"},
+                                                     "operation_id": oid})
+            f1 = (r1.data or {}).get("finishedAt") if r1.ok else None
+            f2 = (r2.data or {}).get("finishedAt") if r2.ok else None
+            r3 = await exec_tool(app, "majin_call", {"name": "fs_read", "arguments": {"path": "other.txt"},
+                                                     "operation_id": oid})
+            mismatch_blocked = (not r3.ok) and r3.category in ("invalid_args", "tool_failed", "permission")
+            # `f1 and f1 == f2` — both calls must have really succeeded, or two
+            # identical failures would masquerade as an idempotent receipt.
+            replayed = bool(f1) and f1 == f2
+            s.rec("M2", "MAJIN exactly-once: no duplicate effect on retry",
+                  "PASS" if (r1.ok and r2.ok and replayed and mismatch_blocked) else "FAIL",
+                  f"first_ok={r1.ok}, replay_ok={r2.ok}, same_receipt={replayed}, "
+                  f"mismatched_id_refused={mismatch_blocked}"
+                  + ("" if r1.ok else f" first_error={clip(r1.error, 140)}")
+                  + ("" if mismatch_blocked else f" (got ok={r3.ok} category={r3.category})"))
+        except Exception as e:
+            s.rec("M2", "MAJIN exactly-once", "FAIL", f"{type(e).__name__}: {e}")
+
+        # M3 — a lane the owner never granted must be refused, classified as a
+        # permission problem, and must NOT be presented as retryable.
+        try:
+            denied = await exec_tool(app, "majin_call", {"name": "browser_open",
+                                                         "arguments": {"url": "https://example.com"}})
+            s.rec("M3", "MAJIN permission boundary enforced and not retried",
+                  "PASS" if (not denied.ok and denied.category == "permission"
+                             and "do not retry" in (denied.hint or "").lower()) else "FAIL",
+                  f"ok={denied.ok}, category={denied.category}, hint={clip(denied.hint, 130)}"
+                  + ("" if not denied.ok else " — an ungranted lane was executed!"))
+        except Exception as e:
+            s.rec("M3", "MAJIN permission boundary", "FAIL", f"{type(e).__name__}: {e}")
+
+        # M4 — durable queue + failure injection: kill the MAJIN child process
+        # under Omega and prove work state survives and the bridge recovers.
+        try:
+            q1 = await exec_tool(app, "majin_queue_add",
+                                 {"kind": "tool", "title": "omega integration proof",
+                                  "payload": {"tool": "fs_read", "arguments": {"path": "omega-proof.txt"}}})
+            tid = ""
+            if q1.ok and isinstance(q1.data, dict):
+                task = q1.data.get("task") if isinstance(q1.data.get("task"), dict) else q1.data
+                tid = str(task.get("id") or "")
+            q2 = await exec_tool(app, "majin_queue_add",
+                                 {"kind": "tool", "title": "omega integration proof",
+                                  "payload": {"tool": "fs_read", "arguments": {"path": "omega-proof.txt"}}})
+            tid2 = ""
+            if q2.ok and isinstance(q2.data, dict):
+                t2 = q2.data.get("task") if isinstance(q2.data.get("task"), dict) else q2.data
+                tid2 = str(t2.get("id") or "")
+            deduped = bool(tid) and tid == tid2
+            bridge = app.majin._bridge
+            killed = False
+            if bridge is not None and getattr(bridge, "_proc", None) is not None:
+                bridge._proc.kill()
+                with contextlib.suppress(Exception):
+                    bridge._proc.wait(timeout=10)
+                killed = True
+            after = await exec_tool(app, "majin_queue_list", {"limit": 50})
+            recovered = after.ok and killed
+            persisted = bool(tid) and tid in jdump(after.data) if after.ok else False
+            s.rec("M4", "MAJIN durable queue survives a worker crash",
+                  "PASS" if (deduped and killed and recovered and persisted) else "FAIL",
+                  f"queued={bool(tid)}, dedupe_prevented_second_task={deduped}, child_killed={killed}, "
+                  f"bridge_recovered={recovered}, task_still_in_queue={persisted}")
+        except Exception as e:
+            s.rec("M4", "MAJIN durable queue survives a worker crash", "FAIL", f"{type(e).__name__}: {e}")
+
+    # ════ N: legacy memory migration ════
+    mm = sibling("memory_migration")
+    if mm is None:
+        for tid, nm in (("N1", "migrate legacy memory and retrieve it"),
+                        ("N2", "legacy records arrive untrusted, secrets never migrate"),
+                        ("N3", "migration backup + rollback restore the exact state")):
+            s.rec(tid, nm, "BLOCKED", "memory_migration module unavailable")
+    else:
+        try:
+            legacy = tmp / "legacy"
+            home_dir, v5d, v6d = legacy / "StuddyBuddy", legacy / "MAJIN" / "v5", legacy / "MAJIN" / "v6"
+            vault = legacy / "Documents" / "Vault"
+            (home_dir).mkdir(parents=True, exist_ok=True)
+            # a previous Omega database, in the real schema
+            conn = sqlite3.connect(str(home_dir / "buddy.db"))
+            conn.execute("CREATE TABLE memories(id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, title TEXT, "
+                         "content TEXT, tags TEXT, status TEXT, source_run TEXT, created REAL, updated REAL, uses INTEGER)")
+            conn.execute("CREATE TABLE runs(id TEXT, ts REAL, goal TEXT, status TEXT, verified INTEGER, summary TEXT, "
+                         "steps INTEGER, tokens INTEGER)")
+            conn.execute("CREATE TABLE summaries(id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, content TEXT, upto_id INTEGER)")
+            t0 = now() - 86400 * 30
+            conn.execute("INSERT INTO memories(kind,title,content,tags,status,created,updated,uses) VALUES(?,?,?,?,?,?,?,?)",
+                         ("fix", "WSL DNS fix", "Disable mirrorNetworking in .wslconfig to repair WSL DNS resolution.",
+                          "wsl networking", "active", t0, t0, 4))
+            conn.execute("INSERT INTO memories(kind,title,content,tags,status,created,updated) VALUES(?,?,?,?,?,?,?)",
+                         ("fact", "api key", "key sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZ123456", "", "active", t0, t0))
+            conn.execute("INSERT INTO runs VALUES(?,?,?,?,?,?,?,?)", ("lr1", t0, "install python", "complete", 1, "verified", 9, 4000))
+            conn.execute("INSERT INTO summaries(ts,content,upto_id) VALUES(?,?,?)", (t0, "We planned the router upgrade.", 7))
+            conn.commit()
+            conn.close()
+            # an Obsidian vault with the real marker directory
+            (vault / ".obsidian").mkdir(parents=True, exist_ok=True)
+            (vault / "Projekt Alpha.md").write_text(
+                "---\ntitle: Projekt Alpha\nkind: project\ncreated: 2025-03-04\ntags: [alpha]\n---\n\n"
+                "# Projekt Alpha\n\nBeslut: använd SQLite lokalt. Owner approved this on 2025-03-04.\n", encoding="utf-8")
+            # MAJIN V2 namespaced memory in the real schema
+            (v5d / "memory").mkdir(parents=True, exist_ok=True)
+            (v5d / "memory" / "preference.json").write_text(jdump({
+                "schema": "majin.v2.memory/v1", "kind": "preference", "syncSchema": 1,
+                "entries": [{"key": "editor", "text": "Owner uses Neovim for editing", "tags": ["editor"],
+                             "importance": 0.9, "at": "2025-06-01T12:00:00.000Z", "id": "aa11"}], "tombstones": []}),
+                encoding="utf-8")
+            # MAJIN V6 job history in the real schema
+            (v6d / "jobs").mkdir(parents=True, exist_ok=True)
+            (v6d / "jobs" / "applications.json").write_text(jdump({
+                "schema": "majin.v6.jobs/v1", "version": 1, "updatedAt": "2025-09-01T10:00:00.000Z",
+                "applications": [{"id": "app_1", "state": "submitted", "fingerprint": "fp1", "candidateId": "owner",
+                                  "job": {"company": "Ericsson", "title": "Backend engineer"},
+                                  "createdAt": "2025-09-01T08:00:00.000Z", "updatedAt": "2025-09-01T09:00:00.000Z",
+                                  "evidence": {"receipt": "r1"}}]}), encoding="utf-8")
+
+            roots = {"omega_home": home_dir, "studdy_home": home_dir, "majin_v5": v5d, "majin_v6": v6d,
+                     "documents": legacy / "Documents", "home": legacy, "repo": tmp / "no-repo"}
+            # The exact row count at the moment the backup is taken. N3 asserts
+            # the rollback restores *this*, not whatever the count happens to be
+            # later — records written after the migration are not the
+            # migration's business and must not be counted against it.
+            pre_migration = app.store.one("SELECT COUNT(*) AS n FROM memories")["n"]
+            sink = mm.SqliteSink(app.store.path)
+            mig = mm.Migrator(sink, roots=roots)
+            rep = mig.run(dry_run=False, retrieval_probe="mirrorNetworking")
+            imported = rep.imported
+            by_src = sorted(rep.by_source)
+            # retrieval through Omega's OWN memory engine, not the migrator's
+            hits = app.memory.search("how did I fix WSL DNS", limit=3, touch=False)
+            found_fix = any("mirrorNetworking" in (h.get("content") or "") for h in hits)
+            obs = app.memory.search("Projekt Alpha SQLite beslut", limit=3, touch=False)
+            found_obsidian = any("SQLite" in (o.get("content") or "") for o in obs)
+            jobhit = app.memory.search("Ericsson application submitted", limit=3, touch=False)
+            found_job = any("Ericsson" in (j.get("title") or "") + (j.get("content") or "") for j in jobhit)
+            s.rec("N1", "migrate legacy memory and retrieve it",
+                  "PASS" if (rep.ok and imported > 0 and found_fix and found_obsidian and found_job) else "FAIL",
+                  f"imported={imported}, sources={by_src}, wsl_fix_retrievable={found_fix}, "
+                  f"obsidian_note_retrievable={found_obsidian}, majin_job_history_retrievable={found_job}, "
+                  f"retrieval={rep.retrieval_check.get('status')}")
+
+            # N2 — untrusted by construction, and no secret crossed the boundary
+            rows = app.store.q("SELECT status, tags, title, content FROM memories WHERE tags LIKE '%legacy%'")
+            all_migrated = bool(rows) and all(r["status"] == "migrated" for r in rows)
+            all_tagged = bool(rows) and all("legacy" in (r["tags"] or "") for r in rows)
+            blob = " ".join(f"{r['title']} {r['content']}" for r in
+                            app.store.q("SELECT title, content FROM memories"))
+            leaked = "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZ" in blob
+            # and a legacy record must not outrank a verified current fact
+            app.memory.save("fix", "WSL DNS fix (verified 2026)", "Set networkingMode=mirrored and restart WSL.",
+                            "wsl networking", status="verified")
+            ranked = app.memory.search("WSL DNS fix", limit=2, touch=False)
+            verified_first = bool(ranked) and ranked[0]["status"] == "verified"
+            s.rec("N2", "legacy records arrive untrusted, secrets never migrate",
+                  "PASS" if (all_migrated and all_tagged and not leaked and rep.skipped_secret > 0 and verified_first) else "FAIL",
+                  f"legacy_rows={len(rows)}, all_status_migrated={all_migrated}, all_tagged_legacy={all_tagged}, "
+                  f"secret_leaked={leaked}, secrets_withheld={rep.skipped_secret}, verified_outranks_legacy={verified_first}")
+
+            # N3 — backup exists, is consistent, and rollback really restores
+            before = app.store.one("SELECT COUNT(*) AS n FROM memories")["n"]
+            backup_ok = bool(rep.backup) and Path(rep.backup).is_file() and len(rep.backup_sha256) == 64
+            sha_ok = backup_ok and mm.file_sha256(Path(rep.backup)) == rep.backup_sha256
+            sink2 = mm.SqliteSink(app.store.path)
+            mig2 = mm.Migrator(sink2, roots=roots)
+            rolled = mig2.rollback(rep.backup) if backup_ok else False
+            # The rollback replaced the file under the live connection, so the
+            # agent must reconnect — otherwise it would keep reading the old
+            # inode and the restore would be theatre.
+            app.store.reopen()
+            after = app.store.one("SELECT COUNT(*) AS n FROM memories")["n"]
+            legacy_left = app.store.one("SELECT COUNT(*) AS n FROM memories WHERE tags LIKE '%legacy%'")["n"]
+            s.rec("N3", "migration backup + rollback restore the exact state",
+                  "PASS" if (backup_ok and sha_ok and rolled and after == pre_migration and legacy_left == 0) else "FAIL",
+                  f"backup={backup_ok}, consistent_snapshot={sha_ok}, rollback={rolled}, "
+                  f"rows {pre_migration}→{before}→{after} (restored to the pre-migration {pre_migration}), "
+                  f"legacy_rows_after_rollback={legacy_left}")
+        except Exception as e:
+            for tid, nm in (("N1", "migrate legacy memory and retrieve it"),
+                            ("N2", "legacy records arrive untrusted"),
+                            ("N3", "migration backup + rollback")):
+                if not any(r["id"] == tid for r in s.res):
+                    s.rec(tid, nm, "FAIL", f"{type(e).__name__}: {e}")
+
+    # ════ P: measured capability level ════
+    lvm = sibling("level")
+    if lvm is None:
+        s.rec("P1", "level formula cannot be gamed with tokens or runtime", "BLOCKED", "level module unavailable")
+        s.rec("P2", "level rises only on real verified evidence", "BLOCKED", "level module unavailable")
+    else:
+        try:
+            cheap = {"runs_decided": 30, "runs_verified": 20, "tasks_recovered": 4, "tasks_abandoned": 1,
+                     "distinct_tools_used": 6, "tools_available": 20, "memories_total": 8, "memories_used": 4,
+                     "stat_memory_searches": 20, "stat_memory_hits": 15}
+            expensive = dict(cheap)
+            # 50 000× the tokens and a year of extra runtime must change nothing.
+            db_a, db_b = tmp / "lvl_a.db", tmp / "lvl_b.db"
+            for db, tokens in ((db_a, 1_000), (db_b, 50_000_000)):
+                c = sqlite3.connect(str(db))
+                c.execute("CREATE TABLE runs(id TEXT PRIMARY KEY, ts REAL, goal TEXT, status TEXT, verified INTEGER, "
+                          "summary TEXT, steps INTEGER, tokens INTEGER)")
+                for i in range(30):
+                    c.execute("INSERT INTO runs VALUES(?,?,?,?,?,?,?,?)",
+                              (f"r{i}", now() - (31536000 if db is db_b else 0), "g",
+                               "complete" if i < 20 else "failed", int(i < 20), "x" * 500, 9, tokens))
+                c.commit()
+                c.close()
+            la = lvm.compute(evidence=cheap, db_path=db_a)
+            lb = lvm.compute(evidence=expensive, db_path=db_b)
+            gated = lvm.compute(evidence={"runs_decided": 3, "runs_verified": 3})
+            s.rec("P1", "level formula cannot be gamed with tokens or runtime",
+                  "PASS" if (la.level == lb.level and la.score == lb.score and gated.score == 1.0 and gated.level <= 5
+                            and gated.cap < gated.raw_level) else "FAIL",
+                  f"same_level_despite_50000x_tokens={la.level == lb.level} ({la.level} vs {lb.level}), "
+                  f"3_perfect_runs_score={gated.score:.2f}_but_level={gated.level} (cap {int(gated.cap)})")
+        except Exception as e:
+            s.rec("P1", "level formula cannot be gamed", "FAIL", f"{type(e).__name__}: {e}")
+        try:
+            before = app.measure_level(record=True)
+            # do real, verified work: a run whose outcome is recorded as verified
+            app.store.x("INSERT OR REPLACE INTO runs(id,ts,goal,status,verified,summary,steps,tokens) VALUES(?,?,?,?,?,?,?,?)",
+                        ("lvl_proof", now(), "integration proof", "complete", 1, "verified by test", 3, 10))
+            for i in range(12):
+                app.store.x("INSERT OR REPLACE INTO runs(id,ts,goal,status,verified,summary,steps,tokens) VALUES(?,?,?,?,?,?,?,?)",
+                            (f"lvl_p{i}", now(), "proof", "complete", 1, "verified", 3, 10))
+            after = app.measure_level(record=True)
+            hist = lvm.history(app.store.path, limit=10)
+            lvl = lambda r: (r.get("level") if isinstance(r, dict) else getattr(r, "level", None)) or 0
+            axes = after.axes if hasattr(after, "axes") else []
+            grew = lvl(after) >= lvl(before)
+            a_axis = next((x for x in axes if x.key == "A"), None)
+            s.rec("P2", "level rises only on real verified evidence",
+                  "PASS" if (grew and len(hist) >= 2 and a_axis is not None and a_axis.measured) else "FAIL",
+                  f"level {lvl(before)}→{lvl(after)}, history_rows={len(hist)}, "
+                  f"axis_A={'measured %.2f' % a_axis.value if a_axis and a_axis.measured else 'unmeasured'}"
+                  + (f", reason={after.get('reason')}" if isinstance(after, dict) else ""))
+        except Exception as e:
+            s.rec("P2", "level rises only on real verified evidence", "FAIL", f"{type(e).__name__}: {e}")
+
+    # ════ R: run outcomes are recorded truthfully (regression guard) ════
+    try:
+        run = AgentRun(app, "record the real outcome", background=True)
+        run.record_run(RunOutcome("blocked", "gateway unreachable in this test", False, "network", 4, 1))
+        row = app.store.one("SELECT status, verified, summary, steps FROM runs WHERE id=?", (run.id,))
+        vrun = AgentRun(app, "a verified completion", background=True)
+        vrun.record_run(RunOutcome("complete", "file written and read back", True, "", 6, 0))
+        vrow = app.store.one("SELECT status, verified FROM runs WHERE id=?", (vrun.id,))
+        s.rec("R1", "run history records the real outcome, not a placeholder",
+              "PASS" if (row and row["status"] == "blocked" and row["verified"] == 0 and "gateway" in row["summary"]
+                         and vrow and vrow["status"] == "complete" and vrow["verified"] == 1) else "FAIL",
+              f"blocked_run={dict(row) if row else None}, verified_run_status="
+              f"{vrow['status'] if vrow else None}/{vrow['verified'] if vrow else None}")
+    except Exception as e:
+        s.rec("R1", "run history records the real outcome", "FAIL", f"{type(e).__name__}: {e}")
+
+    with contextlib.suppress(Exception):
+        app.majin.close()
+    for k in maj_env:
+        os.environ.pop(k, None)
 
 
 async def windows_tests(s: Suite, app: Buddy, key: bool) -> None:

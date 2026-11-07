@@ -918,6 +918,131 @@ class MajinWorkspaceSource(Source):
                                  extra={"entries": len(items)})
 
 
+def _table_counts(conn: sqlite3.Connection) -> dict:
+    out = {}
+    for (name,) in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"):
+        try:
+            out[name] = int(conn.execute(f"SELECT COUNT(*) FROM '{name}'").fetchone()[0])
+        except sqlite3.Error:
+            return {}
+    return out
+
+
+def consistent_sqlite_snapshot(src_path: Path, dest_path: Path) -> tuple[bool, str]:
+    """Copy a live SQLite database (possibly in WAL mode) into a consistent file.
+
+    Three strategies are tried in order and the result is *verified by comparing
+    every table's row count against the source*. Nothing is trusted because an
+    API exists:
+
+      1. `Connection.backup()` — the online backup API. Not every CPython build
+         returns a usable backup object (some return None and copy nothing), so
+         it is verified rather than assumed.
+      2. `Connection.iterdump()` — a pure-Python SQL dump. Slower, but it works
+         everywhere and produces a self-contained database.
+      3. File copy of the database plus its `-wal`/`-shm` sidecars, then a
+         `wal_checkpoint(TRUNCATE)` inside the copy so the sidecars are folded
+         in and removed. A bare file copy without the sidecars would silently
+         lose the most recent writes, which is exactly what a pre-migration
+         backup must not do.
+
+    Returns (ok, method). On failure the destination is removed.
+    """
+    dest_path = Path(dest_path)
+    with _suppress_ctx():
+        if dest_path.exists():
+            dest_path.unlink()
+    try:
+        src = sqlite3.connect(f"file:{Path(src_path).as_posix()}?mode=ro", uri=True, timeout=15)
+        src.execute("SELECT count(*) FROM sqlite_master")
+    except sqlite3.Error as e:
+        return False, f"source unreadable: {e}"
+    try:
+        expected = _table_counts(src)
+        if not expected and src.execute("SELECT count(*) FROM sqlite_master").fetchone()[0] > 0:
+            return False, "source tables could not be counted"
+
+        # 1. online backup API
+        try:
+            dst = sqlite3.connect(str(dest_path))
+            try:
+                bk = src.backup(dst)
+                if bk is not None:
+                    with _suppress_ctx():
+                        bk.close()
+                dst.commit()
+            finally:
+                dst.close()
+            if _verify_snapshot(dest_path, expected):
+                return True, "sqlite-backup-api"
+        except sqlite3.Error:
+            pass
+        with _suppress_ctx():
+            dest_path.unlink()
+
+        # 2. pure-Python SQL dump
+        try:
+            dst = sqlite3.connect(str(dest_path))
+            try:
+                dst.executescript("\n".join(src.iterdump()))
+                dst.commit()
+            finally:
+                dst.close()
+            if _verify_snapshot(dest_path, expected):
+                return True, "sqlite-iterdump"
+        except sqlite3.Error:
+            pass
+        with _suppress_ctx():
+            dest_path.unlink()
+    finally:
+        src.close()
+
+    # 3. file copy including the WAL sidecars, then checkpoint inside the copy
+    try:
+        shutil.copy2(src_path, dest_path)
+        for suffix in ("-wal", "-shm"):
+            side = Path(str(src_path) + suffix)
+            if side.is_file():
+                shutil.copy2(side, Path(str(dest_path) + suffix))
+        conn = sqlite3.connect(str(dest_path), timeout=15)
+        try:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            conn.commit()
+        finally:
+            conn.close()
+        for suffix in ("-wal", "-shm"):
+            with _suppress_ctx():
+                Path(str(dest_path) + suffix).unlink()
+        src2 = sqlite3.connect(f"file:{Path(src_path).as_posix()}?mode=ro", uri=True, timeout=15)
+        try:
+            expected = _table_counts(src2)
+        finally:
+            src2.close()
+        if _verify_snapshot(dest_path, expected):
+            return True, "file-copy+wal-checkpoint"
+    except (OSError, sqlite3.Error):
+        pass
+    with _suppress_ctx():
+        dest_path.unlink()
+    return False, "no strategy produced a verified snapshot"
+
+
+def _verify_snapshot(dest_path: Path, expected: dict) -> bool:
+    if not Path(dest_path).is_file():
+        return False
+    try:
+        conn = sqlite3.connect(f"file:{Path(dest_path).as_posix()}?mode=ro", uri=True, timeout=10)
+    except sqlite3.Error:
+        return False
+    try:
+        actual = _table_counts(conn)
+    finally:
+        conn.close()
+    if not actual:
+        return False
+    return all(actual.get(t) == n for t, n in expected.items())
+
+
 def _clip(value: Any, n: int = 400) -> Any:
     if value is None:
         return None
@@ -1045,6 +1170,14 @@ class Migrator:
 
     # ── 3. verified backup ─────────────────────────────────────────────────
     def backup_target(self, backup_dir: Optional[Path] = None) -> tuple[str, str]:
+        """A consistent, verified copy of the target taken *before* any import.
+
+        Omega's database runs in WAL mode, so a plain file copy can miss the
+        writes still sitting in `-wal`. `consistent_sqlite_snapshot` handles that
+        and verifies the result table by table; if no strategy can be verified
+        the migration refuses to import rather than proceeding without a way
+        back.
+        """
         target = self.sink.snapshot_path()
         if target is None or not target.is_file():
             return "", ""
@@ -1052,25 +1185,44 @@ class Migrator:
         backup_dir.mkdir(parents=True, exist_ok=True)
         stamp = time.strftime("%Y%m%d-%H%M%S")
         dest = backup_dir / f"{target.stem}-pre-migration-{stamp}.db"
-        before = file_sha256(target)
-        shutil.copy2(target, dest)
-        after = file_sha256(dest)
-        if before != after:
-            dest.unlink(missing_ok=True)
-            raise RuntimeError(f"backup verification failed for {target} (sha256 mismatch)")
-        self._log("migration.backup", {"target": str(target), "backup": str(dest), "sha256": after or ""})
-        return str(dest), after or ""
+        ok, method = consistent_sqlite_snapshot(target, dest)
+        if not ok:
+            raise RuntimeError(f"backup of {target} could not be verified ({method}); refusing to import")
+        sha = file_sha256(dest) or ""
+        self._log("migration.backup", {"target": str(target), "backup": str(dest), "sha256": sha,
+                                       "method": method, "size": dest.stat().st_size if dest.is_file() else 0})
+        return str(dest), sha
 
     def rollback(self, backup_path: str) -> bool:
+        """Restore the pre-migration database.
+
+        The sink is closed first: replacing a database file underneath a live
+        connection leaves that connection talking to the old inode, so the
+        rollback would look successful and change nothing. Callers that keep a
+        long-lived connection (the agent itself) must reopen it afterwards —
+        `Store.reopen()` in buddy.py does exactly that.
+        """
         target = self.sink.snapshot_path()
-        if not target or not Path(backup_path).is_file():
+        backup = Path(backup_path)
+        if not target or not backup.is_file():
             return False
-        if file_sha256(Path(backup_path)) is None:
+        if file_sha256(backup) is None:
             return False
-        tmp = target.with_suffix(target.suffix + ".rollback-tmp")
-        shutil.copy2(backup_path, tmp)
+        with _suppress_ctx():
+            close = getattr(self.sink, "close", None)
+            if callable(close):
+                close()
+        tmp = target.with_name(target.name + ".rollback-tmp")
+        shutil.copy2(backup, tmp)
         os.replace(tmp, target)
-        self._log("migration.rollback", {"restored": str(backup_path), "target": str(target)})
+        # WAL/SHM sidecars from the rolled-back database must not survive: they
+        # belong to the state we are undoing and would replay it on next open.
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(str(target) + suffix)
+            if sidecar.is_file():
+                with _suppress_ctx():
+                    sidecar.unlink()
+        self._log("migration.rollback", {"restored": str(backup), "target": str(target)})
         return True
 
     # ── 4–8. import, dedupe, validate ──────────────────────────────────────

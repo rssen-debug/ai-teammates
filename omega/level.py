@@ -232,6 +232,10 @@ def collect_from_db(db_path: Path) -> dict[str, Any]:
         return ev
     try:
         conn = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True, timeout=5)
+        # sqlite3.connect does not validate the header, so a corrupt or non-SQLite
+        # file connects fine and then fails on the first query. Probe it here so a
+        # damaged database is *reported* instead of silently scoring as empty.
+        conn.execute("SELECT count(*) FROM sqlite_master")
     except sqlite3.Error as e:
         ev["error"] = f"cannot open database read-only: {e}"
         return ev
@@ -273,13 +277,20 @@ def collect_from_db(db_path: Path) -> dict[str, Any]:
                 ev["memory_searches"] = int(_scalar(conn, "SELECT COALESCE(SUM(uses),0) FROM memories"))
             if "status" in cols:
                 ev["memories_verified"] = int(_scalar(conn, "SELECT COUNT(*) FROM memories WHERE status='verified'"))
+        if "stats" in tables:
+            # The engine's own monotonic counters: retrieval quality is measured
+            # from real searches and real hits, never estimated.
+            try:
+                for key, value in conn.execute("SELECT key, value FROM stats"):
+                    ev[f"stat_{key}"] = float(value or 0)
+            except sqlite3.Error:
+                pass
         if "settings" in tables:
             try:
                 rows = dict(conn.execute("SELECT key, value FROM settings").fetchall())
             except sqlite3.Error:
                 rows = {}
-            for key in ("tools_available", "stat_tool_searches", "stat_tool_search_hits", "stat_tool_calls",
-                        "stat_tool_errors", "level_tools_available"):
+            for key in ("tools_available", "level_tools_available"):
                 if key in rows:
                     try:
                         ev[key] = json.loads(rows[key])
@@ -356,8 +367,8 @@ def compute(evidence: Optional[dict] = None, db_path: Optional[Path] = None,
         axes.append(Axis("C", None, used, 0, "tool availability has not been recorded yet"))
 
     # D — memory retrieval quality
-    searches = float(ev.get("stat_tool_search_hits", 0) or 0) + float(ev.get("memory_searches") or 0)
-    hits = float(ev.get("stat_tool_search_hits") or 0)
+    searches = float(ev.get("stat_memory_searches") or ev.get("memory_searches") or 0)
+    hits = float(ev.get("stat_memory_hits") or 0)
     mem_total = float(ev.get("memories_total") or 0)
     mem_used = float(ev.get("memories_used") or 0)
     if searches > 0 or mem_total > 0:

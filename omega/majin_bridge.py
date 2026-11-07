@@ -79,12 +79,18 @@ def find_majin_root(explicit: Optional[str] = None) -> Optional[Path]:
     Search order is deterministic and never guesses outside the repository or
     the owner's own environment variables.
     """
+    named = explicit or os.environ.get("MAJIN_ROOT")
+    if named:
+        # An explicit location is authoritative. Falling back to some other
+        # checkout would let Omega quietly drive a MAJIN the owner did not name.
+        c = Path(named).expanduser()
+        try:
+            if (c / "bin" / "majin-v6.mjs").is_file() and (c / "src" / "v6" / "mcp.js").is_file():
+                return c.resolve()
+        except OSError:
+            pass
+        return None
     candidates: list[Path] = []
-    if explicit:
-        candidates.append(Path(explicit).expanduser())
-    env = os.environ.get("MAJIN_ROOT")
-    if env:
-        candidates.append(Path(env).expanduser())
     here = Path(__file__).resolve()
     # <repo>/omega/majin_bridge.py → <repo>/integrations/majin-original
     for parent in here.parents:
@@ -281,8 +287,8 @@ class MajinBridge:
                 return
             ok, why = self.availability()
             if not ok:
-                raise MajinError(why, kind="blocked" if "V5_DATA_MISSING" in why or "owner grants" in why else "unavailable",
-                                 code="MAJIN_UNAVAILABLE")
+                raise MajinError(why, kind="blocked" if ("V5_DATA_MISSING" in why or "owner grants" in why) else "unavailable",
+                                 code="MAJIN_UNAVAILABLE", retryable=False)
             self._errbuf = []
             self._proc = self._spawn()
             self._reader = threading.Thread(target=self._read_loop, name="majin-mcp-reader", daemon=True)
@@ -338,6 +344,12 @@ class MajinBridge:
             except Exception:
                 with _suppress():
                     proc.kill()
+                with _suppress():
+                    proc.wait(timeout=2)
+            for stream in (proc.stdout, proc.stderr):
+                with _suppress():
+                    if stream is not None:
+                        stream.close()
             for q in list(self._pending.values()):
                 q.put(MajinError("MAJIN bridge closed while a call was in flight", kind="crashed", retryable=False))
             self._pending.clear()
@@ -668,24 +680,29 @@ def unwrap_mcp_result(res: dict, redact: Callable[[str], str] = lambda s: s) -> 
     if payload is None:
         payload = {}
     if res.get("isError"):
-        message = text.strip() or (payload.get("blocker") if isinstance(payload, dict) else "") or "MAJIN tool call failed"
         code = "MAJIN_TOOL_ERROR"
-        if isinstance(payload, dict):
-            code = str(payload.get("errorCode") or payload.get("code") or payload.get("error") or code)
+        message = ""
+        record = payload if isinstance(payload, dict) else {}
         # MAJIN sometimes reports an error as a JSON text block rather than as
         # structuredContent. Parse it so the real code drives classification —
         # guessing here would make a *denied* call look retryable and send the
         # agent into a retry loop against a permission boundary.
-        if isinstance(payload, dict) and isinstance(payload.get("text"), str):
+        if isinstance(record.get("text"), str):
             try:
-                inner = json.loads(payload["text"])
+                inner = json.loads(record["text"])
                 if isinstance(inner, dict):
-                    code = str(inner.get("errorCode") or inner.get("code") or inner.get("error") or code)
-                    message = str(inner.get("message") or inner.get("blocker") or message)
+                    record = inner
             except json.JSONDecodeError:
                 pass
-        uncertain = bool(isinstance(payload, dict) and (payload.get("status") == "uncertain" or payload.get("uncertain")))
-        retryable = bool(isinstance(payload, dict) and payload.get("retryable", not uncertain)) and not uncertain
+        if record:
+            code = str(record.get("errorCode") or record.get("code") or record.get("error") or code)
+            # Prefer MAJIN's own human-readable blocker over the raw JSON dump:
+            # the model has to be able to read *why* it failed.
+            message = str(record.get("blocker") or record.get("message") or "")
+        if not message:
+            message = text.strip() or "MAJIN tool call failed"
+        uncertain = bool(record.get("status") == "uncertain" or record.get("uncertain"))
+        retryable = bool(record.get("retryable", not uncertain)) and not uncertain
         upper, lower = code.upper(), str(message).lower()
         denied_markers = ("PERMISSION_DENIED", "NOT_AUTHORIZED", "PATH_DENIED", "LANE_", "GRANT")
         invalid_markers = ("VALIDATION_ERROR", "INVALID_ARGUMENTS", "UNKNOWN_TOOL", "TOOL_NOT_FOUND",
@@ -698,7 +715,7 @@ def unwrap_mcp_result(res: dict, redact: Callable[[str], str] = lambda s: s) -> 
             kind = "uncertain"
         else:
             kind = "tool"
-        raise MajinError(redact(str(message))[:800], kind=kind, code=code, detail=_clip(payload, 1200),
+        raise MajinError(redact(str(message))[:800], kind=kind, code=code, detail=_clip(record or payload, 1500),
                          uncertain=uncertain, retryable=retryable)
     if isinstance(payload, dict):
         return payload
