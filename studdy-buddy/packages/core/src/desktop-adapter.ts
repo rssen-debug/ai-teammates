@@ -1,4 +1,5 @@
-import { execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
 import type { SupportedAppKind, UiElementInfo, UiSnapshot, WindowInfo } from '@studdy/shared';
 
 /**
@@ -20,28 +21,36 @@ import type { SupportedAppKind, UiElementInfo, UiSnapshot, WindowInfo } from '@s
  */
 
 export interface CommandRunner {
-  run(command: string, args: string[], timeoutMs: number): Promise<{ code: number; stdout: string; stderr: string }>;
+  run(command: string, args: string[], timeoutMs: number, input?: string): Promise<{ code: number; stdout: string; stderr: string }>;
 }
 
 export const defaultRunner: CommandRunner = {
-  run(command, args, timeoutMs) {
+  run(command, args, timeoutMs, input) {
     return new Promise((resolve) => {
-      // Execute the native binary directly. No cmd.exe/PowerShell shim: a shell
-      // layer broke multi-word app names and widened the injection surface.
-      execFile(command, args, { timeout: timeoutMs, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
-        const code = error && typeof (error as { code?: number }).code === 'number' ? ((error as { code?: number }).code as number) : error ? 1 : 0;
-        resolve({ code, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') });
-      });
+      const child = spawn(command, args, { shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+      let stdout = '', stderr = '', settled = false;
+      const finish = (code: number, error?: string) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ code, stdout, stderr: error ?? stderr });
+      };
+      const timer = setTimeout(() => { child.kill(); finish(1, `Native helper timeout efter ${timeoutMs} ms.`); }, timeoutMs);
+      child.stdout.setEncoding('utf8').on('data', (chunk: string) => { if (stdout.length < 4_000_000) stdout += chunk; });
+      child.stderr.setEncoding('utf8').on('data', (chunk: string) => { if (stderr.length < 100_000) stderr += chunk; });
+      child.stdin.on('error', () => { /* process error/exit is authoritative */ });
+      child.stdin.end(input ?? '');
+      child.once('error', error => finish(1, error.message));
+      child.once('close', code => finish(code ?? 1));
     });
   },
 };
-
 export interface AdapterConfig {
   runner?: CommandRunner;
   /** Executable name or absolute path. Configurable for packaged builds. */
   binary?: string;
   timeoutMs?: number;
-  /** Platform guard; the CLI is Windows-only. */
+  /** Supported OS guard; actual permissions are checked by native status. */
   platform?: string;
 }
 
@@ -74,46 +83,18 @@ export class DesktopAccessibilityAdapter {
   }
 
   async status(): Promise<AdapterStatus> {
-    if (this.platform !== 'win32') {
-      return {
-        available: false,
-        version: null,
-        detail: 'agent-desktop använder Windows UI Automation och är endast tillgängligt på Windows.',
-        mode: 'unavailable',
-      };
-    }
-    // `agent-desktop version` prints the JSON envelope; `--version` prints a bare
-    // string. We read the envelope so we also learn whether accessibility is
-    // actually granted, which is the thing that will break observation later.
+    if (!['win32', 'linux', 'darwin'].includes(this.platform)) return { available: false, version: null, detail: `agent-desktop stöds inte på ${this.platform}.`, mode: 'unavailable' };
     const result = await this.runner.run(this.binary, ['version'], this.timeoutMs);
     const envelope = readEnvelope(result.stdout);
-    if (result.code !== 0 || !envelope.ok) {
-      return {
-        available: false,
-        version: null,
-        detail: `agent-desktop kunde inte köras (${describeFailure(result)}).`,
-        mode: 'unavailable',
-      };
-    }
+    if (result.code !== 0 || !envelope.ok) return { available: false, version: null, detail: `agent-desktop kunde inte köras (${describeFailure(result)}).`, mode: 'unavailable' };
     const version = typeof envelope.data?.version === 'string' ? envelope.data.version : 'okänd';
-
     const statusResult = await this.runner.run(this.binary, ['status'], this.timeoutMs);
     const statusEnvelope = readEnvelope(statusResult.stdout);
     const accessibility = readPermissionState(statusEnvelope.data, 'accessibility');
-    if (accessibility === 'denied') {
-      return {
-        available: false,
-        version,
-        detail: `agent-desktop ${version} finns, men Windows-tillgänglighet är inte tillåtet för appen. ${readSuggestion(statusEnvelope.data)}`.trim(),
-        mode: 'unavailable',
-      };
+    if (statusResult.code !== 0 || !statusEnvelope.ok || accessibility === 'denied') {
+      return { available: false, version, detail: `agent-desktop ${version} finns, men desktop-åtkomst nekas. ${(statusEnvelope.error ? describeFailure(statusResult, statusEnvelope) : '')} ${readSuggestion(statusEnvelope.data)}`.trim(), mode: 'unavailable' };
     }
-    return {
-      available: true,
-      version,
-      detail: accessibility === 'granted' ? 'agent-desktop svarar och tillgänglighet är tillåtet.' : 'agent-desktop svarar över CLI.',
-      mode: 'cli-json',
-    };
+    return { available: true, version, detail: accessibility === 'granted' ? 'agent-desktop svarar och tillgänglighet är tillåtet.' : 'agent-desktop svarar; OS-tillgänglighet är overifierad (unknown).', mode: 'cli-json' };
   }
 
   /**
@@ -124,7 +105,6 @@ export class DesktopAccessibilityAdapter {
    * see docs/AGENT_DESKTOP.md.
    */
   async listWindows(): Promise<{ windows: WindowInfo[]; error: string | null }> {
-    if (this.platform !== 'win32') return { windows: [], error: 'Endast Windows stöds.' };
     const result = await this.runner.run(this.binary, ['list-windows'], this.timeoutMs);
     const envelope = readEnvelope(result.stdout);
     if (!envelope.ok) {
@@ -139,10 +119,10 @@ export class DesktopAccessibilityAdapter {
    * Returns CLI-confirmed process status, not a fabricated success response.
    */
   async launchApp(name: string): Promise<{ ok: boolean; detail: string }> {
-    if (this.platform !== 'win32') return { ok: false, detail: 'Programstart kräver Windows.' };
+    if (!['win32', 'linux', 'darwin'].includes(this.platform)) return { ok: false, detail: `Programstart stöds inte på ${this.platform}.` };
     const app = name.trim();
     if (!app || app.length > 80 || !/^[\p{L}\p{N} ._-]+$/u.test(app) ||
-        /^(?:cmd|powershell|pwsh|wscript|cscript|regedit|mshta|rundll32|schtasks|taskkill|terminal|bash)(?:\.exe)?$/i.test(app)) {
+        /^(?:cmd|powershell|pwsh|wscript|cscript|regedit|mshta|rundll32|schtasks|taskkill|terminal|bash|sh|zsh|fish|sudo|osascript)(?:\.exe)?$/i.test(app)) {
       return { ok: false, detail: 'Appnamnet får inte vara ett kommando, en sökväg eller ett skript.' };
     }
     const result = await this.runner.run(this.binary, ['launch', app, '--activate'], Math.max(this.timeoutMs, 30_000));
@@ -154,7 +134,6 @@ export class DesktopAccessibilityAdapter {
   }
 
   async listApps(): Promise<{ apps: unknown[]; error: string | null }> {
-    if (this.platform !== 'win32') return { apps: [], error: 'Endast Windows stöds.' };
     const result = await this.runner.run(this.binary, ['list-apps'], this.timeoutMs);
     const raw = safeJson(result.stdout) as { ok?: boolean; data?: unknown; error?: { message?: string } } | null;
     if (result.code !== 0 || raw?.ok !== true) return { apps: [], error: raw?.error?.message ?? describeFailure(result) };
@@ -168,12 +147,33 @@ export class DesktopAccessibilityAdapter {
     return result.code === 0 && envelope.ok ? { ok: true, detail: 'click ' + ref } : { ok: false, detail: describeFailure(result, envelope) };
   }
 
-  async type(ref: string, text: string): Promise<{ ok: boolean; detail: string }> {
+  /**
+   * `type` is physical on Windows: the official capability table states it needs
+   * `--headed` and returns POLICY_DENIED headless. Callers must opt in explicitly
+   * because headed delivery may move focus and the cursor.
+   */
+  async type(ref: string, text: string, options: { headed?: boolean } = {}): Promise<{ ok: boolean; detail: string }> {
     if (!/^@[^:]+:e\d+$/i.test(ref)) return { ok: false, detail: 'Ogiltig agent-desktop-ref.' };
-    if (text.length > 128_000) return { ok: false, detail: 'Texten är för lång.' };
-    const result = await this.runner.run(this.binary, ['type', ref, text], this.timeoutMs);
+    if (Buffer.byteLength(text, 'utf8') > 10_000) return { ok: false, detail: 'Texten är för lång (max 10 000 UTF-8-byte).' };
+    const args = ['type', ref, '--stdin'];
+    if (options.headed) args.push('--headed');
+    const result = await this.runner.run(this.binary, args, Math.max(this.timeoutMs, 8000 + text.length * 30), text);
     const envelope = readEnvelope(result.stdout);
-    return result.code === 0 && envelope.ok ? { ok: true, detail: 'Text skickad till ' + ref } : { ok: false, detail: describeFailure(result, envelope) };
+    if (result.code === 0 && envelope.ok) return { ok: true, detail: `Text skickad till ${ref} (${options.headed ? 'headed/fysisk' : 'headless/semantisk'}).` };
+    const hint = !options.headed && /POLICY_DENIED|not actionable|supported_action/i.test(envelope.error?.code ?? '' + (envelope.error?.message ?? ''))
+      ? ' På Windows kräver type fysisk leverans: kör med --headed.' : '';
+    return { ok: false, detail: describeFailure(result, envelope) + hint };
+  }
+
+  /** Semantic value write. Works headless on Windows where `type` refuses. */
+  async setValue(ref: string, text: string): Promise<{ ok: boolean; detail: string }> {
+    if (!/^@[^:]+:e\d+$/i.test(ref)) return { ok: false, detail: 'Ogiltig agent-desktop-ref.' };
+    if (Buffer.byteLength(text, 'utf8') > 128 * 1024) return { ok: false, detail: 'Texten är för lång (max 128 KiB).' };
+    const result = await this.runner.run(this.binary, ['set-value', ref, '--stdin'], Math.max(this.timeoutMs, 8000), text);
+    const envelope = readEnvelope(result.stdout);
+    return result.code === 0 && envelope.ok
+      ? { ok: true, detail: `Värde satt semantiskt på ${ref}.` }
+      : { ok: false, detail: describeFailure(result, envelope) };
   }
 
   async press(combo: string, windowId?: string): Promise<{ ok: boolean; detail: string }> {
@@ -192,9 +192,10 @@ export class DesktopAccessibilityAdapter {
   }
 
   async screenshot(windowId: string, path: string): Promise<{ ok: boolean; detail: string }> {
-    const result = await this.runner.run(this.binary, ['screenshot', '--window-id', windowId, path], Math.max(this.timeoutMs, 15_000));
+    const result = await this.runner.run(this.binary, [ 'screenshot', path, '--window-id', windowId ], Math.max(this.timeoutMs, 15_000));
     const envelope = readEnvelope(result.stdout);
-    return result.code === 0 && envelope.ok ? { ok: true, detail: path } : { ok: false, detail: describeFailure(result, envelope) };
+    const ok = result.code === 0 && envelope.ok && existsSync(path) && statSync(path).size > 0;
+    return ok ? { ok: true, detail: path } : { ok: false, detail: describeFailure(result, envelope) };
   }
 
   /** Captures an accessibility snapshot for one window. */
@@ -206,7 +207,6 @@ export class DesktopAccessibilityAdapter {
       accessible: false,
       note: null,
     };
-    if (this.platform !== 'win32') return { ...empty, note: 'Endast Windows stöds.' };
 
     const result = await this.runner.run(
       this.binary,
@@ -320,6 +320,7 @@ export function parseSnapshot(stdout: string, windowId: string): UiSnapshot {
       value: raw.value !== undefined && raw.value !== null ? String(raw.value) : null,
       bounds: readRect(raw),
       enabled: raw.enabled !== false && raw.disabled !== true,
+      availableActions: readActions(raw.available_actions),
       stale: false,
     });
   }
@@ -403,6 +404,7 @@ function describeFailure(
   if (fromEnvelope?.message) {
     return fromEnvelope.suggestion ? `${fromEnvelope.message} ${fromEnvelope.suggestion}` : fromEnvelope.message;
   }
+  if (envelope && result.code === 0) return 'Tomt eller ogiltigt svar från native helper.';
   return result.stderr.trim() || `exit ${result.code}`;
 }
 
@@ -443,6 +445,7 @@ export function flattenTree(tree: Record<string, unknown>, depth = 0, out: UiEle
       value: nodeValue,
       bounds: readRect(tree),
       enabled: tree.enabled !== false && tree.disabled !== true,
+      availableActions: readActions(tree.available_actions),
       stale: false,
     });
   }
@@ -451,6 +454,13 @@ export function flattenTree(tree: Record<string, unknown>, depth = 0, out: UiEle
     if (isRecord(child)) flattenTree(child, depth + 1, out);
   }
   return out;
+}
+
+/** Only string action names are kept; anything else is ignored, never guessed. */
+function readActions(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const actions = value.filter((a): a is string => typeof a === 'string' && a.length > 0).slice(0, 20);
+  return actions.length ? actions : undefined;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

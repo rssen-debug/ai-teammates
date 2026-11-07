@@ -21,9 +21,13 @@ npm run studdy          # interaktiv chatt
 npm run doctor          # hälsokontroll
 npm run build           # bygger dist/cli/studdy.mjs
 npm run package:cli     # skapar dist/studdy-buddy-*.tgz
+npm run test:e2e        # byggd CLI i riktiga processer + lokal HTTP/WebSocket
 ```
 
 ## Kom igång
+
+> Vill du verifiera att allt fungerar på din egen maskin? Följ **[docs/TESTA_LIVE.md](docs/TESTA_LIVE.md)** och kör `studdy prove`.
+
 
 ```bash
 studdy setup
@@ -33,7 +37,8 @@ studdy provider test
 studdy ask "förklara subnetting som om jag vore nybörjare"
 ```
 
-Presets: `kilo`, `deepseek`, `openrouter`, `opencode`. Nycklar sparas i ett lokalt
+Presets: `kilo`, `deepseek`, `openrouter`, `opencode`, samt `custom` för valfri
+OpenAI-kompatibel endpoint (`--base-url`, `--model`, `--vision-model`). Nycklar sparas i ett lokalt
 AES-256-GCM-valv (`secrets.vault`), aldrig i klartext i databasen och aldrig som argument.
 
 ## Kommandon
@@ -42,12 +47,14 @@ AES-256-GCM-valv (`secrets.vault`), aldrig i klartext i databasen och aldrig som
 | --- | --- |
 | `studdy` | Interaktiv chatt + live-status, skriver bara vid faktisk statusväxling |
 | `studdy ask "…"` | Engångsfråga till din AI |
+| `studdy repl` | Scriptbar interaktiv chatt från stdin, avslutar vid EOF |
 | `studdy status` | Kompakt dashboard |
 | `studdy doctor` | Ärlig lokal hälsokontroll; BLOCKED ≠ FAIL |
+| `studdy prove` | **Live-bevis på din dator:** starta app → hitta fönster → läs UI-träd → skriv och läs tillbaka → skärmbild |
 | `studdy open "Google Chrome"` | Generisk appstart via native helper, verifierad |
 | `studdy apps` / `windows` | Lista appar/fönster |
 | `studdy snapshot <id>` | Läs UI-träd med `ref:`er |
-| `studdy see <id> "fråga"` | Skärmbild + UIA + visionmodell |
+| `studdy see <id> "fråga"` | Skärmbild + native UI-träd + uttryckligen konfigurerad visionmodell |
 | `studdy screenshot <id> <fil>` | Spara skärmbild |
 | `studdy click <ref>` / `type <ref> "text"` | Styra observerade UI-element |
 | `studdy press ctrl+s [id]` / `focus <id>` | Tangenter/fokus |
@@ -58,7 +65,7 @@ AES-256-GCM-valv (`secrets.vault`), aldrig i klartext i databasen och aldrig som
 | `studdy github configure owner/repo --token-stdin --enable` | Debugjournal till GitHub |
 | `studdy memory` | Synka Obsidian-minne |
 | `studdy progress` / `readiness` | Lärande, nivå och readiness |
-| `studdy voice "text"` | Lokal Windows-TTS |
+| `studdy voice "text"` | Lokal TTS: SAPI på Windows, `say` på macOS, `espeak-ng`/`espeak` på Linux |
 
 Alla kommandon stödjer `--json` där det är meningsfullt och `--no-color`.
 
@@ -69,9 +76,12 @@ webbläsarläsning, datorhandlingar och provider-delning. Senare återkallelser 
 Det betyder **inte** att vi kringgår Windows UAC, konton, lösenord eller privata fönster.
 Privata fönster (bank, login, Gmail-chatt m.fl.) blockeras från observation.
 
-Datorstyrning på Windows använder den lilla native hjälparen `agent-desktop` (Apache-2.0)
-via npm-paketet. Den är inte Electron-appen. På Linux/macOS saknas Windows UI
-Automation; CLI:t rapporterar det ärligt som BLOCKED i stället för att låtsas fungera.
+Datorstyrningen använder den lilla native hjälparen `agent-desktop` (Apache-2.0)
+via npm-paketet, på Windows, Linux och macOS. Den är inte Electron-appen.
+Windows använder UI Automation, Linux AT-SPI/X11 och macOS accessibility-API:er.
+OS-behörighet och en tillgänglig desktop-session krävs. En headless Linux-sandbox
+utan D-Bus/AT-SPI ger BLOCKED, inte en låtsad grön status. `watch --once` kör en
+faktisk observationsrunda och ger exitkod 1 när ingen live-observation lyckas.
 
 ## Webbläsartillägg
 
@@ -93,6 +103,10 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+`cli-linux-e2e.test.ts` kör den byggda CLI:n i riktiga processer mot lokal HTTP,
+loopback-WebSocket och den installerade native-binären. Linux-headless-blockers
+ kontrolleras uttryckligen; extern Kilo/Gmail-trafik ersätts inte med påstådd live-verifiering.
 
 Windows CI kör dessutom ett riktigt native-bevis: `doctor` → `open "Notepad"` →
 `windows` → `snapshot` och failar om något steg inte faktiskt lyckas.

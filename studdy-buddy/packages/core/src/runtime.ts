@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import WebSocket from 'ws';
 import { fileURLToPath } from 'node:url';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,6 +28,8 @@ export interface RuntimeOptions {
   binaryOverride?: string;
   fetchImpl?: typeof fetch;
   platform?: string;
+  openUrl?: (url: string) => Promise<void>;
+  gmailFetch?: typeof fetch;
 }
 
 /** Owns every local capability. The CLI is a presentation layer over this runtime. */
@@ -57,8 +60,8 @@ export class StuddyRuntime {
     this.adapter = new DesktopAccessibilityAdapter({ binary, platform: this.platform });
     this.journal = new DebugJournal(this.dataDir);
     this.logger = new BoundedLogger(join(this.dataDir, 'studdy.log'));
-    this.gmail = new GmailConnector(this.dataDir);
-    this.github = new GitHubDebugSync(this.dataDir);
+    this.gmail = new GmailConnector(this.dataDir, options.openUrl, options.gmailFetch);
+    this.github = new GitHubDebugSync(this.dataDir, options.fetchImpl);
     this.observer = new LiveObserver({ services: this.services, adapter: this.adapter });
   }
 
@@ -91,11 +94,16 @@ export class StuddyRuntime {
     return result;
   }
 
-  async computerAction(action: 'click' | 'type' | 'press' | 'focus', args: string[]): Promise<{ ok: boolean; detail: string }> {
+  async computerAction(
+    action: 'click' | 'type' | 'set-value' | 'press' | 'focus',
+    args: string[],
+    options: { headed?: boolean } = {},
+  ): Promise<{ ok: boolean; detail: string }> {
     const gate = this.services.permissions.check('act', ['computer.actions']);
     if (!gate.allowed) return { ok: false, detail: gate.reason };
     if (action === 'click') return this.adapter.click(args[0] ?? '');
-    if (action === 'type') return this.adapter.type(args[0] ?? '', args.slice(1).join(' '));
+    if (action === 'type') return this.adapter.type(args[0] ?? '', args.slice(1).join(' '), options);
+    if (action === 'set-value') return this.adapter.setValue(args[0] ?? '', args.slice(1).join(' '));
     if (action === 'press') return this.adapter.press(args[0] ?? '', args[1]);
     return this.adapter.focusWindow(args[0] ?? '');
   }
@@ -123,9 +131,10 @@ export class StuddyRuntime {
       if (this.services.permissions.check('observe', ['application.observe']).allowed) {
         const snap = await this.adapter.snapshot(windowId);
         const safe = snap.elements.filter(e => e.enabled && e.name && !/(password|lösenord|token|api.?key|nyckel|secret|pin.?code|bank)/i.test(e.name)).slice(0, 24);
-        if (safe.length) evidence.push('Windows UI Automation: ' + safe.map(e => `${e.role}: ${e.name.slice(0, 65)}`).join(' | ').slice(0, 1300));
+        if (safe.length) evidence.push('Native UI-träd: ' + safe.map(e => `${e.role}: ${e.name.slice(0, 65)}`).join(' | ').slice(0, 1300));
       }
-      const model = provider.visionModelId ?? provider.modelId;
+      const model = provider.visionModelId;
+      if (!model) return fail('NO_VISION_MODEL', 'Ange en verifierad visionmodell: studdy provider set <preset> --key-stdin --vision-model <id>.');
       const image = readFileSync(path).toString('base64');
       const observed = await this.services.router.complete({ ...provider, modelId: model }, {
         task: 'vision', maxTokens: 400, cacheable: false,
@@ -147,14 +156,16 @@ export class StuddyRuntime {
     }
   }
 
-  async inbox(query?: string): Promise<string> {
+  async inbox(query?: string): Promise<string> { return (await this.inboxResult(query)).text; }
+
+  async inboxResult(query?: string): Promise<{ ok: boolean; text: string }> {
     const gate = this.services.permissions.check('observe', ['browser.read']);
-    if (!gate.allowed) return gate.reason;
+    if (!gate.allowed) return { ok: false, text: gate.reason };
     const status = this.gmail.status();
-    if (!status.connected) return status.configured ? 'Gmail är konfigurerat men inte anslutet. Kör `studdy gmail connect <client-id>`.' : 'Gmail är inte konfigurerat. Kör `studdy gmail connect <client-id>`.';
+    if (!status.connected) return { ok: false, text: status.configured ? 'Gmail är konfigurerat men inte anslutet. Kör `studdy gmail connect <client-id>`.' : 'Gmail är inte konfigurerat. Kör `studdy gmail connect <client-id>`.' };
     const messages = await this.gmail.list(query ?? 'in:inbox', 8);
     this.ledger().record('gmail:list', true);
-    return messages.length ? messages.map(m => `${m.from}\n  ${m.subject}\n  ${m.snippet}`).join('\n\n') : 'Inga matchande meddelanden.';
+    return { ok: true, text: messages.length ? messages.map(m => `${m.from}\n  ${m.subject}\n  ${m.snippet}`).join('\n\n') : 'Inga matchande meddelanden.' };
   }
 
   async startBridge(port?: number): Promise<{ status: BridgeStatus; token: string }> {
@@ -186,7 +197,32 @@ export class StuddyRuntime {
       },
     });
     const status = await this.bridge.start();
+    if (status.running && status.port !== null) this.services.db.checkpoints.set('bridge.port', status.port);
     return { status, token: credentials.token };
+  }
+
+  /** Probe a bridge in another CLI process with the locally stored token. */
+  async probeBridge(): Promise<BridgeStatus> {
+    if (this.bridge) return this.bridge.status();
+    const credentials = this.services.bridgeCredentials();
+    return new Promise(resolve => {
+      const socket = new WebSocket(`ws://127.0.0.1:${credentials.port}`);
+      let done = false;
+      const finish = (running: boolean, detail: string) => {
+        if (done) return; done = true; clearTimeout(timer); socket.terminate();
+        resolve({ running, port: credentials.port, host: '127.0.0.1', clients: 0, detail });
+      };
+      const timer = setTimeout(() => finish(false, 'Ingen autentiserad brygga svarar på den sparade porten.'), 1000);
+      socket.once('error', () => finish(false, 'Bryggan är inte startad.'));
+      socket.once('open', () => socket.send(JSON.stringify({ type: 'hello', token: credentials.token })));
+      socket.once('message', raw => {
+        try {
+          const message = JSON.parse(raw.toString()) as { type?: string };
+          finish(message.type === 'welcome', message.type === 'welcome' ? 'Autentiserad brygga svarar (annan CLI-process).' : 'Bryggan avvisade autentisering.');
+        } catch { finish(false, 'Ogiltigt bryggsvar.'); }
+      });
+      socket.once('close', () => finish(false, 'Bryggan stängde anslutningen.'));
+    });
   }
 
   bridgeStatus(): BridgeStatus {
@@ -204,7 +240,7 @@ export class StuddyRuntime {
   liveStatus(): LiveStatus { return this.observer.status(); }
 
   syncMemory(): string {
-    const path = writeStudyVault(this.services.db, join(this.dataDir, 'Obsidian-Vault'));
+    const path = writeStudyVault(this.services.db, this.dataDir);
     this.ledger().record('memory:export', true);
     return path;
   }
@@ -247,7 +283,7 @@ export class StuddyRuntime {
       const result = await this.launchApp(launch.programName);
       return reply(result.ok ? 'Startade ' + launch.programName + ': ' + result.detail : 'Kunde inte starta ' + launch.programName + ': ' + result.detail, !result.ok, result.ok ? null : 'LAUNCH_FAILED');
     }
-    if (isInboxRequest(text)) return reply(await this.inbox());
+    if (isInboxRequest(text)) { const result = await this.inboxResult(); return reply(result.text, !result.ok, result.ok ? null : 'GMAIL_UNAVAILABLE'); }
     let selectedText = this.selection()?.text;
     if (isScreenQuestion(text)) {
       const live = this.liveStatus();
@@ -267,6 +303,7 @@ export class StuddyRuntime {
 
   async close(): Promise<void> {
     this.observer.stop();
+    await this.observer.tick();
     await this.stopBridge();
     this.services.close();
   }

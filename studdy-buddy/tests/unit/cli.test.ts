@@ -28,7 +28,13 @@ describe('CLI presentation', () => {
 });
 
 describe('CLI commands', () => {
-  it('help and version work without touching provider network', async () => {
+  it('help and version flags work without touching provider network', async () => {
+    expect(await runCli(['--version', '--json'], io(), { dataDir: dir, version: '9.9.9' })).toBe(0);
+    expect(JSON.parse(out[0]!)).toEqual({ version: '9.9.9' });
+    out = [];
+    expect(await runCli(['--help'], io(), { dataDir: dir })).toBe(0);
+    expect(out.join('')).toContain('Användning');
+    out = [];
     expect(await runCli(['help'], io(), { dataDir: dir })).toBe(0);
     expect(out.join('')).toContain('Studdy Buddy CLI');
     out = [];
@@ -66,8 +72,8 @@ describe('CLI commands', () => {
     expect(await runCli(['provider', 'set', 'nope', '--key-stdin'], { ...io(), stdin: Readable.from(['x']) }, { dataDir: dir })).toBe(2);
   });
 
-  it('doctor reports honest blocked native helper on non-Windows', async () => {
-    const code = await runCli(['doctor', '--json'], io(), { dataDir: dir, platform: 'linux' });
+  it('doctor reports honest blocked native helper when missing', async () => {
+    const code = await runCli(['doctor', '--json'], io(), { dataDir: dir, platform: 'freebsd' });
     const report = JSON.parse(out[0]!);
     const native = report.checks.find((c: { name: string }) => c.name === 'Native helper');
     expect(native.ok).toBe(false);
@@ -75,10 +81,10 @@ describe('CLI commands', () => {
     expect(code).toBe(1);
   });
 
-  it('open refuses shell commands and reports platform blocker honestly', async () => {
+  it('open refuses shell commands on every platform', async () => {
     await runCli(['setup'], io(), { dataDir: dir });
     out = [];
-    expect(await runCli(['open', 'cmd.exe', '--json'], io(), { dataDir: dir, platform: 'linux' })).toBe(1);
+    expect(await runCli(['open', 'cmd.exe', '--json'], io(), { dataDir: dir, platform: 'freebsd' })).toBe(1);
     expect(JSON.parse(out[0]!).ok).toBe(false);
   });
 
@@ -86,6 +92,7 @@ describe('CLI commands', () => {
     expect(await runCli(['memory', '--json'], io(), { dataDir: dir })).toBe(0);
     const path = JSON.parse(out[0]!).path;
     expect(existsSync(path)).toBe(true);
+    expect(path).toBe(join(dir, 'Obsidian-Vault'));
     out = [];
     await runCli(['progress', '--json'], io(), { dataDir: dir });
     expect(JSON.parse(out[0]!).skills.verified).toBeGreaterThanOrEqual(1);

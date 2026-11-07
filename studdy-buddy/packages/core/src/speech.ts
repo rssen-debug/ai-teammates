@@ -1,9 +1,9 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import type { VoiceSettings } from '@studdy/shared';
 import { WindowsNativeProvider, voiceAvailability, toSpokenText } from '@studdy/voice-engine';
 
 /**
- * Speech playback in the main process.
+ * Speech playback in the CLI process.
  *
  * Owns the child process so the student can STOP playback instantly (a hard
  * requirement). The renderer can only ask; it can never spawn processes.
@@ -26,20 +26,24 @@ export class SpeechPlayer {
 
   async speak(text: string, settings: VoiceSettings): Promise<{ ok: boolean; error: string | null }> {
     this.stop();
-    if (this.platform !== 'win32') {
-      return { ok: false, error: 'Uppläsning stöds bara på Windows med SAPI-röster.' };
-    }
-    const provider = new WindowsNativeProvider(this.platform);
-    if (!provider.isConfigured()) return { ok: false, error: 'Inga Windows-röster hittades.' };
-
-    // Long answers are spoken in chunks so the student can stop between them and
-    // so a single utterance does not block the process for minutes.
     const spoken = toSpokenText(text, { language: settings.language }).slice(0, 4000);
-    const { command, args } = provider.buildCommand({ text: spoken, settings });
+    if (!spoken.trim()) return { ok: false, error: 'Ingen text att läsa upp.' };
+    let command: string, args: string[];
+    if (this.platform === 'win32') {
+      ({ command, args } = new WindowsNativeProvider(this.platform).buildCommand({ text: spoken, settings }));
+    } else if (this.platform === 'darwin') {
+      command = 'say'; args = ['-r', String(Math.round(180 * settings.speed)), spoken];
+    } else if (this.platform === 'linux') {
+      command = ['espeak-ng', 'espeak'].find(binary => spawnSync(binary, ['--version'], { stdio: 'ignore' }).error === undefined) ?? '';
+      if (!command) return { ok: false, error: 'Ingen lokal Linux-röst hittades. Installera espeak-ng eller espeak och försök igen.' };
+      args = ['-v', settings.language === 'sv-SE' ? 'sv' : 'en', '-s', String(Math.round(175 * settings.speed)), '-a', String(Math.round(settings.volume * 100)), '--stdin'];
+    } else return { ok: false, error: `Lokal uppläsning stöds inte på ${this.platform}.` };
 
     return new Promise((resolve) => {
       try {
-        const child = spawn(command, args, { windowsHide: true, stdio: 'ignore' });
+        const child = spawn(command, args, { windowsHide: true, shell: false, stdio: ['pipe', 'ignore', 'pipe'] });
+        child.stdin.on('error', () => { /* child error is reported below */ });
+        child.stdin.end(this.platform === 'linux' ? spoken : '');
         this.current = child;
         const timer = setTimeout(() => {
           this.stop();

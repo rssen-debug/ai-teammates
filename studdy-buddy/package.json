@@ -15,13 +15,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "npm run build && vitest run tests/integration/cli-linux-e2e.test.ts tests/integration/external-connectors.test.ts",
     "lint": "eslint .",
     "build": "node scripts/build-cli.mjs",
     "dev": "tsx packages/cli/src/bin.ts",
     "start": "tsx packages/cli/src/bin.ts",
     "package:cli": "node scripts/build-cli.mjs && npm pack ./dist/cli --pack-destination dist",
     "studdy": "tsx packages/cli/src/bin.ts",
-    "doctor": "tsx packages/cli/src/bin.ts doctor"
+    "doctor": "tsx packages/cli/src/bin.ts doctor",
+    "prove": "npm run build && node dist/cli/studdy.mjs prove"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

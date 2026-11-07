@@ -54,4 +54,21 @@ describe('LiveObserver', () => {
     expect(observer.status().observing).toBe(false);
     services.close();
   });
+  it('drains an in-flight observation before closing the database', async () => {
+    const services = new StuddyServices({ dataDir: ':memory:' });
+    services.permissions.grant('application.observe');
+    let release!: (value: { windows: WindowInfo[]; error: string | null }) => void;
+    const adapter = {
+      listWindows: () => new Promise<{ windows: WindowInfo[]; error: string | null }>(resolve => { release = resolve; }),
+      snapshot: async () => snap(true),
+    } as unknown as DesktopAccessibilityAdapter;
+    const observer = new LiveObserver({ services, adapter });
+    observer.start();
+    const pending = observer.tick();
+    observer.stop();
+    release({ windows: [win()], error: null });
+    await pending;
+    expect(() => services.close()).not.toThrow();
+    expect(() => observer.status()).not.toThrow();
+  });
 });

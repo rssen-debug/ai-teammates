@@ -31,6 +31,9 @@ export interface LiveObserverOptions {
 export class LiveObserver {
   private timer: ReturnType<typeof setInterval> | null = null;
   private busy = false;
+  private stopped = false;
+  private pending: Promise<LiveStatus> | null = null;
+  private cachedStatus: LiveStatus = { state: 'starting', observing: false, windowTitle: null, windowId: null, elementCount: 0, lastObservedAt: null, activity: 'Startar', level: 1 };
   private state: ObservationState = 'starting';
   private window: WindowInfo | null = null;
   private snapshot: UiSnapshot | null = null;
@@ -44,6 +47,7 @@ export class LiveObserver {
   }
 
   start(): void {
+    this.stopped = false;
     if (this.timer) return;
     this.timer = setInterval(() => { void this.tick(); }, this.options.intervalMs ?? 12_000);
     this.timer.unref?.();
@@ -51,15 +55,17 @@ export class LiveObserver {
   }
 
   stop(): void {
+    this.stopped = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
   }
 
   status(): LiveStatus {
+    if (this.stopped) return this.cachedStatus;
     const observing = this.state === 'active' && this.lastObservedAt !== null &&
       this.clock() - this.lastObservedAt < 35_000 &&
       this.options.services.permissions.isGranted('application.observe');
-    return {
+    this.cachedStatus = {
       state: observing ? 'active' : this.state === 'active' ? 'no-window' : this.state,
       observing,
       windowTitle: observing ? this.window?.title ?? null : null,
@@ -69,13 +75,21 @@ export class LiveObserver {
       activity: this.activity,
       level: new VerifiedSkillLedger(this.options.services.db.checkpoints).level(),
     };
+    return this.cachedStatus;
   }
 
   lastSnapshot(): UiSnapshot | null { return this.snapshot; }
 
   async tick(): Promise<LiveStatus> {
+    if (this.stopped) return this.status();
+    if (this.pending) return this.pending;
+    this.pending = this.observeOnce().finally(() => { this.pending = null; });
+    return this.pending;
+  }
+
+  private async observeOnce(): Promise<LiveStatus> {
     const { services, adapter } = this.options;
-    if (this.busy) return this.status();
+    if (this.busy || this.stopped) return this.status();
     if (!services.permissions.isGranted('application.observe')) {
       this.state = 'off';
       this.activity = 'Observation avstängd';
@@ -85,6 +99,7 @@ export class LiveObserver {
     const before = JSON.stringify(this.status());
     try {
       const result = await adapter.listWindows();
+      if (this.stopped) return this.status();
       if (result.error) {
         this.state = 'unavailable';
         this.activity = result.error.slice(0, 160);
@@ -103,6 +118,7 @@ export class LiveObserver {
         return this.status();
       }
       const snapshot = await adapter.snapshot(active.id);
+      if (this.stopped) return this.status();
       this.window = active;
       this.snapshot = snapshot;
       if (snapshot.accessible) {
@@ -129,7 +145,7 @@ export class LiveObserver {
       return this.status();
     } finally {
       this.busy = false;
-      if (JSON.stringify(this.status()) !== before) this.options.onChange?.(this.status());
+      if (!this.stopped && JSON.stringify(this.status()) !== before) this.options.onChange?.(this.status());
     }
   }
 }
