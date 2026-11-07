@@ -27,6 +27,7 @@ import { AGENT_SYSTEM, runAgent, type Activity, type AgentReport } from './deskt
 import { openKernel, Supervisor, buildHandlers, type OpenKernel } from '@studdy/agent-core';
 import { createKernelInvoker, type KernelInvoker } from './kernel-runtime.js';
 import { runGoal, type AgentRunResult } from './agent-kernel.js';
+import { runOmegaSelfTest, importOmegaReport, type OmegaRun } from './omega-bridge.js';
 import { parseLaunchIntent, isInboxRequest, isStartLiveRequest, isLiveQuestion, isAccessQuestion, isScreenQuestion } from './chat-intents.js';
 
 export interface RuntimeOptions {
@@ -130,6 +131,20 @@ export class StuddyRuntime {
       planTimeoutMs: options.planTimeoutMs,
       onStep: options.onStep,
     });
+  }
+
+  /**
+   * Runs Omega's real acceptance suite and records its verdicts in the kernel
+   * event log. The suite is never re-implemented here; `omega/buddy.py` stays
+   * the single source of truth for those checks.
+   */
+  async runOmegaSelfTest(options: { script?: string; python?: string; timeoutMs?: number } = {}): Promise<{ run: OmegaRun; imported: ReturnType<typeof importOmegaReport> | null }> {
+    const script = options.script ?? process.env.STUDDY_OMEGA_SCRIPT ?? join(process.cwd(), 'omega', 'buddy.py');
+    const run = await runOmegaSelfTest({ script, python: options.python, timeoutMs: options.timeoutMs });
+    if (!run.report) return { run, imported: null };
+    const kernel = this.kernel();
+    const imported = importOmegaReport(kernel.log, run.report);
+    return { run, imported };
   }
 
   /** Builds a supervisor wired to the real tool invoker for this runtime. */

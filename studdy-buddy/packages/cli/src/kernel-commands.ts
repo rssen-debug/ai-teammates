@@ -354,6 +354,84 @@ export async function runKernelCommand({ args, flags, runtime, io }: KernelComma
   }
 }
 
+/** `studdy omega` — runs Omega's real acceptance suite and imports its verdicts. */
+export async function runOmegaCommand({ args, flags, runtime, io }: Omit<KernelCommandOptions, 'args'> & { args: string[] }): Promise<number> {
+  const sub = args[0] ?? 'selftest';
+  if (sub === 'help') {
+    io.out(`studdy omega — kör Omegas riktiga acceptanssvit
+
+  studdy omega selftest [--timeout-ms N]   Kör omega/buddy.py --self-test
+  studdy omega results                     Läs importerade domar ur händelseloggen
+
+Sviten är Python-koden i omega/buddy.py; inget återimplementeras här.
+PASS importeras som bevis, BLOCKED och NOT TESTED förblir detsamma.`);
+    return 0;
+  }
+
+  if (sub === 'results') {
+    const kernel = runtime.kernel();
+    const events = kernel.log.read({ types: ['buddy.probe', 'buddy.verified', 'buddy.blocked'], limit: 500 });
+    if (io.json) {
+      io.out(events);
+      return 0;
+    }
+    if (!events.length) {
+      io.out('Inga Omega-resultat importerade ännu. Kör: studdy omega selftest');
+      return 0;
+    }
+    for (const event of events) {
+      const data = event.data as Record<string, unknown>;
+      const id = String(data.probeId ?? '--');
+      if (event.type === 'buddy.verified') io.out(`  PASS     ${id.padEnd(4)} ${String(data.claim).slice(0, 90)}`);
+      else if (event.type === 'buddy.blocked') io.out(`  ${String(data.code) === 'OMEGA_NOT_TESTED' ? 'NOT TESTED' : 'BLOCKED'} ${id.padEnd(4)} ${String(data.reason).slice(0, 100)}`);
+      else io.out(`  ${String(data.state).padEnd(8)} ${id.padEnd(4)} ${String(data.subsystem).slice(0, 90)}`);
+    }
+    return 0;
+  }
+
+  if (sub !== 'selftest') {
+    io.err(`Okänt omega-kommando: ${sub}`);
+    return 2;
+  }
+
+  const timeoutRaw = stringFlag(flags, 'timeout-ms');
+  const timeoutMs = timeoutRaw == null ? 180_000 : Number(timeoutRaw);
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 1000) {
+    io.err('--timeout-ms måste vara >= 1000');
+    return 2;
+  }
+  if (!io.json) io.out('Kör Omegas riktiga självtest (kan ta en minut)…');
+  const { run, imported } = await runtime.runOmegaSelfTest({ timeoutMs });
+
+  if (io.json) {
+    io.out({
+      ok: run.ok,
+      reported: run.reported,
+      blocked: run.blocked,
+      summary: run.summary,
+      imported,
+      durationMs: run.durationMs,
+      results: run.report?.results ?? [],
+    });
+    return run.ok ? 0 : 1;
+  }
+
+  if (run.blocked) {
+    io.err(`${run.blocked.code}: ${run.blocked.reason}`);
+    return 1;
+  }
+  for (const result of run.report?.results ?? []) {
+    io.out(`  ${result.status.padEnd(10)} ${result.id.padEnd(4)} ${result.name}${result.detail ? ` — ${result.detail.slice(0, 140)}` : ''}`);
+  }
+  const s = run.summary;
+  io.out('');
+  io.out(`PASS=${s.pass}  FAIL=${s.fail}  BLOCKED=${s.blocked}  NOT TESTED=${s.notTested}`);
+  if (imported) {
+    io.out(`Importerat till kernelloggen: ${imported.verified} bevis, ${imported.blocked} blockerade, ${imported.failed} misslyckade.`);
+  }
+  return run.ok ? 0 : 1;
+}
+
 /** `studdy tools` — only tools with a real implementation behind them. */
 export async function runToolsCommand({ flags, runtime, io }: Omit<KernelCommandOptions, 'args'>): Promise<number> {
   const invoker = runtime.kernelInvoker();

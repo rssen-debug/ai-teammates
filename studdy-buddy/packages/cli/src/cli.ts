@@ -8,7 +8,7 @@ import { maskKey } from '@studdy/ai-router';
 import { voiceSettingsSchema, type ProviderConfig } from '@studdy/shared';
 import { neuralVoiceFor, synthesizeNeural } from '@studdy/voice-engine';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
-import { runKernelCommand, runToolsCommand } from './kernel-commands.js';
+import { runKernelCommand, runToolsCommand, runOmegaCommand } from './kernel-commands.js';
 
 export interface CliIO {
   out: (text: string) => void;
@@ -62,6 +62,7 @@ Användning:
   studdy agent "mål"            Autonomt: planera → kö → köra → verifiera
   studdy kernel status|enqueue|run|list|get|events  Autonom, spårbar arbetskö
   studdy kernel cancel|retry|reconcile|verify  Ägarbeslut och beviskontroll
+  studdy omega selftest|results  Omegas riktiga acceptanssvit + importerade domar
   studdy tools                   Verktyg workern faktiskt kan köra
   studdy selftest                Kör riktiga Windows-tester och skriv anonym rapport
   studdy prove [--app "App"]     Bevisa live: starta, läs, skriv, skärmbild
@@ -219,6 +220,14 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
       }
       case 'kernel': {
         return await runKernelCommand({
+          args: positional.slice(1),
+          flags: flags as Record<string, unknown>,
+          runtime,
+          io: { out: (value) => out(value), err: (text) => io.err(text), json },
+        });
+      }
+      case 'omega': {
+        return await runOmegaCommand({
           args: positional.slice(1),
           flags: flags as Record<string, unknown>,
           runtime,
