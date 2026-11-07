@@ -24,9 +24,12 @@ export function isChatGPTConversationRequest(input: string): boolean {
 }
 function editable(e: UiElementInfo): boolean {
   const label=e.name.trim();
+  // Chromium exposes the ChatGPT composer differently across UIA versions:
+  // "edit", "text area", "editable text", and sometimes an unnamed textbox.
+  // Never infer an arbitrary editor from the browser window alone.
   return e.enabled && !e.stale && /^@[^:]+:e\d+$/i.test(e.ref) &&
-    /^(?:edit|textbox|text field|text input|textarea|entry)$/i.test(e.role) &&
-    /(?:ask anything|ask chatgpt|message chatgpt|send a message|fråga chatgpt|skriv ett meddelande|message|prompt|chatgpt)/i.test(label) &&
+    /^(?:edit|textbox|text ?field|text ?input|text ?area|editable text|entry)$/i.test(e.role.trim()) &&
+    /(?:ask anything|ask chatgpt|message chatgpt|send a message|fråga chatgpt|skriv ett meddelande|message|prompt|chatgpt|fråga vad som helst)/i.test(label) &&
     !/(?:password|lösenord|api.?key|token|secret|search)/i.test(label);
 }
 function provesChatGPT(elements: UiElementInfo[]): boolean {
@@ -48,17 +51,27 @@ export async function prepareChatGPTDraft(
     !w.minimized && /(?:chrome|msedge|brave|firefox|edge)/i.test(w.processName+' '+w.title))
     .sort((a,b)=>Number(b.focused)-Number(a.focused)).slice(0,8);
   if(!browsers.length)return {ok:false,detail:'Ingen öppen webbläsare hittades.'};
+  let sawChatGPT=false, sawEditor=false, observationError='';
   for(const w of browsers){
     const snap=await adapter.snapshot(w.id);
-    if(!snap.accessible || !provesChatGPT(snap.elements))continue;
+    if(!snap.accessible){ observationError=snap.note ?? 'Tillgänglighetsträdet kunde inte läsas.'; continue; }
+    if(!provesChatGPT(snap.elements))continue;
+    sawChatGPT=true;
     const input=snap.elements.find(editable);
     if(!input)continue;
+    sawEditor=true;
     if(input.value?.trim())return {ok:false,detail:'ChatGPT har redan ett utkast. Jag skriver inte över det.'};
     const focused=await adapter.focusWindow(w.id);
     if(!focused.ok)return {ok:false,detail:'Kunde inte fokusera ChatGPT: '+focused.detail.slice(0,100)};
     const refreshed=await adapter.snapshot(w.id);
-    const field=refreshed.accessible ? refreshed.elements.find(e=>e.ref===input.ref && editable(e)) : undefined;
-    if(!field || field.value?.trim())return {ok:false,detail:'Skrivfältet förändrades. Ingen text skickades.'};
+    // Refreshing or activating a Chromium tab can regenerate agent-desktop
+    // element refs. Re-find the *verified ChatGPT composer*, never a random edit.
+    const field=refreshed.accessible
+      ? refreshed.elements.find(e=>e.ref===input.ref && editable(e)) ??
+        refreshed.elements.find(e=>editable(e) && e.name===input.name)
+      : undefined;
+    if(!field)return {ok:false,detail:'ChatGPT-fältet saknas efter fokusering. '+(refreshed.note??'Ingen text skickades.')};
+    if(field.value?.trim())return {ok:false,detail:'ChatGPT-fältet innehåller redan text. Inget skrevs över.'};
     let written=await adapter.setValue(field.ref,message);
     if(!written.ok) written=await adapter.type(field.ref,message,{headed:true});
     if(!written.ok)return {ok:false,detail:'Kunde inte skriva i ChatGPT: '+written.detail.slice(0,140)};
@@ -67,7 +80,9 @@ export async function prepareChatGPTDraft(
     if(value !== message) return {ok:false,detail:'Text skrevs men kunde inte verifieras i ChatGPT. Kontrollera fönstret manuellt.'};
     return {ok:true,detail:'Texten är verifierad i ChatGPTs skrivfält, men inte skickad.',windowId:w.id,inputRef:field.ref};
   }
-  return {ok:false,detail:'Jag hittade inget verifierat ChatGPT-skrivfält. Öppna ChatGPT-fliken och försök igen.'};
+  return {ok:false,detail: sawChatGPT
+    ? 'ChatGPT hittades, men inget tillgängligt skrivfält med rätt roll/etikett kunde identifieras. Kör studdy snapshot för att se fältets faktiska roll och namn.'
+    : 'Inget verifierat ChatGPT-fönster hittades. '+(observationError ? 'Observation: '+observationError.slice(0,140) : 'Öppna ChatGPT-fliken i Chrome eller Edge.')};
 }
 export async function sendApprovedChatGPTDraft(
   draft:ChatDraft,

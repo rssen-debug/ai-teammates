@@ -42,6 +42,29 @@ describe('ChatGPT native UI message workflow',()=>{
     expect(sent.ok).toBe(true);
     expect(f.adapter.press).toHaveBeenCalledWith('enter','chrome1');
   });
+  it('recognizes Chromium text area role for a verified ChatGPT composer',async()=>{
+    const f=fake();
+    const original=f.adapter.snapshot;
+    f.adapter.snapshot=vi.fn(async()=>{
+      const snap=await original();
+      return {...snap,elements:snap.elements.map(e=>e.ref==='@w:e2'?{...e,role:'text area'}:e)};
+    });
+    expect((await prepareChatGPTDraft('hej',f.adapter as never)).ok).toBe(true);
+  });
+  it('re-finds the composer when a fresh snapshot regenerates its element ref',async()=>{
+    const f=fake();
+    const original=f.adapter.snapshot;
+    let count=0;
+    f.adapter.snapshot=vi.fn(async()=>{
+      const snap=await original();
+      count++;
+      return {...snap,elements:snap.elements.map(e=>e.ref==='@w:e2'?
+        {...e,ref:count===1?'@w:e2':'@w:e9'}:e)};
+    });
+    const draft=await prepareChatGPTDraft('hej',f.adapter as never);
+    expect(draft.ok).toBe(true);
+    expect(f.adapter.setValue).toHaveBeenCalledWith('@w:e9','hej');
+  });
   it('does not type in arbitrary Chrome pages',async()=>{
     const f=fake();f.changePage();
     expect((await prepareChatGPTDraft('hej',f.adapter as never)).ok).toBe(false);
