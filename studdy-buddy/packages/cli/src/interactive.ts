@@ -3,7 +3,7 @@ import { Readable } from 'node:stream';
 import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
 import { SLASH_COMMANDS, slashMatches, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
-import { liveLines } from './live-ui.js';
+import { liveLines, compactLivePrompt } from './live-ui.js';
 import { configureLoginAutostart } from './login-autostart.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
@@ -53,35 +53,30 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
     '', p.dim('Skriv naturligt · / öppnar kommandomenyn · Tab kompletterar'),
   ], color));
   if (runtime.services.permissions.isGranted('application.observe')) runtime.observer.start();
-  let lastState = runtime.liveStatus().state;
-  let lastObservedAt: number | null = null;
+  // The live indicator is part of the readline input prompt. Updating it
+  // redraws the SAME screen row without appending one line per observation.
+  // Redraws are suppressed during credential entry or command execution.
+  let inCommand = false;
   let lastStatusLine = '';
+  const currentPrompt = () => p.dim(compactLivePrompt(runtime.liveStatus(), runtime.ledger().level())) + '  ' + p.mint('du › ');
+  const refreshPrompt = (force = false) => {
+    if (!terminal || closed || secretInputActive || inCommand) return;
+    const status = compactLivePrompt(runtime.liveStatus(), runtime.ledger().level());
+    if (!force && status === lastStatusLine) return;
+    lastStatusLine = status;
+    rl.setPrompt(currentPrompt());
+    rl.prompt(true);
+  };
+  rl.setPrompt(terminal ? currentPrompt() : p.mint('du › '));
   const timer = setInterval(() => {
-    // Never redraw or interrupt the terminal while the user pastes a credential.
-    if (secretInputActive) return;
-    const s = runtime.liveStatus();
-    const changed = s.state !== lastState || (s.observing && s.lastObservedAt !== lastObservedAt);
-    lastState = s.state;
-    lastObservedAt = s.lastObservedAt;
-    if (changed) {
-      const observation = s.observing
-        ? '● LIVE · ' + s.elementCount + ' UI-element · ' + (s.windowTitle ?? 'fönster') +
-          ' · Skills ' + runtime.ledger().level() + '/100'
-        : '○ ' + s.state.toUpperCase() + ' · ' + s.activity;
-      if (observation !== lastStatusLine) {
-        lastStatusLine = observation;
-        log(p.dim(observation));
-        rl.prompt(true);
-      }
-    }
+    if (secretInputActive || inCommand) return;
+    refreshPrompt();
     for (const hint of runtime.takeProactiveHints()) {
-      // Only grounded, deduplicated, local UI classifications are shown.
-      // Never emit raw screen text, private data, or speculative thoughts.
+      // Notify only on real, deduplicated and non-sensitive context signals.
       log(p.mint('● Buddy · ') + hint.question);
-      rl.prompt(true);
+      if (terminal) rl.prompt(true);
     }
   }, 1000);
-  rl.setPrompt(p.mint('du › '));
   rl.prompt();
   // readline's async iterator pauses after each yield. Mixing it with nested
   // rl.question() and background prompts can leave a piped REPL permanently
@@ -102,6 +97,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       if (!text) { log(p.dim('Stängt.')); rl.prompt(); continue; }
     }
     if (text === '/exit' || text === '/quit') break;
+    inCommand = true;
     try {
       if (text === '/help') {
         log('Skriv / för en väljbar meny, Tab för komplettering, eller prata naturligt.\n' + SLASH_COMMANDS.map(item => item.command.padEnd(12) + item.description).join('\n'));
@@ -270,6 +266,8 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       runtime.journal.record('cli.interactive', error);
       log(p.red('Fel: ') + (error instanceof Error ? error.message : String(error)));
     }
+    inCommand = false;
+    if (terminal) { rl.setPrompt(currentPrompt()); lastStatusLine = compactLivePrompt(runtime.liveStatus(), runtime.ledger().level()); }
     rl.prompt();
   }
   clearInterval(timer);
