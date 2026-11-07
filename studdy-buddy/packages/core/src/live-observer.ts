@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { UiSnapshot, WindowInfo } from '@studdy/shared';
 import type { StuddyServices } from './services.js';
 import type { DesktopAccessibilityAdapter } from './desktop-adapter.js';
-import { allowedObservationTitle, safeWindowLabel, detectCompanionHint, detectContextHint, type CompanionHint } from './companion-observer.js';
+import { safeWindowLabel, detectCompanionHint, detectContextHint, type CompanionHint } from './companion-observer.js';
 import { VerifiedSkillLedger } from './verified-skills.js';
 
 export type ObservationState = 'starting' | 'active' | 'off' | 'private' | 'unavailable' | 'no-window';
@@ -16,6 +16,10 @@ export interface LiveStatus {
   lastObservedAt: number | null;
   activity: string;
   level: number;
+  openWindowCount?: number;
+  openWindows?: string[];
+  foregroundWindow?: string | null;
+  observationScope?: 'foreground' | 'background' | 'none';
 }
 
 export interface LiveObserverOptions {
@@ -41,6 +45,10 @@ export class LiveObserver {
   private activity = 'Startar';
   private readonly clock: () => number;
   private readonly signatures = new Set<string>();
+  private allOpenWindows: string[] = [];
+  private foregroundWindow: string | null = null;
+  private lastExternalId: string | null = null;
+  private observationScope: 'foreground' | 'background' | 'none' = 'none';
 
   constructor(private readonly options: LiveObserverOptions) {
     this.clock = options.clock ?? Date.now;
@@ -58,6 +66,9 @@ export class LiveObserver {
     this.stopped = true;
     this.state = 'off';
     this.activity = 'Observation stoppad';
+    this.allOpenWindows = [];
+    this.foregroundWindow = null;
+    this.observationScope = 'none';
     this.cachedStatus = { ...this.cachedStatus, state: 'off', observing: false, windowTitle: null, windowId: null, elementCount: 0, activity: this.activity };
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
@@ -77,6 +88,10 @@ export class LiveObserver {
       lastObservedAt: this.lastObservedAt,
       activity: this.activity,
       level: new VerifiedSkillLedger(this.options.services.db.checkpoints).level(),
+      openWindowCount: this.allOpenWindows.length,
+      openWindows: this.allOpenWindows.slice(0, 8),
+      foregroundWindow: this.foregroundWindow,
+      observationScope: observing ? this.observationScope : 'none',
     };
     return this.cachedStatus;
   }
@@ -108,27 +123,32 @@ export class LiveObserver {
         this.activity = result.error.slice(0, 160);
         return this.status();
       }
-      // Never silently substitute a different background app for a focused
-      // private window. The status must describe what was ACTUALLY observed.
-      const focused = result.windows.find(w => !w.minimized && w.focused);
-      if (!focused) {
+      // Inventory all top-level windows. Read one external window per tick,
+      // including a background app while the terminal has focus.
+      const windows = result.windows.filter(w => w.title.trim());
+      const isTerminal = (w: WindowInfo) =>
+        /(?:^|[\\/])(?:cmd|powershell|pwsh|windowsterminal|wt|node)(?:\.exe)?$/i.test(w.processName.trim()) ||
+        (!w.processName.trim() && /(?:cmd\.exe|powershell|studdy buddy)/i.test(w.title));
+      const foreground = windows.find(w => w.focused && !w.minimized);
+      this.foregroundWindow = foreground ? safeWindowLabel(foreground.title, foreground.processName) : null;
+      this.allOpenWindows = windows.filter(w => !isTerminal(w))
+        .map(w => safeWindowLabel(w.title, w.processName) + (w.minimized ? ' (minimerad)' : ''));
+      const candidates = windows.filter(w => !isTerminal(w) && !w.minimized);
+      const active = (foreground && !isTerminal(foreground) ? foreground : null)
+        ?? (this.lastExternalId ? candidates.find(w => w.id === this.lastExternalId) : null)
+        ?? candidates[0];
+      if (!active) {
         this.state = 'no-window';
-        this.activity = 'Inget aktivt fönster bekräftat';
-        return this.status();
-      }
-      if (!allowedObservationTitle(focused.title)) {
-        this.state = 'private';
         this.window = null;
         this.snapshot = null;
-        this.activity = 'Privat fönster · observation pausad';
+        this.observationScope = 'none';
+        this.activity = windows.length
+          ? 'Terminal aktiv · inga andra läsbara program identifierade'
+          : 'Inga öppna fönster rapporterade';
         return this.status();
       }
-      if (/studdy|node|terminal|cmd\.exe|powershell|pwsh/i.test(focused.title)) {
-        this.state = 'no-window';
-        this.activity = 'Eget terminalfönster · inga externa UI-element lästa';
-        return this.status();
-      }
-      const active = focused;
+      this.lastExternalId = active.id;
+      this.observationScope = foreground?.id === active.id ? 'foreground' : 'background';
       const snapshot = await adapter.snapshot(active.id);
       if (this.stopped) return this.status();
       // Never forward arbitrary Chrome tab titles to CLI, logs or status.
@@ -138,7 +158,7 @@ export class LiveObserver {
       if (snapshot.accessible) {
         this.state = 'active';
         this.lastObservedAt = this.clock();
-        this.activity = `Läser ${snapshot.elements.length} UI-element i ${label}`;
+        this.activity = `Läser ${snapshot.elements.length} UI-element i ${label} (${this.observationScope === 'background' ? 'bakom terminalen' : 'aktivt fönster'})`;
         const proof = createHash('sha256').update(active.processName || active.appKind).digest('hex').slice(0, 20);
         services.db.observations.record('agent.uia.heartbeat', { kind: active.appKind, proof, elementCount: snapshot.elements.length });
         const count = services.db.checkpoints.get<number>('buddy.live.verified-observations.v1') ?? 0;
@@ -157,7 +177,7 @@ export class LiveObserver {
         }
       } else {
         this.state = /misslyckades|error|denied|not supported|kunde inte/i.test(snapshot.note ?? '') ? 'unavailable' : 'no-window';
-        this.activity = snapshot.note?.slice(0, 160) ?? 'Inget läsbart fönster';
+        this.activity = snapshot.note?.slice(0, 160) ?? 'Fönster identifierat, men UI-avläsning saknas';
       }
       return this.status();
     } catch (error) {

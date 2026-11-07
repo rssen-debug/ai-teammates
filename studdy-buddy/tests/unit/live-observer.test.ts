@@ -50,6 +50,55 @@ describe('LiveObserver', () => {
     expect(hints).toEqual([]);
     services.close();
   });
+  it('enumerates apps behind CMD and reads the recent external window without stealing focus', async () => {
+    const services = new StuddyServices({ dataDir: ':memory:' });
+    services.permissions.grant('application.observe');
+    const windows = [
+      win({ id: 'console', title: 'Administrator: CMD', processName: 'cmd.exe', focused: true }),
+      win({ id: 'chrome', title: 'ChatGPT - Google Chrome', processName: 'chrome.exe', focused: false }),
+      win({ id: 'editor', title: 'Visual Studio Code', processName: 'Code.exe', focused: false, minimized: true }),
+    ];
+    const read: string[] = [];
+    const adapter = {
+      listWindows: async () => ({ windows, error: null }),
+      snapshot: async (id: string) => { read.push(id); return { ...snap(true), windowId: id }; },
+    } as unknown as DesktopAccessibilityAdapter;
+    const observer = new LiveObserver({ services, adapter });
+    await observer.tick();
+    expect(observer.status().observing).toBe(true);
+    expect(observer.status().observationScope).toBe('background');
+    expect(observer.status().openWindowCount).toBe(2);
+    expect(observer.status().openWindows).toContain('Webbläsare · AI-chatt');
+    expect(observer.status().openWindows).toContain('Visual Studio Code (minimerad)');
+    expect(observer.status().windowTitle).toBe('Webbläsare · AI-chatt');
+    expect(read).toEqual(['chrome']);
+    services.close();
+  });
+  it('keeps the all-windows inventory even when a background snapshot is inaccessible', async () => {
+    const services = new StuddyServices({ dataDir: ':memory:' });
+    services.permissions.grant('application.observe');
+    const observer = new LiveObserver({ services, adapter: fakeAdapter([
+      win({ id: 'terminal', title: 'Administrator: CMD', processName: 'cmd.exe', focused: true }),
+      win({ id: 'chrome', title: 'Browser - Google Chrome', processName: 'chrome.exe', focused: false }),
+    ], snap(false, 'ACCESS_DENIED')) });
+    await observer.tick();
+    expect(observer.status().openWindowCount).toBe(1);
+    expect(observer.status().openWindows).toEqual(['Webbläsare']);
+    expect(observer.status().observing).toBe(false);
+    expect(observer.status().elementCount).toBe(0);
+    services.close();
+  });
+  it('does not accidentally hide a browser page containing the word terminal', async () => {
+    const services = new StuddyServices({ dataDir: ':memory:' });
+    services.permissions.grant('application.observe');
+    const observer = new LiveObserver({ services, adapter: fakeAdapter([
+      win({ title: 'Terminal tutorial - Google Chrome', processName: 'chrome.exe' }),
+    ], snap(true)) });
+    await observer.tick();
+    expect(observer.status().openWindowCount).toBe(1);
+    expect(observer.status().observing).toBe(true);
+    services.close();
+  });
   it('reports unavailable honestly when adapter fails', async () => {
     const services = new StuddyServices({ dataDir: ':memory:' });
     services.permissions.grant('application.observe');

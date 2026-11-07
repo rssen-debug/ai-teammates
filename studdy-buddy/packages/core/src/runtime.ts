@@ -282,6 +282,17 @@ export class StuddyRuntime {
       const message = this.services.db.messages.append({ sessionId: session.id, role: 'buddy', text: answer, mode });
       return ok({ message, degraded, error, trimmed: false, notice: null });
     };
+    if (/^(?:visa|lista|vilka|vad har jag|what|show|list).{0,65}(?:öppna (?:program|fönster)|program (?:är|har)|windows|apps|applications).{0,80}[?!.]?$/i.test(text.trim())) {
+      await this.observer.tick();
+      const live = this.liveStatus();
+      const items = live.openWindows ?? [];
+      return reply(items.length
+        ? 'Jag hittar ' + (live.openWindowCount ?? items.length) + ' öppna programfönster: ' +
+          items.map((name, i) => (i + 1) + '. ' + name).join(' · ') +
+          '. Aktivt i Windows: ' + (live.foregroundWindow ?? 'okänt') +
+          '. Jag läser ' + (live.observing ? live.windowTitle + (live.observationScope === 'background' ? ' bakom terminalen' : ' i förgrunden') : 'inget UI just nu') + '.'
+        : 'Inga andra öppna programfönster kunde identifieras. Det betyder inte att inga program körs – verktyget listar bara tillgängliga toppnivåfönster.');
+    }
     if (isAccessQuestion(text) || isLiveQuestion(text)) {
       const live = this.liveStatus();
       const allowed = this.services.permissions.getAll().filter(p => p.granted).map(p => p.key);
