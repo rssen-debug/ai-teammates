@@ -12,7 +12,7 @@ och ingår inte i aktiva scripts, beroenden, CI eller release.
 ## Verifierat lokalt
 - `npm run lint` ✅
 - `npm run typecheck` ✅
-- `npm test` ✅ 312 tester / 30 filer
+- `npm test` ✅ 319 tester / 31 filer
 - `npm run build` ✅ `dist/cli/studdy.mjs`
 - `npm run package:cli` ✅ `dist/studdy-buddy-0.2.0.tgz`
 - Installerad tarball i temporär prefix: `studdy --version`, `studdy status` ✅

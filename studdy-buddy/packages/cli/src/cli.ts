@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { spawn } from 'node:child_process';
-import { StuddyRuntime, summarizeSnapshot, SpeechPlayer, type RuntimeOptions } from '@studdy/core';
+import { StuddyRuntime, summarizeSnapshot, SpeechPlayer, proveLive, type RuntimeOptions } from '@studdy/core';
 import { maskKey } from '@studdy/ai-router';
 import { voiceSettingsSchema, type ProviderConfig } from '@studdy/shared';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
@@ -22,6 +22,7 @@ const CLI_FLAGS = {
   model: { type: 'string' as const }, 'vision-model': { type: 'string' as const },
   name: { type: 'string' as const }, duration: { type: 'string' as const },
   once: { type: 'boolean' as const }, stdin: { type: 'boolean' as const },
+  app: { type: 'string' as const }, 'no-write': { type: 'boolean' as const },
   version: { type: 'boolean' as const, short: 'v' }, help: { type: 'boolean' as const, short: 'h' },
 };
 
@@ -43,6 +44,7 @@ Användning:
   studdy provider test | probe   Live-test / uppmätta modellförmågor
   studdy status                  Kompakt dashboard
   studdy doctor                  Lokal hälsokontroll
+  studdy prove [--app "App"]     Bevisa live: starta, läs, skriv, skärmbild
   studdy open "Google Chrome"    Starta valfri app, verifierat
   studdy apps | windows          Lista appar/fönster
   studdy snapshot <window-id>    Läs UI-träd med ref:er
@@ -168,6 +170,15 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
         if (json) { out({ checks }); return checks.some(c => !c.ok && !c.blocked) ? 1 : 0; }
         io.out(box('Doctor', checks.map(c => statusLine(c.name, c.ok, color, c.detail)), color));
         return checks.some(c => !c.ok && !c.blocked) ? 1 : 0;
+      }
+      case 'prove': {
+        const proof = await proveLive(runtime, { app: option('app'), noWrite: flags['no-write'] === true });
+        if (json) { out(proof); return proof.ok ? 0 : 1; }
+        io.out(box('Live-bevis på din dator', [
+          ...proof.steps.map(s => statusLine(s.name, s.status === 'pass', color, (s.status === 'blocked' ? 'BLOCKED · ' : s.status === 'skipped' ? 'SKIP · ' : s.status === 'fail' ? 'FEL · ' : '') + s.detail)),
+          '', proof.ok ? p.mint('✓ Live verifierat med riktiga verktygssvar.') : p.amber('○ Inte fullt live ännu — se BLOCKED/FEL ovan.'),
+        ], color));
+        return proof.ok ? 0 : 1;
       }
       case 'open': case 'launch': {
         const name = positional.slice(1).join(' ').trim();

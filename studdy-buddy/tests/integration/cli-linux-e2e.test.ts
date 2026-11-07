@@ -71,7 +71,7 @@ afterAll(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-describe('built CLI in a real Linux process, real HTTP and real native helper', () => {
+describe('built CLI in a real OS process, real HTTP and real native helper', () => {
   it('version/help flags are clean, deterministic and do not create a database', async () => {
     for (const flag of ['--version', '-v']) {
       const r = await cli([flag, '--json']);
@@ -101,9 +101,16 @@ describe('built CLI in a real Linux process, real HTTP and real native helper', 
     expect(JSON.stringify(await json(['history']))).toContain('Subnetting');
     const status = await json(['status']);
     expect(status.provider.hasApiKey).toBe(true);
-    expect(status.live.observing).toBe(false);
     expect(JSON.stringify(status)).not.toContain(secret);
-    expect((await cli(['watch', '--once'])).code).toBe(1); // real headless blocker, not fake green
+    // On a headless Linux runner observation must stay blocked; on a real desktop
+    // (Windows CI) it may legitimately succeed. Never assert one OS's blocker on another.
+    if (process.platform === 'linux') {
+      expect(status.live.observing).toBe(false);
+      expect((await cli(['watch', '--once'])).code).toBe(1);
+    } else if (status.live.observing) {
+      expect(status.live.elementCount).toBeGreaterThan(0);
+      expect(status.live.windowTitle).toBeTruthy();
+    }
   }, 30_000);
 
   it('measures streaming, JSON, vision and tools over the actual fetch socket', async () => {

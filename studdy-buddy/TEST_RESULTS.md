@@ -4,7 +4,7 @@
 
 - `npm run lint` ✅
 - `npm run typecheck` ✅
-- `npm test` ✅ **312 tester / 30 filer**
+- `npm test` ✅ **319 tester / 31 filer**
 - `npm run build` ✅
 - `npm run package:cli` ✅
 - Tarball installerad i temporär npm-prefix; `studdy --version` och `studdy status` ✅
@@ -36,6 +36,27 @@
 - Status visade initialt `Startar` i stället för att göra en faktisk observationsrunda.
 - Bryggstatus kunde inte se en brygga i en annan CLI-process; autentiserad probe används nu.
 - Gmail OAuth lämnade en timeout-timer levande; headless CLI skriver nu ut kopierbar auth-länk.
+
+## Nytt: `studdy prove` — live-bevis på användarens egen dator
+
+`studdy prove` kör hela kedjan och rapporterar `pass`/`fail`/`blocked`/`skipped` per steg:
+native helper → behörighet → appstart → **fönster hittat i riktig fönsterlista** →
+UI-träd läst → **slumpad text skriven och tillbakaläst** → skärmbild verifierad på disk.
+
+- 7 enhetstester verifierar själva bevislogiken, inklusive att ett lyckat startanrop
+  ensamt aldrig räknas som observerat fönster, och att skrivtest utan tillbakaläsning
+  blir `fail`, inte `pass`.
+- Kärs headless i sandboxen: `prove` ger exitkod 1 och `BLOCKED` på native helper. ✅
+- Windows-CI kör nu `studdy prove --app "Notepad"` som ett hårt grindsteg.
+- Guide: `docs/TESTA_LIVE.md`.
+
+## CI-fix
+
+Den nya E2E-suiten påstod tidigare att observation alltid måste vara blockerad.
+Det stämmer i headless Linux men inte på en riktig Windows-desktop, vilket gav
+rött i Windows-CI (run 42354947354). Påståendet är nu plattformsmedvetet:
+headless Linux kräver BLOCKED, riktig desktop kräver konsekvent bevis
+(elementantal > 0 och fönstertitel) om den rapporterar sig live.
 
 ## Ärliga blockerare — inte gröna
 

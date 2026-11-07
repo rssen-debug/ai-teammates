@@ -26,6 +26,9 @@ npm run test:e2e        # byggd CLI i riktiga processer + lokal HTTP/WebSocket
 
 ## Kom igång
 
+> Vill du verifiera att allt fungerar på din egen maskin? Följ **[docs/TESTA_LIVE.md](docs/TESTA_LIVE.md)** och kör `studdy prove`.
+
+
 ```bash
 studdy setup
 # Lägg nyckeln via stdin så den inte hamnar i shell-historiken:
@@ -47,6 +50,7 @@ AES-256-GCM-valv (`secrets.vault`), aldrig i klartext i databasen och aldrig som
 | `studdy repl` | Scriptbar interaktiv chatt från stdin, avslutar vid EOF |
 | `studdy status` | Kompakt dashboard |
 | `studdy doctor` | Ärlig lokal hälsokontroll; BLOCKED ≠ FAIL |
+| `studdy prove` | **Live-bevis på din dator:** starta app → hitta fönster → läs UI-träd → skriv och läs tillbaka → skärmbild |
 | `studdy open "Google Chrome"` | Generisk appstart via native helper, verifierad |
 | `studdy apps` / `windows` | Lista appar/fönster |
 | `studdy snapshot <id>` | Läs UI-träd med `ref:`er |

@@ -22,7 +22,8 @@
     "start": "tsx packages/cli/src/bin.ts",
     "package:cli": "node scripts/build-cli.mjs && npm pack ./dist/cli --pack-destination dist",
     "studdy": "tsx packages/cli/src/bin.ts",
-    "doctor": "tsx packages/cli/src/bin.ts doctor"
+    "doctor": "tsx packages/cli/src/bin.ts doctor",
+    "prove": "npm run build && node dist/cli/studdy.mjs prove"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

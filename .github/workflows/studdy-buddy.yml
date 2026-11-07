@@ -142,6 +142,14 @@ jobs:
             console.log('Verified launch + window + ' + r.elements.length + ' UI elements');
           " || { echo "::error title=Snapshot::$(node -e "console.log(JSON.stringify(require('./snapshot.json')))")"; exit 1; }
 
+          node dist/cli/studdy.mjs prove --app "Notepad" --json --no-color > prove.json || true
+          cat prove.json
+          node -e "
+            const r = require('./prove.json');
+            if (!r.ok) { console.error('Live proof incomplete:', r.steps.filter(s => s.status !== 'pass' && s.status !== 'skipped')); process.exit(1); }
+            console.log('Full live proof passed: launch + window + tree + typed text read-back + screenshot');
+          " || { echo "::error title=Live proof::$(node -e "console.log(JSON.stringify(require('./prove.json')))")"; exit 1; }
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -151,6 +159,7 @@ jobs:
             studdy-buddy/launch.json
             studdy-buddy/windows.json
             studdy-buddy/snapshot.json
+            studdy-buddy/prove.json
           retention-days: 14
 
   release:
