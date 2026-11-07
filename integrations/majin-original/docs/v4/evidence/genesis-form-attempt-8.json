@@ -1,0 +1,147 @@
+{
+  "at": "2026-10-24T07:15:26.929Z",
+  "sourceCommit": "52d5d04d2b06fb3df0e7a15a63f58f1ceae5c20b",
+  "kind": "real-Go-unfamiliar-local-form",
+  "passed": false,
+  "checks": {
+    "realModelCompleted": false,
+    "providerUnchanged": true,
+    "browserUpload": false,
+    "browserInteraction": false,
+    "validationRecovered": false,
+    "oneAcceptedRegistration": false,
+    "exactUploadedBytes": false,
+    "savedObservedReceipt": false
+  },
+  "failure": "Evaluation approval budget exhausted",
+  "status": "failed",
+  "elapsedMs": 48062,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "conversationId": "conv_mvm2cvxl_f726e247fab5",
+  "successfulActions": [],
+  "toolFailures": [
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "Give exactly one live ref from browser.elements OR a CSS selector"
+    },
+    {
+      "name": "browser_click",
+      "summary": "UNKNOWN",
+      "error": "Provide selector, live ref, or role+accessibleName"
+    },
+    {
+      "name": "browser_fill",
+      "summary": "INVALID_TOOL_INPUT:MAJIN",
+      "error": "tool browser_fill input failed schema at value: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+    },
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "no field matches #slot-f75cc8c574 — Use EXACT selectors from these live controls. Checkboxes and buttons need browser.click, not browser.fill. Do not reopen the page to guess fields.\n\nInteractive fields found on THIS page (real CSS selectors; no field values shown):\n- #mode-f75cc8c574 (select, text) — Participation ChooseIndividualTeam\n- #group-f75cc8c574-2 (input, text) — Group name\n- #email-f75cc8c574-2 (input, email) — Contact email\n- #seats-f75cc8c574-2 (input, number) — Attendees\n- #country-f75cc8c574 (select, text) — Country ChooseSwedenUnited Kingdom\n- #slot-f75cc8c574-2 (select, text) — Session ChooseEarlyLate\n- #consent-f75cc8c574 (input, checkbox, checked) — I agree to this local demo registration\nFor unlisted or dynamic controls use browser.elements for live numbered references."
+    },
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "no field matches #group-f75cc8c574 — Use EXACT selectors from these live controls. Checkboxes and buttons need browser.click, not browser.fill. Do not reopen the page to guess fields.\n\nInteractive fields found on THIS page (real CSS selectors; no field values shown):\n- #mode-f75cc8c574 (select, text) — Participation ChooseIndividualTeam\n- #group-f75cc8c574-2 (input, text) — Group name\n- #email-f75cc8c574-2 (input, email) — Contact email\n- #seats-f75cc8c574-2 (input, number) — Attendees\n- #country-f75cc8c574 (select, text) — Country ChooseSwedenUnited Kingdom\n- #slot-f75cc8c574-2 (select, text) — Session ChooseEarlyLate\n- #consent-f75cc8c574 (input, checkbox, checked) — I agree to this local demo registration\nFor unlisted or dynamic controls use browser.elements for live numbered references."
+    },
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "no field matches #email-f75cc8c574 — Use EXACT selectors from these live controls. Checkboxes and buttons need browser.click, not browser.fill. Do not reopen the page to guess fields.\n\nInteractive fields found on THIS page (real CSS selectors; no field values shown):\n- #mode-f75cc8c574 (select, text) — Participation ChooseIndividualTeam\n- #group-f75cc8c574-2 (input, text) — Group name\n- #email-f75cc8c574-2 (input, email) — Contact email\n- #seats-f75cc8c574-2 (input, number) — Attendees\n- #country-f75cc8c574 (select, text) — Country ChooseSwedenUnited Kingdom\n- #slot-f75cc8c574-2 (select, text) — Session ChooseEarlyLate\n- #consent-f75cc8c574 (input, checkbox, checked) — I agree to this local demo registration\nFor unlisted or dynamic controls use browser.elements for live numbered references."
+    },
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "no field matches #seats-f75cc8c574 — Use EXACT selectors from these live controls. Checkboxes and buttons need browser.click, not browser.fill. Do not reopen the page to guess fields.\n\nInteractive fields found on THIS page (real CSS selectors; no field values shown):\n- #mode-f75cc8c574 (select, text) — Participation ChooseIndividualTeam\n- #group-f75cc8c574-2 (input, text) — Group name\n- #email-f75cc8c574-2 (input, email) — Contact email\n- #seats-f75cc8c574-2 (input, number) — Attendees\n- #country-f75cc8c574 (select, text) — Country ChooseSwedenUnited Kingdom\n- #slot-f75cc8c574-2 (select, text) — Session ChooseEarlyLate\n- #consent-f75cc8c574 (input, checkbox, checked) — I agree to this local demo registration\nFor unlisted or dynamic controls use browser.elements for live numbered references."
+    },
+    {
+      "name": "browser_upload",
+      "summary": "INVALID_TOOL_INPUT:MAJIN",
+      "error": "tool browser_upload input failed schema at path: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+    },
+    {
+      "name": "browser_click",
+      "summary": "UNKNOWN",
+      "error": "Provide selector, live ref, or role+accessibleName"
+    },
+    {
+      "name": "browser_click",
+      "summary": "UNKNOWN",
+      "error": "Provide selector, live ref, or role+accessibleName"
+    },
+    {
+      "name": "browser_click",
+      "summary": "UNKNOWN",
+      "error": "Provide selector, live ref, or role+accessibleName"
+    }
+  ],
+  "oneUseApprovals": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_click",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_click",
+    "browser_click",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_click",
+    "browser_click",
+    "browser_click",
+    "browser_click",
+    "browser_click"
+  ],
+  "deniedActions": [],
+  "proof": {
+    "submissions": [
+      {
+        "values": {
+          "participation": "Team",
+          "group": "Orion-f75cc8c574",
+          "email": "eval-f75cc8c574@example.invalid",
+          "seats": "3",
+          "country": "SE",
+          "slot": null,
+          "consent": "on"
+        },
+        "uploadBytes": 68,
+        "uploadSha256": "79fc3c9c35e925dbf39990bdf50f3971015ec8a6d4d25f4a49c77f95812cd78e",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+        "accepted": false
+      }
+    ],
+    "needsSlot": true,
+    "accepted": null
+  },
+  "artifacts": {
+    "uploadName": "genesis-form-upload-512d35dda9ca.txt",
+    "receiptName": "genesis-form-receipt-512d35dda9ca.txt"
+  },
+  "physicalPhonePass": false,
+  "trace": [],
+  "fullScenarioAComplete": false,
+  "note": "Controlled dynamic-form/upload/validation acceptance only; external authentication handoff, cancellation and other real-world gates remain separate."
+}

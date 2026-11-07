@@ -1,0 +1,27 @@
+name: MAJIN model picker saved selection and restart evidence
+on:
+  push:
+    branches: [fix/model-picker-verify-persisted-selection-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  provider-go-zen:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: node --check src/ui/onboard.js
+      - run: node --check src/ui/model-confirm.js
+      - run: node --test test/model-picker-persist-readback.test.js test/onboarding.test.js test/config.test.js
+      - run: npm test
+      - run: npm run check

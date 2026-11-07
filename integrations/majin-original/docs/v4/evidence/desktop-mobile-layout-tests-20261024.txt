@@ -1,0 +1,15 @@
+✔ desktop: native package and shared server advertise the same release (1.6852ms)
+✔ desktop: only loopback HTTP or HTTPS origins, without embedded credentials (0.9164ms)
+✔ desktop: monitor removal cannot strand the restored window off screen (1.335ms)
+✔ unpaired mobile never requests private heartbeat settings; pairing loads controls without a reload (6397.6632ms)
+✔ heartbeat controls resume paused collection and persist explicit push choice in the existing menu (4922.4305ms)
+✔ mobile touch chromium: recover from legacy PWA CSS without invisible input blockers (10620.1529ms)
+ℹ legacy stylesheet hit target in chromium: lightbox
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11961.8765

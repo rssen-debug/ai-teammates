@@ -1,0 +1,19 @@
+{
+  "id": "window-title-observe",
+  "version": "majin-desktop-eval/1",
+  "environment": "simulated",
+  "category": "windows-desktop-observation",
+  "difficulty": "easy",
+  "goal": "Report the ACTIVE window title (ground truth in state.json) into answer.txt — the read-back skill a desktop agent needs before acting (live lane reads it via control.list_windows on Windows).",
+  "verify": { "cmd": "node", "script": "verify.mjs", "timeoutMs": 10000 },
+  "fixtures": {
+    "good": {
+      "state.json": "{\"activeWindowTitle\":\"Untitled - Notepad\",\"other\":[\"Task Manager - C:\\\\\",\"Settings\"]}\n",
+      "answer.txt": "Untitled - Notepad\n"
+    },
+    "bad": {
+      "state.json": "{\"activeWindowTitle\":\"Untitled - Notepad\",\"other\":[\"Task Manager - C:\\\\\",\"Settings\"]}\n",
+      "answer.txt": "Untitled - Paint\n"
+    }
+  }
+}

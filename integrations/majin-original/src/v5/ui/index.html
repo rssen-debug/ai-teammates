@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="theme-color" content="#050508" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="MAJIN V5 — one simple place to speak, type, and get things done." />
+  <title>MAJIN V5 — GRAND ARCHITECT</title>
+  <link rel="icon" href="/logo.png" type="image/png" />
+  <link rel="stylesheet" href="/app.css" />
+  <style id="v5-minimal-note">/* Enhanced styles are appended to app.css for offline compatibility. */</style>
+</head>
+<body data-activity="idle" data-learning="none">
+  <a class="skip-link" href="#wish-input">Skip to message input</a>
+
+  <header class="v5-topbar" id="topbar">
+    <div class="v5-brand">
+      <span class="v5-brand-dot" id="host-conn-dot" aria-hidden="true"></span>
+      <span class="v5-brand-name">MAJIN</span>
+      <span class="v5-brand-badge" id="version-badge">V5</span>
+    </div>
+    <div class="v5-topbar-controls">
+      <button type="button" class="v5-pill" id="provider-pill" aria-haspopup="dialog" aria-expanded="false">
+        <span class="v5-pill-dot" id="provider-verified-dot" aria-hidden="true"></span>
+        <span id="provider-model-label">OpenCode Go · Choose model</span>
+      </button>
+      <button type="button" class="v5-pill v5-skill-pill" id="skill-tree-toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="skill-tree-drawer">
+        <span>Skills 1–99</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="v5-stage" id="stage">
+    <section class="v5-blackbox-hero" id="hero">
+      <button type="button" class="v5-emblem-btn" id="majin-logo-trigger" aria-label="Open skills and XP details" aria-expanded="false" aria-controls="skill-tree-drawer">
+        <canvas id="dot-matrix-canvas" width="260" height="260" role="img" aria-label="Verified skill progression, levels 1 to 99"></canvas>
+        <img src="/logo.png" alt="MAJIN logo" class="v5-logo-img" id="majin-logo-img" width="96" height="96" />
+      </button>
+
+      <h1 class="v5-hero-title">Hi, how can I help you?</h1>
+      <div class="v5-xp-bar-wrap" aria-live="polite">
+        <p class="v5-xp-ticker" id="xp-ticker">Skills grow with verified results</p>
+        <p class="v5-skill-meta" id="skill-numeric-status">Level 1 of 99 · New</p>
+        <div class="v5-dot-strip" id="dot-segments" role="progressbar" aria-valuemin="1" aria-valuemax="99" aria-valuenow="1" aria-label="99-step verified skill progress"></div>
+      </div>
+
+      <div class="v5-live-status" id="live-status-row" role="status" aria-live="polite" data-state="idle">
+        <span class="v5-status-indicator" id="live-status-dot" aria-hidden="true"></span>
+        <span class="v5-status-text" id="live-status-text">Ready when you are</span>
+      </div>
+    </section>
+
+    <section class="v5-conversation" id="conversation" aria-live="polite" aria-relevant="additions text"></section>
+  </main>
+
+  <form class="v5-composer" id="wish-form" autocomplete="off">
+    <div class="v5-attachments-preview" id="attachments-preview" hidden></div>
+    <div class="v5-composer-box" id="drop-zone">
+      <button type="button" class="v5-icon-btn" id="attach-btn" aria-label="Attach a file">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <input type="file" id="file-input" hidden multiple accept=".pdf,.docx,.xlsx,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.csv,.json" />
+
+      <button type="button" class="v5-icon-btn v5-mic-btn" id="mic-btn" aria-label="Start voice" aria-pressed="false" data-mic-state="idle">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M18 11a6 6 0 0 1-12 0M12 17v4M9 21h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <label class="sr-only" for="wish-input">Tell MAJIN what you need</label>
+      <textarea id="wish-input" rows="1" placeholder="Just tell me what you want…" enterkeyhint="send" maxlength="10000"></textarea>
+
+      <button type="submit" class="v5-send-btn" id="send-btn" aria-label="Send request" title="Send (Enter). New line: Shift+Enter." disabled>
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Send</span>
+      </button>
+      <button type="button" class="v5-stop-btn" id="stop-btn" aria-label="Stop current task" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+  </form>
+
+  <!-- Skill Tree Drawer: CLOSED by default (`hidden`) -->
+  <div class="v5-backdrop" id="drawer-backdrop" hidden></div>
+  <aside class="v5-drawer" id="skill-tree-drawer" role="dialog" aria-modal="true" aria-labelledby="skill-tree-heading" hidden>
+    <header class="v5-drawer-header">
+      <div>
+        <h2 id="skill-tree-heading" class="v5-drawer-title">Skills · Levels 1–99</h2>
+        <p class="v5-drawer-subtitle">Green dots reflect verified progress, not time spent working. Level 99 also requires quality checks.</p>
+      </div>
+      <button type="button" class="v5-icon-btn" id="skill-tree-close" aria-label="Close skills">✕</button>
+    </header>
+    <div class="v5-skill-selected-detail" id="selected-skill-detail"></div>
+    <ul class="v5-skill-list" id="skill-tree-list" role="listbox" aria-label="Skills (1–99)"></ul>
+  </aside>
+
+  <!-- Discreet Provider & Model Modal: CLOSED by default (`hidden`) -->
+  <aside class="v5-drawer" id="provider-drawer" role="dialog" aria-modal="true" aria-labelledby="provider-heading" hidden>
+    <header class="v5-drawer-header">
+      <div>
+        <h2 id="provider-heading" class="v5-drawer-title">Provider & Model</h2>
+        <p class="v5-drawer-subtitle" id="provider-conn-status">Saved settings are not the same as a verified connection.</p>
+      </div>
+      <button type="button" class="v5-icon-btn" id="provider-close" aria-label="Close model settings">✕</button>
+    </header>
+    <div class="v5-form-group">
+      <label for="provider-select">Provider</label>
+      <select id="provider-select">
+        <option value="opencode-go">OpenCode Go</option>
+        <option value="openai">OpenAI</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="xai">xAI (Grok)</option>
+        <option value="deepseek">DeepSeek</option>
+        <option value="ollama">Ollama (Lokal)</option>
+      </select>
+    </div>
+    <div class="v5-form-group">
+      <label for="provider-key-input">API key</label>
+      <input type="password" id="provider-key-input" placeholder="oc_sk_… eller sk-…" autocomplete="off" />
+    </div>
+    <div class="v5-form-group">
+      <button type="button" class="v5-pill" id="provider-discover-btn">Find available models</button>
+      <label for="model-select">Choose model</label>
+      <select id="model-select"><option value="">Connect to find models</option></select>
+      <label for="model-id-input">Exact model ID (optional)</label>
+      <input type="text" id="model-id-input" placeholder="t.ex. glm-5.3-flash eller grok-4.7" autocomplete="off" />
+    </div>
+    <div class="v5-drawer-actions">
+      <button type="button" class="v5-btn-primary" id="provider-save-btn">Use model</button>
+    </div>
+  </aside>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

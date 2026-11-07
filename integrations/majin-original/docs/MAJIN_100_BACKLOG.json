@@ -1,0 +1,458 @@
+{
+  "asOf": "2026-10-21",
+  "branch": "fix/realworld-repairs",
+  "principle": "verifiera före implementereser; aldrig papper-rör som färdig",
+  "priority": [
+    {
+      "rank": 1,
+      "id": "qa-glm-acceptance-closeout",
+      "wave": "metaspår",
+      "desc": "Hämta slutresultaten från den interaktiva/GLM-lane som det (Astra) driver; härma 33/12-tabellen in i status-matrisen.",
+      "blocker": "väntar på run 39474266667",
+      "evidence": "qa-artifacts/ + docs/evidence/",
+      "status": "MATT-ANSVAR (2026-10-21): providern svarar exakt HTTP 401 \"令牌已过期或验证不正确\" (expired/invalid token) pa tre plausa basar via probe — aerligyinte-en-natverks-fraga; scripts/verify-glm-bridge.mjs ar permanent closeout-probe (klassificere OPEN/AUTH-BLOCKED/UNREACHABLE, never-masked); 4/4 classifier-tester; ateroln ej brun-lane far checkas innan nyckel roterats — markedil OPEN-UPNARLEDADKT, INTE FARKEDT FOR ADAMG"
+    },
+    {
+      "rank": 2,
+      "id": "W1-absorb",
+      "wave": "W1",
+      "desc": "'majin absorb <repo>': machine-readable capability map + integration report; verifikation mot MAJIN:s egt verktygskatalog; inga fullföljde-absorptions-påståenden.",
+      "test": "npm test test/absorb.test.js + fixture-repo",
+      "status": "VERIFIED - end-to-end over REAL git-natverk (test/absorb-e2e.test.js): absorb(vercel/ms) klonas (git --depth 1), skannas RIKTIGT (filer>=10, MIT-licens detekterad fran faktisk LICENSE, repoLabel vercel/ms, gap-post finns), tva artifacts skrivs + klon-trea ligger pa disk; motbevis: phantom-repo = clone_failed UTAN nagon capability-fil nagontings (honest skip-om-github-unreachable i sandladan — git ls-remote-preflight); 2/2 + full svit"
+    },
+    {
+      "rank": 3,
+      "id": "W2-research-engine",
+      "wave": "W2",
+      "desc": "PLAN→SEARCH→FETCH→EXTRACT→CROSS-CHECK→SYNTHESIZE→VERIFY + citation ledger, contradiction detection, reliability märkning.",
+      "test": "test/research.test.js + real-topic fixture (offline-mocks for unit, real-net for integration)",
+      "status": "VERIFIED - end-to-end over REAL socket (test/research-e2e.test.js): PLAN->SEARCH->FETCH->EXTRACT->CROSS-CHECK->SYNTHESIZE->VERIFY pa http-loopback; measured: sources:2 aggregate + 404 RAKNAD som error (never hidden) + bada claims nadden report med citationer [1]/[2] + tre-artifacts contract (report.md/ledger.json/sources.jsonl) + 404-URL ar INTE i sources + zero-hits = ENGINE REFUSERAR (refusing to invent, med hits:0-progress) + plan() inspekterbar; honest limit-finding: verify.conflicted flaggar ej nummer-konflikter over kluster graining (backlog praise) | LIMIT STANGD re: numeric-conflict: crossCheck flagetar nu numeriska-divergenskonflikter globalt (air-year-normalized, >10% magnitud, shared-anchors>=2, page-poilet-raw-claims utanfor buckets — bucket-keying var proven-att-dolja konflikten), verdict sager explicit \"N conflicted claim(s) flagged\"; 4/4 test-file research-numeric-conflict.test.js + befintlig e2e fort satt groned"
+    },
+    {
+      "rank": 4,
+      "id": "W3-execution-backends",
+      "wave": "W3",
+      "desc": "Gemensamt execution-interface: local host + docker + ssh + isolated; resource limits, cancellation, logs, artifacts; ärliga fel (aldrig silent-host-fallback).",
+      "status": "VERIFIED - end-to-end genom verktygsytan (test/exec-e2e.test.js): exec.start local RIKTIGT kommando + exec.wait exit=0 & stdout-tail + DURABLE artifacts (streams+meta.json pa disk, oberoende av verktygssvaret) + cancel: sleeper = cancelled-med-akan (e2e-because-we-prove-it reason survive till metadatan, ok=false med code=cancelled) + docker/ssh never-silent-fallback (refusals utan id/metaDir betyder ingen process spawnad) + exec.backends availability; 4/4 + full svit"
+    },
+    {
+      "rank": 5,
+      "id": "W7-mission-contract-acceptance",
+      "wave": "W7",
+      "desc": "Mission engine GOAL→PLAN→EXECUTE→VERIFY→REPAIR→COMPLETE med artifact/outcome-contract per mission + independent verification; bounded retries; blocked-state.",
+      "status": "VERIFIED-DELTA (checkpoint/recovery finns ej tidigare): mission-checkpoint.js (id-stabilitet, writeState atomic, readState, journal.jsonl, carryFromState) + runMission checkpoint-integration (per-verified-milestone state.json + final blocked|complete + mission_resumed-emit + redo-work-proof: carried nodes exekveras aldrig igen) + workerOverride-injection för offline testbarhet + test 3/3 (inclidering reboot-scenario med counter-bevist att alpha endast skrevs 1 gång tross två körningar)"
+    },
+    {
+      "rank": 6,
+      "id": "W5-event-flows",
+      "wave": "W5",
+      "desc": "Trigger-typer: schedule, file change, webhook, email, github-event; durable queue, dedupe, retry limits, history, authorization före extern kommunikation.",
+      "status": "VERIFIED - end-to-end genom verktygsytan (test/flows-e2e.test.js): flows.add file-trigger + RIKTIG fil-drop + dual measurable (state.json lastStatus=ok + fire-post med eventHash + fs.write-biverkar w5-fired.log); e2e FANGADE RIKTIG PRODUKTS-BUGG: chokidar@4+ignoreInitial swallower filer som droppas under initial-scan (forsta ~100ms efter flows.add) - fixat via mtime-window-catch vid ready (no-false-positive construction); testStopHub drain-hook tillagd"
+    },
+    {
+      "rank": 7,
+      "id": "W4-teams-upgrade",
+      "wave": "W4",
+      "desc": "Persistent roles, shared task-scoped memory, delegated work, budgets, checkpoints, restart-recovery on swarm.js basen.",
+      "status": "VERIFIED-CORE concrect-instantierad: docs/REUSE.md (register + evidence per komponent) + browser-ground.js SoM-power-transfer (browser-use-mönstret adaptation to egen CDP-brygga, zero-copy) med real-Live-Chromium-bevis (ground-to-click-ref-verkade, marks+clear+re-ground stablil) + browser.click({ref:\"eN\"}) extension med ref_unknown/ref_stale honest-fail + browser.clear_marks teal-down + golden 126 to 128 + full svit 641/623/0/18"
+    },
+    {
+      "rank": 8,
+      "id": "W8-channels-discord-slack-matrix-email",
+      "wave": "W8",
+      "desc": "Lägg till saknade adappters (reuse-existing), verify send/receive per kanal före production-ready-märkning.",
+      "status": "VERIFIED (transport-kontrakt helt laskt offline; live-API acceptans kvar creds/godkannande): channels-contract.test.js 5/5 — slack endpoint/bearer/3000-cap/unicode survival/zero-secret-reflection; discord v10-path/Bot-header/1900-cap/429-text-honently; matrix PUT/homeserver-pathform/urlenc-body/m.text-shape; email Mailgun-form/Basic-auth/from-KRAV-refusal (e-mail testet fangade: from saknas = refused MNED zero requests skickade); webhook HMAC byte-exakt + round-trip unicode"
+    },
+    {
+      "rank": 9,
+      "id": "W13-never-stuck-metasvit",
+      "wave": "W13",
+      "desc": "Injected-failure-suite (knappar som försvinner, layouts ändrast, crash, timeout) + recovery metrics (success rate, time, interventions).",
+      "status": "VERIFIED-CORE (outbound): channel.send ×1 verktyg (risk exec => approval-gated) rotar till official-REST-klienter: Discord v10, Slack chat.postMessage, Matrix PUT send/m.room.message/<txn>, generisk webhook (https-tvang + HMAC-signering), email via provider-API-rrela (Mailgun-kompatibel). EKA avslutningar: saknad token = not_configured (ALDRIG simulerat sänding); api-fel = yttrar exakt svarsmeddelande; https-only for webhook. HONEST GAP: inbound chatbot-adapters for Discord/Slack/Matrix (poll/websocket) ej implementerade annu — nasta utbyggnad pa denna rad. 8/8 tester (Transport-fake endast for URL/header/payload-forme; samtliga fail-detektorer kora mot REAL fetc-forme)"
+    },
+    {
+      "rank": 10,
+      "id": "W11-desktop-vision-delta",
+      "wave": "W11",
+      "desc": "Desktop screenshot-intake + a11y-tree + active window id + full uppgifts-e2e på MAJIN-INTERACTIVE-01 (open-app→inspect→act→state-change→task done→evidence).",
+      "status": "VERIFIED-CORE: Heartbeat via bus.sub (wildcard-matching egen logik - bus.on matchar bara exakt-strings) + ingest-dedupe (epoch-cold-bug vid start fixad) + queue-cap 50 + rate-limit min-gap med explicit held + desktop-only honest (aldrig latsas-sand nar kanaler saknas) + kanal-fel ytsas i delivery.results + log/state pa disk + majin.heartbeat-verktyg. 7/7 heartbeat-tester + full svit 613/595/0/18. KVARSTAR: desktop-binding via event-bridgen krock-verifieras via server-routen vid UI-expansion"
+    },
+    {
+      "rank": 11,
+      "id": "W12-pink-cursor",
+      "wave": "W12",
+      "desc": "Native Windows overlay (utan src/ui-röring), click-through, smooth movement, click-highlight, pause/resume/stop, human-takeover-yield, crash-recovery.",
+      "status": "ACCEPTANCE-PACK REDO: qa/win-acceptance/run-all.ps1 (interaktiv Windows-runner: screenshot-artifacts, canvas-scan for #ff3ca5, computer.use smoke-exit, A0 NOT TESTED vid non-interactive i stallet for att gissa) + scripts/verify-win-acceptance.mjs (kontrakt win-acceptance/1: PASS fordrar artifact/bevis, A1+A5 DoD-krav, FAIL/NOT TESTED BLOCKERAR gata arligt) + test/win-acceptance.test.js 6/6; sjalva interaktiva korningen pakter win-runner (miljo) — dokumenterat som utestående, inte markerat klart | CI-LOOP SLUTEN: win-runner-acceptance.yml (workflow_dispatch + weekly + PR + branch-push) kicks packen pa windows-latest i service-session och UPPLADDAR artifacts (out-json + shots) => varje framtida push producerar NY WIN- Evidens-verdicet valideras mot kontrakt utan att fejla pa avsaknade interactive-steps nollhara --gate flitstuds ochkonkch interactive: false (aldrig grattis-gron); interactive gate fortsatt apply-pa din maskin"
+    },
+    {
+      "rank": 12,
+      "id": "W6-power-transfer",
+      "wave": "W6",
+      "desc": "DISCOVER→ANALYZE→DESIGN→IMPLEMENT→TEST→REVIEW→APPROVE→INSTALL; license check; sandboxed test-execution; owner approval before install.",
+      "depends": [
+        "W1-absorb"
+      ],
+      "status": "VERIFIED-CORE: reset.js (planRecovery = dry-run-only measured marge counter; confirmToken binder det uppnatta fileset → anti-drift; applyRecovery removed files, collapse empty dirs, scope guard on every path; blocked-kind-list med arlig reason; sessions/memory/config never included in any recovery kind) + reset.plan (read) + reset.apply (exec→approval) verktyg + docs/WINDOWS_RECOVERY_RUNBOOK.md (plansmontering mot klarade fel). 6/6 fixtures + full svit 626/608/0/18 + golden 124→126"
+    },
+    {
+      "rank": 13,
+      "id": "W9-memory-sync",
+      "wave": "W9",
+      "desc": "Opt-in device sync: separation user/project/agent, kryptering, conflict detection, recovery history, export/delete.",
+      "status": "VERIFIED-CORE: src/core/memory-sync.js (majin-memory-sync/1) bidirectional delta-sync med spawnId-sidecars + ledger + tombstone-resurrect-guard + memory.sync verktyg (dryRun plan-lage som reset.plan); 6/6 unit ink. echo-resurrection-negative+idempotens + full svit; utvecklingen fangade: B-re-add av A:glomt-faktum pre-commit (guard-addition), desc-marker-derivering (optional-marker)"
+    },
+    {
+      "rank": 14,
+      "id": "W10-learning-loop",
+      "wave": "W10",
+      "desc": "Failure-pattern detection, reusable skill extraction+versioning, quality measurement, regression protection; aldrig själv-rewrites utan approval.",
+      "status": "VERIFIED-CORE: src/core/learn.js (majin-learn/1) ma.learn/ma.verify_lesson/ma.lessons — lessons fods UNVERIFIED, verify krev PROOF (>=20 tecken), re-occurrence efter verify = auto-DEMOTE + proof arkiverat + demotions-honest-metric; 7/7 unit + full svit 672/654/0/18; golden 133"
+    },
+    {
+      "rank": 15,
+      "id": "W14-benchmark",
+      "wave": "W14",
+      "desc": "Rollback-verifiering, reproducible-builds-gate, competitive benchmark (goalbaserad, mätbar, aldrig ojämförad).",
+      "status": "VERIFIED-CORE: majin.self_audit med 5 regler (unsupported-claims, mock-mode-residue, unfinished-markers, status-drift, recovery-readiness) — varje finding med file:line+why-evidens, 7/7 unit, live-run pa repot: notes-only/clean (1 legitim low borjndokumenterad TODO) + golden 129 + full svit; utvecklingslopet delayade regler med falska positiver innan commit (proof-negative test galler)"
+    }
+  ],
+  "roundLog": [
+    {
+      "round": 1,
+      "date": "2026-10-20",
+      "done": "Gap-audit + STATUS.md + BACKLOG.json etablerade; regression på Astra-sammankoppling 542/0; v4-matris (20✓/5✗/11 modell-SKIP) dokumenterad",
+      "percent": 28,
+      "next": "W1-absorb implementation eller GLM-acceptance-closeout beroende på vilken som bekräftar först"
+    },
+    {
+      "round": 2,
+      "date": "2026-10-20",
+      "done": "W1 absorb implementerad: src/core/absorb.js (statisk radar, licens-detektion, dep-parse, modul-signatur-scan, gap-analys mot ALL_TOOLS) + CLI 'majin absorb <repo>' + test/absorb.test.js (5 gröna) + i18n-fix (English-only policy) + full regression 565/547/0/18 ✓ + riktigt bevis: UFO-scannad",
+      "percent": 31,
+      "next": "W2 research-engine (PLAN→SEARCH→FETCH→EXTRACT→CROSS-CHECK→SYNTHESIZE→VERIFY) eller GLM-acceptance-closeout om run 39474266667 landat"
+    },
+    {
+      "round": 3,
+      "date": "2026-10-20",
+      "done": "W2 RESEARCH: src/core/research.js (pipelinen + contradiction-flags + reliability + ledger + verify) + tools register research.run (109 verktyg, contract-golden uppdaterat medvetet) + 'majin research <question>' CLI + 8 test fixtures gröna + hela sviten 573/555/0/18 ✓ + real-CLI-bevisad honest no_sources-path",
+      "percent": 34,
+      "next": "W3 execution-backends (local/docker/ssh via gemeinsamt interface + ärliga missing-cred-fel) eller W7 mission-contract acceptance"
+    },
+    {
+      "round": 4,
+      "date": "2026-10-20",
+      "done": "W3 EXECUTION BACKENDS: executors.js (enhetlig jobb-interface: startJob/handle/settled/cancelled) + tools exec.backends(-inventory, measured) exec.start exec.wait exec.cancel exec.logs (5 verktyg; guard-risk exec via framework) + test/executors.test.js 7/7 ✓ + verifierad lokal körning + real timeout/cancellation/output-caps + honest docker/ssh-unavailable error pathways (FORBIDDEN-tyngt) + golden guards uppdaterade medvetet 109→114 + full svit 580/562/0/18 ✓",
+      "percent": 37,
+      "next": "W7 mission-contract acceptance (GOAL→PLAN→EXECUTE→VERIFY→REPAIR→COMPLETE med beviskontrakt) — misson.js finns delvis; contract-laget med bevisartifakter"
+    },
+    {
+      "round": 5,
+      "date": "2026-10-20",
+      "done": "W7 mission checkpoints+recovery implementerat pa toppen av befintlig robust mission.js (kontrakt, verify→repair→replan, budget/timeout-limits fanns redan): persistents till disk per verified-milestone + complete|blocked-final + resume-via-carry (+emit mission_resumed); 3 nya tester grant (checkpoint-modulen, stopp+sforesoning resume med counter-bevist att ingen sida-effektuppter, blocked-state som aldrig lyfter fullfoljande claims); full svit 583/565/0/18",
+      "percent": 40,
+      "next": "W5 event-flows (schedule, file change, webhook, github event support pa schedule.js basen) eller W4/W13"
+    },
+    {
+      "round": 6,
+      "date": "2026-10-20",
+      "done": "W5 EVENT FLOWS: flows engine + 6 verktyg (add/list/enable/remove/trigger/webhook.recorded) + server-route POST /api/flows/hook/<id> (token-gated, samma guard som allt annat) + cho-chokidar@4 runtime-dependency verified (live watch detektion) + bundle-styrka 1MB+3incl flows-tools i bundle + 8/8 fixtures + golden uppdatering medveten 114→120 + npm test 591/575/0/16",
+      "percent": 43,
+      "next": "W8 kanal-utokad (Discord/Slack/Matrix/Email — reuse modelenbaust on telegram/whatsapp patterns) eller W13 never-stuck"
+    },
+    {
+      "round": 7,
+      "date": "2026-10-20",
+      "done": "W8 CHANNEL EXPANSION (outbound-delen): channels/send.js (5 kanaler, shared post-helper med abort-timeout) + channel.send-verktyg med dryRun-preview-lage + https-only + HMAC for webhooks + i18n fix-uppgard (utrutade svenska litteraler ur mina nya files) + 8/8 tester + golden uppdatering 120→121 (medvetet) + full svit 599/583/0/16",
+      "percent": 46,
+      "next": "W13 NEVER-STUCK (watchdogs + bounded loops + cancellation + stalled-aP) eller W9 (heartbeat/cron/turn-continuation dar W13 är baken)"
+    },
+    {
+      "round": 8,
+      "date": "2026-10-20",
+      "done": "W13 NEVER-STUCK: watchdog.js (withTimeout hard racetimed kill; RepeatDetector name+args-key N>=maxRepeatCalls gate; StallTracker bump-organized; TurnClock; ApprovalWatch stadieovergangarna active-stalled-timed_out akeylard map-purge) + loop.js-integration: per-verktyg 300s-default hart-timeout + repeat_block-stopReason + turn_time-us (maxTurnSec 1800 default via TurnClock i huvudloopen) + modelCall==exec-seam (parality med mission workerOverride). EN unref-bugg -ofuddad: unref'd tool-timeout-timer lurade node:test-runner 'cancelledByParent' - ref'd morality (self-clearing pa bada grenar). 7/7 watchdog-tester (hanging-promise <1s bounded, repeat_block att verkligen bara 3 korningar sedan berglätang, turn_timeout elapsed<3000ms pa 250ms box, okallning kan modellen fortfortuoro en final). Full svit 606/588/0/18; golden 121 unchanged",
+      "percent": 49,
+      "next": "W9 HEARTBEAT (agent.alert heartbeat cron pa TurnClock-stall-detekten + notify for warnings) eller W11 Reset (dry-run-reset/sekvenser + Win-integration)"
+    },
+    {
+      "round": 9,
+      "date": "2026-10-20",
+      "done": "W9 HEARTBEAT: src/core/heartbeat.js (Heartbeat-klass realtimers/digest/rate/dedupe/cap) + majin.heartbeat-verktyg (1 ny tool, golden 121 till 122 medvetet). V2: bus.sub-wildcards istallet for dead exact-listeners, epoch-cold-dedupe-fix, kanal-leverering via channels/send med arliga 429-felvarden. 7/7 heartbeat + full 613/595/0/18",
+      "percent": 52,
+      "next": "W11 RESET toolkit eller W4 (browser/search/computer-control-slinga starkare Dar vilket passar Windows-program produktdefinisjonen)"
+    },
+    {
+      "round": 10,
+      "date": "2026-10-20",
+      "done": "PINK CURSOR / COMPUTER USE (host-milio: IMPLEMENTED + OFFLINE-VERIFIERAT, WINDOWS-LANE: NOT TESTED har): computer-use.js OBSERVE-PLAN-ACT-VERIFY-RECOVER-loop ovan pa BEFINTLIGA control.* SendMessage-survivor-lane (inga parallella system) + screen.capture; modelCall-seam = samma family som mission/workerOverride; done-claim refused utan verify-proof; W13 RepeatDetector own the strategy-wall (identiska plan = vägring, forced change); bounded maxSteps + explicit blocked-state med errorCategory (budget|model|stuck...); evidence steps.jsonl per session; ALLOWED_ACTIONS allowlist (inga godtyckliga modell-forstag). pink-cursor.js: verklig WinForms transparent topmost overlay (rosa glod citackel + label) via state.json-file 60ms-poll (inga sockets/deps) + quota/quit/hide/show/move; isWindowsDesktop-honest FORBIDDEN pa icke-Win. cursor.overlay + computer.use verktyg (exec-risk) inkopplade i befintligt registry. Golden 122 till 124 medvetet. 7/7 offline CU-tester + i18n-fix + schema-derivation-fix (default: kolon) + full svit 620/602/0/18",
+      "percent": 55,
+      "next": "Win-runner acceptance for CU-lane (interaktiv session, before/after screenshots, dedupe av CLAUDE-mandat Hal mandatkrav: actual interactive desktop tests) + UI-lager visualisering (Astra ager src/ui, frozen) + W11 RESET"
+    },
+    {
+      "round": 11,
+      "date": "2026-10-20",
+      "done": "W11 RESET-toolkit implementerad pa samma sakerhets-mekanismer som resten av systemet (dry-run measure only / token-bound apply / scope guard / blocked-claims): reset.js + 2 verktyg + recovery-runbook-doc. 6/6 reset-tester + full 626/608/0/18",
+      "percent": 58,
+      "next": "W4 browser/computer-control-loop-strangthening eller W5/W6-outkrafter (telelistar klar) eller win-runner-acceptancen for CU-lane + UI-repair stream-switch gapet (numeriserat OPEN i UI-specen)"
+    },
+    {
+      "round": 12,
+      "date": "2026-10-20",
+      "done": "UI-specens gap #6 (stream-switch cross-chat, sjalv-rapporterad OPEN i forra push) NU STANGD: acceptance-gates P0.6a-c added to scripts/ui-repair-test.mjs (real SSE-stream into chat-A via API mid-flight, switch to chat-B, verify no leak, switch back). Test FIRST: P0.6b was RED -> real bug: window.S was undefined in classic-script global scope (const top-level scripts don't attach); chats.js wrote to a ghost object — clicks never moved the actual session. Fix: explicit window.S = S alias in app.js. Also P0.5a/b robustness-gates. 30/30 gates + full suite 633/615/0/18",
+      "percent": 60,
+      "next": "W14 self-audit eller W6 power-transfer eller win-runner acceptance for CU + headline-chrome pa Windows (env-gate)"
+    },
+    {
+      "round": 13,
+      "date": "2026-10-20",
+      "done": "W6 POWER TRANSFER instantiated concretely: docs/REUSE.md register (chokidar/UFO/browser-use-pattern/TradingAgents/pkg-med-evidence-rader) + SoM-grounding for browser.adaptern (browser-use-patenne adaptation, aldrig kopierad rampi): browser.elements (marks+refs) + browser.click-ref extension (selector eller ref) + browser.clear_marks med ref-tears; 6/6 unit + live-Chromium-bevis (fick-titeln ändrad via e1-klick, marks-drawn-clear-stabe) + full regression 641/623/0/18",
+      "percent": 63,
+      "next": "W14 self-audit (systemet auditar sin egen arlighet-top-down, mock-hantering foralltating) eller W4 browser-control-loop"
+    },
+    {
+      "round": 14,
+      "date": "2026-10-20",
+      "done": "W14 SELF-AUDIT: majin.self_audit (5 regler, evidence-bearing); utvecklingen fangade sjalv 2 falska positiver pre-commit (diwithTyped-diagnostics i re.js + auditors egna symbolanenergalengder) — korrigerade INNAN landning (detektorer comprehensive dieskall inte lata ga vissel); 7/7 unit + live-audit verdict 'notes only' (1 kand låg TODO) + npm test fulla svit; golden 128 to 129",
+      "percent": 66,
+      "next": "W4 browser-control-loop (nu med SoM-grounding under) eller win-runner acceptance eller W6 fortsatt absorption (ny registry-row per commit)"
+    },
+    {
+      "round": 15,
+      "date": "2026-10-20",
+      "done": "W9 MEMORY SYNC: src/core/memory-sync.js + memory.sync verktyg; forsta korning bevisade ECHO-TOMBSTONE-buggen (peer re-added en glomd faktum) — resurrect-guard med tidsstampeln løste det och testen hails nu att skip CETECHT raknas, inte tyst; 6/6 unit + golden 130 + full svit",
+      "percent": 69,
+      "next": "W10-learning-loop eller W8-channels kvarvarande eller win-runner acceptance"
+    },
+    {
+      "round": 16,
+      "date": "2026-10-20",
+      "done": "W10 LEARNING-LOOP: learn.js + 3 verity — auto-demotions vid ater-upprepning av verified-triggert (proof KAN inte sigas halla), verify krev mätnhi, listing sorterar demoted-first (aldrig gom das daliga); 7/7 unit + golden 133 + full svit; en server-golden 130→133 missed fangades av sviten oven fixat",
+      "percent": 71,
+      "next": "W8-channels rest eller win-runner acceptance-pack eller integration: agenten anvander learn.js vid each detected mistake (stake-harder-loop)"
+    },
+    {
+      "round": 17,
+      "date": "2026-10-21",
+      "done": "W8 CHANতর channels-rest: HMAC-webhook holl-bar via REAL loopback-socket (receiver recompudents signatur byte-exaxt + parseky times); testet fangade normalization-laundring FOR mooni => bytte till stran-niva strict-pattern (forbribk teching describes the hardening); 4/4 wire-tester + 12/12 channels-total (source-exs stringn-anchoring + trust-annotation documented i modulhuvud); full svit",
+      "percent": 73,
+      "next": "W12 pink-cursor win-runner acceptance-pack, eller VERIFIED-delta for W1/W2/W3/W5, eller W6-absorbesademec - forsta-marken-llt"
+    },
+    {
+      "round": 18,
+      "date": "2026-10-21",
+      "done": "W12 ACCEPTANCE-PACK: maskinevidens-lop fran Windows-runner till repots gate; ps1 menypliktig apos-ordning + verifier (PASS-for-cavaeten, Duplikat-ids, boolean-interactive) 6/6; DoD INTERACTIVE run kvar att gora pa Windows — INTE market klart, documented utestående explicitet",
+      "percent": 75,
+      "next": "VERIFIED-deltas for W1/W2/W3/W5, eller W6 absorb ressources: Microsoft Playwright-MCP adapter?"
+    },
+    {
+      "round": 19,
+      "date": "2026-10-21",
+      "done": "W5 VERIFIED via E2E + warmup-swallow-buggen fixad; sandbox-inlarst: node_modules fallest ut ur snapshots mellan sessioner (npm install kravdes innan e2e); hela korvagen forklarades phase-for-phase",
+      "percent": 77,
+      "next": "VERIFIED-delta W2/W3, eller W6 continue-absorb, eller win-runner acceptance-korning"
+    },
+    {
+      "round": 20,
+      "date": "2026-10-21",
+      "done": "W2 VERIFIED via real-socket e2e 3/3; forsta assertions var byggd av antagen shapes (S1/[S]-formatet, ok:true-for-0-hits) mot RIKTIGA engine-contractet — engine svarade no_sources/refusing-to-invent, citation numbers [n]; assertions calibrerade mot moten-verklighet testet fangade darvid ingen regresjon men EN known-limit for backlog",
+      "percent": 79,
+      "next": "W3 execution-backends VERIFIED-delta, eller W6 continue-absorb, eller win-runner acceptance"
+    },
+    {
+      "round": 21,
+      "date": "2026-10-21",
+      "done": "W3 VERIFIED via tool-surface e2e 4/4; forsta forsok skrev jag en slarvig egen efterbevis-assert (echo-namn-i-tail var meninlo& fel) - tog bort den feat ersatte med en SKARPAR demostration: refused-backends har NOLL id/metaDir = process never spawnad (dollar no-fallback-by-measurement); full svit groned",
+      "percent": 81,
+      "next": "W1 absorb VERIFIED-delta eller W6 continue-absorb eller win-runner acceptance"
+    },
+    {
+      "round": 22,
+      "date": "2026-10-21",
+      "done": "W1 VERIFIED: verklig absorb-kede levere MIT-repo over natverket; preflightcheck fortsatt-skips-arlig (aldrig red-da-natverk-ansae); full svit fortf groned",
+      "percent": 83,
+      "next": "W6 continue-absorption (REUSE-led), eller win-runner acceptance-korning"
+    },
+    {
+      "round": 23,
+      "date": "2026-10-21",
+      "done": "W6 continue-absorption: TradingAgents-bron fran FORBIDDEN-checked till POSITIVE-proof (test/trading-e2e.test.js 5/5): REAL spawned stub-envelope happy/all-evil-counterfactual paths (raw-text-refusal kravde separate mkRaw-fixture: forsta stubben citerade felaktigt JSON-string = en falsk-justering testet fangade); REUSE.md-row upgradead; full svit groned",
+      "percent": 85,
+      "next": "win-runner acceptance-korning, eller nasta REUSE-instans (Microsoft Playwright-MCP?) i sandlade-verifierbar form"
+    },
+    {
+      "round": 24,
+      "date": "2026-10-21",
+      "done": "W8 transport-kontrakt klar graders offline: alla avsindare Karlegrade med faktiska request-captures pa fetch-seamen; e-post-test lekte fren: MIN egen antagna form (JSON) var fel mot sendEmail:s verkliga Mailgun-form-urlencoded + from-required-kontrakt — testet korrigerade mot moten, production untouched; full svit groned",
+      "percent": 87,
+      "next": "LIVE slack/discord-send med anvandardgivna creds (godkannande-krav), eller win-runner acceptance"
+    },
+    {
+      "round": 25,
+      "date": "2026-10-21",
+      "done": "research-numeric-conflict LIMIT-fIx: tre lager av sanning: (1) forst blev arg oneck-merjen doljde — fixad pa raw-claims-in-cluster; (2) sedan visade bucket-keyingen doljde konflikten bassapade pga ordval medan meningarna sa motsatande — fixad med GLOBAL pass over allClaims (sourceId-sdiff); (3) enhet test antog crude-2-klustret - justerat till RÄTT kontrakt mark-MERGED-cluster-med-conflicts:true; full svit",
+      "percent": 89,
+      "next": "win-runner acceptance eller live-channel med din pekade creds/godkannande"
+    },
+    {
+      "round": 26,
+      "date": "2026-10-21",
+      "done": "jobs STORE named-lock implementerad (mkdir-atomiskt, stale-steal med audit-trail, maxWait timeout, auto-release vid throw) = den enda kvarvarande open-debt-markern fran self-audit nu STANGD: self-audit verdict FOINAN clean 0/0/0/0 for HELA repot (forsta gangen); 3/3 lock-tester (20 concurrent upserts survive, stale-steal, exception-release); full svit 740/724/0/16",
+      "percent": 90,
+      "next": "win-runner acceptance eller live-channel-send med godkanda creds"
+    },
+    {
+      "round": 27,
+      "date": "2026-10-21",
+      "done": "GLM acceptane-closeout MITAT: 401 AUTH (inte natverk) verifierat via 3 candidatebasade + permanent probe med klassifierare (exit-koder korrekta); 4/4 tester; denna gate oforandrad krav: rotera nyckeln forst",
+      "percent": 91,
+      "next": "win-runner acceptance pa er maskin + roterad GLM-nyckel"
+    },
+    {
+      "round": 28,
+      "date": "2026-10-21",
+      "done": "W12 CI-loop: acceptance-pack kors veckovis+per-push pa windows-latest, produceret mottaglig evidence artifacts alla ganger (continue-on-error: true), verifikation mot kontraktet (aldrig forced-green; interactive-gate kvar-anpassad); YAML-validerad (js-yaml load passes, 7 steg)",
+      "percent": 92,
+      "next": "interactive win-acceptance-koring pa er maskin for PASS-grade, alternativt nasta REUSE-absorbance"
+    },
+    {
+      "round": 29,
+      "focus": "win-acceptance CI loop fully closed on REAL runner evidence",
+      "done": [
+        "win-runner-acceptance workflow: contract validation + A5 gate (pure Node, needs no desktop) + interactive-only full gate; uploads evidence artifact (30d retention)",
+        "run-all.ps1 hardened through 6 measured CI rounds: PS5.1-legal hash separators/conditionals, BOM-free JSON emit, non-interactive => A0/A1 NOT TESTED (never luck-pass), probes under Continue preference, param-default $PSScriptRoot scoping bug fixed (paths computed in body)",
+        "A5 computer.use dry-plan now PASSES on real windows-latest Node 22 with the actual tool registry; the gate turns real wiring regressions red instead of green-with-silent-fail"
+      ],
+      "evidence": "GitHub Actions runs 39527628978 (green, A5 PASS) and 39527393552 (red, gate caught missing probe); artifacts win-acceptance-<sha> inspected directly",
+      "verdict": "93/100"
+    },
+    {
+      "round": 30,
+      "focus": "W4 Standing agent teams INCOMPLETE -> VERIFIED-CORE, built on absorb-verified patterns (reuse directive honored, no wheel reinvented)",
+      "done": [
+        "absorb-scans: openai/swarm (278 filer, MIT) source-verified patternextract (Agent-entity, context_variables blackboard, handoff); crewAI 4000 filer gav heat=0 — scanner-limitation flagged honestly in evidence",
+        "src/core/teams.js: TeamStore (roster persistens, member-upsert stabilt addedAt, blackboard jsonl+digest, atomic checkpoint) + runTeam (budget TeamBudgetError loud, resume exactly-once via makeWorker-injection)",
+        "tools: team.manage + team.run (133 -> 135 registered, counter-asserts bumped consciously), i18n-gate honored (12 swedish literals -> english)",
+        "test/teams.test.js 9/9: identity, memory, budget, checkpoint, recovery counter-proof, tool surface, honest-fail-without-provider"
+      ],
+      "evidence": "docs/evidence/w4-teams-absorb-2026-10-21.md; full npm test 760/0/17",
+      "verdict": "94/100"
+    },
+    {
+      "round": 31,
+      "focus": "W13 never-stuck: saknade injec-failure + metrics-svit byggd pa absorb-pattern (chaostoolkit) och RIKTIGA ENGINE-komponenter — inget nytt hjul",
+      "done": [
+        "absorb: chaostoolkit/chaostoolkit (75 filer, Apache-2.0) — experiment-ontologi (steady-state-hypothesis+bound, metod=fault-injektion, dom fran matning) ateranvendd direkt",
+        "src/core/recovery-metrics.js: 15 rader over runSwarm/watchdog/teams/mission-checkpoint/classifier; verdict recovered|controlled|STUCK|not_tested; invariant I1-I4 gate-paus",
+        "reella rotorsaker i sviten sjalv atgardade maste-mitt: unref-timer = tyst process-dod mitt i matris (sleep keep-alive fix), adaptive-raden kravde nodes>cap (beslutspunkter), fel-strang matchades mot REAL validateGraph-text i stallet for gissad",
+        "scripts/w13-recovery-matrix.mjs + docs/evidence/w13-recovery-matrix-2026-10-21.{json,md}; test/recovery-metrics.test.js 4/4 (tacit no-fake-green-kontroll)",
+        "resultat: recoveryRate=1.000, stuck=0, unhandledRejection=0, 15/15 inom bound"
+      ],
+      "evidence": "docs/evidence/w13-recovery-matrix-2026-10-21.json; npm test 774/0/17",
+      "verdict": "95/100"
+    },
+    {
+      "round": 32,
+      "focus": "W8: receive-paritet discord/slack/matrix i befintlig Channels-buss — absorb forst (matrix-js-sdk, slack-sdk, egen telegram-shape), noll nya dependencies",
+      "done": [
+        "tre nya adapters src/core/channels/{discord,slack,matrix}.js: REST-poll, per-channel cursor persistan till workspace, tail-baseline (aldrig backlog-flood), loop-guard (egen/bot), allowlist, honest status-diagnoser (Message Content intent, not_in_channel, skippedEncrypted)",
+        "Channels-buss integration: start/stop/status/deliver/toApproval/sessions parity for de tre kanalerna session-prefix: discord/slack/matrix:",
+        "test/channels-inbound.test.js 7/7 — per-channel receive-verifiering (exakt vad STATUS saknade); tre debug-learnings dokumenterade (import-time dirs-pollution, mock-ok-lju, sendMatrix-cfg-kontrakt)",
+        "STATUS-rad korrigerad faktiskt: OUTBOUND-funktionalitet fanns redan (tidigare \"saknas\" var gammal)"
+      ],
+      "evidence": "docs/evidence/w8-inbound-channels-2026-10-21.md; full npm test 787/0/17",
+      "verdict": "96/100"
+    },
+    {
+      "round": 33,
+      "focus": "W9 + W10 STATUS-korrektion: bada raderna (\"MISSING\") var forlegade — moduler och tester existerade och gronne; ingen ny kod behovdes, sanningen raknades",
+      "done": [
+        "W9: memory-sync.js verificerad 6/6 — converge exactly-one-sync, idempotent, dryRun zero-write, tombstone peer-removal, same-store refusal, provenance; memory.sync tool (write-risk) registered",
+        "W10: learn.js verificerad 7/7 — unverified-at-birth, verify requires measured-proof string, demotion on re-occurrence with archived proof history, honesty-first stats, durable JSONL torn-line tolerance; ma.learn/ma.verify_lesson/ma.lessons registered (som tool-schema-counter-commenten visade)",
+        "FULL regression re-kort 787/0/17"
+      ],
+      "evidence": "test/memory-sync.test.js; test/learn.test.js; npm test 787/0/17",
+      "verdict": "98/100"
+    },
+    {
+      "round": 34,
+      "focus": "W6 Power Transfer MISSING -> VERIFIED-CORE: pipeline DISCOVER->PROPOSE->APPROVE->INSTALL->VERIFY pa absorb (W1) + teams (W4) — riktig e2e mot openai/swarm, aldrig fixtur-pastaende",
+      "done": [
+        "src/core/power-transfer.js: extractor swarm-Agent() python-literal + crewAI agents.yaml (injected js-yaml load); transferPlan deterministisk planHash + license-risk map; ledger append-only; applyPlan gate (not_approved-refusal) + idempotent upsert + roster read-back-verify",
+        "tools: power.propose/approve/apply (135 -> 138 verktyg; copyleft krawer acceptCopyleftRisk-flagga inne i gesten)",
+        "REAL e2e: absorber om openai/swarm (278 filer MIT) -> plan 3abbfa82573f5964 -> 3 agent-definitioner (triage/sales/refunds) installerade i demoteam med provenance + blackboard audit trail, inget upstream-kode exekverat",
+        "test/power-transfer.test.js 6/6; yaml-export-form (js-yaml v5 named exports) matched mot VERKLIG modul istallet for gissad; member-id-sanitizer vs TeamStore regex (underscores) atgardad med hogre-doman-sanning (assert mot derived id)"
+      ],
+      "evidence": "docs/evidence/w6-power-transfer-2026-10-21.md; npm test 802/0/17",
+      "verdict": "99/100"
+    },
+    {
+      "round": 35,
+      "focus": "W14 PARTIAL-VERIFIED-DEL -> VERIFIED-CORE: tre luckor (rollback / reproducible / competitive benchmark) stängda mot riktiga mätningar",
+      "done": [
+        "Rollback: src/core/update-rollback.js (majin-rollback/1) — install-manifest + isolerade backup-kopior under .rollback/backups/<v>/ (överlever att installern raderar källfilen, testat), planRollback väljer senaste TIDIGARE version och verifierar backup-sha256 (tamperade bytes = refusal, aldrig restore av oidentifierat innehåll); executeRollback KRÄVER injicerad plattforms-restorer — utan hook → RollbackError no restorer injected (exit 3 via scripts/rollback.mjs); ledger.jsonl appendas först EFTER lyckad restore",
+        "Reproducible: src/core/reproducible.js — manifestHash = sha256 över git-ls-files (path\\0mode\\0size\\0content-sha256); proof = två computes identiska, live-run 494 tracked files/5 399 009 bytes identical ✓; untracked brus påverkar ALDRIG hashen (testat); binary-exe bit-exact scope = NOT TESTED deklarerat (pkg/NT-signing/timestamps). scripts/reproducible-check.mjs --save → docs/evidence/reproducible-2026-10-21.json",
+        "Competitive benchmark: src/core/competitive-bench.js (majin-competitive-bench/1) — reuse-princip: absorb laude-institute/terminal-bench (layouten och verifier-kontrakt återanvänt; canary GUID-task-innehåll kopierat ALDRIG) + tre egna native tasks (report-largest/json-key-extract/two-step-chain) där verifiern omberäknar sanningen ur task-inputs. Kontrakt: good PASS + bad FAIL annars flagged med cheat-vs-broken-distinktion; live 3/3 verified; anti-cheats validerade (fuskande verifier → harness.healthy=false); agentLanesLive=pending-credentials (aldrig fabrication). scripts/competitive-bench.mjs exit≠0 om flagged",
+        "test/w14-release.test.js 10/10 grön; full regression 846/0/17 (802→846); transcript-fynd korrigerat: renderMarkdown in-operator-på-primitiv-bugg fixad före push"
+      ],
+      "evidence": "docs/evidence/w14-release-2026-10-21.md + competitive-bench-2026-10-21.{json,md} + reproducible-2026-10-21.json; npm test 846/0/17",
+      "verdict": "99/100 — CAP-anteckning oförändrad: W14 stängd höjer inte percent över 99; W11 (desktop vision) + W12 (pink cursor interaktiv acceptance på användarens maskin) är contessanterna. 100 = W11+W12 verifierade på riktig hårdvara."
+    },
+    {
+      "round": 36,
+      "focus": "W11 pARTIAL-VERIFIED-DEL -> VERIFIED-CORE: desktop vision-grounding + task-eval-harness byggda core-verifierbart; live-hardware-del deklarerad deferred (aldrig fabrikerad)",
+      "done": [
+        "Reuse-principen: absorb microsoft/UFO i sandlådan (851 filer, MIT) — layout (HostAgent/AppAgent-split) och conditional-hardware-disciplinen återanvända; innehåll aldrig kopierat (kompositionen MAJINs: vision.js + computer-use observe)",
+        "src/core/desktop-vision.js (majin-desktop-vision/1): injicerad captureFn krävs — utan → DesktopVisionError (ingen frabricerad skärmdump); captureEvidence skriver bytes+sha256 före analys; groundTargets accepterar BARA strikt JSON [{label,x,y}] (prosa → refusal, aldrig gissade klickkoordinater); verifyOnScreen kräver callers accept() — aldrig modellen-sa-ja; platformGate: live lane BARA win32",
+        "src/core/desktop-eval.js (majin-desktop-eval/1): diskrimineringskontrakt som competitive-bench — simulerade verifierare MÅSTE passa good och faila bad annars flagged (cheat-vs-broken); windows-real på icke-Windows → DEFERRED hardware-required (aldrig pass/fail); aggregate räknar deferred separat; agentLanesLive=pending-hardware",
+        "3 egna desktop-tasks (eget innehåll): notepad-write-save (spec.json-sanning vs note.txt-bytes), window-title-observe (state.json ground truth vs answer.txt claim), rename-file-dialog-win (WINDOWS REAL LANE: proof=%TEMP%-filsystem, setup-PS1 med read-back verify, icke-Windows exit 3 deferred)",
+        "test/desktop-vision.test.js 7/7 + test/desktop-eval.test.js 6/6; scripts/desktop-bench.mjs --save → docs/evidence/desktop-bench-2026-10-21.{json,md} (2 verified, 1 deferred, flagged=0, healthy)",
+        "self-audit (W1-4-repo-hygiëník) fångade claim-ord i renderDesktopMarkdown — neutraliserad; full regression 846→859/0/17"
+      ],
+      "evidence": "docs/evidence/w11-desktop-vision-2026-10-21.md + docs/evidence/desktop-bench-2026-10-21.{json,md}; npm test 859/0/17",
+      "verdict": "99/100 — CAP kvarstår: W11 core-maskin sanning verifierad i sandlådan, men LIVE screenshot/UFO-eval-körningen kräver Windows-hårdvara; W12 interaktiv acceptance kräver användarens maskin. 100 = rikitig hårdvara, aldrig simulation."
+    },
+    {
+      "round": 37,
+      "focus": "W2 ENV-BLOCK -> LIVE-ACCEPTANCE (github-lane): research.run kord mot VERKLIG egress (api.github.com) inuti sandlådan — 0 fixtures",
+      "done": [
+        "scripts/research-live-acceptance.mjs: searchFn=real HTTPS api.github.com/search/repositories, fetchFn=GitHub README-API base64->utf8; token ur GITHUB_TOKEN-miljö, aldrig lagrat",
+        "Live-körning: 4 riktiga källor (lukeed/sade, mdbetancourt/soly, th317erd/simple-yargs, TheBrenny/big-kahuna), 22 findings, unsupported=0, verdict \"all claims sourced\"; 18 conflicted flaggade (motorns kors-kontroll verklig)",
+        "Adapter-transparens tvingad: query-ladder deklareras per steg i adapter-notes.json (github full-text AND:ar termer — naturliga frågor=0 catch); IR-läxa: interrogativa \"which\" styrde källor felVänt till which-verktyg (thefuck/node-which/pyenv) -> stopword-fix + frågan anpassad till sök-motorns semantik",
+        "Tunn-undermålin högljudd: <3 källor eller unsupported claims => exit!=0 \"refusing to count it as acceptance evidence\"",
+        "test/research-live-acceptance.test.js 5/5: evidential audit av committade receipts (offline-deterministisk) — riktiga github-URLs med fetch-tidsstämnar, findings>=3, unsupported=0, adapter-notes högljudda",
+        "Evidence committat: docs/evidence/research-live-2026-10-21/{report.md,ledger.json,sources.jsonl,adapter-notes.json}; regression 859->864/0/17",
+        "Referens-oförändrat ärligt: DuckDuckGo-/Bing-lanen förblir ENV-BLOCKAD (sandbox-egress) — full-env-acceptans återstår"
+      ],
+      "evidence": "docs/evidence/w2-live-acceptance-2026-10-21.md + docs/evidence/research-live-2026-10-21/*; npm test 864/0/17",
+      "verdict": "99/100 — CAP kvarstår: W11-live + W12 interaktiv acceptance på användarens maskin är de återstående portarna till 100."
+    },
+    {
+      "round": 38,
+      "focus": "W13 LIVE-AGENT-SIDE PENDING -> LIVE-VERIFIED (opencode zen/go): fault-injection-disciplinen körd mot riktig provider via oc_sk_-nyckeln användaren gav",
+      "done": [
+        "Endpoint-utforskning dokumenterad: oc_sk=service-account; opencode.ai/console/api/v2/config 200 (workspace-config); opencode.ai/zen/go/v1 OpenAI-kompatibel (37 modeller); x-opencode-session OBLIGATORISK (annars MissingSessionID) — tidigare 404 var fel host",
+        "src/core/live-provider-chaos.js (majin-live-provider-chaos/1): 7 chaos-rader baserade på samma metod som recovery-metrics men mot RIKTIG api — baseline (riktiga tokens), 400ms-deadline-abort, mid-flight-abort, bad-key-refusal, bogus-model-refusal, burst-of-5, empty-messages-guard",
+        "Live-körning TVÅ gånger, samma resultat: rate 100% (2 recovered+5 controlled av 7), stuck=0, unhandled=0; baseline usage 28+173=201 tokens räknat på riktighet",
+        "Nyckelhygien I5 auditerad: riktig nyckel 0 förekomster i artifacts (assertat i suit), chaos-nyckeln maskad",
+        "test/live-provider-chaos.test.js 6/6 (offline engine-kontrakt + evidential audit av committade receipts); regression 864->870/0/17",
+        "i18n-suiten fångade svenska strängar i koden mitt under rundan — översatta före push",
+        "GLM-QA 25->33-axel (parallell agents spår) förblir pending-honest: annan credential-yta, inte denna lane"
+      ],
+      "evidence": "docs/evidence/live-provider-chaos-2026-10-21.{json,md} + docs/evidence/w13-live-provider-chaos-2026-10-21.md; npm test 870/0/17",
+      "verdict": "99/100 — CAP oförändrad: W11-live + W12-interactive på användarens maskin återstår som hårdvaru-portar. Sandbox klar nu av alla cred-gates som den kan räcka."
+    },
+    {
+      "round": 39,
+      "focus": "STATUS-städning (W12-dublett + förlegade gap-lister) + förenat live-run-paket: gränsen mellan vad som kan/bevisas från sandlådan expliciterad och kodad",
+      "done": [
+        "STATUS: rad-dublett W12 Pink AI cursor/MISSING borttagen (modulen finns — 7/7 offline + win-CI dry-plan med artifact); datum 2026-10-21 med svit 870/0/17; \"Största gap till 100\"-listan (var förlegad och påstod W1/W2/W3/W5/W6/W9/W10/W12 saknade modul — alla VERIFIED-CORE nu) ersatt av dag-justerad lista; \"Nästa konkreta action\" pekade på redan-stängt W1 → ersatt med live-run-kommandon",
+        "scripts/windows/live-acceptance-run.ps1 (NY): tre loramer A=W11-live (setup+manual-reference-rename+rvf + desktop-bench resparat på win32), B=W2 DDG/Bing (majin research via registry med web.search/web.fetch i full egress), C=W12-scaffold (förfylld checklista + steg, alliaga receipts till docs/evidence/live-run-<datum>/); read-back-disciplin på RUN-SUMMARY; anti-fabrication-markerad",
+        "docs/LIVE-RUN-GUIDE.md (NY): vägen 99→100 - clone→ci→1-kommando→5min interaktiv obs→commit; agent-credit/manual-reference-split explicit; exakt commit-path tillstånd; fabrication-regeln marknad (\"a checked box without observed evidence is fabrication — CAP stannar på 99 BY DESIGN\")",
+        "test/live-run-package.test.js 5/5 (offline-deterministisk paketstäd: tre lan-texter, read-back, anti-fabrication-markerad, ingen nyckel-literal, guide completeness)",
+        "Regression 870 -> 875/0/17"
+      ],
+      "evidence": "scripts/windows/live-acceptance-run.ps1 + docs/LIVE-RUN-GUIDE.md + test/live-run-package.test.js; npm test 875/0/17",
+      "verdict": "99/100 — detta är CAP: en kada framtanter för användaren att sluta SEPARAT; inga fler sandlåde-läppar att svals. Vägen till 100 = användarens maskin-körning committad."
+    }
+  ],
+  "percent": 99
+}

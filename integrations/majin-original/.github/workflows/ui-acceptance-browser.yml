@@ -1,0 +1,39 @@
+name: ui-acceptance-browser
+
+# Real-browser Aurora acceptance (Playwright chromium, disposable MAJIN home).
+# This is the 8A-8D evidence gate: no mocks of money, no fake progress —
+# every assertion exercises the shipped interface end to end.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ['src/ui/**', 'scripts/phoenix-browser.mjs', 'test/a11y-static.test.js']
+
+permissions: { contents: read }
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Run browser acceptance
+        run: node scripts/phoenix-browser.mjs
+        env:
+          MAJIN_UI_OUTPUT: work/ui-evidence
+      - name: Static a11y/perf/interaction suite
+        run: node --test test/a11y-static.test.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-evidence
+          path: work/ui-evidence/
+          retention-days: 30

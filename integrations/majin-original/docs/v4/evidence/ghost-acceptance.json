@@ -1,0 +1,128 @@
+{
+  "schema": "majin.v4.ghost-acceptance/v1",
+  "at": "2026-10-23T19:16:34.493Z",
+  "machine": "DESKTOP-C1RSBUA",
+  "deployedSourceCommit": "dd62b49b764e7fed99ae349809bb295e02d6b79d",
+  "backup": {
+    "files": 39,
+    "bytes": 46961,
+    "restoreMismatches": 0,
+    "originalInstallationFilesVerified": 839,
+    "originalInstallationMismatches": 0,
+    "privateMaterialKeptOutOfGit": true
+  },
+  "preservedOriginalState": {
+    "checked": 23,
+    "mismatches": 0
+  },
+  "runtime": {
+    "anonymousStatus": 401,
+    "existingSessions": 6,
+    "historySameAcrossTwoExistingSessions": true,
+    "conversationCount": 11,
+    "publicTailnetHttpsHealth": true,
+    "publicTailnetAnonymousStatus": 401,
+    "loopbackBind": true,
+    "crashRecovery": {
+      "tested": true,
+      "killedChildPid": 7708,
+      "recoveredChildPid": 8304,
+      "supervisorObservedCrash": true,
+      "supervisorObservedRecovery": true
+    },
+    "inferenceAfterRestart": {
+      "at": "2026-10-23T19:13:50.402Z",
+      "machine": "DESKTOP-C1RSBUA",
+      "httpStatus": 200,
+      "provider": "opencode-go",
+      "model": "glm-5.3-flash",
+      "demo": false,
+      "streaming": true,
+      "completed": true,
+      "responseMarkerObserved": true,
+      "credentialContentsRecorded": false,
+      "sourceHost": true,
+      "nativeWindowsAppInstalled": false
+    }
+  },
+  "autostart": {
+    "registeredVia": "native Task Scheduler API; no execution-policy change",
+    "logonTriggerRegistered": true,
+    "actualLogonTested": false,
+    "lastStartSucceeded": false,
+    "observedErrors": [
+      "0x8007010B",
+      "process exit 1"
+    ],
+    "taskDisabledAfterFailedAcceptance": true,
+    "currentSourceHostManuallySupervised": true
+  },
+  "nativeDistribution": {
+    "artifactSourceHead": "522958cf4a30b7b4a29833e1b934e802f3bd5f68",
+    "ciRun": 40000262005,
+    "archiveSha256": "b625add516a68a5f9252a45867bbbe21c0a2a922a04d72bb0d3748126588244c",
+    "installerSha256": "df9a63f4db8da9e9042c1ee79d401de5d82f45ea6fc9d3bdf8e4d31b3ee0f615",
+    "installerAuthenticode": "NotSigned",
+    "installationBlockedByWindowsApplicationControl": true,
+    "securityPolicyChanged": false,
+    "productionSignerProvisioned": false
+  },
+  "phone": {
+    "device": "iPhone 13",
+    "ownerReportedChatWorkingAfterFix": true,
+    "ownerReply": "funkar har du löst den på datorn också appen?",
+    "physicalVoiceIndividuallyVerified": false,
+    "physical5GReconnectIndividuallyVerified": false
+  },
+  "tests": {
+    "legacyGhostBaseline": {
+      "passed": 1234,
+      "failed": 43,
+      "skipped": 23
+    },
+    "legacyFinal": {
+      "passed": 1284,
+      "failed": 0,
+      "skipped": 23
+    },
+    "resolvedReproducedLegacyFailures": 43,
+    "v4BeforeChanges": {
+      "passed": 492,
+      "failed": 0,
+      "skipped": 1
+    },
+    "v4LatestFullLocal": {
+      "passed": 493,
+      "failed": 1,
+      "skipped": 1,
+      "remainingFailure": "Old Scheduled Task text assertion; corrected and all 15 installer tests passed afterwards"
+    },
+    "targetedInstaller": {
+      "passed": 15,
+      "failed": 0
+    },
+    "targetedUiAndHistory": {
+      "passed": 33,
+      "failed": 0
+    },
+    "mobileTouch": {
+      "engines": [
+        "Chromium/Edge",
+        "WebKit"
+      ],
+      "passed": 2,
+      "failed": 0,
+      "physicalDevice": false,
+      "recognitionStub": true,
+      "keyboardViewportSimulated": true
+    },
+    "syntax": {
+      "passed": 612,
+      "failed": 0
+    },
+    "i18n": {
+      "strayLiterals": 0
+    }
+  },
+  "verdict": "NOT READY"
+}

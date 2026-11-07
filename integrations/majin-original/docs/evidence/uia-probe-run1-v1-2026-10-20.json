@@ -1,0 +1,77 @@
+{
+  "schema": "majin.win-uia-probe.v1",
+  "timestamp": "2026-10-20T00:00:12.5255204Z",
+  "env": {
+    "osVersion": "Microsoft Windows NT 10.0.26100.0",
+    "psVersion": "5.1.26100.33438",
+    "clrVersion": "4.0.30319.42000",
+    "machineName": "runnervm0xl3a",
+    "is64Bit": true
+  },
+  "p1_assemblyAndRoot": {
+    "loaded": true,
+    "topWindowCount": 4,
+    "topWindows": [
+      {
+        "name": "",
+        "className": "Shell_TrayWnd",
+        "controlType": "ControlType.Pane",
+        "bounds": "0,720,1024,48"
+      },
+      {
+        "name": "C:\\ProgramData\\GitHub\\HostedComputeAgent\\hosted-compute-agent",
+        "className": "CASCADIA_HOSTING_WINDOW_CLASS",
+        "controlType": "ControlType.Window",
+        "bounds": "44,52,1044,635"
+      },
+      {
+        "name": "System Properties",
+        "className": "#32770",
+        "controlType": "ControlType.Window",
+        "bounds": "311,319,420,192"
+      },
+      {
+        "name": "Program Manager",
+        "className": "Progman",
+        "controlType": "ControlType.Pane",
+        "bounds": "0,0,1024,768"
+      }
+    ]
+  },
+  "p2_negativeControl": {
+    "windowName": "MAJIN-Nonexistent-Window-7f3b9d2e",
+    "found": false,
+    "nullAsExpected": true
+  },
+  "p3_notepad": {
+    "launched": true,
+    "windowFound": true,
+    "windowName": "Untitled - Notepad",
+    "className": "Notepad",
+    "controlType": null,
+    "valuePatternOk": false,
+    "textPatternOk": false,
+    "setValueOk": false,
+    "readBackOk": false,
+    "readBackMatches": false,
+    "clearedOk": false,
+    "closedOk": true,
+    "gapReason": "no Edit/Document control under the Notepad window"
+  },
+  "capabilities": {
+    "identifyWindows": true,
+    "locateControls": false,
+    "textInput": false,
+    "readBack": false
+  },
+  "notes": [],
+  "evidenceSource": {
+    "runId": 39344950257,
+    "artifactId": 12230387475,
+    "artifactName": "uia-probe-result",
+    "workflow": "win-control-poc.yml",
+    "ref": "main (31979be)",
+    "event": "workflow_dispatch",
+    "collectedBy": "MAJIN Agent 2026-10-20"
+  }
+}

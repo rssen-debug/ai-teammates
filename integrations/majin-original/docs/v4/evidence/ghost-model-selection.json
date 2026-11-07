@@ -1,0 +1,96 @@
+{
+  "at": "2026-10-23T20:48:42.623Z",
+  "sourceCommit": "909d758e5c10ce8d58d62cca67cd78a5a8da4bdd",
+  "transport": "Tailscale HTTPS",
+  "existingSessions": 2,
+  "selection": {
+    "version": 1,
+    "modelId": "opencode-go/glm-5.3-flash",
+    "persisted": true,
+    "updatedAt": "2026-10-23T20:48:39.643Z"
+  },
+  "current": {
+    "id": "opencode-go/glm-5.3-flash",
+    "offering": "opencode-go",
+    "billing": {
+      "status": "unknown",
+      "label": "Cost unknown — verify with provider",
+      "subscriptionIncluded": null,
+      "additionalUsageCost": null,
+      "verifiedAt": null
+    }
+  },
+  "catalogue": {
+    "modelCount": 37,
+    "providers": {
+      "opencode-go": {
+        "ok": true,
+        "at": "2026-10-23T20:48:38.836Z",
+        "stale": false,
+        "count": 37
+      }
+    },
+    "usage": {
+      "source": "https://opencode.ai/inference/go/v1/usage",
+      "at": "2026-10-23T20:48:39.577Z",
+      "windows": {
+        "rolling": {
+          "status": "ok",
+          "percent": 0,
+          "resetsAt": "2026-10-23T23:38:41.000Z"
+        },
+        "weekly": {
+          "status": "ok",
+          "percent": 44,
+          "resetsAt": "2026-10-26T00:00:00.000Z"
+        },
+        "monthly": {
+          "status": "ok",
+          "percent": 22,
+          "resetsAt": "2026-11-18T17:49:34.000Z"
+        }
+      },
+      "accountEntitlementVerified": false,
+      "extraUsageEnabled": null,
+      "stale": false
+    }
+  },
+  "sessionsAgree": true,
+  "staleUpdateStatus": 409,
+  "liveInference": {
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "demo": false,
+    "httpStatus": 200,
+    "completed": true,
+    "file": "genesis-model-proof-1792788519706.txt",
+    "bytesVerified": true,
+    "toolActions": [
+      {
+        "type": "tool_start",
+        "name": "workspace_write"
+      },
+      {
+        "type": "tool_result",
+        "name": "workspace_write"
+      },
+      {
+        "type": "tool_start",
+        "name": "workspace_read"
+      },
+      {
+        "type": "tool_result",
+        "name": "workspace_read"
+      }
+    ]
+  },
+  "originalConfigUnchanged": true,
+  "physicalPhoneAcceptance": false,
+  "twoDifferentGoModelsAccepted": false,
+  "restart": {
+    "at": "2026-10-23T20:49:51.698Z",
+    "verified": true,
+    "version": 1,
+    "sessionsAgree": true
+  }
+}

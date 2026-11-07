@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="theme-color" content="#07060c" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="MAJIN — privat assistent som utför saker, inte bara pratar." />
+  <title>MAJIN</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon-192.png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MAJIN" />
+  <link rel="stylesheet" href="/app.css?v=15" />
+</head>
+<body>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar" id="topbar">
+    <div class="topbar-left">
+      <button type="button" class="icon-btn" id="history-btn" aria-label="Historik" aria-haspopup="dialog" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <div class="brand" aria-label="MAJIN">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">MAJIN</span>
+        <span class="brand-ver">v4</span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="pill" id="model-pill" aria-haspopup="dialog">
+        <span class="dot" id="conn-dot" aria-hidden="true"></span>
+        <span id="model-label">ansluter…</span>
+      </button>
+      <button type="button" class="icon-btn" id="menu-btn" aria-label="Meny" aria-haspopup="dialog" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <section class="hero" id="hero">
+      <div class="spirit-wrap">
+        <canvas id="spirit" width="320" height="320" role="img" aria-label="MAJINs närvaro"></canvas>
+      </div>
+      <h1 class="hero-title" id="hero-title">Majin lets run it.</h1>
+    </section>
+
+    <section class="thread" id="thread" aria-live="polite" aria-relevant="additions text"></section>
+  </main>
+
+  <section class="approval" id="approval" hidden aria-live="assertive">
+    <div class="approval-head">
+      <span class="approval-kicker">Kräver ditt godkännande</span>
+      <button type="button" class="approval-x" id="approval-dismiss" aria-label="Stäng">×</button>
+    </div>
+    <p class="approval-text" id="approval-text"></p>
+    <div class="approval-actions">
+      <button type="button" class="btn ghost" id="approval-deny">Nej</button>
+      <button type="button" class="btn primary" id="approval-allow">Ja, kör</button>
+    </div>
+  </section>
+
+  <div class="offline-bar" id="offline-bar" hidden>Offline — MAJIN kan inte nå värden. Meddelanden sparas inte.</div>
+
+  <form class="composer" id="composer" autocomplete="off">
+    <div class="composer-inner">
+      <button type="button" class="attach" id="attach-btn" aria-label="Bifoga fil">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <input type="file" id="file-input" hidden multiple accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,application/json,.docx,.xlsx" />
+      <button type="button" class="mic" id="mic-btn" aria-label="Tala" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/>
+          <path d="M18 11a6 6 0 0 1-12 0M12 17v4M9 21h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <span class="mic-ring" aria-hidden="true"></span>
+      </button>
+      <label class="sr-only" for="input">Meddelande till MAJIN</label>
+      <textarea id="input" rows="1" placeholder="Skriv eller tryck på mikrofonen…" enterkeyhint="send" maxlength="8000"></textarea>
+      <button type="submit" class="send" id="send-btn" aria-label="Skicka" disabled>
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="stop" id="stop-btn" aria-label="Stoppa" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
+      </button>
+    </div>
+    <p class="composer-hint" id="composer-hint"></p>
+  </form>
+
+  <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+  <aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <h2 id="sheet-title" class="sheet-title">MAJIN</h2>
+
+    <div class="sheet-section">
+      <h3>Modell</h3>
+      <p class="sheet-value" id="sheet-model">…</p>
+      <p class="sheet-note" id="sheet-model-note"></p>
+      <label class="sr-only" for="model-search">Search models</label>
+      <input id="model-search" type="search" placeholder="Search models" autocomplete="off" />
+      <label class="row"><span>Verified subscription-included</span><input id="model-included" type="checkbox" /></label>
+      <ul class="model-list" id="model-list" role="radiogroup" aria-label="Välj modell"></ul>
+      <p class="sheet-note" id="model-source"></p>
+      <button type="button" class="btn ghost wide" id="refresh-models" hidden>Uppdatera modellistan</button>
+    </div>
+
+    <div class="sheet-section">
+      <h3>Röst</h3>
+      <label class="row">
+        <span>Läs upp svar</span>
+        <input type="checkbox" id="tts-toggle" />
+      </label>
+      <label class="row">
+        <span>Skicka direkt efter tal</span>
+        <input type="checkbox" id="autosend-toggle" checked />
+      </label>
+      <p class="sheet-note" id="voice-note"></p>
+    </div>
+
+    <div class="sheet-section">
+      <h3>Arbetsyta</h3>
+      <ul class="file-list" id="file-list"></ul>
+    </div>
+
+    <div class="sheet-section">
+      <h3>Behörigheter</h3>
+      <p class="sheet-value" id="owner-state">…</p>
+      <p class="sheet-note" id="owner-note"></p>
+      <ul class="lane-list" id="lane-list"></ul>
+      <label class="row">
+        <span>Mapp att ge åtkomst till</span>
+      </label>
+      <div class="folder-row">
+        <input id="folder-input" type="text" placeholder="T.ex. C:\Users\du\Documents" autocomplete="off" spellcheck="false" />
+        <button type="button" class="btn ghost small" id="folder-add">Lägg till</button>
+      </div>
+      <ul class="folder-list" id="folder-list"></ul>
+      <button type="button" class="btn ghost wide danger" id="owner-revoke" hidden>Återkalla allt</button>
+    </div>
+
+    <div class="sheet-section">
+      <h3>Godkännanden</h3>
+      <p class="sheet-value" id="approval-state">…</p>
+      <p class="sheet-note" id="approval-note"></p>
+      <label class="row">
+        <span>Full behörighet — fråga aldrig</span>
+        <input type="checkbox" id="approval-auto" />
+      </label>
+      <p class="sheet-note" id="approval-warning" hidden></p>
+    </div>
+
+    <div class="sheet-section">
+      <h3>Förmågor</h3>
+      <ul class="skill-list" id="skill-list"></ul>
+    </div>
+
+    <div class="sheet-section">
+      <h3>Inlärt</h3>
+      <p class="sheet-note" id="learned-note">Sådant MAJIN lärt sig av verifierat arbete.</p>
+      <ul class="skill-list" id="learned-list"></ul>
+    </div>
+
+    <div class="sheet-section">
+      <h3>Uppgifter</h3>
+      <ul class="goal-list" id="goal-list"></ul>
+      <button type="button" class="btn ghost wide" id="push-enable">Enable notifications</button>
+      <button type="button" class="btn ghost wide" id="push-test" hidden>Send a test notification</button>
+      <button type="button" class="btn ghost wide" id="push-disable" hidden>Disable notifications on this device</button>
+      <p class="sheet-note" id="push-status"></p>
+      <label class="row"><span>Notify about stalled tasks</span><input type="checkbox" id="heartbeat-notify" /></label>
+      <p class="sheet-note" id="heartbeat-status"></p>
+      <button type="button" class="btn ghost wide" id="heartbeat-resume" hidden>Resume background updates</button>
+    </div>
+
+    <div class="sheet-section">
+      <h3>Säkerhet</h3>
+      <p class="sheet-note">Inloggad enhet. <button type="button" class="link" id="logout">Logga ut</button></p>
+      <p class="sheet-note" id="version-note"></p>
+    </div>
+  </aside>
+
+  <div class="drawer-backdrop" id="history-backdrop" hidden></div>
+  <aside class="history" id="history" role="dialog" aria-modal="true" aria-labelledby="history-title" hidden>
+    <header class="history-head">
+      <h2 id="history-title">Historik</h2>
+      <button type="button" class="icon-btn" id="history-close" aria-label="Stäng historiken">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6l-12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <div class="history-search">
+      <label class="sr-only" for="history-query">Sök i historiken</label>
+      <input id="history-query" type="search" placeholder="Sök i historiken…" autocomplete="off" spellcheck="false" enterkeyhint="search" />
+    </div>
+    <div class="history-tabs" role="tablist" aria-label="Visa">
+      <button type="button" class="history-tab" id="history-tab-active" role="tab" aria-selected="true">Aktiva</button>
+      <button type="button" class="history-tab" id="history-tab-archived" role="tab" aria-selected="false">Arkiverade</button>
+    </div>
+    <ul class="history-list" id="history-list" aria-live="polite"></ul>
+    <p class="history-empty" id="history-empty" hidden></p>
+    <footer class="history-foot">
+      <button type="button" class="btn ghost wide" id="history-settings">⚙ Inställningar &amp; behörigheter</button>
+      <button type="button" class="btn primary wide" id="new-chat">Nytt samtal</button>
+      <button type="button" class="btn ghost wide" id="import-history">Importera tidigare historik</button>
+      <p class="sheet-note" id="import-note"></p>
+    </footer>
+  </aside>
+
+  <div class="dialog-backdrop" id="dialog-backdrop" hidden></div>
+  <div class="dialog" id="rename-dialog" role="dialog" aria-modal="true" aria-labelledby="rename-title" hidden>
+    <h2 id="rename-title">Byt namn</h2>
+    <form id="rename-form">
+      <label class="sr-only" for="rename-input">Namn</label>
+      <input id="rename-input" type="text" maxlength="80" autocomplete="off" required />
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" id="rename-cancel">Avbryt</button>
+        <button type="submit" class="btn primary" id="rename-save">Spara</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="dialog" id="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" hidden>
+    <h2 id="confirm-title">Radera samtalet?</h2>
+    <p class="dialog-copy" id="confirm-copy">Det här går inte att ångra. Arkivering är det reversibla alternativet.</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="confirm-cancel">Avbryt</button>
+      <button type="button" class="btn danger" id="confirm-delete">Radera permanent</button>
+    </div>
+  </div>
+
+  <div class="gate" id="gate" hidden>
+    <div class="gate-card">
+      <div class="gate-orb" aria-hidden="true"></div>
+      <h1>Anslut enheten</h1>
+      <p class="gate-copy">Ange parkodningen som visades på MAJIN-värden första gången den startade.</p>
+      <form id="gate-form" autocomplete="off">
+        <label class="sr-only" for="gate-code">Parkod</label>
+        <input id="gate-code" name="code" inputmode="text" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX" maxlength="12" required />
+        <button type="submit" class="btn primary wide" id="gate-submit">Anslut</button>
+      </form>
+      <p class="gate-error" id="gate-error" role="alert" hidden></p>
+      <p class="gate-note">Koden finns på värden: <code>npm run v4:pair</code> skriver ut en ny.</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <template id="tpl-message">
+    <article class="msg">
+      <div class="msg-body"></div>
+      <div class="msg-meta"></div>
+    </article>
+  </template>
+
+  <div class="lightbox" id="lightbox" hidden>
+    <img id="lightbox-img" alt="" />
+    <button type="button" class="lightbox-x" id="lightbox-x" aria-label="Stäng">×</button>
+  </div>
+
+  <template id="tpl-attachment">
+    <figure class="attach-card">
+      <div class="attach-body"></div>
+      <figcaption class="attach-meta"></figcaption>
+    </figure>
+  </template>
+
+  <template id="tpl-preview">
+    <div class="preview">
+      <div class="preview-head">
+        <span class="preview-name"></span>
+        <button type="button" class="preview-open">Öppna i ny flik</button>
+      </div>
+      <iframe class="preview-frame" sandbox="allow-scripts" referrerpolicy="no-referrer" loading="lazy"></iframe>
+    </div>
+  </template>
+
+  <template id="tpl-tool">
+    <details class="tool">
+      <summary>
+        <span class="tool-state" aria-hidden="true"></span>
+        <span class="tool-name"></span>
+        <span class="tool-summary"></span>
+      </summary>
+      <div class="tool-detail"></div>
+    </details>
+  </template>
+
+  <script type="module" src="/app.js?v=20"></script>
+</body>
+</html>

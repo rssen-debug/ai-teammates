@@ -1,0 +1,96 @@
+name: MAJIN Windows GUI and installer release gate
+on:
+  pull_request:
+    branches: [fix/realworld-repairs, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-gui-release-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows-ui:
+    name: Windows real Chromium UI acceptance (headless)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install Chromium for automated real browser
+        run: npx playwright install chromium
+      - name: Run full UI acceptance against live MAJIN server
+        shell: pwsh
+        run: |
+          npm run test:ui
+          if ($LASTEXITCODE -ne 0) { throw "Real browser acceptance failed with exit $LASTEXITCODE" }
+      - name: Run JS unit and integration suite on Windows
+        shell: pwsh
+        run: |
+          npm test *> windows-test.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $failures = Select-String -Path windows-test.log -Pattern '^not ok ' -Context 0,12
+            if ($failures) {
+              $details = ($failures | ForEach-Object { $_.ToString() + "`n" + ($_.Context.PostContext -join "`n") }) -join "`n---`n"
+            } else {
+              $details = (Get-Content windows-test.log -Tail 50) -join "`n"
+            }
+            $details | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            Write-Output $details
+            throw "Unit and integration tests failed with exit $code"
+          }
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: majin-windows-browser-proof
+          path: work/ui-evidence/
+          retention-days: 7
+          if-no-files-found: warn
+  installer:
+    name: Build and verify Windows installation and uninstall
+    runs-on: windows-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install build toolchain
+        shell: pwsh
+        run: |
+          python -m pip install --quiet ziglang
+          if ($LASTEXITCODE -ne 0) { throw "zig toolchain failed" }
+          choco install innosetup -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup unavailable" }
+      - name: Build fresh binary and installer from PR source
+        shell: pwsh
+        run: |
+          node scripts/build-exe.mjs
+          if ($LASTEXITCODE -ne 0) { throw "MAJIN EXE build failed" }
+          if (-not (Test-Path 'dist/majin-win-x64.exe')) { throw "Binary missing" }
+          node scripts/build-installer.mjs
+          if ($LASTEXITCODE -ne 0) { throw "MAJIN installer build failed" }
+          if (-not (Test-Path 'dist/installer/MAJIN-Setup.exe')) { throw "Installer missing" }
+      - name: Install, execute, restart and uninstall compiled MAJIN
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-on-windows.ps1 -SkipBuild -Ci
+          if ($LASTEXITCODE -ne 0) { throw "Windows installed-app lifecycle failed ($LASTEXITCODE)" }
+      - name: Record reproducible hashes (not a release)
+        shell: pwsh
+        run: |
+          foreach ($file in @('dist/installer/MAJIN-Setup.exe', 'dist/majin-win-x64.exe')) {
+            if (-not (Test-Path $file)) { throw "Missing build output $file" }
+            $hash=(Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            "SHA256 $file = $hash" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+          "CI service sessions cannot prove interactive desktop input. W11/W12 require separate real interactive evidence." | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

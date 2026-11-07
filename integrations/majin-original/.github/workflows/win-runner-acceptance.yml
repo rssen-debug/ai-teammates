@@ -1,0 +1,64 @@
+name: win-runner-acceptance
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1' # weekly fresh proof, never stale green
+  pull_request: {}
+  push:
+    branches: [fix/realworld-repairs, main]
+permissions:
+  contents: read
+jobs:
+  evidence:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install deps
+        run: npm install --no-audit --no-fund
+      # service-session runners have NO interactive desktop: the pack records
+      # interactive-only steps as NOT TESTED (by design). The validation below
+      # verifies the evidence CONFORMS to win-acceptance/1 — it deliberately
+      # keeps the run green while A0/A1 stay recorded-honestly. The
+      # maintainer-gate (scripts/verify-win-acceptance.mjs --gate) is run on
+      # INTERACTIVE evidence produced on a real desktop.
+      - name: Run the acceptance pack (non-interactive)
+        run: powershell -ExecutionPolicy Bypass -File qa\win-acceptance\run-all.ps1 -Out "$env:RUNNER_TEMP\win-acceptance.json"
+        continue-on-error: true
+        env:
+          MAJIN_ACCEPTANCE_NONINTERACTIVE: "1"
+      - name: Validate the evidence conforms to the contract
+        run: node scripts/verify-win-acceptance.mjs "$env:RUNNER_TEMP\win-acceptance.json"
+      - name: A5 must PASS (computer.use dry-plan needs no GUI)
+        shell: node {0}
+        run: |
+          const fs = require('node:fs');
+          const doc = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/win-acceptance.json', 'utf8'));
+          const a5 = doc.steps.find(s => s.step === 'A5');
+          if (a5 && a5.status === 'PASS') { console.log('A5 PASS — tool wiring verified: ' + a5.evidence); process.exit(0); }
+          console.error('A5 must PASS even without a desktop (pure Node wiring check): ' + JSON.stringify(a5));
+          process.exit(1);
+      - name: Enforce the gate ONLY when interactive evidence was captured
+        shell: node {0}
+        run: |
+          const fs = require('node:fs');
+          const doc = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/win-acceptance.json', 'utf8'));
+          if (doc.interactive === false) {
+            console.log('contract-conformant non-interactive evidence — gate deferred to interactive runs (A0/A1 stay NOT TESTED by design)');
+            process.exit(0);
+          }
+          const { execSync } = require('node:child_process');
+          process.exit(execSync(`node scripts/verify-win-acceptance.mjs "${process.env.RUNNER_TEMP}/win-acceptance.json" --gate`, { stdio: 'inherit' }).status ?? 0);
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-acceptance-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/win-acceptance.json
+            qa/win-acceptance/shots/
+          if-no-files-found: warn
+          retention-days: 30

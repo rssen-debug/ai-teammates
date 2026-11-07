@@ -1,0 +1,28 @@
+name: MAJIN fast offline contract tests
+on:
+  pull_request:
+    branches: [main, fix/realworld-repairs]
+  push:
+    branches: [main, fix/realworld-repairs]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fast-contracts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Check source syntax
+        run: npm run check
+      - name: Verify cloud routing and isolated CLI proof (no API keys)
+        run: node --test test/verified-cli-completion.test.js test/opencode-route-pin.test.js test/opencode-transport-contract.test.js test/opencode-go-dialects.test.js test/commonjs-echo-cli-repair.test.js test/escaped-newline-cli-repair.test.js

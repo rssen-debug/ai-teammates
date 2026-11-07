@@ -1,0 +1,110 @@
+{
+  "at": "2026-10-23T22:02:08.248Z",
+  "verdict": "NOT READY",
+  "installedCodeCommit": "527b021d8077d1aabf1ea8ef7bb764d3caaf58ca",
+  "provider": "opencode-go/glm-5.3-flash",
+  "demo": false,
+  "maximumFormAttempts": 5,
+  "attempts": [
+    {
+      "attempt": 1,
+      "sourceCommit": "43003d350704abff768bf381c6e36a0c59b2465e",
+      "passed": false,
+      "failure": null,
+      "status": "failed",
+      "elapsedMs": 17118,
+      "serverSubmissions": 0,
+      "accepted": false,
+      "evidence": "genesis-form-attempt-1.json"
+    },
+    {
+      "attempt": 2,
+      "sourceCommit": "43003d350704abff768bf381c6e36a0c59b2465e",
+      "passed": false,
+      "failure": "model round budget exhausted (12); task is incomplete",
+      "status": "failed",
+      "elapsedMs": 20203,
+      "serverSubmissions": 0,
+      "accepted": false,
+      "evidence": "genesis-form-attempt-2.json"
+    },
+    {
+      "attempt": 3,
+      "sourceCommit": "065711d926898268f9b2b3b3c366c3025431a907",
+      "passed": false,
+      "failure": "model round budget exhausted (12); task is incomplete",
+      "status": "failed",
+      "elapsedMs": 22017,
+      "serverSubmissions": 0,
+      "accepted": false,
+      "evidence": "genesis-form-attempt-3.json"
+    },
+    {
+      "attempt": 4,
+      "sourceCommit": "37c0a25b561fc85ea5aa0276e5abb546f0a7283b",
+      "passed": false,
+      "failure": "model round budget exhausted (12); task is incomplete",
+      "status": "failed",
+      "elapsedMs": 25238,
+      "serverSubmissions": 0,
+      "accepted": false,
+      "evidence": "genesis-form-attempt-4.json"
+    },
+    {
+      "attempt": 5,
+      "sourceCommit": "527b021d8077d1aabf1ea8ef7bb764d3caaf58ca",
+      "passed": false,
+      "failure": "model round budget exhausted (12); task is incomplete",
+      "status": "failed",
+      "elapsedMs": 49740,
+      "serverSubmissions": 0,
+      "accepted": false,
+      "evidence": "genesis-form-attempt-5.json"
+    }
+  ],
+  "preservation": {
+    "at": "2026-10-23T22:00:46.081Z",
+    "sourceCommit": "527b021d8077d1aabf1ea8ef7bb764d3caaf58ca",
+    "originalFilesChecked": 23,
+    "mismatches": 0,
+    "configKeyPairingChecked": true,
+    "originalBackupFiles": 39,
+    "restoredHashMismatches": 0,
+    "privateContentsRecorded": false
+  },
+  "ci": {
+    "lastAllThreeSuccessfulCommit": "43003d350704abff768bf381c6e36a0c59b2465e",
+    "installedCode": {
+      "v4": {
+        "run": 40030665846,
+        "status": "completed",
+        "conclusion": "failure",
+        "passed": 530,
+        "failed": 1,
+        "skipped": 7,
+        "failure": "Old-conversation test fixture assumed distinct millisecond timestamps; explicit fixture age correction passed local 15-test agent suite. No production ordering change."
+      },
+      "desktop": {
+        "run": 40030665852,
+        "status": "in_progress",
+        "conclusion": null
+      },
+      "runner": {
+        "run": 40030665849,
+        "status": "completed",
+        "conclusion": "success"
+      }
+    }
+  },
+  "physicalPhonePass": false,
+  "universalAutonomyPass": false,
+  "productionSigningPass": false,
+  "originalRequirementsWaived": false,
+  "followup": {
+    "runtimeCodeUnchanged": true,
+    "testFixtureCorrection": true,
+    "localAgentPassed": 15,
+    "localAgentFailed": 0,
+    "newHeadCi": "required"
+  }
+}

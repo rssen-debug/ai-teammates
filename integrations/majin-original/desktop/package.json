@@ -1,0 +1,66 @@
+{
+  "name": "majin-v5-desktop",
+  "version": "4.0.0-alpha.3",
+  "v5Version": "5.0.0",
+  "description": "MAJIN V5 — GRAND ARCHITECT Windows desktop application with local Black Box host",
+  "author": "MAJIN contributors",
+  "license": "MIT",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "stage": "node stage-host.mjs",
+    "build": "npm run stage && electron-builder --win nsis --x64",
+    "pack": "npm run stage && electron-builder --win --dir --x64"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.majin.v5",
+    "productName": "MAJIN V5",
+    "extraMetadata": {
+      "name": "majin-v5-desktop",
+      "version": "5.0.0"
+    },
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "policy.cjs",
+      "offline.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "stage/host",
+        "to": "host"
+      },
+      {
+        "from": "stage/host/node_modules",
+        "to": "host/node_modules",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../assets/majin.png",
+        "to": "icon.png"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "stage/icon.ico",
+      "artifactName": "MAJIN-V5-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "createStartMenuShortcut": true,
+      "createDesktopShortcut": "always",
+      "shortcutName": "MAJIN V5",
+      "runAfterFinish": false,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

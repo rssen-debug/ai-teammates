@@ -1,0 +1,45 @@
+{
+  "at": "2026-10-23T23:22:08.631Z",
+  "kind": "real-Go-natural-language-monitor",
+  "sourceCommit": "7b1a3f0b7189779c8846fb83594adabf33d999a9",
+  "passed": false,
+  "checks": {
+    "realGoUnchanged": true,
+    "naturalLanguageCreation": false,
+    "scheduledDispatch": false,
+    "verifiedExternalJson": false,
+    "durableAlert": false,
+    "runBudget": false,
+    "reloadPreserved": true
+  },
+  "taskName": "Genesis node metadata 34b7a7f3",
+  "taskId": null,
+  "conversationId": null,
+  "creationConversationId": "conv_mvllh2y6_7ec06456a553",
+  "runCount": 0,
+  "lastStatus": null,
+  "observation": null,
+  "history": [],
+  "notificationHistory": [],
+  "subscribedDeviceCount": 0,
+  "physicalPhoneReceipt": false,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "approvals": [],
+  "denied": [
+    "task_manage"
+  ],
+  "failure": null,
+  "elapsedMs": 7591,
+  "note": "Real public GitHub repository metadata, not a synthetic price or physical iPhone acceptance. Host restart must also be evidenced by the operator process receipt."
+}

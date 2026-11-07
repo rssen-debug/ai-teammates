@@ -1,0 +1,158 @@
+{
+  "schema": "majin.v5.acceptance-matrix/v1",
+  "generatedAt": "2026-10-25T15:07:53.397Z",
+  "version": "5.0.0",
+  "gitSha": "e59794988795b97b40ec5a90d71e8d1fa71f0d69",
+  "packageTreeSha256": "56d38510ae1eb43bf89fa2766f448c693458d8ccaa4328a3a026b578e8c43b51",
+  "hostEnvironment": {
+    "platform": "linux",
+    "arch": "x64",
+    "nodeVersion": "22.22.3"
+  },
+  "summary": {
+    "totalAcceptanceFlows": 7,
+    "passedAcceptanceFlows": 7,
+    "failedAcceptanceFlows": 0,
+    "allAutomatedChecksPassed": true
+  },
+  "verificationCommands": {
+    "unitAndIntegrationTests": "node --test test/v5/*.test.js",
+    "syntaxCheckAllFiles": "npm run check",
+    "i18nCheck": "npm run i18n",
+    "acceptanceSuite": "node scripts/v5/accept.mjs",
+    "windowsInstallerVerify": "pwsh -File scripts/v5/install-majin-v5-windows.ps1 -VerifyOnly"
+  },
+  "acceptanceFlows": [
+    {
+      "id": "FLOW-1-CV-EXTRACTION",
+      "title": "Läsa en uppladdad CV-fil och extrahera verifierbara fakta",
+      "passed": true,
+      "status": "COMPLETED",
+      "receiptId": "rcpt-docread-8b2a3327e5425a51-1792940872044",
+      "xpAwarded": 24,
+      "evidence": {
+        "fullName": "Maja Bergström",
+        "experienceYears": 6,
+        "skillsCount": 7,
+        "inventedFactsCount": 0
+      }
+    },
+    {
+      "id": "FLOW-2-PORTAL-FORM-AND-UPLOAD",
+      "title": "Felsöka och fylla ett ansökningsformulär i testportal med filuppladdning",
+      "passed": true,
+      "status": "COMPLETED",
+      "receiptId": "rcpt-portal-upload-8b2a3327e5",
+      "evidence": {
+        "fileName": "maja-cv.txt",
+        "bytes": 307,
+        "sha256": "8b2a3327e5425a516e90f12274788a3895d1a20541511688cd385eaaace027e9",
+        "httpFallbackChecked": true
+      }
+    },
+    {
+      "id": "FLOW-3-500-JOB-WORKFLOW",
+      "title": "Söka, deduplicera och matcha jobb mot CV med 500 som tak, samt köra ansökningsflöde mot kontrollerad testportal",
+      "passed": true,
+      "status": "COMPLETED",
+      "counters": {
+        "found": 520,
+        "unique": 500,
+        "matched": 83,
+        "prepared": 83,
+        "submitted": 83,
+        "confirmed": 83,
+        "blocked": 0,
+        "failed": 0
+      },
+      "receiptId": "rcpt-docread-8b2a3327e5425a51-1792940872083"
+    },
+    {
+      "id": "FLOW-4-BUILD-AND-VERIFY-PAGE",
+      "title": "Bygga och verifiera en enkel sida eller ett skript från en kort brief",
+      "passed": true,
+      "status": "COMPLETED",
+      "receiptId": "rcpt-file-0d4b4a47ed13-0",
+      "xpAwarded": 24
+    },
+    {
+      "id": "FLOW-5-PYTHON-SKILL-SYNTHESIS",
+      "title": "Bygga, självtesta och registrera en saknad skill själv via Python 3",
+      "passed": true,
+      "status": "COMPLETED",
+      "synthesizedSkillId": "career.application-stats-py",
+      "receiptId": "rcpt-synth-94da552bfa9fd122-1792940872593"
+    },
+    {
+      "id": "FLOW-6-LOCAL-FILE-REPAIR-OWNER-MODE",
+      "title": "Öppna ett lokalt program eller en fil och lösa ett verkligt fel med ägarläge",
+      "passed": true,
+      "status": "COMPLETED",
+      "receiptId": "rcpt-file-231139affacd-0"
+    },
+    {
+      "id": "FLOW-7-STEERING-RESUME-AND-MOBILE-REMOTE",
+      "title": "Återuppta ett avbrutet mål, svara på omstyrning (\"Nej vänta, bara jobb i Köpenhamn\", \"Öppna de fyra bästa\") samt mobil styrning av värddator",
+      "passed": true,
+      "status": "COMPLETED",
+      "evidence": {
+        "steeredLocations": [
+          "köpenhamn"
+        ],
+        "openedTopJobsCount": 4,
+        "mobileExecutedOnHost": true
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "docs/v5/screenshots/v5-blackbox-home-level18.png",
+      "title": "Black Box Default View (Formulär 18/99 · +24 XP, Skill Tree Closed)",
+      "width": 1280,
+      "height": 800,
+      "bytes": 14664,
+      "sha256": "da7a3bf0096ea3993e8f9e9eaf1a5e3e5d7e2da7595a3d66bd322d690b5b33f2",
+      "level": 18,
+      "greenDotsCount": 18,
+      "pixelVerified": true
+    },
+    {
+      "file": "docs/v5/screenshots/v5-skill-tree-open.png",
+      "title": "Skill Tree Drawer Opened (1–99 Progression)",
+      "width": 1280,
+      "height": 800,
+      "bytes": 9008,
+      "sha256": "6ac818c47b48e8c1a7df2fa2a382514526902abdc41b401cd273f7cb609917f0",
+      "level": 42,
+      "greenDotsCount": 42,
+      "pixelVerified": true
+    },
+    {
+      "file": "docs/v5/screenshots/v5-mastery-level99.png",
+      "title": "Level 99 Cohesive Emerald Mastery State (99/99 All 5 Gates Passed)",
+      "width": 1280,
+      "height": 800,
+      "bytes": 21161,
+      "sha256": "03b634c1b23104134149f9b028a942510f59f688d80715d6d45e8c87da3a6b50",
+      "level": 99,
+      "greenDotsCount": 99,
+      "pixelVerified": true
+    },
+    {
+      "file": "docs/v5/screenshots/v5-mobile-view.png",
+      "title": "Mobile Viewport (390x844 Narrow Screen)",
+      "width": 390,
+      "height": 844,
+      "bytes": 11838,
+      "sha256": "43038ccab89786234648e0d6bb6eb48dbd10658563af53e9799bbd2ac7a7fab9",
+      "level": 18,
+      "greenDotsCount": 18,
+      "pixelVerified": true
+    }
+  ],
+  "honestEnvironmentBoundaries": {
+    "realProviderLiveApiCallInThisRun": "NOT_RUN_IN_SANDBOX_NO_LIVE_API_KEY_IN_ENV (Historically verified on opencode-go/glm-5.3-flash in V4 A-H gate; transport & error classification verified via deterministic HTTP contract tests)",
+    "physicalWindowsGuiSessionInThisRun": "LINUX_CONTAINER_HOST (Windows path/ACL/PowerShell installer manifest verified; physical Win32 UIA window clicking requires a Windows 11 desktop session)",
+    "physicalAcousticHardwareEchoAndNoiseTest": "NOT_CLAIMED (Requires physical microphone/speaker room test; software opt-in & barge-in latency verified)"
+  }
+}

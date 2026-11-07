@@ -1,0 +1,27 @@
+name: MAJIN strict literal text write regression
+on:
+  push:
+    branches: [fix/strict-single-exact-text-write-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-write:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --check src/core/goal-artifact.js
+      - run: node --check src/core/loop.js
+      - run: node --test test/agent-exact-token-once.test.js
+      - run: npm test
+      - run: npm run check

@@ -1,0 +1,132 @@
+name: MAJIN V4 learned-skill acceptance (real Go)
+
+# The mandatory A-H gate from the self-improving-skill brief, run against the
+# real provider. It uses the repository's existing OPENCODE_API_KEY secret, so
+# the owner never has to paste a key anywhere and none is ever printed.
+#
+# Manual only, on purpose: this spends real provider quota. It is bounded to a
+# handful of cheap calls and it refuses to run at all without a key.
+#
+#   gh workflow run v4-learn-accept.yml --ref v4/main
+#   gh run list --workflow v4-learn-accept.yml
+#   gh run view <id> --log        (or download the evidence artifact)
+on:
+  # Manual dispatch is the normal route. It only becomes available once this file
+  # is on the default branch, which is the owner's merge decision — so there is
+  # also an explicit push trigger: committing a change to the trigger file below
+  # runs the gate on v4/main. Nothing runs by accident; a deliberate edit is what
+  # starts it.
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Model id (default: the cheap allowlisted one)'
+        required: false
+        default: 'glm-5.3-flash'
+  push:
+    branches: [v4/main]
+    paths:
+      - '.github/learn-accept-trigger'
+
+permissions:
+  contents: read
+  checks: write
+
+concurrency:
+  group: v4-learn-accept
+  cancel-in-progress: false
+
+jobs:
+  learned-skills:
+    name: A-H on the real provider
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      MAJIN_V4_MODEL: ${{ inputs.model || 'glm-5.3-flash' }}
+      MAJIN_LLM_TIMEOUT: '120000'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Check that a key exists, without exposing it
+        id: access
+        shell: bash
+        run: |
+          if [ -z "${OPENCODE_API_KEY:-}" ]; then
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo 'NOT VERIFIED: OPENCODE_API_KEY is not configured for this repository. The gate did not run.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+            echo 'A provider key is configured. Running the bounded A-H gate; the key is never printed.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Refuse silently passing without a key
+        if: steps.access.outputs.available != 'true'
+        shell: bash
+        run: |
+          echo "::error title=Learned-skill gate not run::OPENCODE_API_KEY is not configured, so the real-inference A-H gate cannot run."
+          exit 1
+
+      - name: A-H against the real provider (bounded, evidence written)
+        if: steps.access.outputs.available == 'true'
+        shell: bash
+        env:
+          # Three varied scenarios is what the promotion ladder needs; more would
+          # only spend quota. Each cycle is a handful of cheap calls.
+          LEARN_REPEAT: '3'
+        run: |
+          node scripts/v4/learn-accept.mjs --repeat "${LEARN_REPEAT}" 2>&1 | tee learn-accept.out
+          code=${PIPESTATUS[0]}
+          {
+            echo '### Learned-skill acceptance (A-H)'
+            echo '```'
+            grep -E 'PASS|FAIL|checks passed|provider:' learn-accept.out || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -ne 0 ]; then
+            # Artifacts live in blob storage that is not reachable from every
+            # client, so the failing lines are also emitted as annotations, which
+            # are readable through the API without downloading anything.
+            fails=$(grep -E 'FAIL|Error|error:|REFUSED|checks passed' learn-accept.out | head -40 | tr '\n' '|')
+            echo "::error title=Learned-skill gate failed::$fails"
+            tail -60 learn-accept.out
+          fi
+          exit $code
+
+      - name: Publish the gate result where it can always be read
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Artifacts and job logs live in storage that is not reachable from
+            // every client. A check run's output is plain API data, so the result
+            // is published there as well.
+            const fs = require('fs');
+            let text = 'no output captured';
+            try {
+              const raw = fs.readFileSync('learn-accept.out', 'utf8');
+              text = raw.split('\n').filter((l) => /PASS|FAIL|checks passed|provider|REFUSED/.test(l)).join('\n').slice(0, 60000) || raw.slice(-60000);
+            } catch (e) { text = 'learn-accept.out missing: ' + e.message; }
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'learned-skill gate (A-H)',
+              head_sha: context.sha,
+              status: 'completed',
+              conclusion: '${{ job.status }}' === 'success' ? 'success' : 'failure',
+              output: { title: 'Learned-skill A-H result', summary: text },
+            });
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: learned-skills-evidence
+          path: |
+            docs/v4/evidence/learned-skills-*.json
+            learn-accept.out
+          if-no-files-found: warn
+          retention-days: 30

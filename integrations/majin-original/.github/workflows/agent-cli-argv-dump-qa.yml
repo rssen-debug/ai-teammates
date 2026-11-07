@@ -1,0 +1,26 @@
+name: MAJIN responder CLI argv-dump regression
+on:
+  push:
+    branches: [fix/agent-cli-argv-dump-false-positive-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qa:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --check src/core/goal-artifact.js
+      - run: node --test test/agent-cli-argv-dump.test.js test/agent-js-syntax-evidence.test.js
+      - run: npm test
+      - run: npm run check

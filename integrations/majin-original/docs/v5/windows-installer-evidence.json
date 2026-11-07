@@ -1,0 +1,23 @@
+{
+  "schema": "majin.v5.windows-installer-evidence/v1",
+  "verifiedAt": "2026-10-25T15:27:49.0223095+00:00",
+  "status": "PASS",
+  "setupExe": {
+    "fileName": "MAJIN-V5-Setup.exe",
+    "bytes": 138204821,
+    "sha256": "cbc4af4ee7307c978dd56c6f67b6af27441cc485481d61594b5d1d7898f10529"
+  },
+  "installedDir": "C:\\Users\\runneradmin\\AppData\\Local\\Programs\\majin-v5-desktop",
+  "installedExecutableVerified": true,
+  "desktopShortcutVerified": true,
+  "startMenuShortcutVerified": true,
+  "majinIconBundled": true,
+  "healthCheckVersion": "5.0.0",
+  "providerPersistedAcrossRestart": {
+    "activeProvider": "opencode-go",
+    "activeModelId": "GLM-5.3"
+  },
+  "cleanUninstallVerified": true,
+  "v5UserDataPreservedOnUninstall": true,
+  "v1AndV4Preserved": true
+}

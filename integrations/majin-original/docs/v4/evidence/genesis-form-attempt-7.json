@@ -1,0 +1,531 @@
+{
+  "at": "2026-10-24T07:14:03.542Z",
+  "sourceCommit": "52d5d04d2b06fb3df0e7a15a63f58f1ceae5c20b",
+  "kind": "real-Go-unfamiliar-local-form",
+  "passed": false,
+  "checks": {
+    "realModelCompleted": false,
+    "providerUnchanged": true,
+    "browserUpload": true,
+    "browserInteraction": true,
+    "validationRecovered": false,
+    "oneAcceptedRegistration": false,
+    "exactUploadedBytes": false,
+    "savedObservedReceipt": false
+  },
+  "failure": "model round budget exhausted (12); task is incomplete",
+  "status": "failed",
+  "elapsedMs": 38548,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "conversationId": "conv_mvm2baxt_82132a34d67d",
+  "successfulActions": [
+    "browser_open",
+    "browser_elements",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_click",
+    "browser_elements",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_click"
+  ],
+  "toolFailures": [
+    {
+      "name": "browser_click",
+      "summary": "UNKNOWN",
+      "error": "Use role+accessibleName together, uniquely, without selector/ref"
+    },
+    {
+      "name": "browser_fill",
+      "summary": "INVALID_TOOL_INPUT:MAJIN",
+      "error": "tool browser_fill input failed schema at value: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+    },
+    {
+      "name": "browser_fill",
+      "summary": "INVALID_TOOL_INPUT:MAJIN",
+      "error": "tool browser_fill input failed schema at value: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+    }
+  ],
+  "oneUseApprovals": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_click",
+    "browser_click",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_click"
+  ],
+  "deniedActions": [],
+  "proof": {
+    "submissions": [],
+    "needsSlot": false,
+    "accepted": null
+  },
+  "artifacts": {
+    "uploadName": "genesis-form-upload-3c35dbef825a.txt",
+    "receiptName": "genesis-form-receipt-3c35dbef825a.txt"
+  },
+  "physicalPhonePass": false,
+  "trace": [
+    {
+      "event": "tool_start",
+      "seq": 5,
+      "data": {
+        "id": "chatcmpl-tool-80f65e2cc7ead921",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:57751/"
+        }
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-80f65e2cc7ead921",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:57751/"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-80f65e2cc7ead921",
+        "name": "browser_open",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_fa883cf886b317cb"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9676e2d135f3115b",
+        "name": "browser_elements",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9676e2d135f3115b",
+        "name": "browser_elements",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_4c62fd6308b62dcd"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a2154dbbf0e9c1f3",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#mode-98ba4fdc6c",
+          "value": "Team"
+        }
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a2154dbbf0e9c1f3",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#mode-98ba4fdc6c",
+          "value": "Team"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a2154dbbf0e9c1f3",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_b89991c2ee3dbbd0"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bc640625963c21c3",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#country-98ba4fdc6c",
+          "value": "Sweden"
+        }
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bc640625963c21c3",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#country-98ba4fdc6c",
+          "value": "Sweden"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bc640625963c21c3",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_6367cb52423b04b8"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b686b8b23e9c9973",
+        "name": "browser_upload",
+        "input": {
+          "path": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-live-20261024-7\\home\\workspace\\genesis-form-upload-3c35dbef825a.txt",
+          "selector": "[name=document]"
+        }
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b686b8b23e9c9973",
+        "name": "browser_upload",
+        "input": {
+          "path": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-live-20261024-7\\home\\workspace\\genesis-form-upload-3c35dbef825a.txt",
+          "selector": "[name=document]"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b686b8b23e9c9973",
+        "name": "browser_upload",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_e165223f64100b33"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-981b3b19375d7cfd",
+        "name": "browser_click",
+        "input": {
+          "accessibleName": "I agree to this local demo registration",
+          "ref": "e4"
+        }
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-981b3b19375d7cfd",
+        "name": "browser_click",
+        "input": {
+          "accessibleName": "I agree to this local demo registration",
+          "ref": "e4"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-981b3b19375d7cfd",
+        "name": "browser_click",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "Use role+accessibleName together, uniquely, without selector/ref"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8d82a06802a29154",
+        "name": "browser_click",
+        "input": {
+          "accessibleName": "Register",
+          "role": "button"
+        }
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8d82a06802a29154",
+        "name": "browser_click",
+        "input": {
+          "accessibleName": "Register",
+          "role": "button"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8d82a06802a29154",
+        "name": "browser_click",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_1a6637951ac6eae6"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a08bbb4f86c0f955",
+        "name": "browser_elements",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a08bbb4f86c0f955",
+        "name": "browser_elements",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_278046162bb8f05c"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-94de69496eba58bc",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e6",
+          "value": "Orion-98ba4fdc6c"
+        }
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-94de69496eba58bc",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e6",
+          "value": "Orion-98ba4fdc6c"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-94de69496eba58bc",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_be2cfe4d2d51a2db"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-98a41cb3fa43cd22",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e7",
+          "value": "eval-98ba4fdc6c@example.invalid"
+        }
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-98a41cb3fa43cd22",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e7",
+          "value": "eval-98ba4fdc6c@example.invalid"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-98a41cb3fa43cd22",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_89169d154503bdb8"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-807cf8840800c01d",
+        "name": "browser_fill",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-807cf8840800c01d",
+        "name": "browser_fill",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool browser_fill input failed schema at value: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bcd1da55f653ea14",
+        "name": "browser_fill",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bcd1da55f653ea14",
+        "name": "browser_fill",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool browser_fill input failed schema at value: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bfa2b97e60b88e82",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#seats-98ba4fdc6c-1",
+          "value": "3"
+        }
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bfa2b97e60b88e82",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#seats-98ba4fdc6c-1",
+          "value": "3"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bfa2b97e60b88e82",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_2869f96624e0fb80"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-830ad7b749262398",
+        "name": "browser_click",
+        "input": {
+          "accessibleName": "I agree to this local demo registration",
+          "role": "checkbox"
+        }
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-830ad7b749262398",
+        "name": "browser_click",
+        "input": {
+          "accessibleName": "I agree to this local demo registration",
+          "role": "checkbox"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-830ad7b749262398",
+        "name": "browser_click",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_41b8dc3d03dc6d62"
+      }
+    }
+  ],
+  "fullScenarioAComplete": false,
+  "note": "Controlled dynamic-form/upload/validation acceptance only; external authentication handoff, cancellation and other real-world gates remain separate."
+}

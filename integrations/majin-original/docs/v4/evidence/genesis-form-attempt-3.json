@@ -1,0 +1,91 @@
+{
+  "at": "2026-10-23T21:55:35.506Z",
+  "sourceCommit": "065711d926898268f9b2b3b3c366c3025431a907",
+  "kind": "real-Go-unfamiliar-local-form",
+  "passed": false,
+  "checks": {
+    "realModelCompleted": false,
+    "providerUnchanged": true,
+    "browserUpload": true,
+    "browserInteraction": true,
+    "validationRecovered": false,
+    "oneAcceptedRegistration": false,
+    "exactUploadedBytes": false,
+    "savedObservedReceipt": false
+  },
+  "failure": "model round budget exhausted (12); task is incomplete",
+  "status": "failed",
+  "elapsedMs": 22017,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "conversationId": "conv_mvlidgpz_0dc051c97a1a",
+  "successfulActions": [
+    "browser_open",
+    "browser_read",
+    "browser_elements",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_elements",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_click",
+    "browser_read"
+  ],
+  "toolFailures": [
+    {
+      "name": "browser_click",
+      "summary": "UNKNOWN",
+      "error": "Browser click was NOT attempted: ref_identity_changed (stale element reference). Re-observe the current page before retrying."
+    },
+    {
+      "name": "browser_click",
+      "summary": "UNKNOWN",
+      "error": "Specify a selector, URL fragment, exact URL path/origin, or title fragment to verify"
+    },
+    {
+      "name": "browser_click",
+      "summary": "UNKNOWN",
+      "error": "no clickable element matches button[name=submit] — Use an EXACT selector from the visible controls below (or browser.elements for live numbered refs). Avoid browser.open again unless navigation is required.\n\nInteractive fields found on THIS page (real CSS selectors; no field values shown):\n- #mode-1b03533345 (select, text) — Participation ChooseIndividualTeam\n- #group-1b03533345-1 (input, text) — Group name\n- #email-1b03533345-1 (input, email) — Contact email\n- #seats-1b03533345-1 (input, number) — Attendees\n- #country-1b03533345 (select, text) — Country ChooseSwedenUnited Kingdom\n- #consent-1b03533345 (input, checkbox, unchecked) — I agree to this local demo registration\nFor unlisted or dynamic controls use browser.elements for live numbered references."
+    }
+  ],
+  "oneUseApprovals": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_click",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_click",
+    "browser_click",
+    "browser_click"
+  ],
+  "deniedActions": [],
+  "proof": {
+    "submissions": [],
+    "needsSlot": false,
+    "accepted": null
+  },
+  "artifacts": {
+    "uploadName": "genesis-form-upload-701b6ce5cdc5.txt",
+    "receiptName": "genesis-form-receipt-701b6ce5cdc5.txt"
+  },
+  "physicalPhonePass": false,
+  "fullScenarioAComplete": false,
+  "note": "Controlled dynamic-form/upload/validation acceptance only; external authentication handoff, cancellation and other real-world gates remain separate."
+}

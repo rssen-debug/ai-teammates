@@ -1,0 +1,322 @@
+name: build-exe
+
+# A normal user should be able to get MAJIN as a double-clickable program.
+# Windows itself has no such thing as "npx majin", and pkg must run on the same
+# family of binaries as the target -- so a Windows runner builds the .exe and
+# uploads it to a release. The bundle itself is built on Ubuntu in `npm test`,
+# this workflow is allowed to fail only on the release part.
+#
+# Triggers:
+#   * a tag v* -> the .exe lands on that release
+#   * manual (gh workflow run build-exe.yml) -> lands on a fresh "latest"
+#     pre-release with the commit sha in the name
+on:
+  push:
+    branches: [main]
+    tags: ['v1.*']  # V2 isolation: never publish production installers from v2 work; V2 uses its own alpha pipeline
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      keep_exe:
+        description: 'Upload the .exe to the release (default: yes)'
+        type: boolean
+        default: true
+
+# A newer push to the same branch supersedes an older build instead of queueing
+# behind it. Present on main, missing from v4/main; the V1 test asserts it.
+concurrency:
+  group: build-exe-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - run: npm run i18n
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+
+  exe:
+    needs: check
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          # pkg fetches a ready-made node binary ("host") for the exact node
+          # version it runs on. The Windows host that pkg's own fetch script
+          # builds is unusable (node.exe exits 2), so pkg-fetch must hand over a
+          # published one. Published hosts for the node 22 line: 22.22.3,
+          # 22.23.1, 22.23.2 (22.23.3 and newer = none). A floating "22" follows
+          # the runner image and breaks the day that image gets a new patch.
+          # So: an exact version that exists, and build-exe.mjs derives the
+          # target from it (never "node22-win-x64" as a constant).
+          # If this has to move forward: list the assets first --
+          #   gh api repos/yao-pkg/pkg-fetch/releases/latest --jq '.assets[].name'
+          node-version: 22.23.2
+          cache: npm
+      - run: npm ci
+      - name: install zig (the setup stub cross-compiles with it, no SDK needed)
+        shell: pwsh
+        run: |
+          python -m pip install --quiet ziglang
+          python -m ziglang version
+      - name: unit and HTTP suite must pass on Windows
+        shell: pwsh
+        run: |
+          npm test *> windows-test.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $failures = Select-String -Path windows-test.log -Pattern '^not ok ' -Context 0,12
+            if ($failures) {
+              $details = ($failures | ForEach-Object { $_.ToString() + "`n" + ($_.Context.PostContext -join "`n") }) -join "`n---`n"
+            } else {
+              $details = (Get-Content windows-test.log -Tail 50) -join "`n"
+            }
+            $details | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            Write-Output $details
+            throw "Windows unit and HTTP suite failed with exit $code"
+          }
+      - name: build the exe
+        shell: pwsh
+        run: |
+          # the small installer first: it is built from the same bundle and does
+          # not depend on pkg or on fetching a node host binary, so a user always
+          # gets *something* to download even when the big exe cannot be made
+          node scripts/build-setup.mjs *>&1 | Tee-Object -FilePath setup.log
+          $setupOk = Test-Path dist/setup/majin-setup.exe
+          if (-not $setupOk) { "::warning::majin-setup.exe was not built -- see setup.log" }
+
+          # all output into a file which can be uploaded as an artifact even on failure
+          node scripts/build-exe.mjs *>&1 | Tee-Object -FilePath build.log
+          $code = $LASTEXITCODE
+          Write-Output "--- build-exe exit: $code ---"
+          Get-ChildItem dist | Select-Object Name, Length | Format-Table -AutoSize | Out-String
+          if (($code -ne 0 -or -not (Test-Path dist/majin-win-x64.exe)) -and -not $setupOk) {
+            # the last lines usually hold the real error -- print them into the log so
+            # nobody has to download anything to find out what pkg complained about
+            "---- build.log tail (last 40 lines) ----"
+            Get-Content build.log -Tail 40
+            if ($code -ne 0) { Write-Output "::error::build-exe.mjs exited $code" }
+            if (-not (Test-Path dist/majin-win-x64.exe)) { Write-Output "::error::dist/majin-win-x64.exe was never produced" }
+            exit 1
+          }
+          if ($code -ne 0 -or -not (Test-Path dist/majin-win-x64.exe)) {
+            Write-Output "::warning::the single-file exe is missing, releasing majin-setup.exe only"
+          }
+          exit 0
+      - name: build MAJIN-Setup.exe with Inno Setup
+        shell: pwsh
+        run: |
+          # pinned install: the runner image is not guaranteed to carry Inno Setup
+          choco install innosetup -y --no-progress | Select-Object -Last 3
+          node scripts/build-installer.mjs *>&1 | Tee-Object -FilePath installer.log
+          if (-not (Test-Path dist/installer/MAJIN-Setup.exe)) {
+            "---- installer.log tail ----"
+            Get-Content installer.log -Tail 30 -ErrorAction SilentlyContinue
+            Write-Output "::error::dist/installer/MAJIN-Setup.exe was never produced"
+            exit 1
+          }
+          Get-ChildItem dist/installer | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: browser tools must work against a real browser (live e2e, observed)
+        # HARD GATE since 2026-10-18: green twice in a row (39 119 535 069 +
+        # 39 120 606 397 — and it caught a real openFor bug on its first run).
+        # Now also the job submit slice end-to-end (fake employer → posted →
+        # thanks-words → status submitted, proof on disk).
+        # The runner has Edge + node 22; the test serves a local form page,
+        # submits it, proves the upload from the input element, and closes.
+        shell: pwsh
+        env:
+          MAJIN_BROWSER_LIVE: '1'
+        run: |
+          $env:MAJIN_HOME = "$env:GITHUB_WORKSPACE\.livedemo"
+          node --test --test-concurrency=1 test/browser.live.test.js test/jobs.live.test.js test/browser-domains.live.test.js *> windows-browser.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $failures = Select-String -Path windows-browser.log -Pattern '^not ok ' -Context 0,20
+            if ($failures) {
+              $details = ($failures | ForEach-Object { $_.ToString() + "`n" + ($_.Context.PostContext -join "`n") }) -join "`n---`n"
+            } else {
+              $details = (Get-Content windows-browser.log -Tail 60) -join "`n"
+            }
+            $details | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            Write-Output $details
+            throw "Real browser e2e failed with exit $code"
+          }
+
+      - name: the installer must install, run, survive a restart and uninstall
+        # One verifier for CI and for a person's own laptop: the same script the
+        # owner can run locally. -SkipBuild because the artifacts above already
+        # exist, -Ci so a failure also lands as ::error:: on the right line.
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-on-windows.ps1 -SkipBuild -Ci
+          if ($LASTEXITCODE -ne 0) { Write-Output "::error::the install/verify/uninstall script failed (exit $LASTEXITCODE)" }
+          exit $LASTEXITCODE
+
+      - name: the exe must run without touching anything
+        shell: pwsh
+        run: |
+          $env:MAJIN_HOME = "$env:GITHUB_WORKSPACE\.smokehome"
+          $env:MAJIN_WORKSPACE = "$env:GITHUB_WORKSPACE\.smokews"
+          New-Item -ItemType Directory -Force -Path $env:MAJIN_HOME, $env:MAJIN_WORKSPACE | Out-Null
+          # only "version" is allowed to gate the release: it must run with no config
+          # and no network. doctor exits 1 whenever a row is X, which is the case on a
+          # key-less CI runner, so its rows are reported as warnings instead.
+          $v = & ./dist/majin-win-x64.exe version 2>&1
+          $vc = $LASTEXITCODE
+          "version (exit $vc): $v"
+          $d = & ./dist/majin-win-x64.exe doctor --json 2>&1
+          $dc = $LASTEXITCODE
+          if ($dc -ne 0) { ($d | Where-Object { "$_" -like '*X *' } | Select-Object -First 6) | ForEach-Object { Write-Output "::warning::doctor (no api key in CI): $_" } }
+          $c = & ./dist/majin-win-x64.exe config get name 2>&1
+          "config get name (exit $LASTEXITCODE): $c"
+          exit 0
+      - name: report the failure log as an issue
+        # GitHub's log endpoint is not always reachable; an issue with the last
+        # lines can be read with `gh issue view` and makes blind debugging
+        # impossible
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $f = [string][char]96 * 3
+          $sections = @()
+          foreach ($file in @('windows-test.log', 'windows-browser.log', 'build.log')) {
+            if (-not (Test-Path $file)) { continue }
+            $failures = Select-String -Path $file -Pattern '^not ok ' -Context 0,20
+            if ($failures) { $details = ($failures | ForEach-Object { $_.ToString() + "`n" + ($_.Context.PostContext -join "`n") }) -join "`n---`n" }
+            else { $details = (Get-Content $file -Tail 60) -join "`n" }
+            $sections += "### $file`n$details"
+          }
+          if (-not $sections.Count) { $sections = @('(no test or build log)') }
+          $log = $sections -join "`n`n"
+          $body = "run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID`n`n$f`n$log`n$f`n"
+          $payload = @{ title = "build-exe failed on $($env:GITHUB_SHA.Substring(0,7))"; body = $body; labels = @('ci') } | ConvertTo-Json -Compress
+          Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/issues" -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json" } -Body $payload | ForEach-Object { "opened $($_.html_url)" }
+      # No artifact upload step at all. Free accounts have 100 MB of artifact
+      # storage and a .exe of ~80 MB per build fills it immediately, so the second
+      # run dies with "Artifact storage quota has been hit" -- an infrastructure
+      # failure that would otherwise look like a build failure. Release assets are
+      # not counted against that quota, so the file goes there instead.
+      - name: determine new version release on main
+        id: release_target
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ver = (node -p "require('./package.json').version").Trim()
+          $tag = "v$ver"
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "User-Agent" = "MAJIN" }
+          $publish = 'true'
+          try {
+            Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" -Headers $headers -TimeoutSec 15 | Out-Null
+            $publish = 'false'
+          } catch {
+            $status = [int]$_.Exception.Response.StatusCode
+            if ($status -ne 404) { throw "Release check failed ($status)" }
+          }
+          Add-Content $env:GITHUB_OUTPUT "publish=$publish"
+          Add-Content $env:GITHUB_OUTPUT "tag=$tag"
+      - name: hash the artifacts
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.keep_exe || github.event_name == 'push' }}
+        shell: pwsh
+        run: |
+          foreach ($f in @('dist/installer/MAJIN-Setup.exe', 'dist/majin-win-x64.exe')) {
+            if (Test-Path $f) {
+              $h = (Get-FileHash -Algorithm SHA256 $f).Hash.ToLower()
+              Set-Content -NoNewline "$f.sha256" "$h  $(Split-Path $f -Leaf)"
+              Write-Output "sha256 $f = $h"
+            }
+          }
+      - name: release the exe
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.keep_exe || github.ref_type == 'tag' || github.ref == 'refs/heads/main' && steps.release_target.outputs.publish == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          # a tag push reuses that tag; a manual run makes its own dev tag
+          tag_name: ${{ steps.release_target.outputs.tag || (github.ref_type == 'tag' && github.ref_name) || format('exe-v{0}', github.run_number) }}
+          name: ${{ steps.release_target.outputs.tag && format('MAJIN {0}', steps.release_target.outputs.tag) || (github.ref_type == 'tag' && format('MAJIN {0}', github.ref_name)) || format('MAJIN exe (run {0})', github.run_number) }}
+          body: |
+            Two files, both unsigned, both no-admin:
+
+            - **MAJIN-Setup.exe** (~40 MB) — the real installer: desktop icon, Start-menu entry, optional
+              autostart, optional "majin" on PATH, and an uninstaller in Add/Remove programs. Nothing else is
+              needed afterwards: no terminal, no Node, no git
+            - **majin-setup.exe** (~0.5 MB) — the tiny stub for a machine that already has node; it installs into
+              `%LOCALAPPDATA%\MAJIN`, fetches node if you have none, and puts a MAJIN icon on the Desktop.
+              `--print` shows the three commands it would run. Verify it: `certutil -hashfile majin-setup.exe SHA256`
+            - **majin-win-x64.exe** (~80 MB) — the single-file build, nothing installed at all
+
+            Double-click either to start MAJIN, or open a terminal in the folder and run:
+
+                .\majin-win-x64.exe start
+
+            Unsigned, so Windows may warn once (More info -> Run anyway).
+            Or download it with curl:
+
+                curl.exe -L -o majin-win-x64.exe https://github.com/rssen-debug/MAJINCLI/releases/latest/download/majin-win-x64.exe
+          files: |
+            dist/installer/MAJIN-Setup.exe
+            dist/installer/MAJIN-Setup.exe.sha256
+            dist/setup/majin-setup.exe
+            dist/majin-win-x64.exe
+            dist/majin-win-x64.exe.sha256
+          # the installer is always there; the single-file exe only when pkg worked
+          fail_on_unmatched_files: false
+          generate_release_notes: true
+      - name: verify public release bytes and SHA256 against the fresh CI build
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.release_target.outputs.publish == 'true' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = '${{ steps.release_target.outputs.tag }}'
+          $dir = Join-Path $env:RUNNER_TEMP 'majin-published-release-check'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          $downloaded = $false
+          for ($attempt=1; $attempt -le 3; $attempt++) {
+            gh release download $tag --repo $env:GITHUB_REPOSITORY --dir $dir --pattern '*.exe' --pattern '*.sha256' --clobber
+            if ($LASTEXITCODE -eq 0) { $downloaded = $true; break }
+            Write-Warning "Release asset download attempt $attempt/3 failed; retrying"
+            Start-Sleep -Seconds (5 * $attempt)
+          }
+          if (-not $downloaded) { throw "Published $tag assets could not be downloaded for verification" }
+          $pairs = @(
+            @{ name='MAJIN-Setup.exe'; local='dist/installer/MAJIN-Setup.exe' },
+            @{ name='majin-win-x64.exe'; local='dist/majin-win-x64.exe' }
+          )
+          foreach ($pair in $pairs) {
+            $local = $pair.local
+            $published = Join-Path $dir $pair.name
+            $checksumFile = "$published.sha256"
+            if (-not (Test-Path $local) -or -not (Test-Path $published) -or -not (Test-Path $checksumFile)) {
+              throw "Missing source, public binary, or checksum: $($pair.name)"
+            }
+            $srcHash = (Get-FileHash -Algorithm SHA256 $local).Hash.ToLowerInvariant()
+            $pubHash = (Get-FileHash -Algorithm SHA256 $published).Hash.ToLowerInvariant()
+            $checksumText = (Get-Content -Raw $checksumFile).Trim()
+            if ($checksumText -notmatch '^([0-9a-fA-F]{64})\s+\S+$') { throw "Invalid SHA256 manifest: $($pair.name)" }
+            $manifestHash = $Matches[1].ToLowerInvariant()
+            if ($srcHash -ne $pubHash -or $pubHash -ne $manifestHash) {
+              throw "SHA256 MISMATCH: public artifact $($pair.name) differs from newly built binary or checksum"
+            }
+            "VERIFIED $tag $($pair.name) sha256=$pubHash" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          }
+          Write-Output "Public $tag release binary integrity VERIFIED for both executable assets."

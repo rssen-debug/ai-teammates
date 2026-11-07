@@ -1,0 +1,38 @@
+[
+  {
+    "engineQuery": "commander yargs cac clipanion typescript cli argument parsing",
+    "adapterTried": [
+      "commander yargs cac clipanion typescript cli argument parsing",
+      "commander yargs cac clipanion",
+      "commander yargs"
+    ],
+    "reason": "github full-text repo search ANDs tokens; natural-language questions return 0 — keyword-ladder fallback, recorded loudly"
+  },
+  {
+    "engineQuery": "commander yargs clipanion typescript argument parsing overview",
+    "adapterTried": [
+      "commander yargs clipanion typescript argument parsing overview",
+      "commander yargs clipanion typescript",
+      "commander yargs"
+    ],
+    "reason": "github full-text repo search ANDs tokens; natural-language questions return 0 — keyword-ladder fallback, recorded loudly"
+  },
+  {
+    "engineQuery": "commander yargs clipanion typescript argument parsing data",
+    "adapterTried": [
+      "commander yargs clipanion typescript argument parsing data",
+      "commander yargs clipanion typescript",
+      "commander yargs"
+    ],
+    "reason": "github full-text repo search ANDs tokens; natural-language questions return 0 — keyword-ladder fallback, recorded loudly"
+  },
+  {
+    "engineQuery": "commander yargs clipanion typescript argument parsing latest",
+    "adapterTried": [
+      "commander yargs clipanion typescript argument parsing latest",
+      "commander yargs clipanion typescript",
+      "commander yargs"
+    ],
+    "reason": "github full-text repo search ANDs tokens; natural-language questions return 0 — keyword-ladder fallback, recorded loudly"
+  }
+]

@@ -1,0 +1,57 @@
+{
+  "at": "2026-10-24T00:02:39.807Z",
+  "kind": "real-Go-primary-source-research",
+  "passed": true,
+  "checks": {
+    "realGoUnchanged": true,
+    "modelCompleted": true,
+    "bothPrimarySourcesRead": true,
+    "citationsInArtifact": true,
+    "retentionAndEncryptionDiscussed": true,
+    "physicalDeliveryNotAssumed": true,
+    "readBack": true
+  },
+  "evaluationCheckoutCommit": "88bde65793d3fa75134fdd74312ea40859552204",
+  "runtimeCommitVerified": false,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "conversationId": "conv_mvlmwreb_dbf69a06554f",
+  "artifact": {
+    "fileName": "genesis-research-c7978800d5.md",
+    "sha256": "a179a209284aac3e8972906af5fbf12b3921c6944bee053f237c1a4df484ecb6",
+    "content": "# Web Push: Retention (RFC 8030) vs Content Encryption (RFC 8291)\n\nSources (primary, fetched from rfc-editor.org):\n- RFC 8030, \"Generic Event Delivery Using HTTP Push\": https://www.rfc-editor.org/rfc/rfc8030.txt\n- RFC 8291, \"Message Encryption for Web Push\": https://www.rfc-editor.org/rfc/rfc8291.txt\n\n## RFC 8030 — message retention (TTL), Section 5.2\n- The application server MUST include a `TTL` header (seconds); the push service MUST return 400 if it is omitted (§5.2).\n- The push service MAY store the message for that period to improve delivery to intermittently connected user agents (§5.2); it MAY retain it for a shorter time and may expire it early (§7.2).\n- TTL=0: delivered immediately if the user agent is available; if the UA is unavailable, the message expires and is never delivered (§5.2).\n- After TTL elapses the service MUST NOT attempt delivery (§5.2); expired messages are not delivered when the UA resumes monitoring (§7.2).\n\nGuarantees: short-term server-side storage so an offline device can receive the message when it reconnects, within the TTL window.\nDoes NOT guarantee: delivery, indefinite storage, or that a 201/202 \"accepted\" response means the phone got it — §5 states explicitly that 201 \"does not indicate that the message was delivered to the user agent.\" Real confirmation only comes from the UA's acknowledgment (HTTP DELETE on the message resource, §6.2) surfaced via receipts (§5.1, §6.3); even then it is a service-level ack, not proof a physical phone screen was seen.\n\n## RFC 8291 — content encryption (aes128gcm)\n- End-to-end encryption of the message body so the push service cannot inspect, modify, or forge content (§1, §2).\n- ECDH P-256 key agreement + 16-octet authentication secret, combined via HKDF (§2, §3.1–3.3); encryption per RFC 8188 \"aes128gcm\" content coding (§3.4).\n- Single record required; max ~4096-octet payload (≈3993 octets plaintext) (§4).\n\nGuarantees: confidentiality, integrity, and data-origin authentication of the payload against the push service (§1, §2).\nDoes NOT guarantee: hiding metadata — timing, length, and which app server talks to which subscription remain visible to the push service (§7); HTTP header fields are not protected and must be treated as coming from the push service (§7). It also says nothing about delivery or retention.\n\n## Relation and offline mobile device\n- RFC 8030 §8.1: TLS protects content only from outside parties; the push service itself can read messages, so applications MUST use end-to-end mechanisms — RFC 8291 is the adopted scheme.\n- The two are complementary: 8030 decides *whether and when* the message reaches the device (storage/TTL/receipts); 8291 decides *what the service can see* while holding it.\n- Offline phone: retention (TTL) is what makes offline delivery possible at all; encryption ensures the stored message stays unreadable at the service. But an accepted push (201/202) proves only that the push service stored/accepted it — not that the physical phone received it. Delivery is only confirmed by the UA's DELETE acknowledgment / receipt (8030 §6.2, §6.3), and even receipts are service-reported, not device-screen proof.\n"
+  },
+  "sources": [
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc8030.txt",
+      "sha256": "bc8b9646c153e2d1ac79b35e1d8850a92608fabf6fae8a54b223dc39791a0e13",
+      "bytes": 68069,
+      "rfc": 8030,
+      "mentionsRetention": true,
+      "mentionsEncryption": true
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc8291.txt",
+      "sha256": "d7130962cbe0940465ca375a9fcecfaaa33afb0febd71dd58e2712502fdc0504",
+      "bytes": 25780,
+      "rfc": 8291,
+      "mentionsRetention": true,
+      "mentionsEncryption": true
+    }
+  ],
+  "failure": null,
+  "status": "completed",
+  "elapsedMs": 27611,
+  "physicalDevicePass": false,
+  "note": "Scoped standards comparison with actual source reads; factual review and all other real-world gates remain separate."
+}

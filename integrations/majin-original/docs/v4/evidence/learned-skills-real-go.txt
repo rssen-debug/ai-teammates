@@ -1,0 +1,24 @@
+  provider: env · glm-5.3-flash
+  PASS  auth.paired                    pair -> 200
+  PASS  turn.A.completed               completed
+  PASS  turn.A.tool_calls              3 call(s): fs_read:not found: /tmp/majin-learn-accept-NSHiv5/Documents/CV Anders 2026.txt | fs_find:ok | fs_read:ok
+  PASS  turn.A.failed_first_attempt    a real failure was observed
+  PASS  turn.A.independent_verification at least one receipt was verified
+  PASS  D.skill_stored                 learn-files-5d9a03
+  PASS  D.skill_manifest               state EXPERIMENTAL, 2 step(s)
+  PASS  D.avoid_correct                none abandoned — the model corrected itself inside the run
+  PASS  turn.A.cost                    4 model call(s), 17000 in / 197 out, $0.002649
+  PASS  E.skill_survives_restart       1 learned skill(s) after restart
+  PASS  F.turn.completed               completed
+  PASS  G.skill_retrieved              the learned section and the skill name reached the prompt
+  PASS  G.skill_used_or_adapted        fs_list:true, fs_read:true, fs_read:true · learned tools: fs_find,fs_read
+  PASS  H.failed_strategy_not_repeated the failed action was not executed again
+  PASS  cycle.1.completed              invoice: completed · fs_read:false, fs_find:true, fs_read:true
+  PASS  cycle.1.learned                learn-files-5d9a03
+  PASS  cycle.1.cost                   4 model call(s), 18569 in / 173 out, $0.002872
+  PASS  cycle.2.completed              contract: completed · fs_read:false, fs_find:true, fs_read:true
+  PASS  cycle.2.learned                learn-files-5d9a03
+  PASS  cycle.2.cost                   4 model call(s), 18595 in / 184 out, $0.002881
+  PASS  efficiency.measured            baseline 4 call(s)/17197 tokens · later 4.0 call(s)/18761 tokens → no material change
+  PASS  promotion.state                learn-files-5d9a03: REUSABLE (3 success(es), 3 scenario(s))
+  22/22 checks passed

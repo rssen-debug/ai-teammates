@@ -1,0 +1,191 @@
+{
+  "schema": "majin.v5.build-manifest/v1",
+  "product": "MAJIN V5 — GRAND ARCHITECT",
+  "version": "5.0.0",
+  "gitSha": "e59794988795b97b40ec5a90d71e8d1fa71f0d69",
+  "packageTreeSha256": "0a41347d12c42cbe6cfc2c9914a0115f237e3243eb9d395846fb87d74220dc1a",
+  "windowsInstallerScript": "scripts/v5/install-majin-v5-windows.ps1",
+  "filesCount": 45,
+  "files": {
+    "bin/majin-v5.mjs": {
+      "bytes": 3577,
+      "sha256": "4543efcb2a80d82c310d9a88f7ac5a3dfbf6f9d380c3ec0e70cd6142bc1347f7"
+    },
+    "desktop/main.cjs": {
+      "bytes": 9228,
+      "sha256": "459bdc0a7125f9f0ff9e1b598461213991530424089d88be43edb66c5b9fced1"
+    },
+    "desktop/policy.cjs": {
+      "bytes": 2079,
+      "sha256": "64d497ab6ff36af42efc826ee17e217df3940a1ea541eaf7e01ecdde2dbe1229"
+    },
+    "desktop/stage-host.mjs": {
+      "bytes": 2701,
+      "sha256": "fa20127a217ea4ab29622b6c24fa19f0dda55e93e783cf0026c5311e816368c6"
+    },
+    "desktop/offline.html": {
+      "bytes": 1107,
+      "sha256": "782fb5619b6b36a3e04132fd7d360b173a9b5313009f5a6cf3fc4cdc147ce43f"
+    },
+    "desktop/package.json": {
+      "bytes": 1601,
+      "sha256": "a5586beea68b95e6333ccd1e64e12ff72e9aaa5e4c8e3fca84858637b357348e"
+    },
+    "src/v5/architect.js": {
+      "bytes": 33573,
+      "sha256": "98bdaa49d843adb143b6abb34250963417f58fc6bf3d9047a9ac2c5d00b20d59"
+    },
+    "src/v5/files-access.js": {
+      "bytes": 12744,
+      "sha256": "25e119928044fcd26dcacaedf50c9debcc2ad20d4448fab8431890a01ac7e1cf"
+    },
+    "src/v5/inventory.js": {
+      "bytes": 9343,
+      "sha256": "76de73dee62891a1c4269e7848b8ddce5b5f797337d0bbd79414153e9bd43e20"
+    },
+    "src/v5/learning-engine.js": {
+      "bytes": 16058,
+      "sha256": "bc48cd1c034dc44f91515851700c3d544a178c00baa44dd5ab44225ff7876e97"
+    },
+    "src/v5/ops.js": {
+      "bytes": 11256,
+      "sha256": "c14f82fd9f95ea4255f0624e5e3f386742052644b1bebb5b04f5ffac85d03453"
+    },
+    "src/v5/providers.js": {
+      "bytes": 25617,
+      "sha256": "eb78da4b0c283be08c19aa1dcb99480f6e20a789ef2323f59baba8d083a9ebf3"
+    },
+    "src/v5/server.js": {
+      "bytes": 12566,
+      "sha256": "f664c16ef52bbb3681cf5f7207db7378a47bfc91aaca8138554a058c3bbd82ff"
+    },
+    "src/v5/skill-builder.js": {
+      "bytes": 14243,
+      "sha256": "3ddbc8702674d823b64b1b1a0b1920140a491c6daf9760b5fda9508bcd376dcd"
+    },
+    "src/v5/skill-tree.js": {
+      "bytes": 45981,
+      "sha256": "b3cdda0e64d85dac0f031757c6d85264ae34db23f1d38d7fc18c5eac90fd22d9"
+    },
+    "src/v5/ui/app.css": {
+      "bytes": 9859,
+      "sha256": "3124212cb316cd03ba60b22e4650c782cd175142397e94d9dccebcce7915d06a"
+    },
+    "src/v5/ui/app.js": {
+      "bytes": 14874,
+      "sha256": "ba94214e5affe54b9b6ccf9ffbccff22691051ed39561262260fbd068fd1cecf"
+    },
+    "src/v5/ui/dot-matrix.js": {
+      "bytes": 7637,
+      "sha256": "a63ec6d22f7118053cf6d61688c426f192cacce5634f5a1517cb2eec590e7fc6"
+    },
+    "src/v5/ui/index.html": {
+      "bytes": 7736,
+      "sha256": "2e52e288c58c655ba2c87ade51a5aec3a0e51317050047d5bc5dde6867e4be7f"
+    },
+    "src/v5/ui/strings.js": {
+      "bytes": 2172,
+      "sha256": "49897bf19423d4a5bcc199f918c50b4d15d269cf42772c880221c2631a705d69"
+    },
+    "src/v5/voice-controller.js": {
+      "bytes": 5802,
+      "sha256": "4be382b682be1fe4d0413800bdae3e3253eecafc222e9393553fb0a436bcd65f"
+    },
+    "src/v5/workflows/job-search.js": {
+      "bytes": 32622,
+      "sha256": "92dae41ca04646b9615467c96cb5e48c687bb11373eae7136798008ad20d12ed"
+    },
+    "src/v5/xp-engine.js": {
+      "bytes": 15908,
+      "sha256": "e28aaf127806f43ec562aa3862815df958bb20001047fb54dc1e325da3aa8073"
+    },
+    "test/v5/architect.test.js": {
+      "bytes": 8093,
+      "sha256": "b8f53dad4c7bc9927e771587ac17c3d9f649b574bc5226b2ad47a6249c1a33e5"
+    },
+    "test/v5/desktop-v5.test.js": {
+      "bytes": 6246,
+      "sha256": "2a0cb4593ed7a42f4eb68fae713b71e3f5cfc8c185e3dd74a4059cc7f378fd62"
+    },
+    "test/v5/job-workflow.test.js": {
+      "bytes": 8840,
+      "sha256": "93046408c12cc5931582004952b888c680158428d983be23c72756e2e306fee3"
+    },
+    "test/v5/learning-engine.test.js": {
+      "bytes": 4248,
+      "sha256": "2e4240cbec70da87464345114c145612d80e236feeecb041979514124fbed711"
+    },
+    "test/v5/providers-files-ops.test.js": {
+      "bytes": 9767,
+      "sha256": "38a18dd39f9f040586be4fd53f9e78eb15be793416fe85edbe929e7b9d4dcafe"
+    },
+    "test/v5/skill-tree.test.js": {
+      "bytes": 5917,
+      "sha256": "4f24273c027959bdaf1c15522cb64f187def205422a9d2f030b23ee15636717e"
+    },
+    "test/v5/ui-blackbox.test.js": {
+      "bytes": 11667,
+      "sha256": "94d2cf1212b1cd46eeb6e3084f2c76a2114a5b0b7286d94cee160d0835bb3b8f"
+    },
+    "test/v5/xp-engine.test.js": {
+      "bytes": 5987,
+      "sha256": "d94ff5d9bffeb1f4077111c13a5df27b060e1a53e9c23bad4893110cbb380df6"
+    },
+    "scripts/v5/desktop-host.mjs": {
+      "bytes": 2633,
+      "sha256": "6b031bfae7f20b8a4be4613aa729230cd342b846b1308ba9b28cece38c124191"
+    },
+    "scripts/v5/desktop-smoke.mjs": {
+      "bytes": 9318,
+      "sha256": "c06ba81571dcc6934314365002cdec8595c08465a9633453d7a6763a5fd90baf"
+    },
+    "scripts/v5/desktop-installer-verify.ps1": {
+      "bytes": 10936,
+      "sha256": "404441d849c0a769e6ed14434ee4ef9102f1c28105804aad75f201d6723d5fbd"
+    },
+    "scripts/v5/install-majin-v5-windows.ps1": {
+      "bytes": 1718,
+      "sha256": "7e4b214254cfecec66aa9a484abe86c54b8dfc3854138907a3e337b453461008"
+    },
+    "scripts/v5/render-screenshots.mjs": {
+      "bytes": 11791,
+      "sha256": "1dfa8cadb545635afc0e7ac4baff88452793e11dc0672778ca0b9af4c58d87bc"
+    },
+    "scripts/v5/build-package.mjs": {
+      "bytes": 4035,
+      "sha256": "ee4b5609dc7955790c4937265775b20648b3ec04bbd5a39aa7c3815193fcba9b"
+    },
+    "docs/v5/REUSE_MATRIX.md": {
+      "bytes": 13192,
+      "sha256": "502593aef6f2e602b6e66a23195b1c3d17d4a75f2fc5c9cfe9ce3c603f2b95f5"
+    },
+    "docs/v5/RESEARCH_DECISIONS.md": {
+      "bytes": 6256,
+      "sha256": "c36e1a71506dd95e8ccc2069f11f1c982c8d142e53852734de1c622e346aa132"
+    },
+    "docs/v5/XP_RULES.md": {
+      "bytes": 5545,
+      "sha256": "2816e4093cda60956f58808cad6c68db53f2139fbfc94c369293902005da1342"
+    },
+    "docs/v5/SKILL_REGISTRY.json": {
+      "bytes": 27553,
+      "sha256": "57f3e35ce4ef601da92a22fbec5a8e823d90ac4db3a9de6cb7d02332db23214b"
+    },
+    "docs/v5/HANDOVER.md": {
+      "bytes": 14672,
+      "sha256": "adb950c45de3d87233a0bf78491fb41b605194a505bbcffec8e18b2e5e6e842f"
+    },
+    "assets/majin.png": {
+      "bytes": 50304,
+      "sha256": "e98eb71ee69d05cbededf914a6954724c1bf71d9883c57e5efdc8ab5550bdfba"
+    },
+    "assets/majin.ico": {
+      "bytes": 41324,
+      "sha256": "c2a8ecde5a6726a363f6d9852b47ab9dadda089f4518a0a2def45b0b9705012c"
+    },
+    "assets/majin-transparent.png": {
+      "bytes": 48246,
+      "sha256": "1b3817225fed2057ae045ea4442a7f0b4c89b0814bedefaf81219a23417b36c9"
+    }
+  }
+}

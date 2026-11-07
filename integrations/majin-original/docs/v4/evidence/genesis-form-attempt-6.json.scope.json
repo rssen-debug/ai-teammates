@@ -1,0 +1,12 @@
+{
+  "ordinaryGhostActivationProven": false,
+  "isolatedHost": true,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "roundCap": 12,
+  "toolCallCap": 24
+}

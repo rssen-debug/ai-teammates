@@ -1,0 +1,57 @@
+{
+  "at": "2026-10-24T00:41:17.406Z",
+  "kind": "real-Go-primary-source-research",
+  "passed": true,
+  "checks": {
+    "realGoUnchanged": true,
+    "modelCompleted": true,
+    "bothPrimarySourcesRead": true,
+    "citationsInArtifact": true,
+    "retentionAndEncryptionDiscussed": true,
+    "physicalDeliveryNotAssumed": true,
+    "readBack": true
+  },
+  "evaluationCheckoutCommit": "bfc0e25359705b136e58534bf3c7ae2d2ee3effb",
+  "runtimeCommitVerified": false,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "conversationId": "conv_mvloa3la_9b916c34417c",
+  "artifact": {
+    "fileName": "genesis-research-12f809f36c.md",
+    "sha256": "15004dfe01bee05966d16beda07726939db258b33b607620022cdbf1c5db525e",
+    "content": "# RFC 8030 (message retention) vs RFC 8291 (content encryption) — source-backed comparison\n\nPrimary sources (both fetched in full from rfc-editor.org on 2026-10-24):\n- RFC 8030, \"Generic Event Delivery Using HTTP Push\" (Thomson, Damaggio, Raymor; Dec 2016): https://www.rfc-editor.org/rfc/rfc8030.txt\n- RFC 8291, \"Message Encryption for Web Push\" (Thomson; Nov 2017): https://www.rfc-editor.org/rfc/rfc8291.txt\n\n## 1. RFC 8030 — retention / short-term storage (delivery mechanism)\n\nWhat it provides:\n- TTL header: the application server MUST include TTL (seconds) in every push request; the push service MUST return 400 if TTL is omitted (RFC 8030 §5.2).\n- The push service stores the message so it can be delivered when the intermittently connected user agent resumes monitoring: \"User agents are often only intermittently connected, and so benefit from having short-term message storage at the push service\" (§5.2). Stored undelivered messages are delivered when the user agent recommences monitoring (§7.2).\n- After TTL elapses, the push service MUST NOT attempt delivery (§5.2). Zero-TTL messages are delivered immediately if the UA is available; if the UA is unavailable they expire and are never delivered (§5.2).\n- Replacement via Topic header lets a stored message be replaced while the UA is offline (§5.4).\n- Acknowledgement: the user agent MUST DELETE the push message resource for at-least-once delivery; the service SHOULD retry until the advertised expiration (§6.2). Receipts (§5.1, §6.3) are service→app-server confirmations of acknowledgement.\n\nWhat it does NOT guarantee (per the independent review, corrected wording):\n- Retention is best-effort, not a guarantee of the requested duration. The service MAY retain a message for a shorter duration than requested, indicating the actual TTL in its response (§5.2); it MAY later expire a message before its advertised TTL (§7.2); it is \"not obligated to store messages indefinitely\" (§7.2); it MAY cease retrying delivery before expiration (§6.2). So: short-term storage improves delivery reliability for offline UAs, but no fixed retention duration is guaranteed.\n- A 201/202 response only means the push service accepted the message: \"This does not indicate that the message was delivered to the user agent\" (§5). An accepted push does NOT prove a physical phone received it. Only a 204 receipt (§6.3) confirms the UA acknowledged — and even that is an acknowledgement by the user-agent software, not proof the human saw it.\n- TLS protects messages only from external parties; the push service can inspect and modify content (§8, §8.1).\n\n## 2. RFC 8291 — content encryption (payload protection)\n\nWhat it provides:\n- End-to-end confidentiality, integrity and data-origin authentication between application server and user agent, hiding content from the push service (Abstract, §1, §2).\n- Mechanism: ECDH on P-256 between UA and app server, a 16-octet authentication secret from the UA, HKDF (SHA-256) combining them, then AES128-GCM via the \"aes128gcm\" encrypted content encoding of RFC 8188 (§2, §3, §3.1–3.4). Per-message ECDH key pair and random salt from the app server (§2).\n- Single record per message; padding delimiter 0x02 MUST be checked (§4).\n\nWhat it does NOT guarantee (per the independent review, corrected wording):\n- Size: RFC 8291 §4 states a push service \"is not required to support more than 4096 octets of payload body\" (referring to RFC 8030 §7.2, where services MUST NOT return 413 for bodies ≤4096 bytes). This yields at most 3993 octets of plaintext (4096 − 86 header − 1 padding − 16 AEAD tag). That is a minimum interoperability floor, not a universal protocol maximum; services may accept larger payloads.\n- Metadata: timing, length (unless padded), and which app server talks to which UA/subscription remain visible to the push service (§7). No HTTP header fields are protected by the content encoding (§7).\n- It does not itself provide delivery, storage, or receipts — it only protects payload content while the message sits at and transits the push service.\n\n## 3. How they relate\n\n- Orthogonal layers of the same system: RFC 8030 defines transport, subscription, TTL-based retention and receipts; RFC 8291 encrypts the body that RFC 8030 carries. RFC 8030 §8.1 requires applications to use end-to-end confidentiality and names [ENCRYPT] (RFC 8291) as the W3C Push API's adopted mechanism; RFC 8291 §1 explicitly builds on RFC 8030 and its UA/push-service/app-server roles.\n- Encryption is independent of retention: an encrypted message stored at the push service stays unreadable to the service for the whole retention window; retention duration and encryption strength are unrelated guarantees.\n\n## 4. Relation to an offline mobile device\n\n- Offline device: RFC 8030 §5.2/§7.2 — the push service stores the message for the TTL (which it may shorten, §5.2/§7.2) and delivers it when the device resumes monitoring. If TTL is zero or expires first, the message is never delivered (§5.2, §7.2).\n- The device's radio/battery motivation for consolidated push is described in RFC 8030 §1 and Urgency (§5.3).\n- Encryption (RFC 8291) matters while offline because the ciphertext is stored server-side; the service never sees plaintext. Key agreement happens at subscription time (§2.1), so decryption works whenever the device comes back online — within the TTL window.\n- Critical caveat: a 201/202 from the push service (§5, §5.1) proves only that the service accepted the message for delivery; it does not prove the physical phone received it. Only a 204 receipt after the UA's DELETE acknowledgement (§6.2, §6.3) indicates delivery to the user agent — and even then the service MAY stop retrying early (§6.2), and a zero-TTL message may be removed before any acknowledgement is possible (§5.2).\n\n## 5. Corrections from the independent review (both supported by the primary text)\n\n1. Guarantee wording: RFC 8030 §5.2 and §7.2 explicitly allow shorter retention and early expiry, so retention is described here as best-effort short-term storage, not a guarantee of the requested TTL duration.\n2. Size wording: RFC 8291 §4 gives a minimum supported 4096-octet payload body (3993-octet plaintext capacity), not a universal protocol maximum.\n"
+  },
+  "sources": [
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc8030.txt",
+      "sha256": "bc8b9646c153e2d1ac79b35e1d8850a92608fabf6fae8a54b223dc39791a0e13",
+      "bytes": 68069,
+      "rfc": 8030,
+      "mentionsRetention": true,
+      "mentionsEncryption": true
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc8291.txt",
+      "sha256": "d7130962cbe0940465ca375a9fcecfaaa33afb0febd71dd58e2712502fdc0504",
+      "bytes": 25780,
+      "rfc": 8291,
+      "mentionsRetention": true,
+      "mentionsEncryption": true
+    }
+  ],
+  "failure": null,
+  "status": "completed",
+  "elapsedMs": 43270,
+  "physicalDevicePass": false,
+  "note": "Scoped standards comparison with actual source reads; factual review and all other real-world gates remain separate."
+}

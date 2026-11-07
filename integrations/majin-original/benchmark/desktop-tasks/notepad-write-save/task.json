@@ -1,0 +1,19 @@
+{
+  "id": "notepad-write-save",
+  "version": "majin-desktop-eval/1",
+  "environment": "simulated",
+  "category": "windows-desktop-editing",
+  "difficulty": "easy",
+  "goal": "Write the exact text from spec.json (expectedContent) into note.txt — the task a real desktop agent would do by typing in Notepad and saving. The simulated end-state is measured the same way the live lane would be: by READING the saved bytes.",
+  "verify": { "cmd": "node", "script": "verify.mjs", "timeoutMs": 10000 },
+  "fixtures": {
+    "good": {
+      "spec.json": "{\"expectedContent\":\"MAJIN-11 ready\"}\n",
+      "note.txt": "MAJIN-11 ready"
+    },
+    "bad": {
+      "spec.json": "{\"expectedContent\":\"MAJIN-11 ready\"}\n",
+      "note.txt": "hello world"
+    }
+  }
+}

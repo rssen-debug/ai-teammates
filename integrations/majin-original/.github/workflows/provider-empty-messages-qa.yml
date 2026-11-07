@@ -1,0 +1,25 @@
+name: Provider empty-messages cross-platform gate
+on:
+  push:
+    branches: [fix/provider-empty-message-contract-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --test test/empty-messages-guard.test.js
+      - run: npm test
+      - run: npm run check

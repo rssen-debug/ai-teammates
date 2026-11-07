@@ -1,0 +1,3153 @@
+{
+  "schema": "majin.v4.capability-inventory/v1",
+  "generatedAt": "2026-10-24T13:44:01.044Z",
+  "platform": "linux",
+  "v1": {
+    "modules": [
+      {
+        "file": "agent.js",
+        "exportNames": [
+          "agentTools"
+        ],
+        "tools": [
+          {
+            "name": "agent.plan",
+            "risk": "read",
+            "exportName": "agentTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "agent.delegate",
+            "risk": "read",
+            "exportName": "agentTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "agent.moa",
+            "risk": "read",
+            "exportName": "agentTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "agent.approve",
+            "risk": "read",
+            "exportName": "agentTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          }
+        ],
+        "lanes": [],
+        "decision": {
+          "status": "replaced",
+          "reason": "V1 agent.plan/delegate/moa/approve are bound to V1's own loop, registry and guard. V4 provides the same capability natively (agent_delegate) with its own approval policy; running V1's second agent runtime inside V4 would duplicate state and bypass receipts."
+        }
+      },
+      {
+        "file": "audit.js",
+        "exportNames": [
+          "auditTools"
+        ],
+        "tools": [
+          {
+            "name": "majin.self_audit",
+            "risk": "read",
+            "exportName": "auditTools",
+            "status": "integrated",
+            "lanes": [
+              "audit"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "audit",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through audit"
+        }
+      },
+      {
+        "file": "channels.js",
+        "exportNames": [
+          "channelTools"
+        ],
+        "tools": [
+          {
+            "name": "channel.send",
+            "risk": "exec",
+            "exportName": "channelTools",
+            "status": "integrated",
+            "lanes": [
+              "channels"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "channels",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through channels"
+        }
+      },
+      {
+        "file": "computer.js",
+        "exportNames": [
+          "computerTools"
+        ],
+        "tools": [
+          {
+            "name": "computer.use",
+            "risk": "exec",
+            "exportName": "computerTools",
+            "status": "integrated",
+            "lanes": [
+              "computer"
+            ],
+            "requires": "windows interactive session"
+          },
+          {
+            "name": "cursor.overlay",
+            "risk": "exec",
+            "exportName": "computerTools",
+            "status": "integrated",
+            "lanes": [
+              "computer"
+            ],
+            "requires": "windows interactive session"
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "computer",
+            "windowsOnly": true,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through computer"
+        }
+      },
+      {
+        "file": "exec.js",
+        "exportNames": [
+          "execTools"
+        ],
+        "tools": [
+          {
+            "name": "exec.backends",
+            "risk": "read",
+            "exportName": "execTools",
+            "status": "integrated",
+            "lanes": [
+              "shell"
+            ],
+            "requires": null
+          },
+          {
+            "name": "exec.start",
+            "risk": "exec",
+            "exportName": "execTools",
+            "status": "integrated",
+            "lanes": [
+              "shell"
+            ],
+            "requires": null
+          },
+          {
+            "name": "exec.wait",
+            "risk": "exec",
+            "exportName": "execTools",
+            "status": "integrated",
+            "lanes": [
+              "shell"
+            ],
+            "requires": null
+          },
+          {
+            "name": "exec.cancel",
+            "risk": "exec",
+            "exportName": "execTools",
+            "status": "integrated",
+            "lanes": [
+              "shell"
+            ],
+            "requires": null
+          },
+          {
+            "name": "exec.logs",
+            "risk": "read",
+            "exportName": "execTools",
+            "status": "integrated",
+            "lanes": [
+              "shell"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "shell",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through shell"
+        }
+      },
+      {
+        "file": "files.js",
+        "exportNames": [
+          "fileTools"
+        ],
+        "tools": [
+          {
+            "name": "fs.list",
+            "risk": "read",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.read",
+            "risk": "read",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.write",
+            "risk": "write",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.patch",
+            "risk": "write",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.search",
+            "risk": "read",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.grep",
+            "risk": "read",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.move",
+            "risk": "write",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.copy",
+            "risk": "write",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.delete",
+            "risk": "destructive",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.find",
+            "risk": "read",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.stat",
+            "risk": "read",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.mkdir",
+            "risk": "write",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          },
+          {
+            "name": "fs.tar",
+            "risk": "write",
+            "exportName": "fileTools",
+            "status": "integrated",
+            "lanes": [
+              "files"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "files",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through files"
+        }
+      },
+      {
+        "file": "flows.js",
+        "exportNames": [
+          "flowsTools"
+        ],
+        "tools": [
+          {
+            "name": "flows.add",
+            "risk": "exec",
+            "exportName": "flowsTools",
+            "status": "integrated",
+            "lanes": [
+              "flows"
+            ],
+            "requires": null
+          },
+          {
+            "name": "flows.list",
+            "risk": "read",
+            "exportName": "flowsTools",
+            "status": "integrated",
+            "lanes": [
+              "flows"
+            ],
+            "requires": null
+          },
+          {
+            "name": "flows.enable",
+            "risk": "write",
+            "exportName": "flowsTools",
+            "status": "integrated",
+            "lanes": [
+              "flows"
+            ],
+            "requires": null
+          },
+          {
+            "name": "flows.remove",
+            "risk": "write",
+            "exportName": "flowsTools",
+            "status": "integrated",
+            "lanes": [
+              "flows"
+            ],
+            "requires": null
+          },
+          {
+            "name": "flows.trigger",
+            "risk": "exec",
+            "exportName": "flowsTools",
+            "status": "integrated",
+            "lanes": [
+              "flows"
+            ],
+            "requires": null
+          },
+          {
+            "name": "flows.webhook.recorded",
+            "risk": "write",
+            "exportName": "flowsTools",
+            "status": "integrated",
+            "lanes": [
+              "flows"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "flows",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through flows"
+        }
+      },
+      {
+        "file": "github.js",
+        "exportNames": [
+          "githubTools"
+        ],
+        "tools": [
+          {
+            "name": "github.verify",
+            "risk": "exec",
+            "exportName": "githubTools",
+            "status": "integrated",
+            "lanes": [
+              "github"
+            ],
+            "requires": null
+          },
+          {
+            "name": "github.research",
+            "risk": "read",
+            "exportName": "githubTools",
+            "status": "integrated",
+            "lanes": [
+              "github"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "github",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through github"
+        }
+      },
+      {
+        "file": "heartbeat.js",
+        "exportNames": [
+          "heartbeatTools"
+        ],
+        "tools": [
+          {
+            "name": "majin.heartbeat",
+            "risk": "net",
+            "exportName": "heartbeatTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          }
+        ],
+        "lanes": [],
+        "decision": {
+          "status": "replaced",
+          "reason": "The existing core Heartbeat engine is reused by src/v4/heartbeat.js with actual V4 goal/approval events, durable queue and shared-history/opt-in push delivery. The old tool wrapper uses V1 journal events and is not a second V4 heartbeat owner."
+        }
+      },
+      {
+        "file": "jobs.js",
+        "exportNames": [
+          "jobTools"
+        ],
+        "tools": [
+          {
+            "name": "jobs.search",
+            "risk": "read",
+            "exportName": "jobTools",
+            "status": "integrated",
+            "lanes": [
+              "jobs"
+            ],
+            "requires": null
+          },
+          {
+            "name": "jobs.match",
+            "risk": "read",
+            "exportName": "jobTools",
+            "status": "integrated",
+            "lanes": [
+              "jobs"
+            ],
+            "requires": null
+          },
+          {
+            "name": "jobs.list",
+            "risk": "read",
+            "exportName": "jobTools",
+            "status": "integrated",
+            "lanes": [
+              "jobs"
+            ],
+            "requires": null
+          },
+          {
+            "name": "jobs.start",
+            "risk": "write",
+            "exportName": "jobTools",
+            "status": "integrated",
+            "lanes": [
+              "jobs"
+            ],
+            "requires": null
+          },
+          {
+            "name": "jobs.skip",
+            "risk": "write",
+            "exportName": "jobTools",
+            "status": "integrated",
+            "lanes": [
+              "jobs"
+            ],
+            "requires": null
+          },
+          {
+            "name": "jobs.cv.set",
+            "risk": "write",
+            "exportName": "jobTools",
+            "status": "integrated",
+            "lanes": [
+              "jobs"
+            ],
+            "requires": null
+          },
+          {
+            "name": "jobs.cv.show",
+            "risk": "read",
+            "exportName": "jobTools",
+            "status": "integrated",
+            "lanes": [
+              "jobs"
+            ],
+            "requires": null
+          },
+          {
+            "name": "jobs.prepare",
+            "risk": "exec",
+            "exportName": "jobTools",
+            "status": "integrated",
+            "lanes": [
+              "jobs"
+            ],
+            "requires": null
+          },
+          {
+            "name": "jobs.send",
+            "risk": "destructive",
+            "exportName": "jobTools",
+            "status": "integrated",
+            "lanes": [
+              "jobs"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "jobs",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through jobs"
+        }
+      },
+      {
+        "file": "learn.js",
+        "exportNames": [
+          "learnTools"
+        ],
+        "tools": [
+          {
+            "name": "ma.learn",
+            "risk": "write",
+            "exportName": "learnTools",
+            "status": "integrated",
+            "lanes": [
+              "learn"
+            ],
+            "requires": null
+          },
+          {
+            "name": "ma.verify_lesson",
+            "risk": "write",
+            "exportName": "learnTools",
+            "status": "integrated",
+            "lanes": [
+              "learn"
+            ],
+            "requires": null
+          },
+          {
+            "name": "ma.lessons",
+            "risk": "read",
+            "exportName": "learnTools",
+            "status": "integrated",
+            "lanes": [
+              "learn"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "learn",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through learn"
+        }
+      },
+      {
+        "file": "majin.js",
+        "exportNames": [
+          "majinTools"
+        ],
+        "tools": [
+          {
+            "name": "majin.configure",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.routes",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.provider",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.moa",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.guard",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.memory",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.skill",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.schedule",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.channel",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.status",
+            "risk": "read",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.doctor",
+            "risk": "read",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.selftest",
+            "risk": "read",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.tools",
+            "risk": "read",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.backup",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.ui",
+            "risk": "read",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.control",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.dataset",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "majin.adapter",
+            "risk": "write",
+            "exportName": "majinTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          }
+        ],
+        "lanes": [],
+        "decision": {
+          "status": "excluded",
+          "reason": "Self-configuration writes V1's config.json and restarts V1's agent. V4 has its own setup, doctor, owner-mode and updater. Adapting these would let the model edit the wrong configuration while appearing to manage MAJIN."
+        }
+      },
+      {
+        "file": "marketing.js",
+        "exportNames": [
+          "marketingTools"
+        ],
+        "tools": [
+          {
+            "name": "marketing.channel_report",
+            "risk": "read",
+            "exportName": "marketingTools",
+            "status": "integrated",
+            "lanes": [
+              "marketing"
+            ],
+            "requires": null
+          },
+          {
+            "name": "marketing.plan",
+            "risk": "read",
+            "exportName": "marketingTools",
+            "status": "integrated",
+            "lanes": [
+              "marketing"
+            ],
+            "requires": null
+          },
+          {
+            "name": "marketing.status",
+            "risk": "read",
+            "exportName": "marketingTools",
+            "status": "integrated",
+            "lanes": [
+              "marketing"
+            ],
+            "requires": null
+          },
+          {
+            "name": "marketing.analyze",
+            "risk": "read",
+            "exportName": "marketingTools",
+            "status": "integrated",
+            "lanes": [
+              "marketing"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "marketing",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through marketing"
+        }
+      },
+      {
+        "file": "memory-sync.js",
+        "exportNames": [
+          "memorySyncTools"
+        ],
+        "tools": [
+          {
+            "name": "memory.sync",
+            "risk": "write",
+            "exportName": "memorySyncTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          }
+        ],
+        "lanes": [],
+        "decision": {
+          "status": "replaced",
+          "reason": "The existing core memory-sync entry point now supports canonical V2 namespaced records. V4 memory_sync uses that engine and MemoryStore with approval, folder checks and tombstones. The old wrapper assumes V1 text facts and is not used to create a shadow V4 store."
+        }
+      },
+      {
+        "file": "meta.js",
+        "exportNames": [
+          "metaTools"
+        ],
+        "tools": [
+          {
+            "name": "tools.search",
+            "risk": "read",
+            "exportName": "metaTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          }
+        ],
+        "lanes": [],
+        "decision": {
+          "status": "replaced",
+          "reason": "tools.search needs V1's registry.search. V4 ships tools_search/tools_activate over the live V4 registry, which also makes discovered tools callable in the next round."
+        }
+      },
+      {
+        "file": "net.js",
+        "exportNames": [
+          "netTools"
+        ],
+        "tools": [
+          {
+            "name": "net.dns",
+            "risk": "read",
+            "exportName": "netTools",
+            "status": "integrated",
+            "lanes": [
+              "net"
+            ],
+            "requires": null
+          },
+          {
+            "name": "net.tcp",
+            "risk": "read",
+            "exportName": "netTools",
+            "status": "integrated",
+            "lanes": [
+              "net"
+            ],
+            "requires": null
+          },
+          {
+            "name": "net.http",
+            "risk": "net",
+            "exportName": "netTools",
+            "status": "integrated",
+            "lanes": [
+              "net"
+            ],
+            "requires": null
+          },
+          {
+            "name": "net.serve",
+            "risk": "exec",
+            "exportName": "netTools",
+            "status": "integrated",
+            "lanes": [
+              "net"
+            ],
+            "requires": null
+          },
+          {
+            "name": "net.serve_stop",
+            "risk": "exec",
+            "exportName": "netTools",
+            "status": "integrated",
+            "lanes": [
+              "net"
+            ],
+            "requires": null
+          },
+          {
+            "name": "screen.capture",
+            "risk": "read",
+            "exportName": "netTools",
+            "status": "integrated",
+            "lanes": [
+              "screen"
+            ],
+            "requires": "windows interactive session"
+          },
+          {
+            "name": "screen.claim",
+            "risk": "read",
+            "exportName": "netTools",
+            "status": "integrated",
+            "lanes": [
+              "screen"
+            ],
+            "requires": "windows interactive session"
+          },
+          {
+            "name": "sys.notify",
+            "risk": "read",
+            "exportName": "netTools",
+            "status": "integrated",
+            "lanes": [
+              "screen"
+            ],
+            "requires": "windows interactive session"
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "screen",
+            "windowsOnly": true,
+            "only": [
+              "screen.capture",
+              "screen.claim",
+              "sys.notify"
+            ]
+          },
+          {
+            "lane": "net",
+            "windowsOnly": false,
+            "only": [
+              "net.dns",
+              "net.tcp",
+              "net.http",
+              "net.serve",
+              "net.serve_stop"
+            ]
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through screen, net"
+        }
+      },
+      {
+        "file": "power.js",
+        "exportNames": [
+          "powerTools"
+        ],
+        "tools": [
+          {
+            "name": "power.propose",
+            "risk": "write",
+            "exportName": "powerTools",
+            "status": "integrated",
+            "lanes": [
+              "power"
+            ],
+            "requires": null
+          },
+          {
+            "name": "power.approve",
+            "risk": "write",
+            "exportName": "powerTools",
+            "status": "integrated",
+            "lanes": [
+              "power"
+            ],
+            "requires": null
+          },
+          {
+            "name": "power.apply",
+            "risk": "exec",
+            "exportName": "powerTools",
+            "status": "integrated",
+            "lanes": [
+              "power"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "power",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through power"
+        }
+      },
+      {
+        "file": "re.js",
+        "exportNames": [
+          "reTools"
+        ],
+        "tools": [
+          {
+            "name": "re.analyze",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.strings",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.hexdump",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.search",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.entropy",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.sections",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.imports",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.exports",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.yara",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.iocs",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.overlay",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.extract",
+            "risk": "write",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.apk",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.pcap",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.diff",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.modules",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.tool",
+            "risk": "exec",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.tools",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.disasm",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.unpack",
+            "risk": "write",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.hash",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.spec",
+            "risk": "write",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          },
+          {
+            "name": "re.rules",
+            "risk": "read",
+            "exportName": "reTools",
+            "status": "integrated",
+            "lanes": [
+              "re"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "re",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through re"
+        }
+      },
+      {
+        "file": "research.js",
+        "exportNames": [
+          "researchTools"
+        ],
+        "tools": [
+          {
+            "name": "research.run",
+            "risk": "read",
+            "exportName": "researchTools",
+            "status": "integrated",
+            "lanes": [
+              "research"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "research",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through research"
+        }
+      },
+      {
+        "file": "reset.js",
+        "exportNames": [
+          "resetTools"
+        ],
+        "tools": [
+          {
+            "name": "reset.plan",
+            "risk": "read",
+            "exportName": "resetTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "reset.apply",
+            "risk": "exec",
+            "exportName": "resetTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          }
+        ],
+        "lanes": [],
+        "decision": {
+          "status": "excluded",
+          "reason": "Deletes artifacts measured by V1 recovery inside a shared data dir. V4 reconciles its own goals and must never run destructive V1 recovery on paths it does not own."
+        }
+      },
+      {
+        "file": "shell.js",
+        "exportNames": [
+          "shellTools"
+        ],
+        "tools": [
+          {
+            "name": "shell.run",
+            "risk": "exec",
+            "exportName": "shellTools",
+            "status": "integrated",
+            "lanes": [
+              "shelltools"
+            ],
+            "requires": null
+          },
+          {
+            "name": "shell.bg",
+            "risk": "exec",
+            "exportName": "shellTools",
+            "status": "integrated",
+            "lanes": [
+              "shelltools"
+            ],
+            "requires": null
+          },
+          {
+            "name": "shell.jobs",
+            "risk": "read",
+            "exportName": "shellTools",
+            "status": "integrated",
+            "lanes": [
+              "shelltools"
+            ],
+            "requires": null
+          },
+          {
+            "name": "shell.stop",
+            "risk": "exec",
+            "exportName": "shellTools",
+            "status": "integrated",
+            "lanes": [
+              "shelltools"
+            ],
+            "requires": null
+          },
+          {
+            "name": "shell.env",
+            "risk": "read",
+            "exportName": "shellTools",
+            "status": "integrated",
+            "lanes": [
+              "shelltools"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "shelltools",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through shelltools"
+        }
+      },
+      {
+        "file": "sys.js",
+        "exportNames": [
+          "sysTools"
+        ],
+        "tools": [
+          {
+            "name": "sys.info",
+            "risk": "read",
+            "exportName": "sysTools",
+            "status": "integrated",
+            "lanes": [
+              "sys"
+            ],
+            "requires": null
+          },
+          {
+            "name": "sys.ps",
+            "risk": "read",
+            "exportName": "sysTools",
+            "status": "integrated",
+            "lanes": [
+              "sys"
+            ],
+            "requires": null
+          },
+          {
+            "name": "sys.ports",
+            "risk": "read",
+            "exportName": "sysTools",
+            "status": "integrated",
+            "lanes": [
+              "sys"
+            ],
+            "requires": null
+          },
+          {
+            "name": "sys.fs_usage",
+            "risk": "read",
+            "exportName": "sysTools",
+            "status": "integrated",
+            "lanes": [
+              "sys"
+            ],
+            "requires": null
+          },
+          {
+            "name": "sys.procs_top",
+            "risk": "read",
+            "exportName": "sysTools",
+            "status": "integrated",
+            "lanes": [
+              "sys"
+            ],
+            "requires": null
+          },
+          {
+            "name": "sys.services",
+            "risk": "read",
+            "exportName": "sysTools",
+            "status": "integrated",
+            "lanes": [
+              "sys"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "sys",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through sys"
+        }
+      },
+      {
+        "file": "teams.js",
+        "exportNames": [
+          "teamTools"
+        ],
+        "tools": [
+          {
+            "name": "team.manage",
+            "risk": "write",
+            "exportName": "teamTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          },
+          {
+            "name": "team.run",
+            "risk": "exec",
+            "exportName": "teamTools",
+            "status": "excluded",
+            "lanes": [],
+            "requires": null
+          }
+        ],
+        "lanes": [],
+        "decision": {
+          "status": "replaced",
+          "reason": "The V1 tool wrapper binds team.run to V1's loop and registry. Its ENGINE (src/core/teams.js: TeamStore, runTeam) and the scheduler behind it (src/core/swarm.js) are reused verbatim by V4's team_run, with V4 subagents as the worker."
+        }
+      },
+      {
+        "file": "trading.js",
+        "exportNames": [
+          "tradingTools"
+        ],
+        "tools": [
+          {
+            "name": "trading.plan",
+            "risk": "read",
+            "exportName": "tradingTools",
+            "status": "integrated",
+            "lanes": [
+              "trading"
+            ],
+            "requires": null
+          },
+          {
+            "name": "trading.research",
+            "risk": "read",
+            "exportName": "tradingTools",
+            "status": "integrated",
+            "lanes": [
+              "trading"
+            ],
+            "requires": null
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "trading",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through trading"
+        }
+      },
+      {
+        "file": "web.js",
+        "exportNames": [
+          "webTools"
+        ],
+        "tools": [
+          {
+            "name": "web.search",
+            "risk": "read",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": null
+          },
+          {
+            "name": "web.fetch",
+            "risk": "read",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": null
+          },
+          {
+            "name": "web.download",
+            "risk": "write",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": null
+          },
+          {
+            "name": "browser.open",
+            "risk": "exec",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.read",
+            "risk": "read",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.click",
+            "risk": "exec",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.form",
+            "risk": "read",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.form_fill",
+            "risk": "exec",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.form_submit",
+            "risk": "exec",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.fill",
+            "risk": "exec",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.shot",
+            "risk": "read",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.upload",
+            "risk": "exec",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.verify",
+            "risk": "read",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.elements",
+            "risk": "read",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.clear_marks",
+            "risk": "write",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          },
+          {
+            "name": "browser.close",
+            "risk": "write",
+            "exportName": "webTools",
+            "status": "integrated",
+            "lanes": [
+              "web"
+            ],
+            "requires": "browser runtime"
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "web",
+            "windowsOnly": false,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through web"
+        }
+      },
+      {
+        "file": "wincontrol.js",
+        "exportNames": [
+          "winControlTools"
+        ],
+        "tools": [
+          {
+            "name": "mouse.move",
+            "risk": "exec",
+            "exportName": "winControlTools",
+            "status": "integrated",
+            "lanes": [
+              "desktop"
+            ],
+            "requires": "windows interactive session"
+          },
+          {
+            "name": "control.list_windows",
+            "risk": "read",
+            "exportName": "winControlTools",
+            "status": "integrated",
+            "lanes": [
+              "desktop"
+            ],
+            "requires": "windows interactive session"
+          },
+          {
+            "name": "control.type",
+            "risk": "exec",
+            "exportName": "winControlTools",
+            "status": "integrated",
+            "lanes": [
+              "desktop"
+            ],
+            "requires": "windows interactive session"
+          },
+          {
+            "name": "control.read",
+            "risk": "read",
+            "exportName": "winControlTools",
+            "status": "integrated",
+            "lanes": [
+              "desktop"
+            ],
+            "requires": "windows interactive session"
+          },
+          {
+            "name": "control.click_button",
+            "risk": "exec",
+            "exportName": "winControlTools",
+            "status": "integrated",
+            "lanes": [
+              "desktop"
+            ],
+            "requires": "windows interactive session"
+          }
+        ],
+        "lanes": [
+          {
+            "lane": "desktop",
+            "windowsOnly": true,
+            "only": null
+          }
+        ],
+        "decision": {
+          "status": "lane",
+          "reason": "reused through desktop"
+        }
+      }
+    ],
+    "totals": {
+      "modules": 26,
+      "tools": 144,
+      "integrated": 115,
+      "excluded": 29,
+      "lanes": 20
+    }
+  },
+  "v1Engines": [
+    {
+      "path": "src/core/absorb.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/adapters.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/agent.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/argv-joined-dataflow.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser-action-receipt.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser-compact.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser-control-hints.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser-evidence.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser-form.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser-ground.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser-outline.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser-recovery-policy.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser-semantic.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser-stagnation.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/browser.js",
+      "status": "reused",
+      "importedBy": [
+        "src/v4/agent.js"
+      ]
+    },
+    {
+      "path": "src/core/chats.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/checkpoint-store.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/cli-proof.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/competitive-bench.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/computer-use.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/config.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/context.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/dataset.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/desktop-eval.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/desktop-vision.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/diagnostics.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/effects.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/executors.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/flows.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/goal-artifact.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/guard.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/heartbeat.js",
+      "status": "reused",
+      "importedBy": [
+        "src/v4/heartbeat.js"
+      ]
+    },
+    {
+      "path": "src/core/injection.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/intent-tasks.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/learn.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/live-provider-chaos.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/log.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/loop.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/marketing-channels.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/marketing-plan.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/marketing.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/memory-sync.js",
+      "status": "reused",
+      "importedBy": [
+        "src/v4/tools/memory-sync.js"
+      ]
+    },
+    {
+      "path": "src/core/memory.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/mission-checkpoint.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/mission-data-evidence.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/mission.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/moa.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/paths.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/pink-cursor.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/power-transfer.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/presets.js",
+      "status": "reused",
+      "importedBy": [
+        "src/v4/models.js"
+      ]
+    },
+    {
+      "path": "src/core/pricing.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/ratelimit.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/recovery-metrics.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/recovery-policy.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/recovery-preview.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/reproducible.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/research.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/reset.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/router.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/routes.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/runtime.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/schedule.js",
+      "status": "reused",
+      "importedBy": [
+        "src/v4/background-tasks.js"
+      ]
+    },
+    {
+      "path": "src/core/self-audit.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/serialize.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/shortcut.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/speculate.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/strategy-recovery.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/subagent.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/swarm.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/tasks.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/teams.js",
+      "status": "reused",
+      "importedBy": [
+        "src/v4/server.js",
+        "src/v4/teams.js"
+      ]
+    },
+    {
+      "path": "src/core/tool-failure-diagnosis.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/tool-heartbeat.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/trading.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/update-rollback.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/update.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/usage.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/version.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/vision.js",
+      "status": "not-used",
+      "importedBy": []
+    },
+    {
+      "path": "src/core/watchdog.js",
+      "status": "not-used",
+      "importedBy": []
+    }
+  ],
+  "v2": {
+    "components": [
+      {
+        "path": "src/v2/audit/anchor.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/audit/export.js",
+          "src/v2/audit/index.js",
+          "src/v4/audit.js"
+        ],
+        "reason": "imported by src/v2/audit/export.js, src/v2/audit/index.js, src/v4/audit.js"
+      },
+      {
+        "path": "src/v2/audit/bind.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/audit/index.js"
+        ],
+        "reason": "imported by src/v2/audit/index.js"
+      },
+      {
+        "path": "src/v2/audit/chain.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/audit/anchor.js",
+          "src/v2/audit/export.js",
+          "src/v2/audit/index.js",
+          "src/v2/studio/server.js"
+        ],
+        "reason": "imported by src/v2/audit/anchor.js, src/v2/audit/export.js, src/v2/audit/index.js, src/v2/studio/server.js"
+      },
+      {
+        "path": "src/v2/audit/export.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/studio/server.js",
+          "src/v4/audit.js"
+        ],
+        "reason": "imported by src/v2/studio/server.js, src/v4/audit.js"
+      },
+      {
+        "path": "src/v2/audit/index.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v4/audit.js"
+        ],
+        "reason": "imported by src/v4/audit.js"
+      },
+      {
+        "path": "src/v2/audit/permissions.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/audit/anchor.js",
+          "src/v2/audit/chain.js",
+          "src/v4/push.js",
+          "src/v4/server.js"
+        ],
+        "reason": "imported by src/v2/audit/anchor.js, src/v2/audit/chain.js, src/v4/push.js, src/v4/server.js"
+      },
+      {
+        "path": "src/v2/audit/timestamp.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/audit/export.js"
+        ],
+        "reason": "imported by src/v2/audit/export.js"
+      },
+      {
+        "path": "src/v2/compiler/goal-compiler.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/compiler/router.js"
+        ],
+        "reason": "Compiles natural language into V2 task graphs; V4 plans inside the conversation turn."
+      },
+      {
+        "path": "src/v2/compiler/router.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/runtime/orchestrator.js"
+        ],
+        "reason": "V2 intent compiler targets V2 tool vocabulary and orchestration."
+      },
+      {
+        "path": "src/v2/config/config.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "Trust-gated V2 config loader. V4's configuration is explicit and env-overridable."
+      },
+      {
+        "path": "src/v2/context/engine.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/supervisor/roles.js",
+          "src/v4/context.js",
+          "src/v4/memory.js"
+        ],
+        "reason": "imported by src/v2/supervisor/roles.js, src/v4/context.js, src/v4/memory.js"
+      },
+      {
+        "path": "src/v2/exec/approval-modes.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/exec/sandbox.js"
+        ],
+        "reason": "Execution approval modes for the V2 executor. V4 uses V2's Approvals + runner directly."
+      },
+      {
+        "path": "src/v2/exec/sandbox.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "Sandbox for the V2 executor; V4 does not spawn via the V2 executor."
+      },
+      {
+        "path": "src/v2/exec/whitelist.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "Command whitelisting for the V2 executor; V4's shell tools run through V1's executor and V4 approvals."
+      },
+      {
+        "path": "src/v2/gauntlet/gauntlet.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "V2 test gauntlet, not a runtime capability."
+      },
+      {
+        "path": "src/v2/gauntlet/scenarios-objectives.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "V2 test scenarios, not a runtime capability."
+      },
+      {
+        "path": "src/v2/gauntlet/scenarios.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "V2 test scenarios, not a runtime capability."
+      },
+      {
+        "path": "src/v2/memory/store.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v4/backup.js",
+          "src/v4/memory.js",
+          "src/v4/tools.js",
+          "src/v4/tools/memory-sync.js"
+        ],
+        "reason": "imported by src/v4/backup.js, src/v4/memory.js, src/v4/tools.js, src/v4/tools/memory-sync.js"
+      },
+      {
+        "path": "src/v2/model/profiles.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "V2 model profiles; V4 resolves models from V1's provider catalog."
+      },
+      {
+        "path": "src/v2/model/provider.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/compiler/router.js",
+          "src/v2/model/profiles.js",
+          "src/v2/model/registry-refresh.js",
+          "src/v2/model/registry.js",
+          "src/v2/supervisor/roles.js",
+          "src/v2/voice/stt.js",
+          "src/v2/voice/tts.js"
+        ],
+        "reason": "imported by src/v2/compiler/router.js, src/v2/model/profiles.js, src/v2/model/registry-refresh.js, src/v2/model/registry.js, src/v2/supervisor/roles.js, src/v2/voice/stt.js, src/v2/voice/tts.js"
+      },
+      {
+        "path": "src/v2/model/registry-refresh.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "Refreshes the V2 model registry; V4 caches the V1 catalog instead."
+      },
+      {
+        "path": "src/v2/model/registry.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "V2 model failover/circuit registry; V4 uses V1's transport and V4's model cache."
+      },
+      {
+        "path": "src/v2/ops/doctor.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/studio/server.js"
+        ],
+        "reason": "All checks are V2-specific (V2 binary, OpenCode key, Studio port)."
+      },
+      {
+        "path": "src/v2/recover/advisor.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/recover/outer-loop.js",
+          "src/v4/agent.js"
+        ],
+        "reason": "imported by src/v2/recover/outer-loop.js, src/v4/agent.js"
+      },
+      {
+        "path": "src/v2/recover/outer-loop.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "Drives V2's runObjective; V4 runs its own loop and reuses only recover/advisor.js."
+      },
+      {
+        "path": "src/v2/runtime/dag.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/gauntlet/scenarios-objectives.js",
+          "src/v2/gauntlet/scenarios.js",
+          "src/v2/runtime/scheduler.js",
+          "src/v2/supervisor/plan-with-model.js",
+          "src/v2/supervisor/supervisor.js",
+          "src/v4/graph.js"
+        ],
+        "reason": "imported by src/v2/gauntlet/scenarios-objectives.js, src/v2/gauntlet/scenarios.js, src/v2/runtime/scheduler.js, src/v2/supervisor/plan-with-model.js, src/v2/supervisor/supervisor.js, src/v4/graph.js"
+      },
+      {
+        "path": "src/v2/runtime/errors.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/runtime/scheduler.js"
+        ],
+        "reason": "imported by src/v2/runtime/scheduler.js"
+      },
+      {
+        "path": "src/v2/runtime/events.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/audit/bind.js",
+          "src/v2/studio/server.js"
+        ],
+        "reason": "imported by src/v2/audit/bind.js, src/v2/studio/server.js"
+      },
+      {
+        "path": "src/v2/runtime/goal.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/gauntlet/gauntlet.js",
+          "src/v2/runtime/orchestrator.js",
+          "src/v3/runtime/file-deliverable.js",
+          "src/v4/agent.js",
+          "src/v4/graph.js",
+          "src/v4/store.js"
+        ],
+        "reason": "imported by src/v2/gauntlet/gauntlet.js, src/v2/runtime/orchestrator.js, src/v3/runtime/file-deliverable.js, src/v4/agent.js, src/v4/graph.js, src/v4/store.js"
+      },
+      {
+        "path": "src/v2/runtime/orchestrator.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/gauntlet/scenarios-objectives.js",
+          "src/v2/recover/outer-loop.js",
+          "src/v2/studio/server.js"
+        ],
+        "reason": "Drives V2's compile→plan→schedule→verify pipeline. V4's agent loop owns planning and verification; running it would be a second orchestrator."
+      },
+      {
+        "path": "src/v2/runtime/receipts.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/runtime/goal.js"
+        ],
+        "reason": "imported by src/v2/runtime/goal.js"
+      },
+      {
+        "path": "src/v2/runtime/scheduler.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/gauntlet/gauntlet.js",
+          "src/v2/runtime/orchestrator.js",
+          "src/v4/graph.js"
+        ],
+        "reason": "imported by src/v2/gauntlet/gauntlet.js, src/v2/runtime/orchestrator.js, src/v4/graph.js"
+      },
+      {
+        "path": "src/v2/runtime/states.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/runtime/goal.js",
+          "src/v4/agent.js",
+          "src/v4/graph.js",
+          "src/v4/store.js"
+        ],
+        "reason": "imported by src/v2/runtime/goal.js, src/v4/agent.js, src/v4/graph.js, src/v4/store.js"
+      },
+      {
+        "path": "src/v2/runtime/verifiers.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/runtime/verify-bridge.js",
+          "src/v2/tools/builtins.js",
+          "src/v2/voice/speak.js",
+          "src/v3/runtime/file-deliverable.js",
+          "src/v4/agent.js"
+        ],
+        "reason": "imported by src/v2/runtime/verify-bridge.js, src/v2/tools/builtins.js, src/v2/voice/speak.js, src/v3/runtime/file-deliverable.js, src/v4/agent.js"
+      },
+      {
+        "path": "src/v2/runtime/verify-bridge.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/gauntlet/scenarios-objectives.js",
+          "src/v2/gauntlet/scenarios.js",
+          "src/v2/runtime/orchestrator.js"
+        ],
+        "reason": "Bridges V2 acceptance to V2 verifiers; V4 calls runVerifier directly."
+      },
+      {
+        "path": "src/v2/safety/approvals.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v4/agent.js",
+          "src/v4/server.js"
+        ],
+        "reason": "imported by src/v4/agent.js, src/v4/server.js"
+      },
+      {
+        "path": "src/v2/safety/command-preflight.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/exec/sandbox.js",
+          "src/v2/voice/stt.js",
+          "src/v2/voice/tts.js"
+        ],
+        "reason": "imported by src/v2/exec/sandbox.js, src/v2/voice/stt.js, src/v2/voice/tts.js"
+      },
+      {
+        "path": "src/v2/spawn/safe-exec.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/voice/stt.js",
+          "src/v2/voice/tts.js"
+        ],
+        "reason": "imported by src/v2/voice/stt.js, src/v2/voice/tts.js"
+      },
+      {
+        "path": "src/v2/studio/page.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/studio/server.js"
+        ],
+        "reason": "UI for the V2 studio server, which V4 rejected for having no session model."
+      },
+      {
+        "path": "src/v2/studio/server.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "Desktop operator surface without a session model (rejected in SOURCE_AUDIT)."
+      },
+      {
+        "path": "src/v2/supervisor/plan-with-model.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/runtime/orchestrator.js"
+        ],
+        "reason": "Model-assisted V2 planning; V4 plans inside the conversation turn."
+      },
+      {
+        "path": "src/v2/supervisor/roles.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/supervisor/plan-with-model.js"
+        ],
+        "reason": "Planning roles for the V2 supervisor, which V4 does not run."
+      },
+      {
+        "path": "src/v2/supervisor/supervisor.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/runtime/orchestrator.js",
+          "src/v2/supervisor/plan-with-model.js"
+        ],
+        "reason": "Plans V2 task graphs for the V2 scheduler."
+      },
+      {
+        "path": "src/v2/telemetry/aggregate.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v2/studio/server.js"
+        ],
+        "reason": "Renders V2's report; V4 reads the ledger directly."
+      },
+      {
+        "path": "src/v2/telemetry/ledger.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/studio/server.js",
+          "src/v4/server.js"
+        ],
+        "reason": "imported by src/v2/studio/server.js, src/v4/server.js"
+      },
+      {
+        "path": "src/v2/tools/builtins.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "V2's read_file/write_file/verify_now demo tools; V4 defines its own workspace tools on the same V2 contract."
+      },
+      {
+        "path": "src/v2/tools/registry.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/tools/runner.js",
+          "src/v4/tools.js"
+        ],
+        "reason": "imported by src/v2/tools/runner.js, src/v4/tools.js"
+      },
+      {
+        "path": "src/v2/tools/runner.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v4/agent.js",
+          "src/v4/server.js",
+          "src/v4/tools.js",
+          "src/v4/tools/host.js"
+        ],
+        "reason": "imported by src/v4/agent.js, src/v4/server.js, src/v4/tools.js, src/v4/tools/host.js"
+      },
+      {
+        "path": "src/v2/voice/listen.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/studio/server.js",
+          "src/v4/voice.js"
+        ],
+        "reason": "imported by src/v2/studio/server.js, src/v4/voice.js"
+      },
+      {
+        "path": "src/v2/voice/speak.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/studio/server.js",
+          "src/v4/voice.js"
+        ],
+        "reason": "imported by src/v2/studio/server.js, src/v4/voice.js"
+      },
+      {
+        "path": "src/v2/voice/stt.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v4/voice.js"
+        ],
+        "reason": "imported by src/v4/voice.js"
+      },
+      {
+        "path": "src/v2/voice/tts.js",
+        "status": "reused",
+        "importedBy": [
+          "src/v2/voice/speak.js",
+          "src/v4/voice.js"
+        ],
+        "reason": "imported by src/v2/voice/speak.js, src/v4/voice.js"
+      }
+    ],
+    "totals": {
+      "components": 52,
+      "reused": 29,
+      "notUsed": 23
+    }
+  },
+  "v3": {
+    "components": [
+      {
+        "path": "src/v3/platform/runtime.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v3/runtime/file-deliverable.js",
+          "src/v3/server.js"
+        ],
+        "reason": "Node >= 22 check; V4 performs the same check in assertNodeSupported()."
+      },
+      {
+        "path": "src/v3/runtime/file-deliverable.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v3/server.js"
+        ],
+        "reason": "V3's file vertical slice is V4's workspace_write + V2 file verifier, with approvals and receipts added."
+      },
+      {
+        "path": "src/v3/server.js",
+        "status": "not-used",
+        "importedBy": [],
+        "reason": "V3's single-purpose HTTP server (one file deliverable). V4's server supersedes it."
+      },
+      {
+        "path": "src/v3/ui/page.js",
+        "status": "not-used",
+        "importedBy": [
+          "src/v3/server.js"
+        ],
+        "reason": "V3's static page for the file-deliverable demo; V4 has the PWA."
+      }
+    ],
+    "totals": {
+      "components": 4,
+      "reused": 0,
+      "notUsed": 4
+    }
+  },
+  "v4": {
+    "builtinTools": 9,
+    "registeredOnThisHost": 114,
+    "lanes": [
+      {
+        "lane": "desktop",
+        "available": false,
+        "reason": "Windows-only (this host is linux)",
+        "tools": []
+      },
+      {
+        "lane": "computer",
+        "available": false,
+        "reason": "Windows-only (this host is linux)",
+        "tools": []
+      },
+      {
+        "lane": "screen",
+        "available": false,
+        "reason": "Windows-only (this host is linux)",
+        "tools": []
+      },
+      {
+        "lane": "net",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "net.dns",
+          "net.tcp",
+          "net.http",
+          "net.serve",
+          "net.serve_stop"
+        ]
+      },
+      {
+        "lane": "files",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "fs.list",
+          "fs.read",
+          "fs.write",
+          "fs.patch",
+          "fs.search",
+          "fs.grep",
+          "fs.move",
+          "fs.copy",
+          "fs.delete",
+          "fs.find",
+          "fs.stat",
+          "fs.mkdir",
+          "fs.tar"
+        ]
+      },
+      {
+        "lane": "shell",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "exec.backends",
+          "exec.start",
+          "exec.wait",
+          "exec.cancel",
+          "exec.logs"
+        ]
+      },
+      {
+        "lane": "shelltools",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "shell.run",
+          "shell.bg",
+          "shell.jobs",
+          "shell.stop",
+          "shell.env"
+        ]
+      },
+      {
+        "lane": "sys",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "sys.info",
+          "sys.ps",
+          "sys.ports",
+          "sys.fs_usage",
+          "sys.procs_top",
+          "sys.services"
+        ]
+      },
+      {
+        "lane": "power",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "power.propose",
+          "power.approve",
+          "power.apply"
+        ]
+      },
+      {
+        "lane": "web",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "web.search",
+          "web.fetch",
+          "web.download",
+          "browser.open",
+          "browser.read",
+          "browser.click",
+          "browser.form",
+          "browser.form_fill",
+          "browser.form_submit",
+          "browser.fill",
+          "browser.shot",
+          "browser.upload",
+          "browser.verify",
+          "browser.elements",
+          "browser.clear_marks",
+          "browser.close"
+        ]
+      },
+      {
+        "lane": "research",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "research.run"
+        ]
+      },
+      {
+        "lane": "jobs",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "jobs.search",
+          "jobs.match",
+          "jobs.list",
+          "jobs.start",
+          "jobs.skip",
+          "jobs.cv.set",
+          "jobs.cv.show",
+          "jobs.prepare",
+          "jobs.send"
+        ]
+      },
+      {
+        "lane": "flows",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "flows.add",
+          "flows.list",
+          "flows.enable",
+          "flows.remove",
+          "flows.trigger",
+          "flows.webhook.recorded"
+        ]
+      },
+      {
+        "lane": "github",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "github.verify",
+          "github.research"
+        ]
+      },
+      {
+        "lane": "channels",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "channel.send"
+        ]
+      },
+      {
+        "lane": "audit",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "majin.self_audit"
+        ]
+      },
+      {
+        "lane": "learn",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "ma.learn",
+          "ma.verify_lesson",
+          "ma.lessons"
+        ]
+      },
+      {
+        "lane": "marketing",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "marketing.channel_report",
+          "marketing.plan",
+          "marketing.status",
+          "marketing.analyze"
+        ]
+      },
+      {
+        "lane": "re",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "re.analyze",
+          "re.strings",
+          "re.hexdump",
+          "re.search",
+          "re.entropy",
+          "re.sections",
+          "re.imports",
+          "re.exports",
+          "re.yara",
+          "re.iocs",
+          "re.overlay",
+          "re.extract",
+          "re.apk",
+          "re.pcap",
+          "re.diff",
+          "re.modules",
+          "re.tool",
+          "re.tools",
+          "re.disasm",
+          "re.unpack",
+          "re.hash",
+          "re.spec",
+          "re.rules"
+        ]
+      },
+      {
+        "lane": "trading",
+        "available": true,
+        "reason": null,
+        "tools": [
+          "trading.plan",
+          "trading.research"
+        ]
+      }
+    ],
+    "browserRuntime": {
+      "available": false,
+      "reason": "no browser binary found (npx playwright install chromium)"
+    },
+    "skills": [
+      "fix-code",
+      "job-search"
+    ],
+    "mcp": "configured by the owner in <data>/v4/mcp.json"
+  },
+  "undecided": [],
+  "domains": {
+    "tools": {
+      "builtin": 9,
+      "v1Integrated": 115,
+      "registeredOnHost": 114
+    },
+    "skills": {
+      "shipped": [
+        "fix-code",
+        "job-search"
+      ],
+      "mechanism": "src/v4/skills.js — declared required/preferred tools decide visibility, not app code",
+      "learned": "src/v4/learning.js — procedures extracted from goals that completed with an independently verified receipt; stored in the same skills directory with a `learned` block, so one loader serves both. States: EXPERIMENTAL, VERIFIED, REUSABLE, STALE, FAILED.",
+      "learnedAcceptance": "npm run v4:learn-accept — the mandatory A–H gate against the real provider"
+    },
+    "mcp": {
+      "state": "configured by the owner in <data>/v4/mcp.json",
+      "mechanism": "src/v4/mcp.js + mcp-tools.js — stdio JSON-RPC, scrubbed env, tools at process tier"
+    },
+    "agentFunctions": {
+      "turnEngine": "src/v4/agent.js — goal, rounds, receipts, verification, recovery advisor",
+      "discovery": "tools_search + tools_activate (src/v4/tool-exposure.js)",
+      "delegation": "agent_delegate — bounded subagent, owner-gated",
+      "resume": "resumeGoal — re-verifies every artifact against the recorded SHA-256"
+    },
+    "computerControl": {
+      "lanes": [
+        {
+          "lane": "desktop",
+          "available": false,
+          "tools": 0,
+          "reason": "Windows-only (this host is linux)"
+        },
+        {
+          "lane": "computer",
+          "available": false,
+          "tools": 0,
+          "reason": "Windows-only (this host is linux)"
+        },
+        {
+          "lane": "screen",
+          "available": false,
+          "tools": 0,
+          "reason": "Windows-only (this host is linux)"
+        }
+      ],
+      "mechanism": "V1 wincontrol.js / computer.js through the V1 lane adapter; Windows interactive session only"
+    },
+    "browser": {
+      "lane": "web",
+      "tools": [
+        "browser.open",
+        "browser.read",
+        "browser.click",
+        "browser.form",
+        "browser.form_fill",
+        "browser.form_submit",
+        "browser.fill",
+        "browser.shot",
+        "browser.upload",
+        "browser.verify",
+        "browser.elements",
+        "browser.clear_marks",
+        "browser.close"
+      ],
+      "runtime": {
+        "available": false,
+        "reason": "no browser binary found (npx playwright install chromium)"
+      }
+    },
+    "terminal": {
+      "lanes": [
+        {
+          "lane": "shell",
+          "available": true,
+          "tools": 5
+        },
+        {
+          "lane": "shelltools",
+          "available": true,
+          "tools": 5
+        }
+      ],
+      "mechanism": "V1 exec.js (managed jobs) and shell.js (command/background) through the V2 runner and approvals"
+    },
+    "memory": {
+      "tools": [
+        "memory_save",
+        "memory_search"
+      ],
+      "store": "src/v2/memory/store.js (used directly)",
+      "promptInjection": "src/v4/memory.js memoryForPrompt — retrieval, not just writes"
+    },
+    "voice": {
+      "server": "src/v2/voice/{speak,listen,tts,stt}.js imported by src/v4/voice.js",
+      "client": "browser-native speech + text fallback (src/v4/ui/voice.js)",
+      "measured": false
+    },
+    "automation": {
+      "flows": 6,
+      "supervisor": "src/v4/supervisor.js — crash recovery and health checks",
+      "updater": "signed release, overlay activation, journal recovery, daily Windows task",
+      "scheduler": "Windows Task Scheduler (logon host + daily update)"
+    },
+    "multiAgent": {
+      "implemented": "agent_delegate (1 level), agent_graph (V2 DAG), team_run (V1 standing teams, resumable)",
+      "teams": "V1 TeamStore + runTeam + runSwarm reused unchanged; members executed by V4 subagents",
+      "graph": "V2 TaskGraph + runGraph reused unchanged, executed by V4 subagents",
+      "notUsed": "V2 orchestrator/compiler/supervisor (they compile and plan for the V2 loop, which V4 does not run)"
+    }
+  }
+}

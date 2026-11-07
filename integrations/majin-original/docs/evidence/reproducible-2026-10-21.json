@@ -1,0 +1,11 @@
+{
+  "version": "majin-reproducible/1",
+  "rootChecked": "/home/user/majincli",
+  "files": 494,
+  "bytes": 5399015,
+  "hashA": "4b5ede00271ef54dd5b633d19368e8283e9c86113577d232ebcba069fe77aee6",
+  "hashB": "4b5ede00271ef54dd5b633d19368e8283e9c86113577d232ebcba069fe77aee6",
+  "identical": true,
+  "binaryExeReproducibilityScope": "NOT TESTED — pkg/NT-signing/npm-tarball timestamps make bit-exact exe reproducibility a separate pipeline item (stated, not hidden)",
+  "at": "2026-10-21T05:24:24.622Z"
+}

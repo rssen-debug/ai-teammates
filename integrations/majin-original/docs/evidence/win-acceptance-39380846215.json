@@ -1,0 +1,18 @@
+{
+  "schema": "majin.win-acceptance.v1",
+  "ts": "2026-10-20T06:31:30.2565587Z",
+  "checks": {
+    "sha256_match": true,
+    "installed": true,
+    "first_run_version": true,
+    "data_preserved": true,
+    "kill_recovery": true
+  },
+  "notes": [
+    "shaRel=df9ac8e9b9adad85d03d872424136c0ad10b4267b83dc7c23c67224c317756d7 shaFile=df9ac8e9b9adad85d03d872424136c0ad10b4267b83dc7c23c67224c317756d7 size=17403121",
+    "first_run_output=majin 0.9.20 · node v22.23.2 · win32",
+    "serve_first_run out=majin 0.9.20 · node v22.23.2 · win32 err_tail=",
+    "mid_task_alive=True",
+    "restart out=majin 0.9.20 · node v22.23.2 · win32 err_tail="
+  ]
+}

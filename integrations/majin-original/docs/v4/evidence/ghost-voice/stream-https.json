@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-23T20:36:51.850Z",
+  "sourceCommit": "fffa91847f1758af3123dd1285def44ce0564f3e",
+  "transport": "Tailscale HTTPS",
+  "authenticated": true,
+  "kind": "synthetic-text-to-tts-stream",
+  "provider": "kokoro-onnx",
+  "firstMs": 4301,
+  "totalMs": 7758,
+  "chunks": 2,
+  "complete": true,
+  "shell9": true,
+  "physicalDevicePass": false
+}

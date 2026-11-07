@@ -1,0 +1,27 @@
+name: MAJIN mission source data integrity regression
+on:
+  push:
+    branches: [fix/mission-verify-source-job-ids-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mission-data:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: node --check src/core/mission-data-evidence.js
+      - run: node --check src/core/mission.js
+      - run: node --test test/mission-job-id-integrity.test.js
+      - run: npm test
+      - run: npm run check

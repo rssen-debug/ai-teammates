@@ -1,0 +1,19 @@
+{
+  "version": "majin-competitive-bench/1",
+  "category": "multi-step",
+  "difficulty": "medium",
+  "instruction": "The candidate workspace has nums.txt (one integer per line). Step 1: write step1.json {\"sum\": N} — the sum. Step 2: write step2.json {\"doubled\": M} where M must equal 2 * sum. Both files must exist and be chain-consistent.",
+  "verify": { "cmd": "node", "script": "verify.mjs", "timeoutMs": 10000 },
+  "fixtures": {
+    "good": {
+      "nums.txt": "3\n10\n-4\n7\n",
+      "step1.json": "{\"sum\":16}\n",
+      "step2.json": "{\"doubled\":32}\n"
+    },
+    "bad": {
+      "nums.txt": "3\n10\n-4\n7\n",
+      "step1.json": "{\"sum\":16}\n",
+      "step2.json": "{\"doubled\":30}\n"
+    }
+  }
+}

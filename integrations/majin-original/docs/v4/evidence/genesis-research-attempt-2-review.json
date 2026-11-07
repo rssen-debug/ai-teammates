@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-24T00:43:00Z",
+  "kind": "independent-primary-source-factual-review",
+  "receipt": "genesis-research-attempt-2.json",
+  "artifactSha256": "15004dfe01bee05966d16beda07726939db258b33b607620022cdbf1c5db525e",
+  "automatedChecksPassed": true,
+  "semanticReviewPassed": false,
+  "scenarioStatus": "PARTIAL",
+  "sources": ["https://www.rfc-editor.org/rfc/rfc8030.txt", "https://www.rfc-editor.org/rfc/rfc8291.txt"],
+  "verifiedCorrections": [
+    "Requested TTL is no longer presented as a guaranteed storage duration.",
+    "4096 bytes is now correctly distinguished as a supported interoperability floor rather than a universal maximum."
+  ],
+  "remainingIssue": "The offline-device section says key agreement happens at subscription time and links decryption to a TTL window. RFC 8291 sections 2 and 3.1 distinguish subscription key distribution from per-message sender ECDH generation and receiver key derivation on receipt. TTL controls push-service delivery attempts, not a cryptographic expiry rule.",
+  "physicalDevicePass": false,
+  "note": "Go corrected the two supplied review findings but introduced an inaccurate extra explanation. Preserve both attempts; do not promote scenario C to complete PASS."
+}

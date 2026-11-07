@@ -1,0 +1,25 @@
+name: MAJIN job follow-up exact ID QA
+on:
+  push:
+    branches: [fix/job-followup-actual-id-contract-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  followup:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --test test/agent-job-followup-integrity.test.js test/mission-job-id-integrity.test.js
+      - run: npm test
+      - run: npm run check

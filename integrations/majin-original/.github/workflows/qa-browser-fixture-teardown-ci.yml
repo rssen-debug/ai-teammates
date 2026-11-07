@@ -1,0 +1,27 @@
+name: MAJIN Qwen fixture teardown no-hang QA
+on:
+  push:
+    branches: [fix/qa-browser-http-teardown-deadlock-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qa-no-hang:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --check scripts/qa/fixture-teardown.mjs
+      - run: node --check scripts/qa/prompt-battery.mjs
+      - run: node --test test/qa-fixture-teardown.test.js
+      - run: npm test
+      - run: npm run check

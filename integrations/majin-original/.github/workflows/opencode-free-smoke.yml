@@ -1,0 +1,24 @@
+name: OpenCode Free MAJIN smoke
+on:
+  push:
+    branches:
+      - qa/opencode-free-smoke-20261020
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  opencode-free:
+    name: Real free-model inference and tool-call contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      MAJIN_LLM_TIMEOUT: '45000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify OpenCode free model with MAJIN transport
+        shell: bash
+        run: node scripts/qa/opencode-free-smoke.mjs

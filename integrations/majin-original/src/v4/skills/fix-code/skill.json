@@ -1,0 +1,9 @@
+{
+  "schema": "majin.v4.skill/v1",
+  "name": "fix-code",
+  "title": "Hitta och åtgärda fel i ett projekt",
+  "summary": "Läs koden, reproducera felet, åtgärda minsta möjliga, kör testerna och visa diffen.",
+  "requires": ["files", "shell"],
+  "tools": ["fs_list", "fs_read", "fs_patch", "exec_start", "exec_wait", "exec_logs"],
+  "experimental": false
+}

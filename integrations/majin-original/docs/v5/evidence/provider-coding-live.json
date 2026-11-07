@@ -1,0 +1,13 @@
+{
+  "scenario": "C_coding",
+  "model": "deepseek-v4-pro",
+  "liveInference": true,
+  "modelExecutedCommands": true,
+  "independentSyntaxCheck": true,
+  "independentAutomatedTests": true,
+  "independentCliExamples": 2,
+  "elapsedMs": 49281,
+  "modelCalls": 5,
+  "toolCalls": 9,
+  "status": "passed"
+}

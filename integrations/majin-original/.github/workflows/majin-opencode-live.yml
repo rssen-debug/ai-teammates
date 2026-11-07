@@ -1,0 +1,59 @@
+name: MAJIN OpenCode Go live cloud acceptance
+# Live OpenCode Go/Qwen calls are intentionally manual so normal PRs never
+# contact a paid or user-owned model account.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  go-live:
+    name: OpenCode Go real cloud chat and tool calls
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      MAJIN_LLM_TIMEOUT: '120000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Check live-key availability without exposing secrets
+        id: access
+        shell: bash
+        run: |
+          if [ -z "${OPENCODE_API_KEY:-}" ]; then
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo 'NOT VERIFIED: Repository OPENCODE_API_KEY secret not configured; no live Go request attempted.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+            echo 'Live Go credential is configured. Executing low-cost smoke test; key never printed.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Real OpenCode Go chat and tool-call acceptance
+        if: steps.access.outputs.available == 'true'
+        shell: bash
+        run: |
+          node scripts/qa/opencode-free-smoke.mjs
+          echo 'OpenCode Go live smoke passed.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Real Qwen and Grok protocol acceptance
+        if: steps.access.outputs.available == 'true'
+        shell: bash
+        run: |
+          node scripts/qa/opencode-dialects-live.mjs
+          echo 'All three Go wire-protocol families were exercised against the live account.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Real installed V5 CLI bare-goal acceptance
+        if: steps.access.outputs.available == 'true'
+        shell: bash
+        env:
+          MAJIN_LIVE_TIMEOUT_MS: '300000'
+          MAJIN_LIVE_TOTAL_TIMEOUT_MS: '900000'
+          MAJIN_LIVE_MAX_ATTEMPTS: '3'
+        run: |
+          node scripts/v5/cli-live-accept.mjs
+          echo 'Installed MAJIN V5 CLI completed a live bare goal with model-registered criteria and host verification.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Report missing real-key coverage
+        if: steps.access.outputs.available != 'true'
+        run: echo "::notice::Live Go acceptance BLOCKED by missing OPENCODE_API_KEY; green job DOES NOT mean live Go passed."

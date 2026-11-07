@@ -1,0 +1,88 @@
+name: win-acceptance-install
+
+# 11A/11C/12B automation per owner directive (2026-10-22): what is automatable
+# on a disposable Windows runner MUST be automated. Downloads the real v1.0.0
+# release assets (public, no secrets), then on windows-latest:
+#  sha256: published hash vs installer hash (update-chain integrity)
+#  11A:    silent Inno install + first run (`majin --version` prints 0.9.x)
+#  11C:    seed user data, install OVER it, assert data survived
+#  12B:    `_serve` headless server running mid-task gets hard-killed,
+#         restart proves boot resilience
+# Emits ONE verdict JSON + uploads it. Dispatch-gated evidence runs.
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Acceptance verdict (11A/11C/12B)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $out = [ordered]@{ schema='majin.win-acceptance.v1'; ts=(Get-Date).ToUniversalTime().ToString('o'); checks=[ordered]@{}; notes=@() }
+          $rel = 'https://github.com/rssen-debug/MAJINCLI/releases/download/v1.0.0'
+          $setup = "$env:TEMP\majin-setup.exe"
+          Invoke-WebRequest "$rel/MAJIN-Setup.exe" -OutFile $setup
+          $raw = (Invoke-WebRequest "$rel/MAJIN-Setup.exe.sha256").Content
+          if ($raw -is [byte[]]) { $raw = [System.Text.Encoding]::UTF8.GetString($raw) }
+          $shaRel = ("$raw".Trim() -split '\s+')[0].ToLower()
+          $shaFile = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          $out.notes += "shaRel=$shaRel shaFile=$shaFile size=$((Get-Item $setup).Length)"
+          $out.checks['sha256_match'] = ($shaRel -eq $shaFile -and $shaRel.Length -eq 64)
+
+          # 11A: clean install + first run
+          & $setup /VERYSILENT /SUPPRESSMSGBOXES /NORESTART | Out-Null
+          $exe = "$env:LOCALAPPDATA\Programs\MAJIN\majin-win-x64.exe"
+          if (-not (Test-Path $exe)) { $exe = "$env:ProgramFiles\MAJIN\majin-win-x64.exe" }
+          $out.checks['installed'] = (Test-Path $exe)
+          $verOut = ''
+          if ($out.checks['installed']) {
+            # electron .exe: pipe the console through cmd.exe (session 0 safe)
+            $verOut = (cmd /c "`"$exe`" --version" 2>&1 | Out-String).Trim()
+          }
+          $out.checks['first_run_version'] = ($verOut -match 'majin [0-9]+\.[0-9]+\.[0-9]+') ? $true : $false
+          $out.notes += "first_run_output=$verOut"
+
+          # 11C: data preservation across install-over-install
+          $homeApp = "$env:USERPROFILE\.majin"
+          New-Item -ItemType Directory -Force $homeApp | Out-Null
+          '{"cfg":{"seed":true,"createdFor":"11C-acceptance"}}' | Out-File "$homeApp\config.json"
+          'session-marker-content' | Out-File "$homeApp\session.marker"
+          & $setup /VERYSILENT /SUPPRESSMSGBOXES /NORESTART | Out-Null
+          $out.checks['data_preserved'] = (Test-Path "$homeApp\config.json") -and
+            ((Get-Content "$homeApp\config.json" -Raw) -match '11C-acceptance') -and
+            ((Get-Content "$homeApp\session.marker" -Raw) -match 'session-marker-content')
+          # 12B: mid-task hard kill + restart recovery (boot resilience)
+          $serveOut = "$env:TEMP\serve-out.txt"; $serveErr = "$env:TEMP\serve-err.txt"
+          $outPath = "$env:TEMP\restart-out.txt"
+          $p = Start-Process -FilePath $exe -ArgumentList '--version' -PassThru -NoNewWindow -RedirectStandardOutput $serveOut -RedirectStandardError $serveErr
+          $p.WaitForExit(30000) | Out-Null
+          $firstOut = if (Test-Path $serveOut) { (Get-Content $serveOut -Raw) } else { '' }
+          $firstErr = if (Test-Path $serveErr) { (Get-Content $serveErr -Raw) } else { '' }
+          $errTail1 = $firstErr.Trim(); if ($errTail1.Length -gt 200) { $errTail1 = $errTail1.Substring($errTail1.Length-200) }
+          $out.notes += "serve_first_run out=$($firstOut.Trim()) err_tail=$errTail1"
+          $p2 = Start-Process -FilePath $exe -ArgumentList '_serve' -PassThru -NoNewWindow
+          Start-Sleep -Seconds 6
+          $alive = -not $p2.HasExited
+          if ($alive) { Stop-Process -Id $p2.Id -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2 }
+          $out.notes += "mid_task_alive=$alive"
+          $p3 = Start-Process -FilePath $exe -ArgumentList '--version' -PassThru -NoNewWindow -RedirectStandardOutput $outPath -RedirectStandardError "$env:TEMP\restart-err.txt"
+          $p3.WaitForExit(30000) | Out-Null
+          Start-Sleep -Seconds 1
+          $restartOut = if (Test-Path $outPath) { (Get-Content $outPath -Raw) } else { '' }
+          $restartErr = if (Test-Path "$env:TEMP\restart-err.txt") { (Get-Content "$env:TEMP\restart-err.txt" -Raw) } else { '' }
+          $errTail2 = $restartErr.Trim(); if ($errTail2.Length -gt 200) { $errTail2 = $errTail2.Substring($errTail2.Length-200) }
+          $out.notes += "restart out=$($restartOut.Trim()) err_tail=$errTail2"
+          $out.checks['kill_recovery'] = $alive -and ($restartOut -match 'majin [0-9]+\.[0-9]+\.[0-9]+')
+
+          $out | ConvertTo-Json -Depth 6 | Out-File verdict.json -Encoding utf8
+          Get-Content verdict.json -Raw
+      - name: Upload verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-acceptance-verdict
+          path: verdict.json

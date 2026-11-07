@@ -1,0 +1,207 @@
+﻿{
+    "schema":  "majin.win-uia-probe.v2.6",
+    "timestamp":  "2026-10-20T06:58:21.1210543Z",
+    "env":  {
+                "osVersion":  "Microsoft Windows NT 10.0.26100.0",
+                "psVersion":  "5.1.26100.33438",
+                "clrVersion":  "4.0.30319.42000",
+                "machineName":  "runnervm0xl3a",
+                "is64Bit":  true,
+                "userName":  "runneradmin",
+                "userDomain":  "runnervm0xl3a",
+                "userInteractive":  true,
+                "sessionId":  2
+            },
+    "p1_assemblyAndRoot":  {
+                               "loaded":  true,
+                               "topWindowCount":  3,
+                               "topWindows":  [
+                                                  {
+                                                      "name":  "",
+                                                      "className":  "Shell_TrayWnd",
+                                                      "controlType":  "ControlType.Pane",
+                                                      "bounds":  "0,720,1024,48"
+                                                  },
+                                                  {
+                                                      "name":  "C:\\ProgramData\\GitHub\\HostedComputeAgent\\hosted-compute-agent",
+                                                      "className":  "CASCADIA_HOSTING_WINDOW_CLASS",
+                                                      "controlType":  "ControlType.Window",
+                                                      "bounds":  "18,26,1044,635"
+                                                  },
+                                                  {
+                                                      "name":  "Program Manager",
+                                                      "className":  "Progman",
+                                                      "controlType":  "ControlType.Pane",
+                                                      "bounds":  "0,0,1024,768"
+                                                  }
+                                              ]
+                           },
+    "p2_negativeControl":  {
+                               "windowName":  "MAJIN-Nonexistent-Window-7f3b9d2e",
+                               "found":  false,
+                               "nullAsExpected":  true
+                           },
+    "p3_notepad":  {
+                       "launched":  true,
+                       "windowFound":  true,
+                       "windowName":  "Untitled - Notepad",
+                       "className":  "Notepad",
+                       "controlType":  null,
+                       "valuePatternOk":  false,
+                       "textPatternOk":  false,
+                       "setValueOk":  false,
+                       "readBackOk":  false,
+                       "readBackMatches":  false,
+                       "clearedOk":  false,
+                       "closedOk":  true,
+                       "gapReason":  "no Edit/Document control under the Notepad window"
+                   },
+    "p5_subtreeAndFallback":  {
+                                  "ran":  true,
+                                  "nodeCount":  2,
+                                  "nodes":  [
+                                                {
+                                                    "idx":  0,
+                                                    "name":  "",
+                                                    "className":  "Edit",
+                                                    "controlType":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                },
+                                                {
+                                                    "idx":  1,
+                                                    "name":  "",
+                                                    "className":  "msctls_statusbar32",
+                                                    "controlType":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                }
+                                            ],
+                                  "valuePatternCandidates":  0,
+                                  "textPatternCandidates":  0,
+                                  "fallbackValueWriteOk":  false,
+                                  "fallbackReadBackMatches":  false,
+                                  "fallbackClearedOk":  false,
+                                  "sendKeysAttempted":  true,
+                                  "sendKeysOk":  false,
+                                  "winnerLane":  null,
+                                  "note":  null
+                              },
+    "capabilities":  {
+                         "identifyWindows":  true,
+                         "locateControls":  true,
+                         "textInput":  true,
+                         "readBack":  true
+                     },
+    "notes":  [
+
+              ],
+    "p7_runDialogFixture":  {
+                                "ran":  true,
+                                "dialogFound":  true,
+                                "editFound":  false,
+                                "editClass":  null,
+                                "valuePatternOk":  false,
+                                "setValueOk":  false,
+                                "readBackOk":  false,
+                                "readBackMatches":  false,
+                                "clearedOk":  false,
+                                "cancelInvokeOk":  false,
+                                "note":  "no ValuePattern-bearing descendant (incl. ComboBox probe)",
+                                "valuePatternCandidates":  0,
+                                "subtree":  [
+                                                {
+                                                    "idx":  0,
+                                                    "cls":  "Static",
+                                                    "ct":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                },
+                                                {
+                                                    "idx":  1,
+                                                    "cls":  "Static",
+                                                    "ct":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                },
+                                                {
+                                                    "idx":  2,
+                                                    "cls":  "Static",
+                                                    "ct":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                },
+                                                {
+                                                    "idx":  3,
+                                                    "cls":  "ComboBox",
+                                                    "ct":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                },
+                                                {
+                                                    "idx":  4,
+                                                    "cls":  "Edit",
+                                                    "ct":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                },
+                                                {
+                                                    "idx":  5,
+                                                    "cls":  "Static",
+                                                    "ct":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                },
+                                                {
+                                                    "idx":  6,
+                                                    "cls":  "Static",
+                                                    "ct":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                },
+                                                {
+                                                    "idx":  7,
+                                                    "cls":  "Button",
+                                                    "ct":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                },
+                                                {
+                                                    "idx":  8,
+                                                    "cls":  "Button",
+                                                    "ct":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                },
+                                                {
+                                                    "idx":  9,
+                                                    "cls":  "Button",
+                                                    "ct":  "ControlType.Pane",
+                                                    "patterns":  [
+
+                                                                 ]
+                                                }
+                                            ]
+                            },
+    "p8_win32Messaging":  {
+                              "ran":  true,
+                              "windowFound":  true,
+                              "editFound":  true,
+                              "setTextOk":  true,
+                              "readBackMatches":  true,
+                              "clearedOk":  true,
+                              "closedOk":  true,
+                              "note":  null
+                          }
+}

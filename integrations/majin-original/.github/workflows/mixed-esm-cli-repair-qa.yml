@@ -1,0 +1,27 @@
+name: MAJIN mixed ESM CLI safe repair regression
+on:
+  push:
+    branches: [fix/mixed-esm-exports-cli-repair-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mixed-esm:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: node --check src/core/goal-artifact.js
+      - run: node --check src/core/loop.js
+      - run: node --test test/agent-mixed-esm-cli-repair.test.js test/agent-cli-argv-dump.test.js
+      - run: npm test
+      - run: npm run check

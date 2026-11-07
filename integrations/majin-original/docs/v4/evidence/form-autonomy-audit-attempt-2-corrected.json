@@ -1,0 +1,122 @@
+{
+  "at": "2026-10-24T07:59:51.108Z",
+  "attempt": "2",
+  "kind": "post-run-independent-artifact-and-telemetry-audit",
+  "newFormsPassed": 3,
+  "originalRegressionPassed": false,
+  "currentSourceMatches": false,
+  "verdict": "FORM AUTONOMY NOT READY",
+  "results": [
+    {
+      "kind": "A",
+      "evidence": "docs/v4/evidence/form-autonomy-A-attempt-2.json",
+      "evidenceSha256": "25374b664997d000ee1d5a309330f09e3998f0bf68af0f9082af4410be6c6e33",
+      "passed": true,
+      "independent": {
+        "oneServerAcceptance": true,
+        "exactReceivedBytes": true,
+        "actualSavedReceipt": true,
+        "modelRoundAccounting": true,
+        "genuineGo": true,
+        "receiptChecks": true
+      },
+      "sourceMatchesCurrent": false,
+      "rounds": 8,
+      "toolCalls": 7,
+      "recoveryActions": [],
+      "failures": 0,
+      "tokenUsage": {
+        "input": 46075,
+        "output": 399,
+        "source": "Actual provider response telemetry; not a billing receipt"
+      },
+      "currencyCost": null,
+      "receiptSha256": "23274142596d14e60ecbebe86182fe16173c484152fb7e1922f7ffc5f7fe9c1d",
+      "uploadSha256": "89c061d209961c91ed4dd14e8378f61714990cabf0255b2e6f3f7a77fa33437c"
+    },
+    {
+      "kind": "B",
+      "evidence": "docs/v4/evidence/form-autonomy-B-attempt-2.json",
+      "evidenceSha256": "91a105507df9e597442e1c3c8f58b3565344f80a16ed30e57a9fb27786fc9e28",
+      "passed": true,
+      "independent": {
+        "oneServerAcceptance": true,
+        "exactReceivedBytes": true,
+        "actualSavedReceipt": true,
+        "modelRoundAccounting": true,
+        "genuineGo": true,
+        "receiptChecks": true
+      },
+      "sourceMatchesCurrent": false,
+      "rounds": 12,
+      "toolCalls": 11,
+      "recoveryActions": [],
+      "failures": 2,
+      "tokenUsage": {
+        "input": 71084,
+        "output": 407,
+        "source": "Actual provider response telemetry; not a billing receipt"
+      },
+      "currencyCost": null,
+      "receiptSha256": "f57fc273713388ae63d68ddbbe789689e5ac3b996538af542dd2208fac76b2a7",
+      "uploadSha256": "ed2a7842f77bcd69dee0064991752d6ad27ce1edf1a62100d5433179d5678878"
+    },
+    {
+      "kind": "C",
+      "evidence": "docs/v4/evidence/form-autonomy-C-attempt-2.json",
+      "evidenceSha256": "04a735e9026928e048e2dfe20dc2f0b0cc20216d4e76d0b92100119599ad6354",
+      "passed": true,
+      "independent": {
+        "oneServerAcceptance": true,
+        "exactReceivedBytes": true,
+        "actualSavedReceipt": true,
+        "modelRoundAccounting": true,
+        "genuineGo": true,
+        "receiptChecks": true
+      },
+      "sourceMatchesCurrent": false,
+      "rounds": 11,
+      "toolCalls": 10,
+      "recoveryActions": [],
+      "failures": 2,
+      "tokenUsage": {
+        "input": 70075,
+        "output": 497,
+        "source": "Actual provider response telemetry; not a billing receipt"
+      },
+      "currencyCost": null,
+      "receiptSha256": "d67beb76e05283c94ec6e9138f4cf0cc964ea1e8815d185db645bf0714421830",
+      "uploadSha256": "3e9a492fea8a963735053ae200aee3f79a317f112e7339ca5f73ad4c9e311132"
+    },
+    {
+      "kind": "regression",
+      "evidence": "docs/v4/evidence/form-autonomy-regression-attempt-2.json",
+      "evidenceSha256": "59e472b5b8514845ffde7e9c294ee9088c6b536a1ddf6a6688f7155c758c3502",
+      "passed": false,
+      "independent": {
+        "oneServerAcceptance": false,
+        "exactReceivedBytes": false,
+        "actualSavedReceipt": false,
+        "modelRoundAccounting": true,
+        "genuineGo": true,
+        "receiptChecks": false
+      },
+      "sourceMatchesCurrent": false,
+      "rounds": 12,
+      "toolCalls": 12,
+      "recoveryActions": [],
+      "failures": 3,
+      "tokenUsage": {
+        "input": 64042,
+        "output": 254,
+        "source": "Actual provider response telemetry; not a billing receipt"
+      },
+      "currencyCost": null,
+      "receiptSha256": null,
+      "uploadSha256": "872e35d5b291ef9de5cb6813fecc857a09bf851b2cbd4c665c1591645b3ac9cb"
+    }
+  ],
+  "universalAutonomyProven": false,
+  "productionReleaseReady": false,
+  "ordinaryGhostActivationProven": false
+}

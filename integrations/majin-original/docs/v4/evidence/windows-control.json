@@ -1,0 +1,21 @@
+{
+  "schema": "majin-owner-desktop-live/1",
+  "syntheticWindow": true,
+  "controlList": true,
+  "controlType": true,
+  "controlRead": true,
+  "controlClick": true,
+  "computerUseVerified": true,
+  "computerUseCloudVerified": false,
+  "verifiedSavedBytes": true,
+  "mouseMoveVerified": true,
+  "screenCaptureVerified": true,
+  "desktopPixelCanary": true,
+  "pinkVisible": true,
+  "pinkMoved": true,
+  "pinkHidden": true,
+  "pinkStateLabel": true,
+  "screenshotsUploaded": false,
+  "status": "PASS",
+  "computerUseCloudCoverage": "NOT_VERIFIED_NO_GITHUB_SECRET"
+}

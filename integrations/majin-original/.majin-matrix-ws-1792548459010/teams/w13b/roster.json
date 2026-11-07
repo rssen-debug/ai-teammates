@@ -1,0 +1,15 @@
+{
+  "version": "majin-teams/1",
+  "name": "w13b",
+  "members": [
+    {
+      "id": "a",
+      "role": "act",
+      "instructions": "",
+      "tools": null,
+      "maxSteps": null,
+      "addedAt": "2026-10-21T02:07:39.971Z"
+    }
+  ],
+  "createdAt": "2026-10-21T02:07:39.971Z"
+}

@@ -1,0 +1,79 @@
+{
+  "at": "2026-10-23T22:01:05.655Z",
+  "sourceCommit": "527b021d8077d1aabf1ea8ef7bb764d3caaf58ca",
+  "kind": "real-Go-unfamiliar-local-form",
+  "passed": false,
+  "checks": {
+    "realModelCompleted": false,
+    "providerUnchanged": true,
+    "browserUpload": false,
+    "browserInteraction": false,
+    "validationRecovered": false,
+    "oneAcceptedRegistration": false,
+    "exactUploadedBytes": false,
+    "savedObservedReceipt": false
+  },
+  "failure": "model round budget exhausted (12); task is incomplete",
+  "status": "failed",
+  "elapsedMs": 49740,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "conversationId": "conv_mvlijy2h_150c0062103d",
+  "successfulActions": [
+    "browser_open",
+    "browser_elements",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_read",
+    "browser_elements",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_elements",
+    "browser_read",
+    "browser_elements"
+  ],
+  "toolFailures": [
+    {
+      "name": "browser_upload",
+      "summary": "UNKNOWN",
+      "error": "no file input matches [e3] — browser.read the page or browser.shot it; find the real input"
+    }
+  ],
+  "oneUseApprovals": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill"
+  ],
+  "deniedActions": [],
+  "proof": {
+    "submissions": [],
+    "needsSlot": false,
+    "accepted": null
+  },
+  "artifacts": {
+    "uploadName": "genesis-form-upload-9a1c864c3810.txt",
+    "receiptName": "genesis-form-receipt-9a1c864c3810.txt"
+  },
+  "physicalPhonePass": false,
+  "fullScenarioAComplete": false,
+  "note": "Controlled dynamic-form/upload/validation acceptance only; external authentication handoff, cancellation and other real-world gates remain separate."
+}

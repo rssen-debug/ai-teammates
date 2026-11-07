@@ -1,0 +1,16 @@
+{
+ "schema": "majin.probe-6c-model.v1",
+ "model": "qwen3:0.6b",
+ "ok": true,
+ "elapsedMs": 61911,
+ "answer": "Swedish capital is Stockholm.",
+ "usage": {
+  "input": 22,
+  "output": 111,
+  "cached": 0,
+  "reported": true,
+  "total": 133,
+  "costUsd": 0
+ },
+ "answerOk": true
+}

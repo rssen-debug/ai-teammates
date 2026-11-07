@@ -1,0 +1,26 @@
+name: MAJIN CLI must bind runtime argument
+on:
+  push:
+    branches: [fix/cli-must-invoke-respond-arg-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  proof:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --check src/core/goal-artifact.js
+      - run: node --test test/agent-cli-runtime-argument-binding.test.js
+      - run: npm test
+      - run: npm run check
