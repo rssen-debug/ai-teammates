@@ -10,6 +10,7 @@ import { StuddyServices, type AskResult } from './services.js';
 import { DesktopAccessibilityAdapter, type AdapterStatus } from './desktop-adapter.js';
 import { resolveAgentDesktopBinary } from './agent-desktop-binary.js';
 import { LiveObserver, type LiveStatus } from './live-observer.js';
+import type { CompanionHint } from './companion-observer.js';
 import { BrowserBridgeServer, type BridgeStatus } from './bridge-server.js';
 import { GmailConnector } from './gmail-connector.js';
 import { GitHubDebugSync } from './debug-sync.js';
@@ -44,6 +45,7 @@ export class StuddyRuntime {
   readonly logger: BoundedLogger;
   private bridge: BrowserBridgeServer | null = null;
   private lastSelection: SelectionContext | null = null;
+  private proactiveHints: CompanionHint[] = [];
   private readonly platform: string;
 
   constructor(options: RuntimeOptions = {}) {
@@ -62,7 +64,17 @@ export class StuddyRuntime {
     this.logger = new BoundedLogger(join(this.dataDir, 'studdy.log'));
     this.gmail = new GmailConnector(this.dataDir, options.openUrl, options.gmailFetch);
     this.github = new GitHubDebugSync(this.dataDir, options.fetchImpl);
-    this.observer = new LiveObserver({ services: this.services, adapter: this.adapter });
+    this.observer = new LiveObserver({
+      services: this.services,
+      adapter: this.adapter,
+      onHint: (hint) => {
+        // Only an observed, locally classified error can trigger outreach.
+        // Keep raw UI data out of logs; the user must approve any corrective action.
+        this.proactiveHints.push(hint);
+        if (this.proactiveHints.length > 8) this.proactiveHints.shift();
+        this.journal.record('observer.hint', 'UI_ERROR_DETECTED', 'warn');
+      },
+    });
   }
 
   databasePath(): string { return databasePath(this.dataDir); }
@@ -238,6 +250,20 @@ export class StuddyRuntime {
   selection(): SelectionContext | null { return this.lastSelection; }
   async stopBridge(): Promise<void> { await this.bridge?.stop(); this.bridge = null; }
   liveStatus(): LiveStatus { return this.observer.status(); }
+  takeProactiveHints(): CompanionHint[] {
+    return this.proactiveHints.splice(0);
+  }
+  liveMetrics(): { verifiedSnapshots: number; verifiedSkills: number; level: number; memoryFacts: number; vaultPath: string | null; debuggerPath: string } {
+    const skills = this.ledger().details();
+    return {
+      verifiedSnapshots: this.services.db.checkpoints.get<number>('buddy.live.verified-observations.v1') ?? 0,
+      verifiedSkills: skills.verified,
+      level: skills.level,
+      memoryFacts: this.services.memory?.profileFacts().length ?? 0,
+      vaultPath: this.services.memory?.path ?? null,
+      debuggerPath: this.journal.path,
+    };
+  }
 
   syncMemory(): string {
     const path = writeStudyVault(this.services.db, this.dataDir);

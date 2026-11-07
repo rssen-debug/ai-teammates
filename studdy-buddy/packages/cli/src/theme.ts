@@ -5,9 +5,12 @@ export function palette(enabled: boolean) {
   const wrap = (code: string) => (text: string) => enabled ? `\x1b[${code}m${text}\x1b[0m` : text;
   return { mint: wrap('38;2;126;231;196'), violet: wrap('38;2;167;139;250'), amber: wrap('38;2;246;196;83'), red: wrap('38;2;248;113;113'), dim: wrap('2'), bold: wrap('1') };
 }
-export function dots(color: boolean): string {
+/** Five evidence-linked dots. Grey until a real active UI observation;
+ * increasing verified skill levels color more dots, never fake progress. */
+export function dots(color: boolean, level = 1, observing = false): string {
   const p = palette(color);
-  return [p.mint('●'), p.mint('●'), p.violet('●'), p.amber('●'), p.violet('●')].join(' ');
+  const lit = observing ? Math.min(5, Math.max(1, Math.ceil(level / 20))) : 0;
+  return Array.from({ length: 5 }, (_, i) => i < lit ? p.mint('●') : p.dim('○')).join(' ');
 }
 export function box(title: string, lines: string[], color: boolean): string {
   const p = palette(color);

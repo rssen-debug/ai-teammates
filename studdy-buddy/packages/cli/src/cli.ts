@@ -224,20 +224,20 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
       }
       case 'watch': {
         const seconds = flags.once ? 0 : option('duration') === undefined ? Infinity : Number(option('duration'));
-        if (!Number.isFinite(seconds) || seconds < 0) { io.err('Ange --duration i sekunder (0 eller större).'); return 2; }
+        if (Number.isNaN(seconds) || seconds < 0 || seconds === -Infinity) { io.err('Ange --duration i sekunder (0 eller större).'); return 2; }
         runtime.observer.start();
         const render = () => {
           const s = runtime.liveStatus();
           if (json) out(s);
-          else io.out(box(`${dots(color)}  Live`, [statusLine(s.observing ? 'Observerar' : 'Väntar', s.observing, color, s.windowTitle ?? s.activity), p.dim(`${s.elementCount} element · nivå ${s.level} · Ctrl+C avslutar`)], color));
+          else io.out(box(`${dots(color, s.level, s.observing)}  Live`, [statusLine(s.observing ? 'Observerar' : 'Väntar', s.observing, color, s.windowTitle ?? s.activity), p.dim(`${s.elementCount} element · nivå ${s.level} · Ctrl+C avslutar`)], color));
         };
         await new Promise(resolve => setTimeout(resolve, 200));
         render();
         if (flags.once || seconds === 0) return runtime.liveStatus().observing ? 0 : 1;
         await new Promise<void>(resolve => {
-          const stop = () => { clearInterval(timer); clearTimeout(limit); resolve(); };
+          const stop = () => { clearInterval(timer); if (limit) clearTimeout(limit); resolve(); };
           const timer = setInterval(render, 2500);
-          const limit = setTimeout(stop, seconds * 1000);
+          const limit = Number.isFinite(seconds) ? setTimeout(stop, seconds * 1000) : null;
           process.once('SIGINT', stop);
         });
         return 0;

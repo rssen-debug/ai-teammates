@@ -442,7 +442,7 @@ export class StuddyServices {
       const result = await this.explainer.explain(provider, {
         question: input.text,
         mode,
-        language: 'sv-SE',
+        language: this.db.checkpoints.get<string>('buddy.chat.language.v1') === 'en-US' ? 'en-US' : 'sv-SE',
         contextFacts: facts,
         knowledgeFacts: context.knowledge,
         history,
