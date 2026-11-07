@@ -10,6 +10,7 @@ import { StuddyServices, type AskResult } from './services.js';
 import { DesktopAccessibilityAdapter, type AdapterStatus } from './desktop-adapter.js';
 import { resolveAgentDesktopBinary } from './agent-desktop-binary.js';
 import { LiveObserver, type LiveStatus } from './live-observer.js';
+import { PROACTIVE_DEFAULTS, type ProactiveSettings } from '@studdy/agent-core';
 import type { CompanionHint } from './companion-observer.js';
 import { isSensitiveWindow } from './companion-observer.js';
 import { BrowserBridgeServer, type BridgeStatus } from './bridge-server.js';
@@ -259,8 +260,36 @@ export class StuddyRuntime {
   selection(): SelectionContext | null { return this.lastSelection; }
   async stopBridge(): Promise<void> { await this.bridge?.stop(); this.bridge = null; }
   liveStatus(): LiveStatus { return this.observer.status(); }
+  /**
+   * Hand out at most one proactive hint, and only when the existing
+   * ProactiveGovernor allows it. Before this, the CLI printed every hint the
+   * observer produced, once per second, which is exactly the spam that was
+   * reported. The governor already knew how to rate-limit; it was simply never
+   * consulted here.
+   */
   takeProactiveHints(): CompanionHint[] {
-    return this.proactiveHints.splice(0);
+    const queued = this.proactiveHints.splice(0);
+    if (!queued.length) return [];
+    const settings = proactiveSettingsFor(this.services.db.checkpoints.get<string>('buddy.proactive.v1'), Date.now());
+    if (settings.mode === 'OFF') return [];
+    const hint = queued[queued.length - 1]!; // newest signal, not the oldest
+    // Relevance is derived from the real signal, not invented: an observed error
+    // is worth interrupting for, a generic context hint is not.
+    const relevance = hint.kind === 'error' ? 0.95 : hint.kind === 'study' ? 0.8 : hint.kind === 'code' ? 0.7 : 0.5;
+    const decision = this.services.proactive.maySuggest(settings, relevance, 'SELF_STUDY');
+    if (!decision.allowed) {
+      this.journal.record('proactive.suppressed', decision.reason);
+      return [];
+    }
+    this.services.proactive.markSuggested();
+    return [hint];
+  }
+
+  /** What the student has actually chosen to let the assistant notice. */
+  proactiveStatus(): { mode: string; allowed: boolean; reason: string } {
+    const settings = proactiveSettingsFor(this.services.db.checkpoints.get<string>('buddy.proactive.v1'), Date.now());
+    const decision = this.services.proactive.maySuggest(settings, 1, 'SELF_STUDY');
+    return { mode: settings.mode, allowed: decision.allowed, reason: decision.reason };
   }
   liveMetrics(): { verifiedSnapshots: number; verifiedSkills: number; level: number; memoryFacts: number; vaultPath: string | null; debuggerPath: string } {
     const skills = this.ledger().details();
@@ -354,6 +383,11 @@ export class StuddyRuntime {
   async chat(text: string): Promise<Result<AskResult>> {
     const mode = 'NORMAL' as const;
     const session = this.services.ensureSession();
+    // Autopilot: learn durable facts from ordinary messages. No /remember needed.
+    // The learned fact is reported once so the student can correct it, and it is
+    // only ever an extraction of something they actually said.
+    const learnedFact = this.services.memory?.rememberProfileAuto(text) ?? null;
+    if (learnedFact) this.journal.record('memory.auto-profile', learnedFact);
     const reply = (answer: string, degraded = false, error: string | null = null) => {
       this.services.db.messages.append({ sessionId: session.id, role: 'user', text, mode });
       const message = this.services.db.messages.append({ sessionId: session.id, role: 'buddy', text: answer, mode });
@@ -457,3 +491,22 @@ function extractSnapshot(payload: unknown): Parameters<StuddyServices['observePa
 }
 
 export type { SourcePage };
+
+/**
+ * Proactive policy from stored choice + time of day.
+ *
+ * Quiet hours are 22:00-07:00 local time: during them nothing may interrupt,
+ * regardless of the stored mode. Study software that talks over a person at
+ * midnight is not helpful, it is just noise.
+ */
+export function proactiveSettingsFor(stored: string | null | undefined, now: number): ProactiveSettings {
+  const mode = stored === 'OFF' || stored === 'NORMAL' || stored === 'QUIET'
+    ? stored
+    : PROACTIVE_DEFAULTS.QUIET.mode;
+  const hour = new Date(now).getHours();
+  const quietHours = hour >= 22 || hour < 7;
+  if (quietHours || mode === 'OFF') {
+    return { mode: 'OFF', cooldownMs: Number.POSITIVE_INFINITY, minRelevance: 1 };
+  }
+  return PROACTIVE_DEFAULTS[mode];
+}

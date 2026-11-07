@@ -31,7 +31,7 @@ export type ProviderConfigInput = z.infer<typeof providerConfigSchema>;
 export const voiceSettingsSchema = z.object({
   /** Voice is OFF by default by explicit product requirement. */
   enabled: z.boolean().default(false),
-  provider: z.enum(['windows-native', 'openai-compatible', 'elevenlabs', 'none']).default('none'),
+  provider: z.enum(['windows-neural', 'windows-native', 'openai-compatible', 'elevenlabs', 'none']).default('none'),
   voiceId: z.string().max(120).default(''),
   language: z.enum(['sv-SE', 'en-US']).default('sv-SE'),
   speed: z.number().min(0.5).max(2).default(1),
