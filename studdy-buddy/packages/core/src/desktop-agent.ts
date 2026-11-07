@@ -56,6 +56,8 @@ export async function runAgent(goal: string, adapter: Pick<DesktopAccessibilityA
   if (external.test(goal)) return {complete:false,blocked:true,summary:'Köp, betalningar, externa meddelanden och radering kräver manuell bekräftelse. Ingen åtgärd utförd.',events};
   let windows: WindowInfo[]=[];
   let current: {id:string;refs:Set<string>}|null=null;
+  let pendingVerification=false;
+  let verifiedEffect=false;
   const limit=Math.max(1,Math.min(maxSteps,10));
   for(let step=1;step<=limit;step++){
     let action:Action|null;
@@ -63,8 +65,7 @@ export async function runAgent(goal: string, adapter: Pick<DesktopAccessibilityA
     catch(e){return {complete:false,blocked:true,summary:'Kilo svarade inte korrekt: '+String(e).slice(0,140),events};}
     if(!action){event(step,'plan',false,'Ogiltigt JSON-verktygsval');break;}
     if(action.action==='finish'){
-      const verified=events.some(e=>e.ok&&['click','type','press'].includes(e.action)) &&
-        events.some(e=>e.ok&&e.action==='inspect');
+      const verified=verifiedEffect && !pendingVerification;
       return {complete:verified,blocked:!verified,
         summary:verified?(action.message??'Klart'):'Resultatet är ännu inte verifierat. '+(action.message??''),events};
     }
@@ -80,6 +81,7 @@ export async function runAgent(goal: string, adapter: Pick<DesktopAccessibilityA
     if(action.action==='inspect'){
       const snap=await adapter.snapshot(w.id);
       current=snap.accessible?{id:w.id,refs:new Set(snap.elements.map(e=>e.ref))}:null;
+      if(snap.accessible && pendingVerification){verifiedEffect=true;pendingVerification=false;}
       observations.push('UI '+safeWindowLabel(w.title,w.processName)+':\n'+safeUi(snap));
       event(step,'inspect',snap.accessible,snap.accessible?snap.elements.length+' element':'UI otillgängligt');continue;
     }
@@ -92,6 +94,7 @@ export async function runAgent(goal: string, adapter: Pick<DesktopAccessibilityA
         event(step,'press',false,'Tangentkombination kräver separat godkännande');break;
       }
       const r=await adapter.press(action.combo,w.id);current=null;
+      if(r.ok)pendingVerification=true;
       observations.push(r.ok?'Key delivered; inspect again to verify.':'Press failed.');
       event(step,'press',r.ok,r.detail.slice(0,130));continue;
     }
@@ -105,6 +108,7 @@ export async function runAgent(goal: string, adapter: Pick<DesktopAccessibilityA
     const r=action.action==='click'?await adapter.click(action.ref):
       await adapter.setValue(action.ref,action.text??'');
     current=null;
+    if(r.ok)pendingVerification=true;
     observations.push(r.ok?'Tool accepted; inspect again to verify result.':'Tool failed.');
     event(step,action.action,r.ok,r.ok?'Verktygsåtgärd bekräftad; slutresultat ej verifierat':r.detail.slice(0,130));
   }
