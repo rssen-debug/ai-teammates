@@ -95,6 +95,16 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text === '/prove') {
         const proof = await (await import('@studdy/core')).proveLive(runtime, { app: process.platform === 'win32' ? 'Notepad' : undefined });
         log(box('Datorstyrning', [...proof.steps.map(step => `${step.status === 'pass' ? '●' : '○'} ${step.name}: ${step.detail}`), proof.ok ? p.mint('Verifierad') : p.amber('Inte verifierad – se status ovan')], color));
+      } else if (modelRequest(text)) {
+        const modelId = modelRequest(text)!;
+        const active = runtime.services.activeProvider();
+        if (!active) log(p.amber('Anslut en AI-tjänst med /api först.'));
+        else {
+          const updated = runtime.services.saveProvider({ id: active.id, modelId });
+          log(updated.ok
+            ? p.mint(`Bytte till ${modelId}. Valet är sparat och används nästa meddelande.`)
+            : p.red(updated.error.message));
+        }
       } else if (text.startsWith('/open ')) {
         const r = await runtime.launchApp(text.slice(6));
         log(r.ok ? p.mint('✓ ' + r.detail) : p.amber('○ ' + r.detail));
@@ -144,4 +154,13 @@ function secret(rl: readline.Interface, nextLine: () => Promise<string | null>, 
       resolve(answer);
     });
   });
+}
+
+/** Recognise explicit natural-language model requests without hijacking ordinary chat.
+ * Model ids must be a single token. Never guess a provider/model from a loose phrase.
+ */
+export function modelRequest(text: string): string | null {
+  const value = text.trim();
+  const match = /^(?:byt(?:\\s+nu)?\\s+modell(?:en)?\\s+till|växla\\s+modell(?:en)?\\s+till|använd\\s+modellen)\\s+([a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,179})[.!]?$/i.exec(value);
+  return match?.[1] ?? null;
 }
