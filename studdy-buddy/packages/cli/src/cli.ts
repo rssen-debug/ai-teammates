@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { probeWindowsVoice } from './continuous-voice.js';
 import { parseArgs } from 'node:util';
 import { spawn } from 'node:child_process';
 import { StuddyRuntime, summarizeSnapshot, SpeechPlayer, proveLive, type RuntimeOptions } from '@studdy/core';
@@ -47,6 +48,7 @@ Användning:
   studdy provider test | probe   Live-test / uppmätta modellförmågor
   studdy status                  Kompakt dashboard
   studdy doctor                  Lokal hälsokontroll
+  studdy selftest                Kör riktiga Windows-tester och skriv anonym rapport
   studdy prove [--app "App"]     Bevisa live: starta, läs, skriv, skärmbild
   studdy open "Google Chrome"    Starta valfri app, verifierat
   studdy apps | windows          Lista appar/fönster
@@ -175,6 +177,65 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
         if (json) { out({ checks }); return checks.some(c => !c.ok && !c.blocked) ? 1 : 0; }
         io.out(box('Doctor', checks.map(c => statusLine(c.name, c.ok, color, c.detail)), color));
         return checks.some(c => !c.ok && !c.blocked) ? 1 : 0;
+      }
+      case 'selftest': {
+        // Collect real Windows/device evidence but no raw window titles, paths,
+        // screenshot pixels, UI text, conversation, or API credentials.
+        const check = async (label: string, fn: () => Promise<unknown>): Promise<unknown> => {
+          try { return await fn(); }
+          catch { return { status: 'error', code: label + '_FAILED' }; }
+        };
+        const native = await check('native', async () => {
+          const result = await runtime.nativeStatus();
+          return { status: result.available ? 'pass' : 'fail',
+            code: result.available ? 'NATIVE_READY' :
+              /foreign principal|foreign owner|owned by/i.test(result.detail) ? 'NATIVE_OWNER_MISMATCH' : 'NATIVE_UNAVAILABLE' };
+        });
+        const windows = await check('windows', async () => {
+          const result = await runtime.adapter.listWindows();
+          return { status: result.error ? 'fail' : 'pass',
+            windowCount: result.windows.length, code: result.error ? 'WINDOWS_ENUM_FAILED' : 'WINDOWS_ENUM_READY' };
+        });
+        const observation = await check('observation', async () => {
+          const result = await runtime.observer.tick();
+          return { status: result.observing ? 'pass' : 'fail', observed: result.observing,
+            windowCount: result.openWindowCount ?? 0, elementCount: result.observing ? result.elementCount : 0,
+            code: result.observing ? 'UI_READ_READY' : 'UI_READ_UNAVAILABLE' };
+        });
+        const voice = await check('microphone', async () => {
+          const result = await probeWindowsVoice();
+          return { status: result.microphone === 'ready' ? 'pass' : result.microphone === 'not-tested' ? 'not-tested' : 'fail',
+            engineLanguage: result.recognizer, code: result.microphone === 'ready' ? 'MIC_READY' :
+              result.detail.includes('taligenkännare är installerad') ? 'NO_RECOGNIZER' : 'MIC_UNAVAILABLE' };
+        });
+        const provider = runtime.services.activeProvider();
+        const report = {
+          schema: 'studdy-selftest-v1', timestamp: new Date().toISOString(),
+          platform: process.platform, nodeMajor: Number(process.versions.node.split('.')[0]),
+          packageVersion: options.version ?? 'unknown',
+          checks: { native, windows, observation, voice,
+            kilo: { status: provider?.hasApiKey ? 'configured' : 'not-configured',
+              key: 'never-exported' },
+            permissions: {
+              screen: runtime.services.permissions.isGranted('application.observe'),
+              actions: runtime.services.permissions.isGranted('computer.actions'),
+              microphone: runtime.services.permissions.isGranted('microphone'),
+            },
+          },
+          note: 'No screenshots, window titles, filenames, user text, voice recordings, or keys included. Only reported checks are verified.',
+        };
+        if (json) { out(report); return 0; }
+        const folder = join(runtime.dataDir, 'diagnostics');
+        mkdirSync(folder, { recursive: true });
+        const file = join(folder, 'selftest.json');
+        writeFileSync(file, JSON.stringify(report, null, 2), { encoding: 'utf8', mode: 0o600 });
+        io.out(box('Studdy självtest · riktiga enheter', [
+          ...Object.entries(report.checks).map(([name,value]) =>
+            name + ': ' + JSON.stringify(value)),
+          '', 'Sparad lokal rapport: ' + file,
+          'Rapporten laddas INTE upp automatiskt. Den kan delas som en enda fil i chatten.',
+        ], color));
+        return 0;
       }
       case 'prove': {
         const proof = await proveLive(runtime, { app: option('app'), noWrite: flags['no-write'] === true });
