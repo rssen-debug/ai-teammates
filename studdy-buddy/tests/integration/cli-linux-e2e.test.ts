@@ -122,11 +122,13 @@ describe('built CLI in a real OS process, real HTTP and real native helper', () 
   }, 30_000);
 
   it('scripted interactive REPL consumes every line and exits on EOF', async () => {
-    const r = await cli(['repl'], '/status\n/memory\nhar du full åtkomst?\nFörklara subnetting\n');
+    const r = await cli(['repl'], '/status\n/memory\nhar du full åtkomst?\nFörklara subnetting\n/models\n/model local-model-two\n/models\n');
     expect(r.code).toBe(0); expect(r.stderr).toBe('');
     expect(r.stdout).toContain('verkliga åtkomst');
     expect(r.stdout).toContain('Subnetting delar');
     expect(r.stdout).toContain('Obsidian-Vault');
+    expect(r.stdout).toContain('Modell vald: local-model-two');
+    expect(r.stdout).toContain('Aktiv: Egen provider · local-model-two');
   }, 20_000);
 
   it.runIf(process.platform === 'linux')('runs the real installed Linux helper and reports the missing desktop bus honestly', async () => {
