@@ -38,7 +38,7 @@ const SCRIPT = [
   '    }',
   '  }',
   '} finally { $r.Dispose() }',
-].join(';');
+].join('\n');
 
 export class WindowsContinuousInput implements VoiceInput {
   private child: ChildProcessWithoutNullStreams | null = null;
