@@ -17,9 +17,10 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   // Lightweight ANSI suggestion overlay: appears as soon as / is typed in a TTY.
   // Render below the readline input and restore the cursor, so typing stays natural.
   // Piped/CI mode never emits terminal control sequences.
+  let closed = false;
   let previewVisible = false;
   const preview = () => {
-    if (!terminal || rl.closed) return;
+    if (!terminal || closed) return;
     const inputLine = rl.line.trim();
     const matches = /^\/[a-z]*$/i.test(inputLine) ? slashMatches(inputLine).slice(0, 6) : [];
     if (!matches.length && !previewVisible) return;
@@ -36,7 +37,6 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   // script and EOF while nativeStatus() is still running.
   const lines: string[] = [];
   let waiting: ((line: string | null) => void) | null = null;
-  let closed = false;
   rl.on('line', line => { if (previewVisible && terminal) { output.write('\x1b[0J'); previewVisible = false; } if (waiting) { const resolve = waiting; waiting = null; resolve(line); } else lines.push(line); });
   rl.on('close', () => { closed = true; if (waiting) { const resolve = waiting; waiting = null; resolve(null); } });
   const nextLine = (): Promise<string | null> => lines.length ? Promise.resolve(lines.shift()!) : closed ? Promise.resolve(null) : new Promise(resolve => { waiting = resolve; });
