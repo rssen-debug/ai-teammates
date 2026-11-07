@@ -1,0 +1,48 @@
+name: Assemble Omega + MAJIN monorepo
+
+on:
+  push:
+    branches:
+      - integration/omega-majin-monorepo
+    paths:
+      - .github/workflows/assemble-omega-majin.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: omega-majin-import
+  cancel-in-progress: false
+
+jobs:
+  import-majin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch with history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Import MAJINCLI preserving its content in an isolated prefix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if test -e integrations/majin-original/package.json; then
+            echo "MAJINCLI already imported; will not overwrite."
+            exit 0
+          fi
+          git subtree add --prefix=integrations/majin-original \
+            https://github.com/rssen-debug/MAJINCLI.git main --squash \
+            -m "Import complete MAJINCLI source as isolated legacy subsystem"
+          test -f integrations/majin-original/bin/majin-v6.mjs
+          test -f integrations/majin-original/package.json
+          test -f studdy-buddy/omega/buddy.py
+          git push origin HEAD:integration/omega-majin-monorepo
+      - name: Report imported file counts
+        shell: bash
+        run: |
+          echo "MAJIN files: $(git ls-files integrations/majin-original | wc -l)"
+          echo "Omega exists: $(test -f studdy-buddy/omega/buddy.py && echo yes || echo no)"
