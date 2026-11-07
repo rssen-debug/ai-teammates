@@ -420,6 +420,9 @@ export class StuddyRuntime {
    * The original speech is persisted as user text; screen data is transient.
    */
   async chatWithScreen(text: string): Promise<Result<AskResult>> {
+    // Refresh the observation for *this* question; never answer from a stale
+    // snapshot just because a timer happened to run several seconds earlier.
+    if (this.services.permissions.isGranted('application.observe')) await this.observer.tick();
     // Deterministic OS questions and commands use the real local capability
     // path. Generic Kilo chat gets the *same evidence* as the status line.
     if (isStartLiveRequest(text) || isAccessQuestion(text) || isLiveQuestion(text) ||
