@@ -1,0 +1,59 @@
+name: MAJIN real Qwen3B browser URL recovery + local form
+on:
+  push:
+    branches: [fix/browser-open-explicit-goal-url-recovery-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-form:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    env:
+      CI: 'true'
+      MAJIN_QA_SANDBOX: '1'
+      QA_MODEL: qwen2.5:3b
+      QA_ONLY: '10'
+      MAJIN_LLM_LOCAL_TIMEOUT: '75000'
+      MAJIN_LLM_TIMEOUT: '75000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Browser and runtime prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npx playwright install chromium
+      - name: Run actual FREE Qwen model in CI sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/ollama.log 2>&1 &
+          for i in $(seq 1 45); do
+            if curl -fs http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
+            sleep 2
+          done
+          curl -fs http://127.0.0.1:11434/api/tags >/dev/null
+          ollama pull "$QA_MODEL"
+          echo "MAJIN_HOME=$(mktemp -d /tmp/majin-browser-url.XXXXXXXX)" >> "$GITHUB_ENV"
+          echo "QA_EVID=$GITHUB_WORKSPACE/qa-evidence" >> "$GITHUB_ENV"
+      - name: Real Qwen browser.open then consent checkbox and local HTTP POST
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/qa/prompt-battery.mjs 2>&1 | tee browser-form-console.log
+      - name: Independently retain actual request and tool traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen3b-browser-open-url-recovery-receipt
+          path: |
+            qa-evidence/
+            browser-form-console.log
+          if-no-files-found: warn
+          retention-days: 30

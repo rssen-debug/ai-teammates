@@ -1,0 +1,16 @@
+{
+ "schema": "majin.probe-6c-model.v1",
+ "model": "smollm2:135m",
+ "ok": true,
+ "elapsedMs": 7485,
+ "answer": "The capital of Sweden is Stockholm.",
+ "usage": {
+  "input": 43,
+  "output": 8,
+  "cached": 0,
+  "reported": true,
+  "total": 51,
+  "costUsd": 0
+ },
+ "answerOk": true
+}

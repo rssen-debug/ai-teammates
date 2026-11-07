@@ -1,0 +1,58 @@
+name: MAJIN Windows acceptance script parser and JSON contract
+on:
+  push:
+    branches: [fix/windows-acceptance-contract-rebased-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-qa-evidence:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Parse run-all.ps1 with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          $script = (Resolve-Path 'qa\win-acceptance\run-all.ps1').Path
+          $null = [System.Management.Automation.Language.Parser]::ParseFile($script,[ref]$tokens,[ref]$parseErrors)
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | Format-List | Out-String | Write-Output
+            throw "PowerShell parser rejected run-all.ps1"
+          }
+      - name: Run pack and produce real noninteractive result (never invent A1 screenshot)
+        shell: powershell
+        run: |
+          & .\qa\win-acceptance\run-all.ps1 -Out "$env:RUNNER_TEMP\win-acceptance.json"
+          if (!(Test-Path "$env:RUNNER_TEMP\win-acceptance.json")) {
+            throw "QA script produced no JSON evidence"
+          }
+      - name: Validate exact win-acceptance/1 evidence contract
+        shell: powershell
+        run: node scripts/verify-win-acceptance.mjs "$env:RUNNER_TEMP\win-acceptance.json"
+      - name: Assert honest hosted runner classification and working dry-plan tool
+        shell: powershell
+        run: |
+          $doc = Get-Content -Raw "$env:RUNNER_TEMP\win-acceptance.json" | ConvertFrom-Json
+          if ($doc.interactive -ne $false) { throw "GitHub hosted runner cannot be treated as a real interactive desktop" }
+          $a1 = @($doc.steps | Where-Object { $_.step -eq 'A1' })
+          $a5 = @($doc.steps | Where-Object { $_.step -eq 'A5' })
+          if ($a1.Count -ne 1 -or $a1[0].status -ne 'NOT TESTED') { throw "A1 must be NOT TESTED on hosted runner" }
+          if ($a5.Count -ne 1 -or $a5[0].status -ne 'PASS') { throw "Real computer.use dry-plan A5 contract must PASS" }
+      - name: Capture evidence even if tests fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-runner-json-contract
+          path: |
+            ${{ runner.temp }}/win-acceptance.json
+            qa/win-acceptance/shots/
+          retention-days: 30
+          if-no-files-found: warn

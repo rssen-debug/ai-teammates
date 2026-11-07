@@ -1,0 +1,20 @@
+{
+  "at": "2026-10-23T19:35:52.818Z",
+  "sourceCommit": "e4cb0905dfee358667b52e8792ed6d2cbe978311",
+  "machine": "DESKTOP-C1RSBUA",
+  "transport": "Tailscale HTTPS",
+  "configuredCommandLane": true,
+  "httpStatus": 200,
+  "ok": true,
+  "transcript": "Hej majen! Kan du öppna historiken och visa mina senaste meddelanden?",
+  "provider": "command",
+  "synthetic": false,
+  "elapsedMs": 5207,
+  "totalMs": 6069,
+  "inputType": "AAC/MP4",
+  "inputBytes": 42324,
+  "source": "Microsoft Bengt Swedish synthetic speech",
+  "physicalDevice": false,
+  "physicalVoiceAccepted": false,
+  "voiceBargeInAccepted": false
+}

@@ -1,0 +1,44 @@
+{
+  "at": "2026-10-23T21:44:53.911008+00:00",
+  "parentCommit": "01c97b46fa093b4faa368baef294cdcec064add3",
+  "exactParentCI": {
+    "linux": {
+      "passed": 520,
+      "failed": 0,
+      "skipped": 7
+    },
+    "windows": {
+      "passed": 526,
+      "failed": 0,
+      "skipped": 1
+    },
+    "runner": "success"
+  },
+  "browserHostAgentCancel": {
+    "passed": 175,
+    "failed": 0,
+    "skipped": 5
+  },
+  "installerTimerActualBrowser": {
+    "passed": 17,
+    "failed": 0,
+    "skipped": 0
+  },
+  "evalClientFixture": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+  },
+  "rootLegacy": {
+    "passed": 1286,
+    "failed": 1,
+    "skipped": 23,
+    "durationMs": 189360.1454,
+    "soleFailure": "Old pure-ASCII assertion counted the PS5 UTF-8 BOM; body remains ASCII. Repaired and focused installer tests pass.",
+    "finalWholeSuiteGreen": false
+  },
+  "plannerForBrowserLifecycle": "injected fixture; not real Go",
+  "realGoFormRun": false,
+  "physicalDevicePass": false,
+  "releaseReady": false
+}

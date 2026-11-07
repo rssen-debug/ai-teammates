@@ -1,0 +1,112 @@
+name: MAJIN Windows OpenCode Go acceptance
+on:
+  push:
+    branches: [qa/failure-recovery-go-20261020]
+  workflow_dispatch:
+concurrency:
+  group: windows-opencode-go-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  build-current-branch:
+    name: Build fresh Windows installer from this commit
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build EXE and real Inno installer
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
+          python -m pip install --quiet ziglang
+          if ($LASTEXITCODE -ne 0) { throw 'zig install failed' }
+          node scripts/build-exe.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'exe build failed' }
+          choco install innosetup -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno setup install failed' }
+          node scripts/build-installer.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'installer build failed' }
+          if (-not (Test-Path dist/installer/MAJIN-Setup.exe)) { throw 'installer missing' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opencode-branch-installer
+          path: dist/installer/MAJIN-Setup.exe
+          retention-days: 7
+          if-no-files-found: error
+  windows-desktop-opencode:
+    needs: build-current-branch
+    name: Real Windows desktop and OpenCode Go (NO OLLAMA)
+    runs-on: [self-hosted, windows, interactive-desktop, majin-qa]
+    timeout-minutes: 30
+    env:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      MAJIN_LLM_TIMEOUT: '120000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require interactive Windows desktop
+        shell: powershell
+        run: |
+          if (-not [Environment]::UserInteractive) { throw 'Real interactive desktop required' }
+          "Interactive Windows desktop verified"
+      - name: Test real MAJIN provider with OpenCode Go (no Ollama)
+        shell: powershell
+        run: |
+          node scripts/qa/opencode-free-smoke.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download this commit's installer (not stale release)
+        uses: actions/download-artifact@v4
+        with:
+          name: opencode-branch-installer
+          path: qa-stage
+      - name: Verify downloaded installer
+        shell: powershell
+        run: |
+          if (-not (Test-Path qa-stage/MAJIN-Setup.exe)) { throw 'branch installer missing' }
+          $h = (Get-FileHash qa-stage/MAJIN-Setup.exe -Algorithm SHA256).Hash.ToLower()
+          Set-Content qa-stage/MAJIN-Setup.exe.sha256 $h
+          "Verified this run's artifact SHA256 $h"
+      - name: Install real MAJIN app
+        shell: powershell
+        run: |
+          $p = Start-Process .\qa-stage\MAJIN-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
+      - name: Real installed-app and Windows control acceptance
+        shell: powershell
+        env:
+          QA_INTERACTIVE: 'true'
+          QA_OPENCODE_GO: 'true'
+          QA_MODELS: 'MECHANICS-ONLY'
+          QA_ARTIFACT: 'branch-built OpenCode Go QA installer'
+          QA_ONLY: 's01,s02,s03,s04,s05,s06,s07,s08,s09,a01,a02,s15,s18,s19,s20,s21,s22,s24,s25,s26,c01,c02,c03,c04,b01'
+        run: |
+          $env:QA_HOME = Join-Path $env:RUNNER_TEMP "majin-opencode-qa-$env:GITHUB_RUN_ID"
+          $env:MAJIN_HOME = $env:QA_HOME
+          $env:QA_EVID = Join-Path $PWD 'qa-evidence'
+          $env:QA_EXE = "$env:LOCALAPPDATA\Programs\MAJIN\majin-win-x64.exe"
+          if (-not (Test-Path $env:QA_EXE)) { $env:QA_EXE = "$env:ProgramFiles\MAJIN\majin-win-x64.exe" }
+          $env:QA_SETUP = Join-Path $PWD 'qa-stage\MAJIN-Setup.exe'
+          $env:QA_SETUP_SHA = Join-Path $PWD 'qa-stage\MAJIN-Setup.exe.sha256'
+          if (-not (Test-Path $env:QA_EXE)) { throw 'Installed MAJIN exe missing' }
+          node scripts/qa/qa-scenarios.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $rep = Get-Content qa-evidence/qa-report.json -Raw | ConvertFrom-Json
+          $bad = @($rep.scenarios | Where-Object { $_.status -eq 'FAILED' })
+          if ($bad.Count) { throw "Failed: $($bad.id -join ',')" }
+          $blocked = @($rep.scenarios | Where-Object { $_.status -eq 'BLOCKED' -or $_.status -eq 'SKIPPED' })
+          "Completed $($rep.scenarios.Count) selected installed-app scenarios; blocked/skipped=$($blocked.Count)"
+          if ($blocked.Count) { throw "Not fully verified: $($blocked.id -join ',')" }
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-opencode-go-qa-evidence
+          path: qa-evidence/
+          retention-days: 30

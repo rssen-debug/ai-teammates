@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-23T17:16:36.986Z",
+  "status": "PASS",
+  "live": true,
+  "credentialContentsRecorded": false,
+  "provider": "opencode",
+  "model": "glm-5.3",
+  "streaming": true,
+  "verifiedBytes": true,
+  "tools": [
+    "workspace_write",
+    "workspace_read"
+  ],
+  "turnStatus": "completed"
+}

@@ -1,0 +1,275 @@
+{
+  "ledger": {
+    "question": "commander yargs cac clipanion typescript cli argument parsing",
+    "planOutput": {
+      "ok": true,
+      "question": "commander yargs cac clipanion typescript cli argument parsing",
+      "queries": [
+        "commander yargs cac clipanion typescript cli argument parsing",
+        "commander yargs clipanion typescript argument parsing overview",
+        "commander yargs clipanion typescript argument parsing data",
+        "commander yargs clipanion typescript argument parsing latest"
+      ],
+      "strategy": "term-focus × definition × numeric × recency"
+    },
+    "sourcesByIds": [
+      "S1",
+      "S2",
+      "S3",
+      "S4"
+    ],
+    "urlById": {
+      "S1": "https://github.com/lukeed/sade|api:https://api.github.com/repos/lukeed/sade",
+      "S2": "https://github.com/mdbetancourt/soly|api:https://api.github.com/repos/mdbetancourt/soly",
+      "S3": "https://github.com/th317erd/simple-yargs|api:https://api.github.com/repos/th317erd/simple-yargs",
+      "S4": "https://github.com/TheBrenny/big-kahuna|api:https://api.github.com/repos/TheBrenny/big-kahuna"
+    },
+    "claimsRaw": 22
+  },
+  "stats": {
+    "ok": true,
+    "findings": 22,
+    "unsupported": 0,
+    "conflicted": 18,
+    "verdict": "all claims sourced · 18 conflicted claim(s) flagged — read the flagged findings critically"
+  },
+  "clusters": [
+    {
+      "sentence": "When defining their [`usage`](#usage-1), everything up until the first argument (`[foo]` or ` `) is interpreted as the command string.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S1"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "Doing so allows you to pass the program's entire [`usage` text](#usage-1) into the `name` argument.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S1"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "See [`mri#options.default`](https://github.com/lukeed/mri#optionsdefault) for info~! ### prog.version(str) The `--version` and `-v` flags will automatically output the Program version. #### str Type: `String` Default: `0.0.0` The new version number for your Program. > **Note:** Your Program `version` is `0.0.0` until you change it. ### prog.parse(arr, opts) Parse a set of CLI arguments. #### arr Type: `Array` Your Program's `process.argv` input. > **Important:** Do not `.slice(2)`!",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S1"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "It enables default commands, git-like subcommands, option flags with aliases, default option values with type-casting, required-vs-optional argument handling, command validation, and automated help text generation!",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S1"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "To enable this, you may make use of the [`isSingle`](#issingle) argument.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S1"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "When `true`, this simplifies your generated `--help` output such that: * the \"root-level help\" is your _only_ help text * the \"root-level help\" does not display an `Available Commands` section * the \"root-level help\" does not inject `$ name ` into the `Usage` section * the \"root-level help\" does not display `For more info, run any command with the `--help` flag` text You may customize the `Usage` of your command by modifying the `name` argument directly.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S1"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "This will be included in the general or command-specific `--help` output. _Required_ arguments are wrapped with ` ` characters; for example, ` ` and ` `. _Optional_ arguments are wrapped with `[` and `]` characters; for example, `[foo]` and `[bar]`.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S1"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "All arguments are ***positionally important***, which means they are passed to your current Command's [`handler`](#handler) function in the order that they were defined.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S1"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "Your handler will receive the unknown flag (string) as its only argument.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S1"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "You get all the power of sun, soly enable you with features like default command, git-like subcommands, docker-like multi commands, parse and coerce arguments and options, variadic arguments, cluster options (-a -b -c -abc) and so on. - **Developer friendly**.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S2"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "This also works for the `command`. * `(description)` **Description**: The `(*)` syntax means you are declaring a description for the item preceeding the description. * `{choices}` **Choices**: The `{item1,item2,item3}` syntax means you are defining a list of comma separated choices for this argument. * ` ` **Type**: The `arg:type` syntax means your are defining an argument to have a specific type.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S3"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "If no command name was specified, then the name of the command will be `names: [ '$0' ]`. * command object schema: * `description` *(string | null)*: The description specified for the argument or option, or `null` if none was specified. * `hidden` *(boolean)*: `true` if the command was specified as hidden (`?` was added to the name of the argument or option). * `kind` *(string)*: Will always be `\"command\"`. * `names` *(Array[string])*: An array of names as strings.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S3"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "The first, at index `[0]`, will always be the full \"real\" name of the argument or option.",
+      "anchors": [
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S3"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "Doing so will break parsing~! #### opts Type: `Object` Default: `{}` Additional `process.argv` parsing config.",
+      "anchors": [
+        "parsing"
+      ],
+      "support": 1,
+      "sources": [
+        "S1"
+      ],
+      "conflicts": false
+    },
+    {
+      "sentence": "Written in TypeScript. ## Install ```bash yarn add soly ``` or ```bash pnpm i soly ``` ### Command-specific Options You can attach options to a command. ```ts import { createCLI, path } from 'soly'; const cli = createCLI('cli'); cli.command('rm', (rm) => { // path is used to parse and throw error if the path does not exists const [dir] = rm.positionals([path()]); const { recursive } = rm.flags(); recursive.alias('r'); return () => { console.log(`remove ${dir.value}${recursive.value ?",
+      "anchors": [
+        "typescript"
+      ],
+      "support": 1,
+      "sources": [
+        "S2"
+      ],
+      "conflicts": false
+    },
+    {
+      "sentence": "If `context` is a function, then the first argument bound will be the command name.* * **commands** (*Array[string]*)- An array of command strings to parse and turn into commands. * **optional [opts]** (*Object*) - Optional options to pass to the command builder. * `opts` schema: `argumentHelper`: *(function(yargs, argumentObject))* - If defined, this method will be called for every argument and option proccessed. `yargs` is the yarg command that was already created. `argumentObject` is the fully parsed argument or option in object form.",
+      "anchors": [
+        "yargs",
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S3"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "The `context` given to `buildCommands` is given as `this` to the method. `commandHelper`: *(function(yargsCommand, commandObject, arguments))* - If defined, this method will be called with every command built.",
+      "anchors": [
+        "yargs",
+        "argument"
+      ],
+      "support": 2,
+      "sources": [
+        "S3",
+        "S3"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "The final name is treated as the \"real\" name of the argument/option. *Note: yargs adds the hyphens to options by default, so the final option hyphens may not be exactly what you declared.* * ` ` **Default values**: The ` ` syntax means you are defining a default value for this argument or option.",
+      "anchors": [
+        "yargs",
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S3"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "Default: `'error'`. ### function **SimpleYargs.parseCommand**(*command: string*) #### Description Parse a command and return an array of command/argument objects.",
+      "anchors": [
+        "yargs",
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S3"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "The command object is always first in the array, with any arguments/options following. i.e. `[ commandObject, argumentOrOptionObject, argumentOrOptionObject, ...]`. #### Arguments * **command** (*string*) - Command to parse. ### function **SimpleYargs.coerceValue**(*value: any, [type: string]*) #### Description Coerce a value to the specified type.",
+      "anchors": [
+        "yargs",
+        "argument"
+      ],
+      "support": 1,
+      "sources": [
+        "S3"
+      ],
+      "conflicts": true
+    },
+    {
+      "sentence": "This can be one of `integer`, `number`, `boolean`, `bigint`, or `string`. ### Object schema for parsed `command` #### Description This is the schema for a command object after a command is parsed. **SimpleYargs.parseCommand** will always return one of these, at index `[0]` in the returned array.",
+      "anchors": [
+        "yargs"
+      ],
+      "support": 1,
+      "sources": [
+        "S3"
+      ],
+      "conflicts": false
+    }
+  ]
+}

@@ -1,0 +1,585 @@
+{
+  "schema": "majin.v3.acceptance-matrix/v1",
+  "as_of": "2026-10-22",
+  "branch": "v3/main",
+  "release_status": "NOT READY",
+  "scoring_rule": "Only VERIFIED criteria earn their full weight. NOT_STARTED, IN_PROGRESS, BLOCKED and REGRESSION earn 0. Any failed mandatory release gate keeps release status NOT READY.",
+  "category_weights": {
+    "source_audit_and_isolation": 5,
+    "architecture_and_core_runtime": 10,
+    "realtime_voice": 12,
+    "computer_and_browser_control": 12,
+    "goal_execution_and_recovery": 12,
+    "multi_agent_coordination": 8,
+    "models_and_providers": 8,
+    "living_memory": 8,
+    "clean_ui_and_workspace": 10,
+    "security_and_permissions": 5,
+    "verification_and_qa": 7,
+    "windows_release_and_packaging": 3
+  },
+  "total_required_weight": 100,
+  "verified_points": 19,
+  "remaining_points": 81,
+  "completion_percent": "19.00",
+  "criteria": [
+    {
+      "id": "SRC-01",
+      "category": "source_audit_and_isolation",
+      "description": "Record exact protected V1/V2 baselines and create a separate V3 branch without modifying either protected ref.",
+      "weight": 2,
+      "status": "VERIFIED",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05",
+        "fcac710a2dd571228f01d3ddc5ed16697999ea2f"
+      ],
+      "test_evidence": [
+        "docs/v3/BASELINE.md: exact SHAs and branch ancestry",
+        "git rev-parse origin/main origin/v2/main unchanged after tests"
+      ],
+      "validation_environment": "Public git clone; Linux sandbox; protected refs checked locally after the V3 tests",
+      "blockers": [
+        "Remote V3 ref is not established until a safe authorized push succeeds"
+      ],
+      "last_verified_sha": "fcac710a2dd571228f01d3ddc5ed16697999ea2f"
+    },
+    {
+      "id": "SRC-02",
+      "category": "source_audit_and_isolation",
+      "description": "Complete behavioral and license audit of all major V1/V2 subsystems, including target Windows/live evidence and a reviewed reuse decision for each.",
+      "weight": 3,
+      "status": "IN_PROGRESS",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+      ],
+      "test_evidence": [
+        "docs/v3/SOURCE_AUDIT.md: structural inventory and initial code evidence"
+      ],
+      "validation_environment": "Source inspection and full automated Node suite on sandbox Linux",
+      "blockers": [
+        "Voice, desktop, Windows install and live browser lanes were not evaluated on target hardware"
+      ],
+      "last_verified_sha": "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+    },
+    {
+      "id": "ARC-01",
+      "category": "architecture_and_core_runtime",
+      "description": "Establish a V3-only module boundary and document reuse boundaries without duplicating V2 Goal/verifier contracts.",
+      "weight": 2,
+      "status": "VERIFIED",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05",
+        "fcac710a2dd571228f01d3ddc5ed16697999ea2f"
+      ],
+      "test_evidence": [
+        "docs/v3/ARCHITECTURE.md",
+        "V3 source imports V2 Goal and runVerifier; V2 Goal/verifier implementations remain unchanged. The Node-floor follow-up changes only the shared V2 doctor runtime check, on v3/main."
+      ],
+      "validation_environment": "Source-level inspection and git diff boundary check on Linux",
+      "blockers": [],
+      "last_verified_sha": "fcac710a2dd571228f01d3ddc5ed16697999ea2f"
+    },
+    {
+      "id": "ARC-02",
+      "category": "architecture_and_core_runtime",
+      "description": "Provide a model-independent, cancellable and durable general V3 runtime with bounded execution, recovery and visible result events.",
+      "weight": 4,
+      "status": "IN_PROGRESS",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+      ],
+      "test_evidence": [
+        "Single deterministic file-task slice exists; no generic runtime/event integration yet"
+      ],
+      "validation_environment": "Unit/integration-tested local single-process execution",
+      "blockers": [
+        "Only one synchronous local file capability is implemented; cancellation, event streaming and recovery are not yet wired"
+      ],
+      "last_verified_sha": "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+    },
+    {
+      "id": "ARC-03",
+      "category": "architecture_and_core_runtime",
+      "description": "Integrate the V3 runtime with the real product entry points, configuration, logging and release-safe compatibility contracts.",
+      "weight": 4,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested",
+      "blockers": [
+        "V3 preview is not wired into the CLI or installer"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "VOI-01",
+      "category": "realtime_voice",
+      "description": "Continuous microphone capture, streaming transcription and spoken response operate in real time with explicit consent and recording indication.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested on real microphone hardware",
+      "blockers": [
+        "V3 has no realtime audio capture path"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "VOI-02",
+      "category": "realtime_voice",
+      "description": "True barge-in stops assistant speech promptly and safely handles partial transcripts, interruption races and turn replacement.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested",
+      "blockers": [
+        "No V3 barge-in loop or latency measurement"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "VOI-03",
+      "category": "realtime_voice",
+      "description": "Swedish and English speech recognition/synthesis work with measured VAD, echo suppression and reconnect behavior.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested with Swedish/English live audio",
+      "blockers": [
+        "Candidate VAD/voice framework has not been selected or integrated"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "VOI-04",
+      "category": "realtime_voice",
+      "description": "Real Windows microphone/speaker acceptance records latency, interruption and recovery evidence.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "No Windows desktop available in this sandbox",
+      "blockers": [
+        "Requires interactive Windows runner and real audio devices"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "CMP-01",
+      "category": "computer_and_browser_control",
+      "description": "Browser actions use structured DOM/accessibility targets where possible and verify state change with inspectable evidence.",
+      "weight": 4,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested as a V3 flow",
+      "blockers": [
+        "V3 has not integrated the inherited browser tools"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "CMP-02",
+      "category": "computer_and_browser_control",
+      "description": "Windows desktop control uses accessibility/native APIs before visual coordinates and is verified on real target applications.",
+      "weight": 4,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "No Windows desktop available in this sandbox",
+      "blockers": [
+        "V3 permission wrapper and live Windows proof are absent"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "CMP-03",
+      "category": "computer_and_browser_control",
+      "description": "Browser/desktop blockers, authentication requirements, recovery and cancellation are surfaced honestly and never bypassed.",
+      "weight": 4,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested",
+      "blockers": [
+        "No V3 browser/desktop action contract yet"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "GOA-01",
+      "category": "goal_execution_and_recovery",
+      "description": "A V3 goal executes one permitted workspace action, persists its Goal state and reaches COMPLETED only after a verified acceptance receipt.",
+      "weight": 3,
+      "status": "VERIFIED",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+      ],
+      "test_evidence": [
+        "test/v3-vertical-slice.test.js: full request-to-file goal lifecycle, saved goal and verified receipt",
+        "Existing V2 Goal completion gate reused"
+      ],
+      "validation_environment": "Node v20.20.2, sandbox Linux, temporary workspace",
+      "blockers": [],
+      "last_verified_sha": "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+    },
+    {
+      "id": "GOA-02",
+      "category": "goal_execution_and_recovery",
+      "description": "Natural-language planning creates acceptance criteria and adapts/replaces active work after user correction or cancellation.",
+      "weight": 3,
+      "status": "IN_PROGRESS",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+      ],
+      "test_evidence": [
+        "Objective text is stored as a Goal; no V3 planner, replanning or cancellation loop"
+      ],
+      "validation_environment": "Single local deterministic task",
+      "blockers": [
+        "No V3 model planner or interrupt controller"
+      ],
+      "last_verified_sha": "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+    },
+    {
+      "id": "GOA-03",
+      "category": "goal_execution_and_recovery",
+      "description": "Crash/restart resume, idempotent external action handling, bounded retries and adaptive recovery are verified with fault injection.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not fault-injection tested",
+      "blockers": [
+        "V3 recovery loop and duplicate-action protection are not integrated"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "GOA-04",
+      "category": "goal_execution_and_recovery",
+      "description": "A multi-step user objective completes through a dependency graph of real tools and its agreed acceptance criteria.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested in V3",
+      "blockers": [
+        "V3 vertical slice currently has one file action only"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "AGT-01",
+      "category": "multi_agent_coordination",
+      "description": "Coordinator delegates only appropriate tasks to isolated workers, shares verified context and merges conflict-free results.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested in V3",
+      "blockers": [
+        "No V3 coordinator/worker runtime"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "AGT-02",
+      "category": "multi_agent_coordination",
+      "description": "Parallel workers respect budgets, fail safely and outperform or match a measured single-agent baseline on real objectives.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "No V3 objective benchmark",
+      "blockers": [
+        "No objective-level V3 baseline or multi-agent policy"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "AGT-03",
+      "category": "multi_agent_coordination",
+      "description": "Worker state, failures, provenance and verification evidence are visible through one simple MAJIN surface.",
+      "weight": 2,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested",
+      "blockers": [
+        "No V3 multi-agent UI/workflow"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "MOD-01",
+      "category": "models_and_providers",
+      "description": "V3 routes text and streaming model calls through reusable provider interfaces including OpenAI-compatible and OpenCode Go paths.",
+      "weight": 2,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "No V3 provider call",
+      "blockers": [
+        "V3 demo intentionally does not call a model"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "MOD-02",
+      "category": "models_and_providers",
+      "description": "Provider/model selection persists securely and validates availability, health, timeouts and explicit fallback policy.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested as V3",
+      "blockers": [
+        "V3 provider configuration surface is absent"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "MOD-03",
+      "category": "models_and_providers",
+      "description": "Real provider success, auth/quota failure, streaming cancellation and secret-redaction scenarios are verified without leaking keys.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "No V3 provider integration test",
+      "blockers": [
+        "Requires safe operator-configured credentials and isolated live test"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "MEM-01",
+      "category": "living_memory",
+      "description": "V3 persists project-aware user/task memory with relevance ranking and source provenance across sessions.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "V2 store inspected; V3 behavior not tested",
+      "blockers": [
+        "V3 memory adapter not implemented"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "MEM-02",
+      "category": "living_memory",
+      "description": "Users can correct, delete, export and configure retention for stored memory, with sensitive-data protection.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not tested in V3",
+      "blockers": [
+        "No V3 memory controls"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "MEM-03",
+      "category": "living_memory",
+      "description": "Retrieval relevance, deduplication and recovery are measured against a project-context benchmark.",
+      "weight": 2,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "No V3 memory benchmark",
+      "blockers": [
+        "Benchmark corpus and V3 adapter not created"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "UI-01",
+      "category": "clean_ui_and_workspace",
+      "description": "Default V3 local surface is minimal, uses semantic labels/live status/visible focus, reduced-motion styling and no external assets.",
+      "weight": 3,
+      "status": "VERIFIED",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+      ],
+      "test_evidence": [
+        "test/v3-vertical-slice.test.js: markup, labels, live region, reduced-motion rule and no external asset assertions",
+        "HTTP integration test returns visible success payload"
+      ],
+      "validation_environment": "Static DOM-string assertions and HTTP API integration; rendered browser and assistive technology not run",
+      "blockers": [
+        "Visual and assistive-technology acceptance is still required for UI-02"
+      ],
+      "last_verified_sha": "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+    },
+    {
+      "id": "UI-02",
+      "category": "clean_ui_and_workspace",
+      "description": "Real-browser responsive, keyboard, screen-reader and visual checks pass on small and desktop viewports.",
+      "weight": 3,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "No browser-rendered UI run",
+      "blockers": [
+        "Playwright/real-browser validation not run for V3 page"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "UI-03",
+      "category": "clean_ui_and_workspace",
+      "description": "One conversation surface streams natural responses and renders contextual verified artifacts without tool/agent clutter.",
+      "weight": 4,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "Not implemented",
+      "blockers": [
+        "Current page is a deterministic file-task preview, not the final chat product"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "SEC-01",
+      "category": "security_and_permissions",
+      "description": "V3 preview server is loopback-only, rejects non-local Host/cross-origin writes and limits the API to JSON local actions.",
+      "weight": 3,
+      "status": "VERIFIED",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+      ],
+      "test_evidence": [
+        "test/v3-vertical-slice.test.js: external Origin rejected, non-JSON refused, non-loopback bind refused"
+      ],
+      "validation_environment": "Node HTTP integration test on sandbox Linux/loopback",
+      "blockers": [
+        "Does not constitute the complete product security threat model"
+      ],
+      "last_verified_sha": "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+    },
+    {
+      "id": "SEC-02",
+      "category": "security_and_permissions",
+      "description": "Workspace write capability rejects traversal/reserved paths and prevents accidental overwrite; complete per-tool permissions and injection defenses are enforced.",
+      "weight": 2,
+      "status": "IN_PROGRESS",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+      ],
+      "test_evidence": [
+        "test/v3-vertical-slice.test.js: path traversal, hidden path, reserved device name and overwrite tests pass"
+      ],
+      "validation_environment": "Node tests on sandbox Linux; system-wide permission and injection model not tested",
+      "blockers": [
+        "Only the file-demo capability is scoped; other V1/V2 tools are not yet routed through V3 policy"
+      ],
+      "last_verified_sha": "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+    },
+    {
+      "id": "VER-01",
+      "category": "verification_and_qa",
+      "description": "V3 completion requires an independent file verification result and verified acceptance receipt with exact SHA-256 evidence.",
+      "weight": 3,
+      "status": "VERIFIED",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+      ],
+      "test_evidence": [
+        "test/v3-vertical-slice.test.js: result hash, COMPLETED state and receipt verified assertions"
+      ],
+      "validation_environment": "Node integration test using V2 file verifier in temporary workspace",
+      "blockers": [],
+      "last_verified_sha": "6b27fa6d93ce95d113569a408174ea4bfcbaaa05"
+    },
+    {
+      "id": "VER-02",
+      "category": "verification_and_qa",
+      "description": "Full post-change automated suite and syntax/i18n/whitespace gates pass with skipped environment-dependent tests reported honestly.",
+      "weight": 2,
+      "status": "VERIFIED",
+      "relevant_commits": [
+        "6b27fa6d93ce95d113569a408174ea4bfcbaaa05",
+        "fcac710a2dd571228f01d3ddc5ed16697999ea2f"
+      ],
+      "test_evidence": [
+        "Node v22.23.4 npm test: 1,186 passed, 0 failed, 19 skipped of 1,205 total",
+        "Node v22.23.4 npm run check: 452/452 files parse cleanly",
+        "Node v22.23.4 npm run i18n: 0 Swedish literals in 236 files",
+        "git diff --check: clean after evidence docs whitespace cleanup"
+      ],
+      "validation_environment": "Node v20.20.2, npm 10.8.2, sandbox Linux",
+      "blockers": [
+        "19 environment-gated tests are not real Windows, microphone or live-provider acceptance"
+      ],
+      "last_verified_sha": "fcac710a2dd571228f01d3ddc5ed16697999ea2f"
+    },
+    {
+      "id": "VER-03",
+      "category": "verification_and_qa",
+      "description": "Mandatory real objective benchmark suite records success, false-success, latency, recovery and cost with artifacts.",
+      "weight": 2,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "No V3 benchmark run",
+      "blockers": [
+        "Real website, job, desktop, browser, voice and recovery objectives not validated as V3"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "PKG-01",
+      "category": "windows_release_and_packaging",
+      "description": "Clean Windows install, startup, config persistence, crash recovery and uninstall are verified on the target OS.",
+      "weight": 1,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "No Windows environment available",
+      "blockers": [
+        "V3 is not wired into the existing installer"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "PKG-02",
+      "category": "windows_release_and_packaging",
+      "description": "V3 Windows executable/release artifacts are reproducibly built, hashed and installation-tested.",
+      "weight": 1,
+      "status": "NOT_STARTED",
+      "relevant_commits": [],
+      "test_evidence": [],
+      "validation_environment": "No V3 packaging run",
+      "blockers": [
+        "No V3 release workflow or artifact"
+      ],
+      "last_verified_sha": ""
+    },
+    {
+      "id": "PKG-03",
+      "category": "windows_release_and_packaging",
+      "description": "Declared Node floor matches production dependency engines and is consistently enforced by package/lock, V3 runtime, Windows preflights, doctor and V3 CI with a regression test.",
+      "weight": 1,
+      "status": "VERIFIED",
+      "relevant_commits": [
+        "fcac710a2dd571228f01d3ddc5ed16697999ea2f"
+      ],
+      "test_evidence": [
+        "test/v3-runtime-floor.test.js verifies Node >=22 package/lock/dependency-engine agreement and runtime rejection of Node 20/21",
+        "The same regression test checks V3 entry points, Windows preflights, doctor, docs and the Node 22 V3 workflow",
+        "Node v22.23.4: clean npm ci completed without EBADENGINE; full suite 1,186 passed, 0 failed, 19 skipped; static checks passed"
+      ],
+      "validation_environment": "Linux sandbox, Node v22.23.4, npm 10.8.2; platform scripts contract-tested; no Windows host or remote Actions run",
+      "blockers": [
+        "Actual Windows installer/doctor execution and GitHub-hosted workflow remain unverified; tracked by platform/release gates"
+      ],
+      "last_verified_sha": "fcac710a2dd571228f01d3ddc5ed16697999ea2f"
+    }
+  ]
+}

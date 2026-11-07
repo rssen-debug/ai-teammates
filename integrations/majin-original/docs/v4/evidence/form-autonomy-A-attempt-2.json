@@ -1,0 +1,435 @@
+{
+  "at": "2026-10-24T07:53:21.872Z",
+  "kind": "A",
+  "passed": true,
+  "checks": {
+    "realModelCompleted": true,
+    "sameGenuineProvider": true,
+    "exactlyOneAccepted": true,
+    "allRequestedValues": true,
+    "exactFileBytes": true,
+    "savedVerifiedReceipt": true,
+    "noDeniedAction": true,
+    "validationRecovery": true
+  },
+  "failure": null,
+  "status": "completed",
+  "elapsedMs": 31830,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "sourceHead": "704de6320341993adb50303b8e11e646cca64710",
+  "dirtyCheckout": true,
+  "sourceHashes": {
+    "src/core/browser-form.js": "9b43550f3d338a385363890bc998929c78daa5ae72c7d763b98638e53a8ed654",
+    "src/core/tools/web.js": "b0a9cff9d18e4db8f9bb30b2d5d86070682813cc8005d88c7ed871dd277ef247",
+    "src/v4/agent.js": "c064e88172ac5ba60af36209675523892bd357a95f34e88aaf5d7fc1e02abc9a",
+    "src/v4/tools/host.js": "033d84625a240b1e42e174d2e96716a9073fe2d107dfdce0ce1d4cff6c435e97",
+    "scripts/v4/evals/form-autonomy.mjs": "a5b82cd2a91d36ef9e90600a80582a2466205c6176abdddb51393ee184cda170",
+    "scripts/v4/evals/form-autonomy-fixtures.mjs": "402e5f4c24dd54e62e4c46711e45bdb135f0ebbde44ce320345e5a4e7675a8af"
+  },
+  "modelRounds": 8,
+  "toolCalls": 7,
+  "uniqueToolRequests": 7,
+  "approved": [
+    "browser_open",
+    "browser_form_fill",
+    "browser_form_fill",
+    "browser_form_submit"
+  ],
+  "denied": [],
+  "stagnationStop": false,
+  "toolFailures": [],
+  "trace": [
+    {
+      "event": "state",
+      "seq": 4,
+      "data": {
+        "state": "thinking",
+        "round": 1
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 5,
+      "data": {
+        "id": "chatcmpl-tool-9155208310bfa59a",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:55152/"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9155208310bfa59a",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:55152/"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9155208310bfa59a",
+        "name": "browser_open",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_90bfdaae31c15e06"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 2
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-924f941fda9c66ad",
+        "name": "browser_form",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-924f941fda9c66ad",
+        "name": "browser_form",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_7ce891f27783a57f"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 3
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b23b738787e43a31",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Activity category": "Workshop",
+            "Allow this isolated application": true,
+            "Application attachment": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt2\\home\\workspace\\form-A-fcd5943845d8.txt",
+            "Country": "Sweden"
+          }
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b23b738787e43a31",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Activity category": "Workshop",
+            "Allow this isolated application": true,
+            "Application attachment": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt2\\home\\workspace\\form-A-fcd5943845d8.txt",
+            "Country": "Sweden"
+          }
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b23b738787e43a31",
+        "name": "browser_form_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_2a97d9240cd0bd51"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 4
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9219eb4eba7efbeb",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Applicant name": "Atlas 7c698629b1",
+            "Email address": "person-7c698629b1@example.invalid",
+            "Number of participants": "4"
+          }
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9219eb4eba7efbeb",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Applicant name": "Atlas 7c698629b1",
+            "Email address": "person-7c698629b1@example.invalid",
+            "Number of participants": "4"
+          }
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9219eb4eba7efbeb",
+        "name": "browser_form_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_22add8b1537ea650"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 5
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9c4fd833f44bec9e",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Save application"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9c4fd833f44bec9e",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Save application"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9c4fd833f44bec9e",
+        "name": "browser_form_submit",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_4ea53cfa382a985d"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 6
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bce0bd2b5248cc40",
+        "name": "workspace_write",
+        "input": {
+          "fileName": "receipt-A-fcd5943845d8.txt",
+          "chars": 62
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bce0bd2b5248cc40",
+        "name": "workspace_write",
+        "ok": true,
+        "verified": true,
+        "summary": "receipt-A-fcd5943845d8.txt · 62 byte",
+        "receiptId": "rcpt_3cd9607e53696211"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 7
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-893f26aae38296ed",
+        "name": "workspace_read",
+        "input": {
+          "fileName": "receipt-A-fcd5943845d8.txt"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-893f26aae38296ed",
+        "name": "workspace_read",
+        "ok": true,
+        "verified": true,
+        "summary": "receipt-A-fcd5943845d8.txt · 62 byte",
+        "receiptId": "rcpt_77432ed206d60f6f"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 8
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "verifying"
+      }
+    }
+  ],
+  "proof": {
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/",
+        "origin": null
+      },
+      {
+        "method": "GET",
+        "path": "/favicon.ico",
+        "origin": null
+      },
+      {
+        "method": "POST",
+        "path": "/submit",
+        "origin": "http://127.0.0.1:55152"
+      }
+    ],
+    "submissions": [
+      {
+        "values": {
+          "category": "Workshop",
+          "name": "Atlas 7c698629b1",
+          "email": "person-7c698629b1@example.invalid",
+          "quantity": "4",
+          "country": "Sweden",
+          "consent": "on"
+        },
+        "uploadBytes": 61,
+        "uploadSha256": "89c061d209961c91ed4dd14e8378f61714990cabf0255b2e6f3f7a77fa33437c",
+        "accepted": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+      }
+    ],
+    "steps": [],
+    "accepted": {
+      "receipt": "ACCEPT-1d5b5c6ad616be3778a3e9b8",
+      "values": {
+        "category": "Workshop",
+        "name": "Atlas 7c698629b1",
+        "email": "person-7c698629b1@example.invalid",
+        "quantity": "4",
+        "country": "Sweden",
+        "consent": "on"
+      },
+      "uploadSha256": "89c061d209961c91ed4dd14e8378f61714990cabf0255b2e6f3f7a77fa33437c"
+    },
+    "challenge": false
+  },
+  "artifacts": {
+    "fileName": "form-A-fcd5943845d8.txt",
+    "receiptName": "receipt-A-fcd5943845d8.txt"
+  },
+  "ordinaryGhostActivationProven": false,
+  "isolatedTestHost": true,
+  "physicalAcceptance": false,
+  "cost": {
+    "currencyAmount": null,
+    "reason": "Provider billing not independently supplied; token telemetry must not be converted to an invented price"
+  }
+}

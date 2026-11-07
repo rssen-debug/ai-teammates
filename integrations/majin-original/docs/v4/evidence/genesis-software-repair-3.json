@@ -1,0 +1,124 @@
+{
+  "at": "2026-10-23T23:29:11.946Z",
+  "kind": "real-Go-software-creation",
+  "sourceCommit": "e45640a5a5e0de2688e4321c713908a62d231d0d",
+  "passed": true,
+  "checks": {
+    "modelCompleted": true,
+    "realGoUnchanged": true,
+    "sourceExists": true,
+    "modelExecutedTests": true,
+    "modelReadBack": true,
+    "independentCliCases": true,
+    "independentModelTests": true
+  },
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "elapsedMs": 18922,
+  "status": "completed",
+  "failure": null,
+  "conversationId": "conv_mvlkw4uc_76a87a75e073",
+  "actions": [
+    "fs_read",
+    "fs_read",
+    "fs_patch",
+    "fs_read",
+    "exec_start",
+    "exec_wait"
+  ],
+  "failures": [
+    {
+      "name": "exec_wait",
+      "error": "tool exec_wait input failed schema at id: Invalid input: expected string, received undefined. Correct the named argument using the tool schema.",
+      "summary": "INVALID_TOOL_INPUT:MAJIN"
+    }
+  ],
+  "approvals": [
+    "fs_patch",
+    "exec_start",
+    "exec_wait"
+  ],
+  "denied": [],
+  "artifacts": {
+    "app": "genesis-expenses-fa1ba1768e.mjs",
+    "tests": "genesis-expenses-fa1ba1768e.test.mjs"
+  },
+  "observations": [
+    {
+      "exitCode": 0,
+      "actual": {
+        "totalCents": -95,
+        "byCategory": {
+          "food": 30,
+          "travel": -125
+        }
+      },
+      "expected": {
+        "totalCents": -95,
+        "byCategory": {
+          "food": 30,
+          "travel": -125
+        }
+      },
+      "pass": true
+    },
+    {
+      "exitCode": 0,
+      "actual": {
+        "totalCents": 0,
+        "byCategory": {}
+      },
+      "expected": {
+        "totalCents": 0,
+        "byCategory": {}
+      },
+      "pass": true
+    },
+    {
+      "exitCode": 0,
+      "actual": {
+        "totalCents": 400,
+        "byCategory": {
+          "__proto__": 101,
+          "constructor": 299
+        }
+      },
+      "expected": {
+        "totalCents": 400,
+        "byCategory": {
+          "__proto__": 101,
+          "constructor": 299
+        }
+      },
+      "pass": true
+    },
+    {
+      "invalidInput": true,
+      "exitCode": 1,
+      "pass": true
+    },
+    {
+      "invalidInput": true,
+      "exitCode": 1,
+      "pass": true
+    },
+    {
+      "invalidInput": true,
+      "exitCode": 1,
+      "pass": true
+    }
+  ],
+  "modelTestExitCode": 0,
+  "modelTestOutput": "✔ empty rows return zero and empty map (3.284ms)\n✔ simple totals per category (0.4845ms)\n✔ avoids binary floating-point summation error (0.1 + 0.2) (0.2402ms)\n✔ classic float drift case: many 0.01 additions (0.3813ms)\n✔ negative amounts and signs (0.2438ms)\n✔ rejects missing category (0.7369ms)\n✔ rejects invalid amounts (0.4075ms)\n✔ rejects non-array and malformed rows (0.2633ms)\n✔ summary nests totals under byCategory, including for empty input (0.574ms)\n✔ prototype-key categories (__proto__, constructor) are own keys (0.5745ms)\n✔ toCents parses exact decimal strings (0.6774ms)\nℹ tests 11\nℹ suites 0\nℹ pass 11\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 244.6423\n",
+  "physicalDevicePass": false
+}

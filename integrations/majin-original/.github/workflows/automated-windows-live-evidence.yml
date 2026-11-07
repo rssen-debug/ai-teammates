@@ -1,0 +1,62 @@
+name: automated-windows-live-evidence
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [fix/realworld-repairs]
+    paths:
+      - 'scripts/windows/live-acceptance-run.ps1'
+      - '.github/workflows/automated-windows-live-evidence.yml'
+  push:
+    branches: [fix/realworld-repairs]
+    paths:
+      - 'scripts/windows/live-acceptance-run.ps1'
+      - '.github/workflows/automated-windows-live-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  live-evidence:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Parse Windows script with UTF-8 aware PowerShell 7
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'scripts/windows/live-acceptance-run.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.ToString() }; throw 'PowerShell syntax invalid' }
+      - name: Run live lanes on CI Windows
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File scripts/windows/live-acceptance-run.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Live acceptance script exited $LASTEXITCODE" }
+      - name: Check recorded results, without claiming interactive success
+        shell: pwsh
+        run: |
+          $runs = @(Get-ChildItem docs/evidence -Directory -Filter 'live-run-*' | Sort-Object LastWriteTime -Descending)
+          if ($runs.Count -eq 0) { throw 'No live-run evidence folder' }
+          $file = Join-Path $runs[0].FullName 'RUN-SUMMARY.json'
+          if (-not (Test-Path $file)) { throw 'Missing RUN-SUMMARY.json' }
+          $result = Get-Content $file -Raw | ConvertFrom-Json
+          if ($null -eq $result.lanes.'W11-manual-reference' -and $null -eq $result.lanes.'W11-desktop-eval') { throw 'Missing W11 reference verdict' }
+          if ($null -eq $result.lanes.'W12-scaffold') { throw 'Missing W12 scaffold verdict' }
+          if ($result.release_ready -ne $false) { throw 'CI must not claim release readiness without interactive evidence' }
+          foreach ($required in @('W11-agent-live','W12-interactive')) {
+            if (@($result.release_blockers) -notcontains $required) { throw "Missing release blocker $required" }
+          }
+          Write-Host 'CI service-session: W11 agent-live and W12 interactive are NOT VERIFIED.'
+          Write-Host 'A successful workflow does not authorize release.'
+      - name: Upload actual run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-live-evidence-${{ github.sha }}
+          path: docs/evidence/live-run-*/
+          if-no-files-found: warn
+          retention-days: 14

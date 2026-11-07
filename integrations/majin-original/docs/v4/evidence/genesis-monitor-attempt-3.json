@@ -1,0 +1,67 @@
+{
+  "at": "2026-10-23T23:25:27.092Z",
+  "kind": "real-Go-natural-language-monitor",
+  "sourceCommit": "e45640a5a5e0de2688e4321c713908a62d231d0d",
+  "passed": true,
+  "checks": {
+    "realGoUnchanged": true,
+    "naturalLanguageCreation": true,
+    "scheduledDispatch": true,
+    "verifiedExternalJson": true,
+    "durableAlert": true,
+    "runBudget": true,
+    "reloadPreserved": true
+  },
+  "taskName": "Genesis node metadata 53d4aa8b",
+  "taskId": "j-fee6f474-777a-42f1-a7c2-9f30bd1757bd",
+  "conversationId": "conv_mvllk6xq_e25388871c27",
+  "creationConversationId": "conv_mvllk1hd_3625d51fcfc9",
+  "runCount": 1,
+  "lastStatus": "completed",
+  "observation": {
+    "actual": 1263,
+    "matched": true,
+    "sequence": 1,
+    "at": "2026-10-23T23:25:26.822Z"
+  },
+  "history": [
+    {
+      "runId": "2cfc5f53-69bd-4610-89e1-afd0d47ebf58",
+      "at": "2026-10-23T23:25:27.022Z",
+      "status": "completed",
+      "summary": "Source checked; condition matched."
+    }
+  ],
+  "notificationHistory": [
+    {
+      "id": "condition:j-fee6f474-777a-42f1-a7c2-9f30bd1757bd:1",
+      "conversationId": "conv_mvllk6xq_e25388871c27",
+      "title": "Genesis node metadata 53d4aa8b",
+      "body": "Your background task has an update.",
+      "createdAt": "2026-10-23T23:25:26.610Z",
+      "status": "no_subscribed_devices",
+      "deliveries": []
+    }
+  ],
+  "subscribedDeviceCount": 0,
+  "physicalPhoneReceipt": false,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "approvals": [
+    "task_manage"
+  ],
+  "denied": [],
+  "failure": null,
+  "elapsedMs": 67978,
+  "note": "Real public GitHub repository metadata, not a synthetic price or physical iPhone acceptance. Host restart must also be evidenced by the operator process receipt."
+}

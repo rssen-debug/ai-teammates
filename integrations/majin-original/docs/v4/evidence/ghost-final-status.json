@@ -1,0 +1,143 @@
+{
+  "schema": "majin.v4.ghost-final-status/v1",
+  "at": "2026-10-23T20:13:31.101Z",
+  "verdict": "NOT READY",
+  "testedCodeCommit": "0dad7432e0da09670ef8af6cd9d7485f17bffb47",
+  "localFullV4": {
+    "passed": 505,
+    "failed": 0,
+    "skipped": 0,
+    "startedFrom": "526b0e6ed48af64699747fa7748c3d7e60007e35",
+    "note": "Checkout received final repairs during the run; do not claim an immutable latest-head full run. Separate final repairs passed 23/23 and CI pins the exact code head."
+  },
+  "legacy": {
+    "passed": 1284,
+    "failed": 0,
+    "skipped": 23,
+    "reproducedFailuresResolved": 43
+  },
+  "finalRepairTests": {
+    "passed": 23,
+    "failed": 0
+  },
+  "newHeroBoot": {
+    "passed": 1,
+    "failed": 0
+  },
+  "exactHeadCi": {
+    "commit": "0dad7432e0da09670ef8af6cd9d7485f17bffb47",
+    "v4": {
+      "run": 40015889624,
+      "conclusion": "success",
+      "passed": 501,
+      "failed": 0,
+      "skipped": 5,
+      "skipReasons": [
+        "Linux Chromium not installed: 4 browser checks",
+        "Windows PowerShell 5 parser check on Linux"
+      ],
+      "parseSources": 617,
+      "i18nStrayLiterals": 0
+    },
+    "windowsRunner": {
+      "run": 40015889628,
+      "conclusion": "success"
+    },
+    "windowsDesktop": {
+      "run": 40015889575,
+      "status": "in_progress",
+      "conclusion": null
+    }
+  },
+  "preservedData": {
+    "at": "2026-10-23T20:04:39.956Z",
+    "sourceCommit": "0dad7432e0da09670ef8af6cd9d7485f17bffb47",
+    "originalFilesChecked": 23,
+    "mismatches": 0,
+    "configKeyPairingChecked": true,
+    "originalBackupFiles": 39,
+    "restoredHashMismatches": 0,
+    "privateContentsRecorded": false
+  },
+  "voiceRoundtrip": {
+    "at": "2026-10-23T20:01:33.539Z",
+    "sourceCommit": "0dad7432e0da09670ef8af6cd9d7485f17bffb47",
+    "machine": "DESKTOP-C1RSBUA",
+    "transport": "Tailscale HTTPS",
+    "inputSource": "Windows Zira synthetic English speech",
+    "stt": {
+      "ok": true,
+      "transcript": "Hello, Major. Please answer in English. How are you today?",
+      "language": "en",
+      "provider": "command",
+      "synthetic": false,
+      "elapsedMs": 2093,
+      "httpStatus": 200,
+      "roundtripMs": 2772
+    },
+    "model": {
+      "provider": "opencode-go",
+      "model": "glm-5.3-flash",
+      "demo": false,
+      "completed": true,
+      "answer": "Hello! I'm doing well, thank you — ready and at your service. How can I help you today?",
+      "roundtripMs": 2741
+    },
+    "tts": {
+      "status": 200,
+      "provider": "command",
+      "verified": "true",
+      "synthetic": "false",
+      "bytes": 219628,
+      "wavHeader": "RIFF",
+      "sha256": "e6a315c8fb15e8f8237354fcdbacd5e3654743b84c28860ac00bb20510c13acf",
+      "roundtripMs": 5753
+    },
+    "totalMs": 11266,
+    "physicalDevice": false,
+    "physicalMicrophoneAccepted": false,
+    "phonePlaybackAccepted": false,
+    "naturalBargeInAccepted": false
+  },
+  "phone": {
+    "device": "iPhone 13",
+    "chatOwnerConfirmed": true,
+    "narratorAndEnglishAudioOwnerApproved": true,
+    "ownerReply": "ja de bra forf lite seg på att svara men kanske de för jag är på 5g fortsätt göra klart den sen öppna appen på min dator också",
+    "naturalBargeInIndividuallyConfirmed": false,
+    "explicit5GReconnectConfirmed": false,
+    "latencyStillOpen": true
+  },
+  "runtime": {
+    "existingSessions": 6,
+    "canonicalHistorySameAcrossTwoExistingSessions": true,
+    "conversations": 13,
+    "anonymousStateStatus": 401,
+    "sourceHostHealthy": true,
+    "localVoiceWorkerSupervisedAndHealthy": true
+  },
+  "desktop": {
+    "nativeInstalled": false,
+    "nativeInstallerNotSigned": true,
+    "productionSignerAvailable": false,
+    "windowsApplicationControlBlockedInstallation": true,
+    "securityPolicyChanged": false,
+    "automaticOpeningVerified": false,
+    "browserOpeningBlockedBySavedOriginPermission": true
+  },
+  "autostart": {
+    "sourceStartupShortcutRegistered": true,
+    "shortcutLaunchBlockedByAutomaticReview": true,
+    "failedScheduledTaskDisabled": true,
+    "actualWindowsLogonVerified": false
+  },
+  "remaining": [
+    "Physical voice barge-in/echo, acceptable conversation latency, explicit 5G reconnect and remaining device acceptance",
+    "Approved production signer/channel; installed native Windows package on Ghost",
+    "Actual Windows login startup",
+    "Production host update activation/restart/rollback; Electron update/activation/rollback",
+    "Outbound channels/proactive heartbeat; separate-store memory sync; typed self-configuration/safe reset",
+    "V4 cryptographic audit/anchors/export; durable graph resume/replan and concurrent team checkpoints; whole-team token/currency budgets",
+    "Live owner tool/MCP/skills/plugins/services walkthrough; OCR/rich previews/large files/DPI/multimonitor/push/background and full device matrix"
+  ]
+}

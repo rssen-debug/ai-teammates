@@ -1,0 +1,60 @@
+name: MAJIN remote command (owner PC, manual dispatch only)
+#
+# What this is: a deliberate remote-control channel for the repository owner.
+# Anyone with write access to this repository can dispatch this workflow and the
+# command runs on the self-hosted runner MAJIN-INTERACTIVE-01 (the owner's own
+# Windows PC) with full interactive-session access.
+#
+# Why: lets the owner's AI assistant run tests/diagnostics on the owner PC
+# without the owner clicking through anything. The output is uploaded back as a
+# non-sensitive artifact the assistant can read via the GitHub API.
+#
+# Safety notes:
+# - Manual dispatch only (no push triggers, no pull_request triggers).
+# - Runs only on the owner's self-hosted runner labels.
+# - To close this channel, delete this file; it does nothing on its own.
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'PowerShell script to run on the owner PC'
+        required: true
+        type: string
+        default: '$PSVersionTable.PSVersion; whoami; node --version'
+permissions: {}
+concurrency:
+  group: majin-remote-command
+  cancel-in-progress: false
+jobs:
+  remote-command:
+    name: Run requested command on the owner PC and upload output
+    runs-on: [self-hosted, windows, interactive-desktop, majin-qa]
+    timeout-minutes: 15
+    steps:
+      - name: Execute command and capture output
+        shell: powershell
+        env:
+          MAJIN_RC_COMMAND: ${{ inputs.command }}
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'remote-command-output.txt'
+          "COMMAND: " + $env:MAJIN_RC_COMMAND | Tee-Object $log
+          "PWD: " + (Get-Location).Path | Tee-Object -Append $log
+          "TIME: " + (Get-Date -Format o) | Tee-Object -Append $log
+          '--- OUTPUT START ---' | Tee-Object -Append $log
+          try {
+            $script = [ScriptBlock]::Create($env:MAJIN_RC_COMMAND)
+            & $script *>&1 | Tee-Object -Append $log
+          } catch {
+            'EXECUTION ERROR: ' + $_.Exception.Message | Tee-Object -Append $log
+          }
+          '--- OUTPUT END ---' | Tee-Object -Append $log
+          # PS 5.1 Tee-Object writes UTF-16; normalize so readers see plain text.
+          (Get-Content $log -Raw) | Out-File $log -Encoding utf8
+      - name: Upload captured output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-command-output
+          path: ${{ runner.temp }}/remote-command-output.txt
+          retention-days: 3
+          if-no-files-found: error

@@ -1,0 +1,756 @@
+/* MAJIN Aurora — quiet surfaces, luminous identity, contextual depth. */
+:root {
+  --bg:#101013; --bg2:#1a1a20; --bg3:#141419; --ink:#ecebf1; --dim:#96949f;
+  --line:#292830; --cy:#eaa0c3; --pink:#eaa0c3; --cysoft:#eaa0c312;
+  --ok:#8ccfb0; --bad:#f29aaa; --radius:16px; --muted:#666371;
+  --sidebar:232px; --studio:380px; --chat-width:740px; color-scheme:dark;
+}
+body.light { --bg:#f8f7fa; --bg2:#fff; --bg3:#f1eff4; --ink:#25232d; --dim:#6e6878; --line:#e2dce8; --cy:#9b3b69; --cysoft:#9b3b690d; --ok:#297d56; --bad:#b53553; --muted:#81798c; color-scheme:light; }
+body { font:15px/1.65 var(--sans); grid-template-rows:64px minmax(0,1fr); }
+button,input,select,textarea { font-family:var(--sans); }
+button { min-height:36px; border-color:var(--line); transition:background .18s,border-color .18s,color .18s; }
+button:hover { background:var(--bg2); color:var(--ink); border-color:#514654; }
+button:disabled { opacity:.5; cursor:wait; }
+button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid var(--cy); outline-offset:3px; }
+[hidden],.icon-library { display:none!important; }
+.icon { width:18px; height:18px; flex:none; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+header { padding:12px 24px; gap:14px; background:var(--bg); border-bottom:1px solid var(--line); }
+header h1 { font-size:13px; font-weight:650; letter-spacing:.16em; color:var(--ink); }
+header .logo { width:26px; height:26px; border-radius:8px; box-shadow:0 0 22px #e54b9718; }
+.chip { font-size:12px; background:transparent; border:0; color:var(--dim); }
+#c-model { border:0; border-left:1px solid var(--line); border-radius:0; padding:6px 16px; color:var(--ink); font-size:13px; max-width:34vw; overflow:hidden; text-overflow:ellipsis; }
+body.simple #c-cost { display:none; }
+#b-studio { display:flex; align-items:center; gap:8px; color:var(--dim); background:transparent; border:1px solid var(--line); border-radius:9px; padding:6px 11px; font-size:12px; }
+#b-studio[aria-expanded=true] { color:var(--cy); background:var(--cysoft); }
+#task-count { border-radius:12px; padding:0 6px; font-size:10px; color:var(--cy); background:var(--cysoft); }
+#b-expert,#b-rail { border:0; background:transparent; width:32px; color:var(--dim); }
+#c-update:not([hidden]) { background:var(--cysoft); border:1px solid var(--line); color:var(--cy); box-shadow:none; }
+body.simple #app { grid-template-columns:var(--sidebar) minmax(0,1fr); }
+body.simple.studio-open #app { grid-template-columns:var(--sidebar) minmax(0,1fr) var(--studio); }
+body.simple.rail-off #app { grid-template-columns:0 minmax(0,1fr); }
+body.simple.rail-off.studio-open #app { grid-template-columns:0 minmax(0,1fr) var(--studio); }
+body.simple #rail { padding:22px 14px; background:var(--bg3); position:relative; padding-bottom:156px; }
+#rail h3,body.simple #rail h3:first-of-type { margin:25px 12px 12px; color:var(--muted); font-size:9px; letter-spacing:.14em; font-weight:650; }
+.nav-new,.nav-link { width:100%; display:flex; align-items:center; gap:11px; text-align:left; padding:10px 12px; font-size:12px; border-radius:10px; margin-bottom:5px; }
+.nav-new { border:1px solid #eaa0c326; color:var(--ink); background:linear-gradient(100deg,#d967a513,#eaa0c303); }
+.nav-new .icon { color:var(--cy); }
+.nav-hint { font-size:9px; color:var(--muted); margin-left:auto; }
+.nav-link { border:1px solid transparent; background:transparent; color:var(--dim); }
+.rail-actions { position:absolute; bottom:0; left:0; right:0; padding:14px; background:var(--bg3); border-top:1px solid var(--line); }
+.rail-caption { display:block; margin:15px 12px 3px; font-size:10px; color:var(--muted); }
+.chat-search { display:flex; align-items:center; gap:9px; padding:9px 12px; color:var(--muted); margin-top:16px; }
+.chat-search .icon { width:15px; height:15px; }
+#chat-search { background:transparent; border:0; border-radius:0; padding:0; font-size:11px; width:100%; box-shadow:none; color:var(--ink); }
+#chat-search::placeholder { color:var(--muted); }
+body.simple #rail .sess,.sess { display:flex; align-items:flex-start; width:100%; text-align:left; border:0; background:transparent; padding:0 4px 0 0; color:var(--dim); font-size:12px; margin:3px 0; border-radius:8px; }
+.sess .sess-open { flex:1 1 auto; text-align:left; border:0; background:transparent; color:inherit; font:inherit; padding:10px 8px 10px 12px; cursor:pointer; min-width:0; }
+.sess.act { color:var(--ink)!important; background:var(--bg2)!important; }
+.sess.pending .session-label::after { content:' (new)'; color:var(--dim); font-size:10px; }
+.sess.is-archived { opacity:.72; }
+.session-label { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sess-meta { display:block; font-size:10px; color:var(--dim); margin-top:2px; }
+.sess .dots { flex:0 0 auto; border:0; background:transparent; color:var(--dim); width:26px; height:34px; margin:4px 2px 0 0; border-radius:6px; opacity:0; cursor:pointer; font-size:15px; line-height:1; }
+.sess:hover .dots,.sess:focus-within .dots { opacity:1; }
+.sess .dots:hover,.sess .dots:focus-visible { background:var(--bg2); color:var(--ink); outline:none; box-shadow:inset 0 0 0 1px var(--line); }
+.rail-mini { border:1px solid var(--line); background:transparent; color:var(--dim); font-size:10px; padding:2px 8px; border-radius:6px; cursor:pointer; }
+.rail-mini:hover,.rail-mini:focus-visible { color:var(--ink); outline:none; }
+.rail-mini[aria-pressed="true"] { color:var(--ink); background:var(--bg2); }
+.chat-state { padding:14px 12px; font-size:11px; color:var(--dim); }
+.chat-state.error { color:#ff7364; }
+#chat-menu { z-index:900; background:var(--bg); border:1px solid var(--line); border-radius:10px; min-width:150px; padding:4px; box-shadow:0 8px 28px rgba(0,0,0,.4); }
+#chat-menu button { display:block; width:100%; text-align:left; border:0; background:transparent; color:var(--ink); font-size:12px; padding:8px 10px; border-radius:6px; cursor:pointer; }
+#chat-menu button:hover,#chat-menu button:focus-visible { background:var(--bg2); outline:none; }
+#chat-menu button.danger { color:#ff7364; }
+.modal { position:fixed; inset:0; z-index:950; background:rgba(6,8,14,.62); display:flex; align-items:center; justify-content:center; padding:20px; }
+.modal-card { background:var(--bg); border:1px solid var(--line); border-radius:14px; padding:22px; width:min(440px,96vw); box-shadow:0 24px 60px rgba(0,0,0,.5); }
+.modal-card h3 { margin:0 0 10px; font-size:15px; }
+.modal-card p { margin:0 0 12px; font-size:12px; color:var(--dim); line-height:1.5; }
+.modal-card input { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg2); color:var(--ink); font-size:12px; margin-bottom:14px; box-sizing:border-box; }
+.modal-card input:focus-visible { outline:2px solid var(--accent,#e05f93); outline-offset:1px; }
+.modal-actions { display:flex; justify-content:flex-end; gap:10px; }
+.modal-actions button { border:1px solid var(--line); background:transparent; color:var(--ink); font-size:12px; padding:8px 14px; border-radius:8px; cursor:pointer; }
+.modal-actions button.primary { background:var(--accent,#e05f93); border-color:transparent; color:#fff; }
+.modal-actions button:disabled { opacity:.45; cursor:default; }
+.modal-actions button:focus-visible { outline:2px solid var(--accent,#e05f93); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce) { .modal,.modal-card,#chat-menu { transition:none!important; animation:none!important; } }
+#chat-empty { color:var(--dim); font-size:11px; padding:0 12px; }
+#main { display:flex; flex-direction:column; min-height:0; min-width:0; position:relative; }
+#scroller { flex:1; min-height:0; scroll-behavior:auto; padding:42px 38px 20px; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+.msg { width:100%; max-width:var(--chat-width); margin:0 auto 34px; }
+.msg .who { color:var(--dim); font-size:10px; font-weight:650; letter-spacing:.12em; margin-bottom:12px; }
+.msg .body { font-size:15px; line-height:1.85; overflow-wrap:anywhere; }
+.msg.majin .body { border:0; padding-left:0; }
+.msg.user { display:flex; flex-direction:column; align-items:flex-end; }
+.msg.user .who { display:none; }
+.msg.user .body { max-width:85%; border:1px solid var(--line); background:var(--bg2); border-radius:18px 18px 5px 18px; padding:11px 18px; }
+.msg pre { font:12px/1.7 var(--mono); padding:18px; border-radius:12px; background:var(--bg3); }
+.foot { font-size:10px; color:var(--muted); margin-top:15px; }
+.msg.err .body { background:var(--bg3); border:1px solid #f29aaa30; padding:22px; border-radius:var(--radius); color:var(--ink); }
+.msg.err strong { font-size:16px; font-weight:600; }
+.msg.err p { font-size:13px; color:var(--dim); margin:9px 0 16px; }
+.error-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.error-actions button { font-size:12px; padding:8px 13px; border-radius:9px; }
+.error-details { font-size:11px; color:var(--dim); margin-top:16px; }
+.error-details summary { cursor:pointer; }
+.home { max-width:700px; margin:clamp(50px,15vh,150px) auto 0; }
+.home-emblem { width:96px; height:96px; display:grid; place-items:center; margin:0 auto 28px; border-radius:50%; background:radial-gradient(circle,#ed8cc40e,transparent 69%); }
+.home h2 { margin:0; font-size:clamp(28px,3vw,38px); line-height:1.25; letter-spacing:-.045em; font-weight:450; color:var(--ink); }
+footer { flex:none; background:var(--bg); border:0; padding:12px max(24px,calc((100% - var(--chat-width))/2)) 15px; }
+#composer { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end; padding:10px; background:linear-gradient(130deg,var(--bg2),var(--bg3)); border:1px solid #5a3b505c; border-radius:20px; box-shadow:0 10px 40px #00000012,0 0 20px #c06da003; }
+#composer:focus-within { border-color:#a96f916b; box-shadow:0 0 0 3px #eaa0c305; }
+#input,#input:focus { background:transparent; border:0; box-shadow:none; font:14px/1.65 var(--sans); padding:13px 11px; min-height:50px; max-height:200px; resize:none; border-radius:10px; }
+#input::placeholder { color:var(--dim); }
+#send { display:grid; place-items:center; width:44px; height:44px; min-width:44px; min-height:44px; margin:3px; border:0; border-radius:50%; padding:0; background:#eeedf2; color:#17171b; box-shadow:0 2px 8px #00000012; transition:transform .28s cubic-bezier(.2,.8,.2,1.4),background .2s,box-shadow .3s,opacity .2s; }
+#send svg { width:24px; height:24px; overflow:visible; transition:transform .18s; }
+#send .send-arrow { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transform-origin:center; transition:transform .28s cubic-bezier(.2,.8,.2,1.4),opacity .18s; }
+#send .send-stop { fill:currentColor; opacity:0; transform:scale(.35) rotate(-45deg); transform-origin:center; transition:transform .28s cubic-bezier(.2,.8,.2,1.4),opacity .18s; }
+#send:disabled { opacity:.28; cursor:default; box-shadow:none; }
+#send:not(:disabled):hover { background:#fff; box-shadow:0 0 0 5px #eaa0c30a,0 0 24px #eaa0c31c; }
+#send:not(:disabled):hover .send-arrow { transform:translateY(-2px); }
+#send:not(:disabled):active svg { transform:scale(.9); }
+#send.busy .send-arrow { opacity:0; transform:translateY(-5px) scale(.6); }
+#send.busy .send-stop { opacity:1; transform:scale(1) rotate(0); }
+#send.busy { background:#eeedf2; color:#17171b; }
+.crow { margin:8px 10px 0; gap:8px; font-size:10px; color:var(--muted); }
+#mic { padding:0 3px; min-height:22px; font-size:12px; border:0; background:transparent; }
+#drop { font-size:9px; border:0; color:var(--muted); }
+#run-state { display:flex; align-items:center; gap:12px; min-height:40px; margin:0 10px 12px; font-size:12px; color:var(--dim); }
+#run-details { margin-left:auto; border:0; background:transparent; font-size:10px; color:var(--muted); padding:4px; }
+#run-details:hover { color:var(--cy); }
+.living-orb { width:30px; height:30px; display:block; position:relative; flex:none; color:var(--cy); }
+.living-orb i { position:absolute; inset:2px; border:1px solid currentColor; border-radius:43% 57% 56% 44% / 55% 38% 62% 45%; transform:rotate(-25deg); box-shadow:inset 0 0 7px #eba1c31c,0 0 7px #eba1c31c; }
+.living-orb i:nth-child(2) { inset:5px 0; opacity:.55; transform:rotate(55deg); }
+.living-orb i:nth-child(3) { inset:0 5px; opacity:.3; transform:rotate(115deg); }
+.home-emblem .living-orb { width:62px; height:62px; }
+.home-emblem .living-orb i:nth-child(2) { animation-direction:reverse; animation-duration:19s; }
+.home-emblem .living-orb i:nth-child(3) { animation-duration:23s; }
+.home-emblem .living-orb i { animation:orb-flow 14s linear infinite; border-width:1.2px; box-shadow:inset 0 0 16px #eba1c324,0 0 16px #eba1c324; }
+#run-state:is([data-state=connecting],[data-state=thinking],[data-state=working],[data-state=waiting]) .living-orb i { animation:orb-flow 5s linear infinite; }
+#run-state .living-orb i:nth-child(2) { animation-direction:reverse; animation-duration:7s; }
+#run-state .living-orb i:nth-child(3) { animation-duration:9s; }
+#run-state[data-state=working] .living-orb { color:#c8b6fa; }
+#run-state[data-state=waiting] .living-orb { color:var(--warn); }
+#run-state[data-state=waiting] .living-orb i { animation-duration:12s; }
+#run-state[data-state=done] .living-orb { color:var(--ok); }
+#run-state[data-state=error] .living-orb { color:var(--bad); }
+#run-state[data-state=stopped] .living-orb { opacity:.4; }
+@keyframes orb-flow { 0%{transform:rotate(0) scale(.9)} 50%{transform:rotate(180deg) scale(1.06)} 100%{transform:rotate(360deg) scale(.9)} }
+.page-hidden .living-orb i { animation-play-state:paused!important; }
+body.simple .deck { display:none!important; }
+/* Workspace: normally absent from the conversation; opened explicitly. */
+#studio { min-width:0; min-height:0; overflow:hidden; display:flex; flex-direction:column; background:var(--bg3); border-left:1px solid var(--line); }
+.studio-heading { display:flex; align-items:center; justify-content:space-between; padding:23px 22px 17px; }
+.studio-heading h2 { font-size:19px; font-weight:500; letter-spacing:-.03em; margin:3px 0 0; }
+#studio-close { border:0; background:transparent; color:var(--dim); padding:6px; min-height:30px; }
+.studio-tabs { display:flex; gap:20px; padding:0 22px; border-bottom:1px solid var(--line); }
+.studio-tabs button { position:relative; padding:10px 0 12px; color:var(--dim); background:transparent; border:0; border-radius:0; font-size:12px; }
+.studio-tabs button[aria-selected=true] { color:var(--ink); }
+.studio-tabs button[aria-selected=true]::after { content:''; position:absolute; height:2px; bottom:-1px; left:0; right:0; background:var(--cy); border-radius:2px; }
+#file-count { color:var(--muted); margin-left:4px; font-size:10px; }
+.studio-view { padding:22px; overflow:auto; flex:1; min-height:0; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+.section-heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:8px; }
+.section-heading h3 { font-size:11px; font-weight:500; margin:0; color:var(--ink); }
+#studio-task-summary { font-size:10px; color:var(--dim); }
+.studio-empty { padding:56px 8px; text-align:center; }
+.studio-empty>.icon { color:var(--muted); width:30px; height:30px; margin-bottom:15px; }
+.constellation-idle { display:block; color:var(--cy); font-size:35px; opacity:.65; margin-bottom:12px; }
+.studio-empty h3 { font-weight:500; font-size:15px; letter-spacing:-.025em; margin:6px 0 10px; }
+.studio-empty p { max-width:260px; margin:0 auto; font-size:12px; line-height:1.8; color:var(--dim); }
+#studio-tasks { position:relative; }
+.agent-node { position:relative; display:flex; align-items:center; gap:11px; width:100%; text-align:left; padding:13px 11px; border:1px solid var(--line); border-radius:13px; background:var(--bg); margin-bottom:12px; }
+.agent-node:not(:last-child)::after { content:''; position:absolute; left:29px; bottom:-13px; height:12px; width:1px; background:var(--line); }
+.agent-node.selected { border-color:#b978a15e; background:var(--cysoft); }
+.agent-mark { display:grid; place-items:center; width:32px; height:32px; border:1px solid var(--line); border-radius:11px; color:var(--cy); flex:none; font-size:18px; background:radial-gradient(circle,#eaa0c311,transparent); }
+.agent-copy { min-width:0; flex:1; }
+.agent-copy strong { display:block; font-size:12px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.agent-copy>span { display:block; font-size:11px; color:var(--dim); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.agent-status { font-size:10px; letter-spacing:.03em; color:var(--dim); border:1px solid var(--line); border-radius:12px; padding:2px 6px; }
+.agent-node[data-state=running] .agent-mark,.agent-node[data-state=running] .agent-status { color:var(--cy); border-color:#eaa0c33a; }
+.agent-node[data-state=done] .agent-mark { color:var(--ok); }
+.agent-node[data-state=error] .agent-mark { color:var(--bad); }
+.agent-node[data-state=waiting] .agent-mark { color:var(--warn); }
+#task-detail { padding:18px; margin:18px 0; border:1px solid var(--line); border-radius:13px; }
+#task-detail h3 { font-size:13px; line-height:1.6; font-weight:500; overflow-wrap:anywhere; }
+.studio-facts { display:grid; grid-template-columns:1fr minmax(0,1fr); gap:10px; font-size:10px; }
+.studio-facts dt { color:var(--dim); }.studio-facts dd { margin:0; text-align:right; overflow-wrap:anywhere; }
+.studio-stop { width:100%; font-size:11px; background:transparent; color:var(--bad); margin-top:14px; }
+#task-connection { font-size:11px; color:var(--warn); }
+#imagine { background:transparent; border:0; border-top:1px solid var(--line); padding:18px 0 0; max-height:none; overflow:visible; margin:22px 0 0; border-radius:0; }
+#imagine .core-row { gap:8px; margin-bottom:15px; }
+#imagine .core { width:9px; height:9px; box-shadow:none; animation:none; }
+#imagine .core-label { font:10px var(--sans); color:var(--dim); }
+#imagine .activity-toggle { display:none; }
+body.simple #imagine .steps,body.simple #imagine.activity-open .steps { display:block; }
+#imagine .step { padding:10px 0; font-size:11px; border-bottom:1px solid var(--line); }
+#imagine .step-icon { font-size:12px; opacity:.55; }
+#imagine .step-title { font-size:11px; font-weight:500; }
+#imagine .step-sub,#imagine .step-time,#imagine .step-detail summary { font-size:9px; color:var(--dim); }
+#imagine .step-detail pre { font-size:10px; overflow:auto; }
+.studio-file { width:100%; display:flex; align-items:center; gap:12px; padding:15px 12px; background:var(--bg); text-align:left; margin-bottom:9px; border-radius:12px; }
+.file-extension { border:1px solid var(--line); border-radius:8px; padding:7px 4px; font-size:8px; width:38px; text-align:center; color:var(--cy); }
+.file-copy { font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.studio-file>span:last-child { font-size:14px; color:var(--dim); }
+.file-preview-head { display:flex; align-items:center; gap:10px; justify-content:space-between; }
+.file-preview-head strong { font-size:12px; font-weight:500; overflow-wrap:anywhere; min-width:0; }
+.preview-download { font-size:10px; color:var(--cy); text-decoration:none; padding:6px 0; flex:none; }
+.studio-caption { font-size:10px; color:var(--dim); margin:13px 0 18px; overflow-wrap:anywhere; }
+.studio-preview-frame { width:100%; height:520px; max-height:65vh; border:1px solid var(--line); background:#fff; border-radius:10px; }
+.file-source { padding:15px; border:1px solid var(--line); background:var(--bg); border-radius:10px; font:11px/1.7 var(--mono); overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
+body:not(.simple) #studio { position:fixed; right:0; top:64px; bottom:0; width:420px; z-index:45; box-shadow:-20px 0 80px #0006; }
+/* Model explorer. All secondary information stays within this dialog. */
+#modeldrop { position:fixed; top:80px; left:50%; right:auto; transform:translateX(-50%); width:min(680px,calc(100vw - 32px)); max-height:calc(100dvh - 106px); overflow:auto; padding:26px; border:1px solid #67506359; border-radius:22px; background:var(--bg3); box-shadow:0 30px 120px #000a,0 0 0 100vmax #05040888; display:flex; flex-direction:column; gap:18px; z-index:60; }
+.explorer-head { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:20px; font-weight:500; letter-spacing:-.03em; }
+.explorer-close { background:transparent; border:0; color:var(--dim); font-size:14px; }
+.explorer-browser { min-height:0; display:flex; flex-direction:column; gap:14px; }
+#modeldrop .ob-input { width:100%; min-height:42px; padding:10px 13px; font-size:12px; background:var(--bg); border-radius:10px; flex:none; }
+.explorer-filters,.capability-filters { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.explorer-sort { margin-left:auto; padding:7px 0; font-size:11px; border:0; background:transparent; color:var(--dim); max-width:55%; }
+.filter-chip { font-size:11px; border-radius:20px; padding:5px 12px; background:transparent; color:var(--dim); min-height:31px; }
+.filter-chip[aria-pressed=true] { border-color:#c388a97a; color:var(--cy); background:var(--cysoft); }
+.filter-chip.free-filter[aria-pressed=true] { color:var(--ok); border-color:#8ccfb066; background:#8ccfb008; }
+.explorer-count { color:var(--dim); font-size:11px; margin:0; min-height:17px; flex:none; }
+#modeldrop .md-list { display:block; overflow:auto; min-height:60px; max-height:41vh; margin:0; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+.model-card { display:grid; grid-template-columns:minmax(0,1fr) 36px; align-items:center; border:1px solid var(--line); border-radius:13px; margin:0 0 8px; background:var(--bg); }
+.model-card:has(.ob-model.on) { border-color:#c388a977; background:var(--cysoft); }
+#modeldrop .ob-model { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; flex:none; gap:5px; width:100%; min-height:88px; border:0; background:transparent; border-radius:12px; padding:14px 16px; text-align:left; white-space:normal; overflow-wrap:anywhere; margin:0; }
+#modeldrop .ob-model:hover { background:var(--cysoft); }
+.model-name { color:var(--ink); font-size:14px; font-weight:550; }
+.model-id { color:var(--dim); font-size:11px; font-family:var(--mono); }
+.model-meta { color:var(--dim); font-size:11px; }.model-free { color:var(--ok); }
+.model-inspect { border:0; background:transparent; color:var(--dim); font-size:14px; padding:4px; margin-right:5px; }
+.explorer-empty { font-size:12px; line-height:1.8; color:var(--dim); padding:15px; }
+.explorer-more { flex:none; font-size:11px; background:var(--bg2); border-radius:10px; }
+.explorer-manage { flex:none; padding:7px; font-size:11px; text-align:center; }
+.manual-model { flex:none; font-size:10px; color:var(--dim); }.manual-model summary { padding:4px; cursor:pointer; }.manual-model p { font-size:11px; }.manual-model button { margin-top:9px; }
+.model-detail { padding:0 2px 8px; }.model-detail h3 { font-size:22px; font-weight:500; letter-spacing:-.03em; margin:24px 0 8px; }.model-detail .model-id { overflow-wrap:anywhere; }.model-detail .studio-facts { font-size:12px; padding:20px 0; gap:16px; }.model-detail p { color:var(--dim); font-size:12px; line-height:1.8; }.model-detail-back { color:var(--dim); font-size:11px; border:0; padding:4px 0; background:transparent; }.model-detail-use { width:100%; margin-top:15px; padding:12px; color:#20101a; background:var(--cy); border:0; border-radius:10px; font-size:12px; }
+#ob-card { background:var(--bg3); border-color:var(--line); box-shadow:0 24px 100px #0008; border-radius:22px; }
+.ob-input { color:var(--ink); background:var(--bg); }.ob-go { background:var(--cy); color:#20101a; border:0; }.ob-go:hover { background:var(--cy); color:#20101a; }.ob-link { color:var(--dim); }
+@media(max-width:1200px) { :root{--studio:340px;--sidebar:210px} body.simple.studio-open #scroller{padding:32px 24px} .studio-heading{padding:20px}.studio-view{padding:20px} }
+@media(max-width:1000px) {
+  body.simple #app,body.simple.studio-open #app,body.simple.rail-off #app,body.simple.rail-off.studio-open #app { grid-template-columns:minmax(0,1fr); }
+  body.simple #rail { display:none; }
+  body.simple footer { padding:12px max(20px,(100vw - var(--chat-width))/2) 15px; }
+  body.simple #studio { position:fixed; right:0; top:64px; bottom:0; width:min(420px,100vw); z-index:45; box-shadow:-40px 0 100px #0008; }
+  body.simple:not(.rail-off).mobile-rail #rail { display:block; position:fixed; top:64px; bottom:0; left:0; width:232px; z-index:44; box-shadow:30px 0 100px #0009; }
+  #scroller { padding:32px 24px; }
+}
+@media(max-width:600px) {
+  body { grid-template-rows:60px minmax(0,1fr); }
+  header { gap:7px; padding:11px 14px; } header .logo{width:24px;height:24px} header h1{font-size:11px}
+  #c-model { max-width:42vw; font-size:11px; padding:6px 9px; }
+  #b-studio { border:0; padding:5px; } #b-studio>span:not(#task-count){display:none} #b-studio .icon{width:20px;height:20px}
+  #b-rail { display:grid;place-items:center;width:26px;padding:4px; } #b-expert{width:26px;padding:4px}
+  body.simple footer { padding:10px 12px 12px; }
+  #scroller{padding:24px 18px} .home{margin:32px auto 0}.home-emblem{margin-bottom:20px;width:78px;height:78px}.home-emblem .living-orb{width:52px;height:52px}.home h2{font-size:32px}
+  #composer{padding:7px;border-radius:18px}#input,#input:focus{font-size:13px;padding:12px 8px}#drop{display:none}#run-state{margin:0 6px 9px;font-size:11px}
+  body.simple #studio,body:not(.simple) #studio{top:60px}.studio-heading{padding:20px}.studio-view{padding:20px}
+  #modeldrop{top:70px;padding:19px;max-height:calc(100dvh - 84px);gap:14px}.explorer-head{font-size:18px}.explorer-sort{font-size:10px}.filter-chip{padding:5px 10px;font-size:9px}.model-name{font-size:12px}.model-id{font-size:9px}.model-meta{font-size:9px}
+}
+/* On 390px phones the full desktop toolbar previously forced header/app to
+   408px and horizontal scrolling. Prioritize the actual controls a person
+   needs: model, workspace, sidebar, stop. Secondary badges and settings live
+   in the expandable workspace / navigation and must not steal mobile width. */
+@media(max-width:600px) {
+  html,body { width:100%; max-width:100%; min-width:0; }
+  #app,#main,footer { min-width:0; max-width:100%; }
+  header { width:100%; max-width:100%; min-width:0; gap:5px; overflow:hidden; }
+  header :is(#tagline,#c-route,#c-moa,#c-tools,#c-cost,#c-tg,#c-wa,
+    #b-mode,#b-panel,#b-quit,#b-theme,#b-voice,#b-test,#v-tag,#c-update) {
+    display:none!important;
+  }
+  header .spacer { flex:1 1 0; min-width:0; }
+  #c-model { min-width:0; max-width:34vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:0 1 auto; }
+  #b-studio,#b-rail,#b-expert,#b-stop { flex:0 0 auto; }
+}
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important} }
+
+#input:focus-visible{outline:none}#composer:has(#input:focus-visible){outline:1px solid #eaa0c34a;outline-offset:2px}
+
+/* Expert controls use the same contextual shell, never a second dashboard. */
+body.simple #view-settings #panel{display:block!important;border:0;padding:0;background:transparent}
+#view-settings #panel h3{font:600 10px var(--sans);letter-spacing:.1em;color:var(--muted);margin:24px 0 12px}
+#view-settings #panel .row{flex-wrap:wrap;font-size:11px;gap:7px;margin:7px 0}
+#view-settings #panel .row select,#view-settings #panel .row input{max-width:100%;font-size:11px;min-height:34px}
+#view-settings #panel .row span{min-width:60px;font-size:11px}
+.settings-utilities{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+body.simple #view-settings .settings-utilities button{display:block;font-size:11px;background:transparent;border-radius:10px}
+#b-expert.on{color:var(--cy)}
+.preview-expand{font-size:9px;border:0;background:transparent;color:var(--dim);padding:5px;margin-left:auto;white-space:nowrap}
+body.simple.studio-wide{--studio:min(760px,52vw)}
+@media(max-width:1000px){.preview-expand{display:none}}
+
+body.light .model-detail-use,body.light .ob-go{color:#fff}
+
+.theme-changing *{transition:none!important}
+
+body.simple .msg .tools,body.simple .msg .trace,body.simple .msg .gauge{display:none}
+body:is([data-run-state=connecting],[data-run-state=thinking],[data-run-state=working]) #status{visibility:hidden}
+
+/* Aurora polish: subtle, readable keyboard interaction on chat actions. */
+body.simple .msg button:focus-visible,
+body.simple .msg a:focus-visible {
+  outline:2px solid var(--cy);
+  outline-offset:3px;
+  border-radius:8px;
+}
+body.simple .msg button:not(:disabled):hover {
+  box-shadow:0 0 0 1px var(--cysoft);
+}
+@media (prefers-reduced-motion:reduce) {
+  body.simple .msg button { transition:none!important; }
+}
+
+/* Aurora: compact file previews remain easy to inspect without busy panels. */
+body.simple .chat-open-file {
+  min-height:32px;
+  padding:5px 10px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:var(--cysoft);
+  color:var(--cy);
+  font-weight:600;
+}
+body.simple .chat-open-file:hover { border-color:var(--cy);box-shadow:0 0 12px var(--cysoft); }
+body.simple .chat-open-file:focus-visible { outline:2px solid var(--cy);outline-offset:3px; }
+@media(prefers-reduced-motion:reduce) { body.simple .chat-open-file { transition:none!important; } }
+
+/* Aurora: file-preview actions feel tactile while remaining quiet. */
+body.simple .chat-open-file {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:36px;
+  max-width:100%;
+  overflow-wrap:anywhere;
+  transition:border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+body.simple .chat-open-file:not(:disabled):active { transform:scale(.98); }
+@media(prefers-reduced-motion:reduce) {
+  body.simple .chat-open-file:not(:disabled):active { transform:none; }
+}
+
+/* Aurora: robust keyboard focus on interactive file results. */
+body.simple .chat-open-file { position:relative; isolation:isolate; }
+body.simple .chat-open-file:focus-visible {
+  outline:2px solid var(--cy);
+  outline-offset:4px;
+  box-shadow:0 0 0 5px var(--cysoft);
+}
+@media(max-width:600px){ body.simple .chat-open-file { min-height:44px; } }
+@media(prefers-reduced-motion:reduce){ body.simple .chat-open-file{transition:none!important} }
+
+/* MAJIN Aurora: refined inline preview controls and dark/light legibility. */
+body.simple .msg .chat-open-file {
+  vertical-align:middle;
+  line-height:1.3;
+  text-decoration:none;
+  white-space:normal;
+}
+body.light.simple .msg .chat-open-file {
+  background:var(--cysoft);
+  color:var(--cy);
+  border-color:var(--line);
+}
+@media (hover:none) {
+  body.simple .chat-open-file:hover { box-shadow:none; }
+}
+
+/* Aurora: unobtrusive tactile clarity for preview actions, no extra panels. */
+body.simple .msg .chat-open-file {
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+  letter-spacing:.01em;
+}
+body.simple .msg .chat-open-file:focus-visible {
+  outline:2px solid var(--cy);
+  outline-offset:4px;
+}
+@media(prefers-reduced-motion:reduce) {
+  body.simple .msg .chat-open-file { transition:none!important; }
+}
+
+/* Aurora: clearly distinguish an approval request within an otherwise quiet chat. */
+body.simple .msg .appr {
+  border:1px solid var(--warn);
+  border-radius:14px;
+  background:var(--bg2);
+  padding:14px 16px;
+}
+body.simple .msg .appr button:focus-visible {
+  outline:2px solid var(--warn);
+  outline-offset:3px;
+}
+@media(max-width:600px) {
+  body.simple .msg .appr button { min-height:44px; }
+}
+
+/* Aurora: make approval actions unmistakable without adding interface clutter. */
+body.simple .msg .appr button {
+  min-height:40px;
+  border-radius:10px;
+  font-weight:600;
+}
+body.simple .msg .appr button:hover {
+  border-color:var(--warn);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--warn) 18%,transparent);
+}
+@media(prefers-reduced-motion:reduce) {
+  body.simple .msg .appr button { transition:none!important; }
+}
+
+/* Aurora: approval choices stay readable and reachable on compact displays. */
+@media(max-width:600px) {
+ body.simple .msg .appr { padding:12px; overflow-wrap:anywhere; }
+ body.simple .msg .appr button { min-height:44px; margin-block:3px; }
+}
+body.simple .msg .appr button:focus-visible {
+ outline:2px solid var(--warn);outline-offset:4px;
+ box-shadow:0 0 0 4px var(--cysoft);
+}
+
+/* Aurora: legible recovery and approval states without heavy alert surfaces. */
+body.simple .msg .appr {
+  box-shadow:inset 3px 0 0 var(--warn);
+}
+body.simple .msg .appr button:not(:disabled):active {
+  filter:brightness(1.08);
+}
+@media(hover:none) {
+  body.simple .msg .appr button:hover { box-shadow:none; }
+}
+
+/* Aurora: improve approval contrast in both themes without another panel. */
+body.simple .msg .appr {
+  border-inline-start:3px solid var(--warn);
+  overflow-wrap:anywhere;
+}
+body.simple .msg .appr button:disabled {
+  opacity:.55;
+  cursor:not-allowed;
+}
+body.simple .msg .appr button:focus-visible {
+  outline:2px solid var(--warn);
+  outline-offset:3px;
+}
+@media(prefers-reduced-motion:reduce){
+ body.simple .msg .appr button{transition:none!important}
+}
+
+/* Aurora polish: actionable plan updates remain quiet but visibly accessible. */
+body.simple .msg .appr button {
+  min-height:40px;
+  border-radius:10px;
+  outline-offset:3px;
+}
+body.simple .msg .appr button:focus-visible {
+  outline:2px solid var(--cy);
+  box-shadow:0 0 0 4px var(--cysoft);
+}
+@media(max-width:600px){
+ body.simple .msg .appr button { min-height:44px; }
+}
+
+/* Aurora: show clearly when an action is disabled without visual noise. */
+body.simple .msg .appr button:disabled {
+ opacity:.5;
+ filter:grayscale(.2);
+ box-shadow:none!important;
+}
+@media (prefers-contrast:more) {
+ body.simple .msg .appr { border-width:2px; }
+ body.simple .msg .appr button:focus-visible { outline-width:3px; }
+}
+
+/* Aurora: predictable approval button hover for pointer-capable devices only. */
+@media(hover:hover) and (pointer:fine) {
+ body.simple .msg .appr button:not(:disabled):hover {
+   box-shadow:0 0 0 2px var(--cysoft);
+   border-color:var(--cy);
+ }
+}
+body.simple .msg .appr button:focus-visible { outline-offset:4px; }
+
+/* Aurora: approval actions are comfortable on touch and keyboard. */
+@media (pointer:coarse) {
+  body.simple .msg .appr button { min-width:44px; min-height:44px; }
+}
+body.simple .msg .appr button:focus-visible {
+  outline:2px solid var(--warn);
+  outline-offset:4px;
+}
+
+/* Aurora: approval choices are visually distinct for keyboard and touch. */
+body.simple .msg .appr button:not(:disabled):focus-visible {
+  outline:3px solid var(--warn);
+  outline-offset:4px;
+}
+body.simple .msg .appr button:disabled {
+  cursor:not-allowed;
+  opacity:.55;
+}
+@media(prefers-reduced-motion:reduce) {
+  body.simple .msg .appr button { animation:none!important; transition:none!important; }
+}
+
+/* Aurora: stable keyboard and touch feedback on permission prompts. */
+body.simple .msg .appr button:not(:disabled):active { transform:translateY(1px); }
+@media(prefers-reduced-motion:reduce) {
+ body.simple .msg .appr button:not(:disabled):active { transform:none; }
+}
+@media(prefers-contrast:more) {
+ body.simple .msg .appr button:not(:disabled):focus-visible { outline-width:4px; }
+}
+
+/* Aurora: crisp permission prompt separation in compact layouts. */
+body.simple .msg .appr {
+  border-radius:12px;
+  background:var(--bg2);
+}
+body.simple .msg .appr button:not(:disabled):focus-visible {
+  outline-offset:4px;
+  box-shadow:0 0 0 4px var(--cysoft);
+}
+@media(max-width:600px) { body.simple .msg .appr { padding:12px; } }
+
+/* Aurora: clean action focus on high-density displays, no new visual clutter. */
+@media (min-resolution:2dppx) {
+  body.simple .msg .appr button:focus-visible {
+    outline-offset:3px;
+    box-shadow:0 0 0 3px var(--cysoft);
+  }
+}
+body.simple .msg .appr button:disabled { pointer-events:none; }
+
+/* Aurora: high-contrast, accessible permission actions. */
+body.simple .msg .appr button:focus-visible {
+  outline:3px solid var(--warn);
+  outline-offset:3px;
+}
+@media(prefers-contrast:more) {
+  body.simple .msg .appr button:focus-visible {
+    box-shadow:0 0 0 5px var(--bg);
+  }
+}
+
+/* Aurora: permission prompt actions remain comfortably spaced on mobile. */
+@media (max-width:480px) {
+  body.simple .msg .appr button {
+    min-height:44px;
+    margin-inline-end:8px;
+    margin-block:4px;
+    touch-action:manipulation;
+  }
+}
+
+/* Aurora: intentional keyboard focus for high-contrast permission decisions. */
+body.simple .msg .appr button:focus-visible {
+  outline:3px solid var(--warn);
+  outline-offset:4px;
+  text-decoration:underline;
+  text-underline-offset:3px;
+}
+@media (prefers-reduced-motion:reduce) {
+  body.simple .msg .appr button { transition:none!important; }
+}
+
+/* Aurora recovery status: compact inline progress, no additional panels. */
+body.simple .msg [data-recovery-status] {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 9px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  color:var(--dim);
+  background:var(--bg2);
+  font-size:.82em;
+}
+body.simple .msg [data-recovery-status="approval"] { border-color:var(--warn);color:var(--ink); }
+
+/* Aurora: distinct readable recovery states in the existing inline treatment. */
+body.simple .msg [data-recovery-status="resume"] { border-color:var(--ok);color:var(--ink); }
+body.simple .msg [data-recovery-status="inspect"] { border-style:dashed;color:var(--ink); }
+body.simple .msg [data-recovery-status="skip"] { opacity:.75; }
+@media(prefers-contrast:more) {
+ body.simple .msg [data-recovery-status] { border-width:2px; }
+}
+
+/* Aurora: glanceable recovery statuses, readable at small sizes. */
+body.simple .msg [data-recovery-status] { font-weight:600; letter-spacing:.01em; }
+body.simple .msg [data-recovery-status="approval"] { border-inline-start:3px solid var(--warn); }
+@media(max-width:480px) { body.simple .msg [data-recovery-status] { max-width:100%; overflow-wrap:anywhere; } }
+
+/* Aurora: clearer recovery approval focus without layout clutter. */
+body.simple .msg [data-recovery-status="approval"] { font-weight:700; }
+body.simple .msg [data-recovery-status="inspect"] { border-width:2px; }
+@media(prefers-reduced-motion:reduce) { body.simple .msg [data-recovery-status] { transition:none!important; } }
+
+/* Aurora: compact recovery labels stay legible in light and dark themes. */
+body.simple .msg [data-recovery-status] { line-height:1.4; vertical-align:middle; }
+body.light.simple .msg [data-recovery-status="inspect"] { color:var(--ink); }
+@media(max-width:480px) { body.simple .msg [data-recovery-status] { white-space:normal; } }
+
+/* Aurora: actual approval cards support clear keyboard focus and readable controls. */
+body.simple .msg .appr { border-inline-start:3px solid var(--warn); }
+body.simple .msg .appr :is(button,a):focus-visible { outline:3px solid var(--warn);outline-offset:3px; }
+@media(max-width:600px) { body.simple .msg .appr button { min-height:44px; } }
+
+/* Aurora: make the real permission prompt easier to scan on mobile. */
+@media(max-width:560px){body.simple .msg .appr{padding:14px;border-radius:14px}body.simple .msg .appr :is(button,a){min-height:44px}}
+body.simple .msg .appr :is(button,a):focus-visible{outline:3px solid var(--warn);outline-offset:4px}
+
+/* Aurora: warn before irreversible tool approvals, without extra UI panels. */
+body.simple .msg .appr { box-shadow: inset 3px 0 0 var(--warn); }
+@media (prefers-contrast: more) { body.simple .msg .appr { border-width:2px; } }
+
+/* Aurora: restrained and accessible keyboard affordance on existing approval cards. */
+@media (hover:hover) {
+  body.simple .msg .appr button:not(:disabled):hover { filter:brightness(1.06); }
+}
+@media (prefers-reduced-motion:reduce) {
+  body.simple .msg .appr button { animation:none!important; }
+}
+
+/* Aurora: keep approval actions usable when keyboard focus moves across choices. */
+body.simple .msg .appr:focus-within { border-color:var(--warn); }
+@media (max-width:560px) { body.simple .msg .appr button { line-height:1.4; } }
+
+/* Aurora: clear active approval choice in the real chat permission card. */
+body.simple .msg .appr:focus-within { box-shadow:inset 3px 0 0 var(--warn),0 0 0 2px var(--cysoft); }
+@media(prefers-contrast:more){body.simple .msg .appr:focus-within{outline:2px solid currentColor;outline-offset:2px}}
+
+/* Aurora: support keyboard navigation without making permission cards visually noisy. */
+body.simple .msg .appr :is(button,a):focus-visible { text-decoration:underline; text-underline-offset:3px; }
+@media (prefers-contrast:more) { body.simple .msg .appr :is(button,a):focus-visible { outline-width:4px; } }
+
+/* Aurora: approved action surfaces remain tappable and readable in forced-colors mode. */
+@media (forced-colors:active) {
+  body.simple .msg .appr { border:2px solid CanvasText; }
+  body.simple .msg .appr :is(button,a):focus-visible { outline:3px solid Highlight; }
+}
+
+/* Aurora: show a readable active target on real permission controls. */
+body.simple .msg .appr :is(button,a):focus-visible { border-radius:6px; text-decoration-thickness:2px; }
+@media (max-width:520px) { body.simple .msg .appr :is(button,a) { min-height:44px; } }
+
+/* Aurora: avoid cropped keyboard outlines near the edges of approval cards. */
+body.simple .msg .appr { overflow:visible; }
+body.simple .msg .appr :is(button,a):focus-visible { outline-offset:3px; }
+
+/* Aurora: permission choices stay clearly grouped at narrow widths. */
+@media (max-width:520px) {
+ body.simple .msg .appr { display:flow-root; }
+ body.simple .msg .appr :is(button,a) { max-width:100%; overflow-wrap:anywhere; }
+}
+
+/* Aurora: readable approval heading on compact screens. */
+body.simple .msg .appr h4 { font-weight:700;line-height:1.45;letter-spacing:.01em; }
+@media(max-width:560px){body.simple .msg .appr h4 {font-size:13px;}}
+
+/* Aurora: visible, compact permission header without new panels. */
+body.simple .msg .appr h4 { overflow-wrap:anywhere; margin-block-end:8px; }
+body.simple .msg .appr:focus-within h4 { text-decoration:underline;text-underline-offset:4px; }
+
+/* V1: make update discoverable and approval controls accessible on touch. */
+body.simple #c-update:not([hidden]) { min-height:36px;padding-inline:12px;font-weight:650; }
+body.simple #c-update:focus-visible { outline:3px solid var(--cy);outline-offset:3px; }
+@media(pointer:coarse){body.simple .msg .appr :is(button,a){min-height:44px;touch-action:manipulation}}
+
+/* V1 chat alignment contract: transcript and composer share ONE centered width. */
+body.simple #main{min-width:0;overflow:hidden}
+body.simple #scroller{width:100%;min-width:0;box-sizing:border-box;overflow-x:hidden}
+body.simple #scroller>.msg{width:min(100%,var(--chat-width));max-width:var(--chat-width);margin-inline:auto;box-sizing:border-box}
+body.simple #scroller>.home{width:min(100%,var(--chat-width));max-width:var(--chat-width);margin-inline:auto;box-sizing:border-box}
+body.simple footer{width:100%;min-width:0;box-sizing:border-box;padding-inline:clamp(16px,3vw,40px)}
+body.simple footer #composer,body.simple footer .crow,body.simple footer #run-state{width:min(100%,var(--chat-width));max-width:var(--chat-width);margin-inline:auto;box-sizing:border-box}
+body.simple footer #composer{grid-template-columns:38px minmax(0,1fr) 44px;align-items:center;gap:8px}
+body.simple #composer #mic{grid-column:1;grid-row:1;align-self:center;justify-self:center;width:38px;height:38px;min-height:38px;margin:0}
+body.simple #composer #input{grid-column:2;grid-row:1;min-width:0;width:100%;align-self:center;margin:0;resize:none}
+body.simple #composer #send{grid-column:3;grid-row:1;align-self:center;justify-self:center;margin:0}
+@media(max-width:600px){body.simple footer{padding-inline:12px}body.simple #scroller{padding-inline:12px}body.simple #scroller>.msg{max-width:100%}}
+\n/* Neon inline mindmap — scrollable, responsive, keyboard-accessible. */\n.majin-mindmap{max-width:100%;border:1px solid #9e4c8f55;background:radial-gradient(ellipse at 15% 10%,#7a2c6944,transparent 55%),#120d17;border-radius:22px;padding:14px;margin:18px 0;box-shadow:0 12px 32px #0005}\n.majin-mindmap-title{font:650 10px/1.4 var(--sans);letter-spacing:.2em;color:#efa2d9;margin:0 0 11px 5px}\n.majin-mindmap-scroll{max-width:100%;overflow:auto;scrollbar-color:#9e4c8f55 transparent}\n.majin-mindmap-scroll svg{display:block;max-width:none}.majin-mindmap-scroll:focus-visible{outline:2px solid #efa2d9;outline-offset:2px}\n
+/* Voice UI: readable listening caption under the orb and stable composer geometry. */
+body.simple #composer #voice-stage{max-width:100%;min-width:0;box-sizing:border-box}
+body.simple #composer #voice-caption{color:var(--ink);overflow-wrap:anywhere;white-space:normal;max-width:min(65ch,100%)}
+body.simple[data-voice-mode="listening"] #composer .composer-talk{box-shadow:0 0 0 3px var(--cysoft),0 0 16px var(--cysoft)}
+@media(max-width:520px){body.simple #composer #voice-stage{flex-wrap:wrap}body.simple #composer .voice-stage-copy{min-width:0;flex:1}}
+
+/* V1 wish-first UI: make the composer the primary luminous action surface.
+   Self-test remains available through /selftest (quick) and /selftest full;
+   keep its DOM node and handler intact for expert mode and compatibility. */
+body.simple header #b-test { display:none; }
+body.simple footer #composer {
+  border-color:color-mix(in srgb,var(--cy) 34%,var(--line));
+  box-shadow:0 0 0 1px var(--cysoft),0 12px 35px rgba(0,0,0,.11);
+}
+body.simple footer #composer:focus-within {
+  border-color:var(--cy);
+  box-shadow:0 0 0 3px var(--cysoft),0 12px 35px rgba(0,0,0,.13);
+}
+@media (prefers-contrast:more) { body.simple footer #composer { border-width:2px; } }
+
+/* V1 round 12: keep advanced English narration in expert mode while
+   using the existing Voice button as the clear, visual voice affordance. */
+body.simple header #b-narrator { display:none; }
+body.simple header #b-voice.on {
+  border-color:var(--cy);
+  box-shadow:0 0 0 2px var(--cysoft),0 0 15px var(--cysoft);
+}
+
+/* One calm voice surface, without double tool/status lines crowding the chat. */
+body.simple .msg .who{letter-spacing:.045em;font-weight:550}
+body.simple .msg .body{line-height:1.7}
+body.simple .msg .foot{opacity:.55;font-size:10px}
+body.simple[data-voice-mode="speaking"] #composer .composer-talk{color:var(--cy);box-shadow:0 0 0 4px var(--cysoft)}
+
+/* MAJIN V1 — Quiet Mode: restrained messenger layout, original MAJIN rose accent.
+   Only simple mode; expert tools, task history, voice controls remain functional. */
+body.simple:not(.light){
+  --bg:#202023;--bg2:#2d2d31;--bg3:#17171a;
+  --ink:#f1eff2;--dim:#aaa5ae;--muted:#89848e;--line:#37353b;
+  --cy:#f296ca;--pink:#f2b2d6;--cysoft:#f296ca16;
+  --sidebar:260px;--chat-width:740px;
+}
+body.simple header{min-height:54px;padding:9px 19px;background:var(--bg);border-bottom:1px solid var(--line);gap:10px}
+body.simple header h1{letter-spacing:.025em;font-size:13px;text-shadow:none}
+body.simple #rail{padding:14px 12px 125px;background:var(--bg3)}
+body.simple #rail h3{letter-spacing:.08em;margin:23px 11px 7px}
+body.simple .chat-search{margin:10px 4px 14px;background:#26262a;border:1px solid #3a393e;border-radius:11px;min-height:38px}
+body.simple #chat-search{font-size:12px}
+body.simple .nav-new{background:transparent;border-color:transparent;padding:11px 12px}
+body.simple .nav-new:hover{background:var(--bg2)}
+body.simple .sess{margin:3px 0;border-radius:11px}
+body.simple .sess.act{background:#303035!important;box-shadow:none}
+body.simple .sess .sess-open{padding:10px 9px 10px 12px}
+body.simple .sess .session-label{font-weight:550;font-size:12.5px}
+body.simple .sess .sess-meta{font-size:11px;margin-top:3px;color:var(--muted)}
+body.simple #scroller{padding-top:30px}
+body.simple #scroller>.msg{margin-bottom:21px}
+body.simple .msg .body{font-size:14px;line-height:1.65}
+body.simple .msg .who{margin-bottom:6px;color:var(--dim);letter-spacing:.015em;font-size:11px}
+body.simple .msg.user .body{border:0;background:#eae9e6;color:#242326;border-radius:17px;padding:11px 15px;max-width:78%;box-shadow:none}
+body.simple .msg.majin .body{border:0;background:transparent;padding:0}
+body.simple .msg .foot{opacity:.55}
+body.simple footer{background:var(--bg);padding-bottom:12px}
+body.simple footer #composer{border:1px solid #444148;border-radius:24px;background:#28282c;box-shadow:none;padding:6px 7px;min-height:54px}
+body.simple footer #composer:focus-within{border-color:#98728c;box-shadow:0 0 0 2px #f296ca0d}
+body.simple #composer #input{font-size:14px;min-height:40px;padding:9px 8px}
+body.simple #composer #mic{border-radius:50%;color:var(--cy);background:transparent;box-shadow:none}
+body.simple #composer #mic:hover{background:var(--cysoft)}
+body.simple #composer #send{width:44px;height:44px;min-width:44px;min-height:44px;background:#efeaee;border-radius:50%;color:#252329;box-shadow:none}
+body.simple #composer #send:disabled{opacity:.38}
+body.simple .crow{font-size:10px;color:var(--muted)}
+body.simple #run-state{border:0;background:transparent;box-shadow:none;padding-block:6px}
+body.simple #run-details{color:var(--dim)}
+body.simple #studio{border-left:1px solid var(--line)}
+@media(max-width:960px){body.simple #rail{padding-bottom:15px}}
+@media(max-width:600px){
+ body.simple #scroller{padding:18px 12px 8px}
+ body.simple #scroller>.msg{margin-bottom:18px}
+ body.simple .msg.user .body{max-width:91%}
+ body.simple footer{padding:8px 12px 11px}
+}
+@media(prefers-reduced-motion:reduce){body.simple .sess,body.simple #composer{transition:none}}
+
+/* V1 round 44: the living orb shows activity without a duplicate action.
+   Workspace already opens the same Activity tab; keep the shortcut in expert mode. */
+body.simple #run-state #run-details { display:none; }

@@ -1,0 +1,112 @@
+name: MAJIN V5 Windows Desktop & Setup.exe
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  checks: write
+
+concurrency:
+  group: v5-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-v5:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+      - name: Install root dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run V5 unit, integration & acceptance suites on Windows
+        shell: pwsh
+        run: |
+          npm run v5:test
+          if ($LASTEXITCODE -ne 0) { throw "V5 tests failed on Windows" }
+          npm run v5:accept
+          if ($LASTEXITCODE -ne 0) { throw "V5 acceptance failed on Windows" }
+      - name: Install desktop Electron build dependencies
+        working-directory: desktop
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Download pinned Electron binary
+        working-directory: desktop
+        run: node node_modules/electron/install.js
+      - name: Stage V5 host & build MAJIN-V5-Setup.exe (NSIS)
+        working-directory: desktop
+        run: npm run build
+      - name: Verify packaged Electron native window, auto-host start & restart persistence
+        shell: pwsh
+        env:
+          MAJIN_V5_DESKTOP_EXE: ${{ github.workspace }}\desktop\dist\win-unpacked\MAJIN V5.exe
+        run: |
+          node scripts/v5/desktop-smoke.mjs
+          if ($LASTEXITCODE -ne 0) { throw "desktop-smoke.mjs failed" }
+      - name: Verify MAJIN-V5-Setup.exe install, Desktop shortcut, V1-V4 preservation & uninstall
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/v5/desktop-installer-verify.ps1 -SetupExe "desktop\dist\MAJIN-V5-Setup.exe"
+          if ($LASTEXITCODE -ne 0) { throw "desktop-installer-verify.ps1 failed" }
+      - name: Compute SHA-256 for MAJIN-V5-Setup.exe
+        run: |
+          node -e "
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const exe = 'desktop/dist/MAJIN-V5-Setup.exe';
+            const buf = fs.readFileSync(exe);
+            const hash = crypto.createHash('sha256').update(buf).digest('hex');
+            fs.writeFileSync(exe + '.sha256', hash + '  MAJIN-V5-Setup.exe\n', 'utf8');
+            console.log('MAJIN-V5-Setup.exe bytes=' + buf.length + ' sha256=' + hash);
+          "
+      - name: Publish MAJIN-V5-Setup.exe to GitHub Release v5.0.0
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v5.0.0
+          target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
+          name: MAJIN V5 — GRAND ARCHITECT (v5.0.0)
+          body: |
+            ## MAJIN V5 — GRAND ARCHITECT (Windows Desktop Application)
+
+            - **Installer**: `MAJIN-V5-Setup.exe` (per-user NSIS installer, no admin required, creates Desktop & Start Menu shortcuts with Majin icon)
+            - **Checksum**: `MAJIN-V5-Setup.exe.sha256`
+            - **Verified on Windows**: Electron native window, automatic local V5 host startup, `/api/health` & `/api/v5/state` (`5.0.0`), provider persistence across restarts, V1–V4 coexistence, and clean uninstallation.
+          files: |
+            desktop/dist/MAJIN-V5-Setup.exe
+            desktop/dist/MAJIN-V5-Setup.exe.sha256
+            docs/v5/windows-desktop-smoke.json
+            docs/v5/windows-installer-evidence.json
+            docs/v5/screenshots/windows-electron-v5-blackbox.png
+          fail_on_unmatched_files: false
+      - name: Publish Windows V5 verification summary to Check Run
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let smoke = '{}';
+            let inst = '{}';
+            try { smoke = fs.readFileSync('docs/v5/windows-desktop-smoke.json', 'utf8'); } catch (e) { smoke = e.message; }
+            try { inst = fs.readFileSync('docs/v5/windows-installer-evidence.json', 'utf8'); } catch (e) { inst = e.message; }
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'Windows V5 Desktop & Setup.exe Result',
+              head_sha: context.sha,
+              status: 'completed',
+              conclusion: '${{ job.status }}' === 'success' ? 'success' : 'failure',
+              output: {
+                title: 'MAJIN V5 Windows Desktop & Setup.exe Verification',
+                summary: `### Desktop Smoke\n\`\`\`json\n${smoke}\n\`\`\`\n\n### Installer Evidence\n\`\`\`json\n${inst}\n\`\`\``,
+              },
+            });

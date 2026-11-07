@@ -1,0 +1,27 @@
+name: MAJIN atomic job shortlist source integrity
+on:
+  push:
+    branches: [fix/job-json-to-shortlist-single-atomic-turn-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qa:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: node --check src/core/mission.js
+      - run: node --check src/core/loop.js
+      - run: node --test test/agent-atomic-job-shortlist.test.js
+      - run: npm test
+      - run: npm run check

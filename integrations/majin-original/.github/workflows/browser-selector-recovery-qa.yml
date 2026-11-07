@@ -1,0 +1,31 @@
+name: MAJIN grounded selector errors and safe checkbox handling
+on:
+  push:
+    branches: [fix/browser-selector-error-live-candidates-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  selector-feedback:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Real Chromium local form and invalid-selector recovery
+        if: runner.os == 'Windows'
+        env:
+          MAJIN_BROWSER_LIVE: '1'
+        run: node --test test/browser-form-privacy.live.test.js
+      - name: Existing browser visibility and privacy regressions
+        run: node --test test/browser-control-hints.test.js test/browser-form-privacy.test.js
+      - run: npm test
+      - run: npm run check

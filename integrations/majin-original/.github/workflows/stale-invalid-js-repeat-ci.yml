@@ -1,0 +1,27 @@
+name: MAJIN stale invalid JS repeat regression
+on:
+  push:
+    branches: [fix/stale-invalid-cli-write-protection-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  invalid-write:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --check src/core/loop.js
+      - run: node --check src/core/goal-artifact.js
+      - run: node --test test/stale-invalid-javascript-write.test.js
+      - run: npm test
+      - run: npm run check

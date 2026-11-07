@@ -1,0 +1,26 @@
+{
+  "version": "majin-teams/1",
+  "status": "complete",
+  "updatedAt": "2026-10-21T02:06:56.115Z",
+  "runId": "w13-crash",
+  "goals": [
+    "g1",
+    "g2"
+  ],
+  "cap": 40,
+  "spent": 1,
+  "okCount": 2,
+  "failCount": 0,
+  "blockedCount": 0,
+  "wallMs": 0,
+  "done": {
+    "g1": {
+      "text": "g1",
+      "steps": 1
+    },
+    "g2": {
+      "text": "g2",
+      "steps": 1
+    }
+  }
+}

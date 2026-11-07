@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-20",
+  "config": {
+    "fan": 8,
+    "reps": 3,
+    "taskMs": 60,
+    "jitterMs": 15,
+    "seed": 62
+  },
+  "speedupMedian": 6.76,
+  "serialMedianMs": 473,
+  "parallelMedianMs": 70,
+  "theoreticalMax": 6.25,
+  "overlap": {
+    "serial": [
+      0,
+      0,
+      0
+    ],
+    "parallel": [
+      28,
+      28,
+      28
+    ]
+  },
+  "parity": true,
+  "failures": 0,
+  "chain": {
+    "wallMs": 192,
+    "criticalPathMs": 192,
+    "depsRespected": true,
+    "okCount": 3
+  },
+  "arms": [
+    {
+      "kind": "serial",
+      "rep": 0,
+      "wallMs": 473,
+      "okCount": 8,
+      "failCount": 0,
+      "overlap": 0,
+      "estSum": 469,
+      "estMax": 75
+    },
+    {
+      "kind": "parallel",
+      "rep": 0,
+      "wallMs": 70,
+      "okCount": 8,
+      "failCount": 0,
+      "overlap": 28,
+      "estSum": 465,
+      "estMax": 70
+    },
+    {
+      "kind": "serial",
+      "rep": 1,
+      "wallMs": 489,
+      "okCount": 8,
+      "failCount": 0,
+      "overlap": 0,
+      "estSum": 485,
+      "estMax": 73
+    },
+    {
+      "kind": "parallel",
+      "rep": 1,
+      "wallMs": 75,
+      "okCount": 8,
+      "failCount": 0,
+      "overlap": 28,
+      "estSum": 483,
+      "estMax": 74
+    },
+    {
+      "kind": "serial",
+      "rep": 2,
+      "wallMs": 452,
+      "okCount": 8,
+      "failCount": 0,
+      "overlap": 0,
+      "estSum": 449,
+      "estMax": 72
+    },
+    {
+      "kind": "parallel",
+      "rep": 2,
+      "wallMs": 70,
+      "okCount": 8,
+      "failCount": 0,
+      "overlap": 28,
+      "estSum": 476,
+      "estMax": 71
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "version": "4.0.0-alpha.2",
+  "sourceCommit": "99d55a29b452e5d8f050b5cf70581de2c5ccd739",
+  "pullRequest": "https://github.com/rssen-debug/MAJINCLI/pull/401",
+  "platform": "win32-x64",
+  "installer": "MAJIN-V4-4.0.0-alpha.2-Setup.exe",
+  "bytes": 138438415,
+  "sha256": "82f239635fb267f228f2aed2d9c3abec65f985a0cda226080fca92ad91317b06",
+  "installerAuthenticode": "NotSigned",
+  "bundledNodeAuthenticode": "Valid",
+  "runtime": {
+    "node": "24.14.0",
+    "arch": "x64"
+  },
+  "productionReleasePublished": false,
+  "status": "NOT_READY"
+}

@@ -1,0 +1,578 @@
+{
+  "schema": "majin.v4.acceptance/v1",
+  "updatedAt": "2026-10-22",
+  "note": "Points are earned only by executable evidence. Weights sum to exactly 100 and are validated by scripts/v4/progress.mjs.",
+  "categories": [
+    {
+      "id": "BASELINE",
+      "title": "Baseline protection and repository hygiene",
+      "criteria": [
+        {
+          "id": "B1",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "V1 main, V2 v2/main and V3 v3/main SHAs recorded before any V4 commit",
+          "evidence": "manual:git ls-remote recorded in docs/v4/SOURCE_AUDIT.md"
+        },
+        {
+          "id": "B2",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "V4 work happens on v4/main only; no merge or force-push to protected refs",
+          "evidence": "manual:verified with git ls-remote before/after"
+        },
+        {
+          "id": "B3",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "No secret, key or token is committed to the repository",
+          "evidence": "test/v4/security.test.js"
+        },
+        {
+          "id": "B4",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "The V4 acceptance matrix is validated by code (weights = 100, evidence required)",
+          "evidence": "node scripts/v4/progress.mjs --check"
+        }
+      ]
+    },
+    {
+      "id": "MOBILE",
+      "title": "Mobile-first UI and PWA",
+      "criteria": [
+        {
+          "id": "M1",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Installable PWA manifest with 192/512/maskable icons and standalone display",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "M2",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Viewport-fit=cover plus safe-area padding for notches and home indicator",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "M3",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Responsive breakpoints for phone, tablet and desktop",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "M4",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "prefers-reduced-motion disables the spirit animation",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "M5",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Touch targets are at least 42px and controls are labelled",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "M6",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "App shell is served by the host with correct content types",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "M7",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Service worker caches the shell only and never API data",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "M8",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Offline state is visible and states that execution is unavailable",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "M9",
+          "weight": 1,
+          "status": "PARTIAL",
+          "title": "Living MAJIN spirit canvas bound to real conversation states",
+          "evidence": "test/v4/ui.test.js",
+          "note": "States are driven by server events and covered by unit tests; motion quality is not machine-verified."
+        },
+        {
+          "id": "M10",
+          "weight": 1,
+          "status": "NOT_STARTED",
+          "title": "iPhone Safari and Android Chrome physical-device walkthrough"
+        },
+        {
+          "id": "M11",
+          "weight": 1,
+          "status": "NOT_STARTED",
+          "title": "Playwright viewport/visual regression for mobile layouts"
+        },
+        {
+          "id": "M12",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Model selector lists host models with honest status labels",
+          "evidence": "test/v4/models.test.js"
+        }
+      ]
+    },
+    {
+      "id": "SECURITY",
+      "title": "Authentication, authorization and hardening",
+      "criteria": [
+        {
+          "id": "S1",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Pairing code is single-use-seeded, 0600, HMAC-hashed and never stored in plaintext",
+          "evidence": "test/v4/security.test.js"
+        },
+        {
+          "id": "S2",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Sessions are signed server-side, HttpOnly, SameSite=Strict, expiring and revocable",
+          "evidence": "test/v4/security.test.js"
+        },
+        {
+          "id": "S3",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "All API routes except health/pair/me require a valid session",
+          "evidence": "test/v4/security.test.js"
+        },
+        {
+          "id": "S4",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "CSRF header and same-origin enforcement on every mutating request",
+          "evidence": "test/v4/security.test.js"
+        },
+        {
+          "id": "S5",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Host-header allowlist blocks DNS rebinding",
+          "evidence": "test/v4/security.test.js"
+        },
+        {
+          "id": "S6",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Rate limiting per client for pairing, turns and general requests",
+          "evidence": "test/v4/security.test.js"
+        },
+        {
+          "id": "S7",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Request body size limits and JSON validation",
+          "evidence": "test/v4/security.test.js"
+        },
+        {
+          "id": "S8",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "CSP forbids inline script, framing and third-party origins",
+          "evidence": "test/v4/security.test.js"
+        },
+        {
+          "id": "S9",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Workspace tool refuses traversal, reserved names and overwrite",
+          "evidence": "test/v4/security.test.js"
+        },
+        {
+          "id": "S10",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Tool calls can never bypass the approval layer",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "S11",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "No API key, Authorization header or credential value reaches the client",
+          "evidence": "test/v4/models.test.js"
+        },
+        {
+          "id": "S12",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Plugin capabilities require declared permissions; undeclared use fails",
+          "evidence": "test/v4/kernel.test.js"
+        },
+        {
+          "id": "S13",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Prompt-injection corpus cannot escape the workspace, schema or approval layer",
+          "evidence": "test/v4/agent-failures.test.js"
+        },
+        {
+          "id": "S14",
+          "weight": 1,
+          "status": "NOT_STARTED",
+          "title": "External penetration test of the tunnelled deployment"
+        }
+      ]
+    },
+    {
+      "id": "CONVERSATION",
+      "title": "Conversation engine",
+      "criteria": [
+        {
+          "id": "C1",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Server-sent streaming of a real turn, tool calls included",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "C2",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Messages persist to disk and survive refresh/restart",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "C3",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Duplicate requestId is replayed, never executed twice",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "C4",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Cancellation propagates and is recorded as CANCELLED",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "C5",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Conversations are independent and correctly scoped",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "C6",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Errors are reported honestly and marked as errors in history",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "C7",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Conversation deletion is real (file removed)",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "C8",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "A correction is linked to the previous goal as a revision, not an orphan",
+          "evidence": "test/v4/resume.test.js"
+        },
+        {
+          "id": "C9",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "A second paired device sees the same conversation and goal state",
+          "evidence": "test/v4/resume.test.js"
+        }
+      ]
+    },
+    {
+      "id": "GOALS",
+      "title": "Goal lifecycle and verification",
+      "criteria": [
+        {
+          "id": "G1",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "V2 goal state machine reused unchanged; illegal transitions impossible",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "G2",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "A file write is only COMPLETED after the disk verifier matches SHA-256",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "G3",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Every action produces a receipt with evidence",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "G4",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "A goal left RUNNING by a crash becomes BLOCKED on boot, never silently completed",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "G5",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Completion is impossible without covered acceptance items",
+          "evidence": "test/v4/conversation.test.js"
+        },
+        {
+          "id": "G6",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Tool throw, schema break, timeout and budget all fail the turn honestly",
+          "evidence": "test/v4/agent-failures.test.js"
+        },
+        {
+          "id": "G7",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Resume re-verifies every acceptance item against recorded hashes before completing",
+          "evidence": "test/v4/resume.test.js"
+        },
+        {
+          "id": "G8",
+          "weight": 2,
+          "status": "NOT_STARTED",
+          "title": "Multi-step browser goal with DOM verification on the Windows host"
+        }
+      ]
+    },
+    {
+      "id": "MODELS",
+      "title": "Existing Windows configuration and model routing",
+      "criteria": [
+        {
+          "id": "A1",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "V1 config is read as the single source of truth; no second mobile configuration",
+          "evidence": "test/v4/models.test.js"
+        },
+        {
+          "id": "A2",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Configured and discovered models are listed without secrets",
+          "evidence": "test/v4/models.test.js"
+        },
+        {
+          "id": "A3",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "An unknown or unconfigured model id is refused by the server",
+          "evidence": "test/v4/models.test.js"
+        },
+        {
+          "id": "A4",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Model choice is scoped to one conversation and persisted",
+          "evidence": "test/v4/models.test.js"
+        },
+        {
+          "id": "A5",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "A broken or missing config degrades to a clearly labelled demo lane",
+          "evidence": "test/v4/models.test.js"
+        },
+        {
+          "id": "A6",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Live results are tracked separately from \"configured\" status",
+          "evidence": "test/v4/models.test.js"
+        },
+        {
+          "id": "A7",
+          "weight": 2,
+          "status": "BLOCKED",
+          "title": "Real inference through a configured provider from the phone",
+          "blocker": "Needs a real provider key and outbound network on the host; not available in this sandbox."
+        },
+        {
+          "id": "A8",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Live catalog discovery via V1 code, TTL cache and refresh",
+          "evidence": "test/v4/models.test.js"
+        }
+      ]
+    },
+    {
+      "id": "VOICE",
+      "title": "Realtime voice",
+      "criteria": [
+        {
+          "id": "V1",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Capability detection is honest: tap-to-talk, never advertised as continuous",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "V2",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Swedish/English recognition language follows the device",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "V3",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Permission, no-speech and network errors are explained to the user",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "V4",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Auto-send only a final transcript and never during an active turn",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "V5",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Markdown is stripped before speech synthesis",
+          "evidence": "test/v4/ui.test.js"
+        },
+        {
+          "id": "V6",
+          "weight": 2,
+          "status": "NOT_STARTED",
+          "title": "Measured TTS latency and barge-in on a real phone"
+        },
+        {
+          "id": "V7",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Server-side TTS/STT through the V2 voice lane (offline + real local subprocess)",
+          "evidence": "test/v4/voice-server.test.js"
+        }
+      ]
+    },
+    {
+      "id": "PLATFORM",
+      "title": "Platform kernel, plugins and flags",
+      "criteria": [
+        {
+          "id": "P1",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Versioned kernel API with frozen capability contracts",
+          "evidence": "test/v4/kernel.test.js"
+        },
+        {
+          "id": "P2",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Plugin manifests are validated and capabilities must be declared",
+          "evidence": "test/v4/kernel.test.js"
+        },
+        {
+          "id": "P3",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Failed plugin activation rolls back every registration",
+          "evidence": "test/v4/kernel.test.js"
+        },
+        {
+          "id": "P4",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Plugins are opt-in, allowlisted and experimental ones are flag-gated",
+          "evidence": "test/v4/kernel.test.js"
+        },
+        {
+          "id": "P5",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Failing plugin is quarantined with a written reason and not retried",
+          "evidence": "test/v4/sandbox.test.js"
+        },
+        {
+          "id": "P6",
+          "weight": 2,
+          "status": "VERIFIED",
+          "title": "Plugins run in a supervised child process with stripped env and call timeouts",
+          "evidence": "test/v4/sandbox.test.js"
+        },
+        {
+          "id": "P7",
+          "weight": 1,
+          "status": "VERIFIED",
+          "title": "Benchmark harness measures pass rate, latency, receipts and replays",
+          "evidence": "test/v4/benchmark.test.js"
+        }
+      ]
+    },
+    {
+      "id": "HOST",
+      "title": "Windows host and private deployment",
+      "criteria": [
+        {
+          "id": "H1",
+          "weight": 2,
+          "status": "NOT_STARTED",
+          "title": "Automatic startup on Windows after login, with crash recovery"
+        },
+        {
+          "id": "H2",
+          "weight": 2,
+          "status": "NOT_STARTED",
+          "title": "Health check and reconnect behaviour on the real host"
+        },
+        {
+          "id": "H3",
+          "weight": 2,
+          "status": "BLOCKED",
+          "title": "A verified private HTTPS URL reachable from a phone",
+          "blocker": "Requires the owner to run the tunnel on the Windows host with their own Cloudflare account."
+        },
+        {
+          "id": "H4",
+          "weight": 2,
+          "status": "BLOCKED",
+          "title": "iPhone Safari and Android Chrome open the real URL and send a message",
+          "blocker": "Depends on H3; no physical device in this environment."
+        },
+        {
+          "id": "H5",
+          "weight": 2,
+          "status": "NOT_STARTED",
+          "title": "Session history survives a host restart in the deployed environment"
+        },
+        {
+          "id": "H6",
+          "weight": 2,
+          "status": "NOT_STARTED",
+          "title": "Least-privilege account and desktop-session limitation handling"
+        }
+      ]
+    }
+  ]
+}

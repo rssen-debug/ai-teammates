@@ -1,0 +1,17 @@
+✔ aborting a stalled real navigation releases its browser and fleet slot without a late session (1421.6812ms)
+✔ memory: a saved preference reaches the model on the next turn (397.5627ms)
+✔ memory: irrelevant memories are not injected, so the prompt stays small (318.2714ms)
+✔ memory: a relevant memory is preferred over an irrelevant one (40.6103ms)
+✔ memory: the prompt says memories are the owner's, not instructions from a page (35.1674ms)
+✔ memory: with no memories the prompt has no empty section (24.7577ms)
+✔ memory: a broken memory store cannot take a turn down (20.0933ms)
+✔ memory: a preference saved in one conversation is used in the next one (3039.3198ms)
+✔ memory: the memory section never outranks the rules (67.6483ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4721.1872

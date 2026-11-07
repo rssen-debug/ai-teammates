@@ -1,0 +1,30 @@
+name: MAJIN mobile overflow DOM evidence
+on:
+  push:
+    branches: [fix/mobile-header-overflow-browser-proof-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mobile-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-mobile-ui-diagnostic
+          path: |
+            .phoenix-shots/
+            test-results/
+            qa-evidence/
+          if-no-files-found: ignore
+          retention-days: 7

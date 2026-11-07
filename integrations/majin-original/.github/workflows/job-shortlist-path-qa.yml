@@ -1,0 +1,25 @@
+name: MAJIN source-linked job shortlist target path gate
+on:
+  push:
+    branches: [fix/job-shortlist-target-path-repair-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: node --test test/agent-job-shortlist-path-pinning.test.js test/agent-atomic-job-shortlist.test.js
+      - run: npm test
+      - run: npm run check

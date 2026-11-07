@@ -1,0 +1,21 @@
+{
+  "id": "fb2c3f4b20992785",
+  "goal": "w13 matrix mission 1792548396696",
+  "nodes": [
+    {
+      "id": "n1",
+      "status": "verified",
+      "text": "part-n1-evidence"
+    },
+    {
+      "id": "n2",
+      "status": "running"
+    },
+    {
+      "id": "n3",
+      "status": "failed",
+      "text": "should not carry (failed != verified)"
+    }
+  ],
+  "savedAt": "2026-10-21T02:06:36.697Z"
+}

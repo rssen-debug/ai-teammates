@@ -1,0 +1,453 @@
+{
+  "schema": "majin.v4.final-test-evidence/v1",
+  "at": "2026-10-23T17:33:24.631Z",
+  "platform": "win32",
+  "note": "Suites overlap. Do not add these counts together. Live provider and physical devices are separate.",
+  "suites": [
+    {
+      "name": "V4 full regression",
+      "log": "v4-final-fixed.log",
+      "tests": 490,
+      "passed": 490,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "name": "V4 intermediate delivery regression (STT failure subsequently corrected)",
+      "log": "v4-final-delivery.log",
+      "tests": 491,
+      "passed": 490,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "status": "FAIL",
+          "name": "voice/stt: the local command lane returns a transcript, and an empty one stays inconclusive",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v4\\\\voice-server.test.js:185:1'",
+          "error": "|-"
+        }
+      ]
+    },
+    {
+      "name": "V4 final delivery regression",
+      "log": "v4-delivery-final.log",
+      "tests": 491,
+      "passed": 490,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "status": "FAIL",
+          "name": "e2e: real browser acceptance on phone viewports",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v4\\\\e2e.browser.test.js:60:1'",
+          "error": "|-"
+        }
+      ]
+    },
+    {
+      "name": "Final STT, filesystem and plugin corrections",
+      "log": "delivery-corrections.log",
+      "tests": 29,
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "name": "Final browser acceptance with atomic receipt snapshot and saved-byte checks",
+      "log": "browser-delivery-final.log",
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "name": "Legacy root regression",
+      "log": "legacy-final.log",
+      "tests": 1300,
+      "passed": 1233,
+      "failed": 44,
+      "skipped": 23,
+      "failures": [
+        {
+          "status": "FAIL",
+          "name": "registry + runtime: the promises kept",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\agent.test.js:156:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "jobs tools: registered, right risks, cv.set/show work end-to-end",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\jobs.test.js:140:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "V2 release identifiers align (2.0.0-alpha)",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\kokoro-narrator.test.js:25:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "/api/state and /api/config: right shape and redacted keys",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\server.test.js:274:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "standard är oförändrad: alla scheman skickas när flaggan är av",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\subset.test.js:29:1'",
+          "error": "'prompten ska fortfarande deklarera alla verktyg'"
+        },
+        {
+          "status": "FAIL",
+          "name": "schema: verktygs-skiktet äga 139 verktyg (5 control + 134 kärna — + power.propose/power.approve/power.apply (W6) tillagda medvetet)",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\tool-schema-contract.test.js:69:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "majin update works with no network at all and never crashes",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\update.test.js:222:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "1. keygen creates 0600 private key + public key; second run refuses silent rotation",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit-anchor.test.js:23:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "8. CLI: keygen → anchor → verify --with-anchor end-to-end, real child processes",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit-anchor.test.js:136:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "1. round trip: export → verify → BUNDLE_OK with chain/anchor/tsr verdicts composed honestly",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit-bundle.test.js:36:1'",
+          "error": "'REFUSED: chain.jsonl missing — cannot build a bundle of nothing'"
+        },
+        {
+          "status": "FAIL",
+          "name": "0. fixture is trustworthy: keygen material absent (private), chain + anchor verify independently",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit-tsr.test.js:30:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "1. TSR_STRUCTURAL: real token parses, imprint matches current anchor, genTime extracted — chain trust honestly NOT claimed",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit-tsr.test.js:36:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "2. TSR_MISMATCH: foreign token (meta imprint flipped) is a hard failure — never upgraded",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit-tsr.test.js:48:1'",
+          "error": "\"ENOENT: no such file or directory, open 'C:\\\\tmp\\\\tsr-fix-kpv1TC\\\\anchor-tsr.json'\""
+        },
+        {
+          "status": "FAIL",
+          "name": "3. TSR_STALE: later anchor without restamp leaves the token honestly stale (seq 1 proven, head newer)",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit-tsr.test.js:59:1'",
+          "error": "\"ENOENT: no such file or directory, open 'C:\\\\tmp\\\\tsr-fix-0WaGOC\\\\anchors.jsonl'\""
+        },
+        {
+          "status": "FAIL",
+          "name": "4. TSR_NOT_REQUESTED: no token file is inconclusive — never a failure and never an OK",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit-tsr.test.js:73:1'",
+          "error": "\"ENOENT: no such file or directory, unlink 'C:\\\\tmp\\\\tsr-fix-YUzLRp\\\\anchors.tsr'\""
+        },
+        {
+          "status": "FAIL",
+          "name": "5. requestTimestamp refuses without anchor (NO_ANCHOR) and keeps anchor intact on TSA refusal (TSA_REFUSED honest partial)",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit-tsr.test.js:82:1'",
+          "error": "\"ENOENT: no such file or directory, unlink 'C:\\\\tmp\\\\tsr-fix-fGYmnS\\\\anchors.tsr'\""
+        },
+        {
+          "status": "FAIL",
+          "name": "6. CLI: --audit-verify --with-anchor --with-tsr prints the honest TSR line on the fixture",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit-tsr.test.js:95:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "1. append/verify round-trip: chain intact, anchor equals computed head",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit.test.js:25:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "8. CLI --audit-verify: real child processes, ok exit 0 / broken exit 1 / usage exit 2",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-audit.test.js:163:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "test\\\\v2-deps-guard.test.js",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-deps-guard.test.js:1:1'",
+          "error": "'test failed'"
+        },
+        {
+          "status": "FAIL",
+          "name": "sandbox: HOLD tier waits for consent; after owner consent it executes",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-exec.test.js:77:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "1. BACK-COMPAT: fixture chain hashed by the legacy canonicalizer verifies under JCS",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-jcs-interop.test.js:40:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "4. hashEntry stability: fixture entry recomputes bit-identically (hash basis unchanged)",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-jcs-interop.test.js:76:1'",
+          "error": "\"ENOENT: no such file or directory, open 'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\test\\\\fixtures\\\\jcs-compat-chain\\\\chain.jsonl'\""
+        },
+        {
+          "status": "FAIL",
+          "name": "7. CLI --profile without env: exit 2 with the env var named, BEFORE any network",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-provider-profile.test.js:117:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "8. CLI --profile with env: banner shows keyRef+keyHash, NEVER the key itself",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-provider-profile.test.js:134:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "test\\\\v2-runbook-consistency.test.js",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-runbook-consistency.test.js:1:1'",
+          "error": "'test failed'"
+        },
+        {
+          "status": "FAIL",
+          "name": "1. INJECTION PROOF: $(...) in text passes literally, payload file PROVEN absent",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-safe-exec.test.js:21:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "4. ENV SCRUB: *_KEY/_TOKEN/_SECRET never cross; PATH/HOME survive",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-safe-exec.test.js:46:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "5. TIMEOUT is mandatory and honest: sleeper killed inside budget with elapsed evidence",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-safe-exec.test.js:55:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "6. output cap honest: flood → truncated flag, no silent loss, process exits",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-safe-exec.test.js:63:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "7. CLI: --enable-goals without --goal-workspace refuses exit 2 before binding any port",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-studio-goals.test.js:153:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "9. CLI --studio --enable-writes: real child, real grant over HTTP, audit chain has it on disk",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-studio-writes.test.js:140:1'",
+          "error": "'exited early 1: '"
+        },
+        {
+          "status": "FAIL",
+          "name": "7. CLI --studio: real child process serves /, SIGINT exits 0)",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\v2-studio.test.js:170:1'",
+          "error": "'exited early: 1: '"
+        },
+        {
+          "status": "FAIL",
+          "name": "one version literal, and package.json agrees with it",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\version.test.js:19:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "the installer shows the same version, from package.json",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\version.test.js:40:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "a freshly installed MAJIN never reports an update",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\version.test.js:50:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "speech recognition arms, sends actual user transcript and suspends while assistant speaks",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\voice-handsfree-regression.test.js:4:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "release version is consistent across all packaging paths",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\voice-handsfree-regression.test.js:26:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "keyboard turns do not trigger Talk; spoken turns stay hands-free",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\voice-handsfree-regression.test.js:47:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "w6: gate exits 0 and all local checks pass on the real repo",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\w6-release-gate.test.js:17:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "w6: json mode emits machine-parseable results",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\w6-release-gate.test.js:26:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "w6: a deliberately broken matrix makes the gate fail (sabotage-proven)",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\w6-release-gate.test.js:35:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "w6: a structurally empty package-lock.json blocks the gate",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\w6-release-gate.test.js:56:1'",
+          "error": "|-"
+        },
+        {
+          "status": "FAIL",
+          "name": "w6: a planted opencode-shaped key is caught; the repo dummy is NOT a false positive",
+          "location": "'C:\\\\Users\\\\krist\\\\Documents\\\\Codex\\\\2026-10-23\\\\har-d\\\\work\\\\MAJINCLI\\\\test\\\\w6-release-gate.test.js:73:1'",
+          "error": "|-"
+        }
+      ]
+    },
+    {
+      "name": "Current V1 browser regression",
+      "log": "browser-parity-final.log",
+      "tests": 136,
+      "passed": 131,
+      "failed": 0,
+      "skipped": 5,
+      "failures": []
+    },
+    {
+      "name": "Windows module/plugin/MCP portability",
+      "log": "windows-portability.log",
+      "tests": 57,
+      "passed": 57,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "name": "Windows remaining updater/timeout contracts",
+      "log": "windows-remaining.log",
+      "tests": 30,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "name": "Final release version/checkpoint contracts",
+      "log": "release-final-targeted.log",
+      "tests": 30,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "name": "Historical checkpoint compatibility",
+      "log": "checkpoint-compatibility.log",
+      "tests": 13,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "windows.native.installer",
+      "status": "PASS",
+      "evidence": "Per-user alpha.2 upgrade, data preservation, installed executable smoke and cold start on krist"
+    },
+    {
+      "id": "provider.live",
+      "status": "PASS",
+      "evidence": "live-model.json; authorized existing OpenCode/glm-5.3 route, streaming and verified file bytes"
+    },
+    {
+      "id": "provider.live.graph",
+      "status": "PASS",
+      "evidence": "live-orchestration.json; 8 actual model calls, peak concurrency 2, independent writes and dependent reads"
+    },
+    {
+      "id": "windows.native.cold-start",
+      "status": "PASS",
+      "evidence": "desktop-cold-smoke.json; real packaged host with demo inference"
+    },
+    {
+      "id": "windows.synthetic.desktop",
+      "status": "PASS",
+      "evidence": "windows-control.json; real Win32, pointer, cropped capture and pixel canary, injected planner"
+    },
+    {
+      "id": "mobile.chromium.layout",
+      "status": "PASS",
+      "evidence": "browser-run.json; five Chromium viewports, not physical phones"
+    },
+    {
+      "id": "ghost.deployment",
+      "status": "BLOCKED",
+      "evidence": "Ghost target is not connected to this execution environment"
+    },
+    {
+      "id": "mobile.physical.5g",
+      "status": "BLOCKED",
+      "evidence": "No physical iPhone/Android execution path; private Tailscale DNS unavailable here"
+    },
+    {
+      "id": "voice.physical",
+      "status": "BLOCKED",
+      "evidence": "No approved real microphone/device test completed"
+    },
+    {
+      "id": "release.production.signature",
+      "status": "BLOCKED",
+      "evidence": "No pinned production signing identity available; installer is a test artifact"
+    },
+    {
+      "id": "parity.excluded.capabilities",
+      "status": "FAIL",
+      "evidence": "FINAL_FEATURE_PARITY.md lists remaining channel, heartbeat, memory-sync and audit gaps"
+    },
+    {
+      "id": "native-shell.automatic-update",
+      "status": "FAIL",
+      "evidence": "Host updater does not replace a running Electron shell; native activation/rollback remains required"
+    },
+    {
+      "id": "history.inline-receipts",
+      "status": "FAIL",
+      "evidence": "History rehydration renders messages without transient inline tool cards; receipts remain server-side"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-23T22:46:42.506Z",
+  "sourceParent": "f01dc187e6007f940412dfa2c8fda7623dfe253c",
+  "verdict": "NOT READY",
+  "existingEngine": "src/core/schedule.js",
+  "tests": {
+    "passed": 16,
+    "failed": 0,
+    "skipped": 0,
+    "scope": "Core scheduler and existing V1 read-only regression; not V4 end-to-end monitoring."
+  },
+  "actualProcessCrashCheckpoint": true,
+  "failedStartDispatchesNoAction": true,
+  "unsafeCronBoundedInChildProcess": true,
+  "atomicStoreFailureReported": true,
+  "v4ScheduleBinding": false,
+  "lockedIphonePushPass": false,
+  "priorFormFailuresPreserved": 5
+}

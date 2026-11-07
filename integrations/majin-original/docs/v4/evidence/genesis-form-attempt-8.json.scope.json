@@ -1,0 +1,15 @@
+{
+  "ordinaryGhostActivationProven": false,
+  "isolatedHost": true,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "roundCap": 24,
+  "toolCallCap": 32,
+  "checkoutHead": "52d5d04d2b06fb3df0e7a15a63f58f1ceae5c20b",
+  "dirtyCheckout": true,
+  "note": "Executed with uncommitted browser field-state/no-op-select changes, not the clean sourceCommit tree. Ordinary-host activation is not proven. Attempt 8 threw at approval budget: its original empty successfulActions/trace arrays are incomplete telemetry, not evidence that no actions occurred; independent server proof records a rejected upload submission."
+}

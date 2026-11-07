@@ -1,0 +1,55 @@
+{
+  "at": "2026-10-23T21:15:55.267Z",
+  "sourceCommit": "01c97b46fa093b4faa368baef294cdcec064add3",
+  "kind": "real-Go-host-tool-discovery",
+  "httpStatus": 200,
+  "conversationId": "conv_mvlgx5lv_3b82867ac30a",
+  "status": "completed",
+  "completed": true,
+  "artifact": "genesis-host-inspection-1792790072837.json",
+  "verifiedAgainstNodeOs": true,
+  "observed": {
+    "platform": "win32",
+    "logicalCpus": 4
+  },
+  "physicalPhonePass": false,
+  "universalAcceptanceComplete": false,
+  "approvedScope": "inspected read-only Node OS/platform/CPU query and its exact job wait only",
+  "productionBudgets": {
+    "modelRounds": 12,
+    "toolCalls": 24
+  },
+  "originalIncompleteEvidence": "ghost-tool-discovery.json",
+  "continuedAfterScopedApprovals": true,
+  "oneUseApprovals": 2,
+  "toolAttempts": [
+    "sys_info",
+    "tools_search",
+    "exec_backends",
+    "exec_start",
+    "exec_start",
+    "exec_wait",
+    "exec_wait",
+    "workspace_write",
+    "workspace_read"
+  ],
+  "successfulActions": [
+    "sys_info",
+    "tools_search",
+    "exec_backends",
+    "exec_start",
+    "exec_wait",
+    "workspace_write",
+    "workspace_read"
+  ],
+  "executionCounts": {
+    "sys_info": 1,
+    "tools_search": 1,
+    "exec_backends": 1,
+    "exec_start": 1,
+    "exec_wait": 1,
+    "workspace_write": 1,
+    "workspace_read": 1
+  },
+  "goalState": "COMPLETED"
+}

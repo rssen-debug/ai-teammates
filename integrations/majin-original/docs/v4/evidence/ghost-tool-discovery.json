@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-23T20:51:16.135Z",
+  "sourceCommit": "909d758e5c10ce8d58d62cca67cd78a5a8da4bdd",
+  "kind": "real-Go-host-tool-discovery",
+  "httpStatus": 200,
+  "completed": false,
+  "actions": [
+    "sys_info",
+    "exec_backends",
+    "exec_start"
+  ],
+  "artifact": "genesis-host-inspection-1792788671851.json",
+  "verifiedAgainstNodeOs": false,
+  "observed": null,
+  "physicalPhonePass": false,
+  "universalAcceptanceComplete": false
+}

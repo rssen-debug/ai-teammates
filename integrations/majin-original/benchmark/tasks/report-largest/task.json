@@ -1,0 +1,25 @@
+{
+  "version": "majin-competitive-bench/1",
+  "category": "file-operations",
+  "difficulty": "easy",
+  "instruction": "The candidate workspace contains a data/ dir with files of different sizes. Write report.json at the workspace root: {\"largest\":[...]} — the two largest file NAMES sorted by descending byte size. Do not modify anything in data/.",
+  "verify": { "cmd": "node", "script": "verify.mjs", "timeoutMs": 10000 },
+  "fixtures": {
+    "good": {
+      "data/a.txt": "aaaaaaaaaa",
+      "data/b.log": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "data/c.bin": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "report.json": "{\"largest\":[\"c.bin\",\"b.log\"]}\n"
+    },
+    "bad": {
+      "data/a.txt": "aaaaaaaaaa",
+      "data/b.log": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "data/c.bin": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "report.json": "{\"largest\":[\"a.txt\",\"b.log\"]}\n"
+    }
+  },
+  "lanes": {
+    "majin": { "requiresProvider": true, "note": "agent-loop needs a model — pending creds" },
+    "raw-baseline": { "requiresProvider": true, "note": "single-shot bare model, same verifier" }
+  }
+}

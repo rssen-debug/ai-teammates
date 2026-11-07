@@ -1,0 +1,28 @@
+name: MAJIN interactive Windows acceptance (personal runner)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  interactive:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [majin-interactive]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install project dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run MAJIN interactive Windows acceptance
+        shell: powershell
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'majin-interactive-acceptance.json'
+          & powershell -NoProfile -ExecutionPolicy Bypass -File qa\win-acceptance\run-all.ps1 -Out $out
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/verify-win-acceptance.mjs $out --gate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      # Deliberately DO NOT upload screenshots or personal desktop artifacts.

@@ -1,0 +1,26 @@
+name: MAJIN Qwen .mjs CommonJS error feedback regression
+on:
+  push:
+    branches: [fix/qwen3b-cli-require-runtime-safety-rebased-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  esmodule-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: node --check src/core/goal-artifact.js
+      - run: node --test test/esm-cli-write-repair.test.js test/instant-js-write-feedback.test.js test/agent-js-syntax-evidence.test.js
+      - run: npm test
+      - run: npm run check

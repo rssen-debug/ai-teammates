@@ -1,0 +1,33 @@
+name: MAJIN full model response timeout regression
+on:
+  push:
+    branches: [fix/llm-stream-deadline-entire-response-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-response-deadline:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install
+        run: npm ci --no-fund --no-audit
+      - name: Syntax check
+        run: |
+          node --check src/core/provider/openai.js
+          node --check test/provider-response-deadline.test.js
+      - name: Timeout behavior over streaming bodies
+        run: node --test test/provider-response-deadline.test.js
+      - name: Full suite
+        run: npm test
+      - name: Repository checks
+        run: npm run check

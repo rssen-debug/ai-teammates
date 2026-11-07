@@ -1,0 +1,18 @@
+{
+  "type": "audio/mp4;codecs=opus",
+  "interrupted": 1,
+  "states": [
+    "requesting",
+    "listening",
+    "transcribing",
+    "idle"
+  ],
+  "errors": [],
+  "active": false,
+  "timer": null,
+  "track": "ended",
+  "encodedBytes": 12753,
+  "physicalDevice": false,
+  "source": "WebAudio oscillator",
+  "at": "2026-10-23T19:32:46.117Z"
+}

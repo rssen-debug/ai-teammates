@@ -1,0 +1,11 @@
+{
+  "version": "4.0.0-alpha.3",
+  "runtimeSourceCommit": "4239555474336786a2ef4be69744250963439d86",
+  "sourceFilesCompared": 262,
+  "installedSourceMatches": true,
+  "sha256": "bbce76dc4321cf4409578052a78bd39b7a3ba18ea5860b4138e3d2597afc94c9",
+  "bytes": 138439245,
+  "installerAuthenticode": "NotSigned",
+  "bundledNodeAuthenticode": "Valid",
+  "productionReleasePublished": false
+}

@@ -1,0 +1,16 @@
+{
+  "at": "2026-10-23T23:30:48.125Z",
+  "source": "Real Go software repair3; actual model-created files, preserved without manual correction",
+  "hashes": [
+    {
+      "name": "genesis-expenses-fa1ba1768e.mjs",
+      "bytes": 3305,
+      "sha256": "f6e0044806e51136b2f724ed406a83b00735f375eb02c6902b4f31d91c154f7f"
+    },
+    {
+      "name": "genesis-expenses-fa1ba1768e.test.mjs",
+      "bytes": 3730,
+      "sha256": "7139665e4e488de7ca2d3d5b435089c19cbbd176c92a05e1f1096c26204d91ce"
+    }
+  ]
+}

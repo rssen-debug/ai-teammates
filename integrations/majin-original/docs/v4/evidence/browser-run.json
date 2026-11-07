@@ -1,0 +1,42 @@
+{
+  "at": "2026-10-24T00:30:50.273Z",
+  "engine": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "node": "24.20.0",
+  "results": [
+    {
+      "viewport": "iphone-13",
+      "w": 390,
+      "h": 844,
+      "verifiedTool": true,
+      "historicalReceipts": true
+    },
+    {
+      "viewport": "pixel-7",
+      "w": 412,
+      "h": 915,
+      "verifiedTool": true,
+      "historicalReceipts": true
+    },
+    {
+      "viewport": "iphone-se",
+      "w": 375,
+      "h": 667,
+      "verifiedTool": true,
+      "historicalReceipts": true
+    },
+    {
+      "viewport": "ipad",
+      "w": 820,
+      "h": 1180,
+      "verifiedTool": true,
+      "historicalReceipts": true
+    },
+    {
+      "viewport": "desktop",
+      "w": 1280,
+      "h": 800,
+      "verifiedTool": true,
+      "historicalReceipts": true
+    }
+  ]
+}

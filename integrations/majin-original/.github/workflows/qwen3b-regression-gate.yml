@@ -1,0 +1,108 @@
+name: MAJIN optional Qwen 3B local compatibility QA (known case 05 timeout)
+# NOT a Windows / OpenCode Go release gate. Real 3B case 05 timeout tracked in #223.
+# Still run on a weekly schedule and on demand; every failure stays red with artifacts.
+on:
+  schedule:
+    - cron: '19 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Run the full 11-task battery instead of three core scenarios
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: real-free-model-regression-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  actual-free-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      CI: 'true'
+      MAJIN_QA_SANDBOX: '1'
+      QA_MODEL: qwen2.5:3b
+      QA_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.full && '01,02,03,04,05,06,07,08,09,10,11' || '01,04,05' }}
+      MAJIN_LLM_LOCAL_TIMEOUT: '75000'
+      MAJIN_LLM_TIMEOUT: '75000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies, Docker CLI image and verify script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-fund --no-audit
+          node --check scripts/qa/prompt-battery.mjs
+          docker pull node:22-alpine
+      - name: Install Chromium for full browser battery only
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full }}
+        run: npx playwright install chromium
+      - name: Start and pull a REAL local Qwen model
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/majin-ollama.log 2>&1 &
+          for i in $(seq 1 50); do
+            if curl -fs http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
+            sleep 2
+          done
+          curl -fs http://127.0.0.1:11434/api/tags >/dev/null
+          # Ollama's CDN can return transient 503 near the end of a 1.9 GB pull.
+          # Retry boundedly without claiming the real-model battery ran if the
+          # infrastructure never delivered the weights. Cached layers survive retries.
+          model_ok=false
+          for attempt in 1 2 3; do
+            if timeout 900 ollama pull "$QA_MODEL" > "$RUNNER_TEMP/majin-ollama-pull.log" 2>&1; then
+              model_ok=true
+              echo "Qwen model downloaded on attempt $attempt"
+              break
+            fi
+            echo "::warning::Ollama model pull failed (attempt $attempt/3). Diagnostic tail:"
+            tail -n 3 "$RUNNER_TEMP/majin-ollama-pull.log" | tr '\\r' '\\n' | tail -n 6 || true
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
+          done
+          if [ "$model_ok" != true ]; then
+            echo "::error::INFRA_BLOCKED: model download failed three times; no live-model pass is claimed"
+            exit 1
+          fi
+          echo "MAJIN_HOME=$(mktemp -d /tmp/majin-real-gate.XXXXXXXX)" >> "$GITHUB_ENV"
+          echo "QA_EVID=$GITHUB_WORKSPACE/qa-evidence" >> "$GITHUB_ENV"
+      - name: Run actual MAJIN tool-use outcomes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/qa/prompt-battery.mjs 2>&1 | tee real-qa-console.log
+      - name: Report PASS FAIL BLOCKED and NOT TESTED without disguising failures
+        if: always()
+        shell: bash
+        run: |
+          if [ -f qa-evidence/prompt-battery.json ]; then
+            node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync("qa-evidence/prompt-battery.json","utf8"));let s="## Genuine Qwen "+x.model+" QA\n\n";s+="| Case | Result | Details |\n|---|---|---|\n";for(const c of x.cases)s+="| "+c.id+" "+c.category+" | "+c.status+" | "+String(c.reason).replace(/\|/g,"/").slice(0,170)+" |\n";s+="\n"+JSON.stringify(x.summary);fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,s+"\n");'
+          else
+            echo "No verdict JSON produced — do not treat this run as passed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve all independent evidence even when a case fails
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${MAJIN_HOME:-}" ] && [ -d "$MAJIN_HOME/workspace" ]; then
+            mkdir -p qa-workspace
+            cp -r "$MAJIN_HOME/workspace/." qa-workspace/ || true
+          fi
+      - name: Upload per-case traces and outputs even when red
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-free-model-evidence
+          path: |
+            qa-evidence/
+            qa-workspace/
+            real-qa-console.log
+          retention-days: 30
+          if-no-files-found: warn

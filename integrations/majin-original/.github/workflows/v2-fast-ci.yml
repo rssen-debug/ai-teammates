@@ -1,0 +1,44 @@
+name: MAJIN V2 fast CI (V2 branches only)
+#
+# Dedicated V2 quality gate. Runs ONLY on v2/* branches and PRs into v2/main.
+# Never publishes anything: no tags, no releases, read-only permissions.
+# Production V1 publishing remains exclusively on main (build-exe.yml).
+
+on:
+  push:
+    branches: [v2/**]
+  pull_request:
+    branches: [v2/main]
+permissions:
+  contents: read
+concurrency:
+  group: v2-fast-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  fast-suite:
+    name: V2 static checks and full node test suite (no publishing)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: V2 identity check (package.json must not be a V1 patch version)
+        run: |
+          node -e "
+          const v=require('./package.json').version;
+          if(!v.startsWith('2.0.0')){ console.error('V2 branch must identify as 2.0.0-alpha*, found '+v); process.exit(1); }
+          console.log('V2 identity OK:', v);"
+      - name: Syntax check core entry points
+        run: |
+          node --check src/core/loop.js
+          node --check src/core/version.js
+          node --check src/core/tools/computer.js
+          node --check src/core/pink-cursor.js
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Full node test suite
+        run: npm test
+      - name: MAJIN GAUNTLET (deterministic end-to-end verification scenarios)
+        run: node scripts/gauntlet/v2-gauntlet.mjs

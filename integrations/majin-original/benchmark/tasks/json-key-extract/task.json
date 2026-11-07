@@ -1,0 +1,17 @@
+{
+  "version": "majin-competitive-bench/1",
+  "category": "json-processing",
+  "difficulty": "easy",
+  "instruction": "The candidate workspace contains api-response.json (nested junk). Write out.json at the root containing EXACTLY {\"endpoint\": <string>, \"status\": <number>} taken from the nested payload (payload.meta.endpoint and payload.status). No extra keys.",
+  "verify": { "cmd": "node", "script": "verify.mjs", "timeoutMs": 10000 },
+  "fixtures": {
+    "good": {
+      "api-response.json": "{\"noise\":[[1,2],{\"x\":\"y\"}],\"payload\":{\"endpoint\":\"https://api.example.com/v2/orders\",\"status\":201,\"more\":{\"junk\":[true,null]}}}\n",
+      "out.json": "{\"endpoint\":\"https://api.example.com/v2/orders\",\"status\":201}\n"
+    },
+    "bad": {
+      "api-response.json": "{\"noise\":[[1,2],{\"x\":\"y\"}],\"payload\":{\"endpoint\":\"https://api.example.com/v2/orders\",\"status\":201,\"more\":{\"junk\":[true,null]}}}\n",
+      "out.json": "{\"endpoint\":\"https://api.example.com/v1/orders\",\"status\":201,\"extra\":\"I invented this\"}\n"
+    }
+  }
+}

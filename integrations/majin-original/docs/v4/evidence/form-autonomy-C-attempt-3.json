@@ -1,0 +1,582 @@
+{
+  "at": "2026-10-24T07:59:06.474Z",
+  "kind": "C",
+  "passed": true,
+  "checks": {
+    "realModelCompleted": true,
+    "sameGenuineProvider": true,
+    "exactlyOneAccepted": true,
+    "allRequestedValues": true,
+    "exactFileBytes": true,
+    "savedVerifiedReceipt": true,
+    "noDeniedAction": true,
+    "validationRecovery": true
+  },
+  "failure": null,
+  "status": "completed",
+  "elapsedMs": 30450,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "sourceHead": "704de6320341993adb50303b8e11e646cca64710",
+  "dirtyCheckout": true,
+  "sourceHashes": {
+    "src/core/browser-form.js": "109a121be015b639f1eb65b65f703bf9e9cccadaa31f9c87937f1c90f7f81c47",
+    "src/core/tools/web.js": "dafeee5a51603272f23535442896fcf56cf421e6d5f5d6a0fcfa727601351eb1",
+    "src/v4/agent.js": "93b8bdba09787d1fde8722013abbf2d222fee0b4234434921d26f0515ade84f6",
+    "src/v4/tools/host.js": "033d84625a240b1e42e174d2e96716a9073fe2d107dfdce0ce1d4cff6c435e97",
+    "scripts/v4/evals/form-autonomy.mjs": "a57cf7aad4df8976cc08822f96545b428cc4c8dffdb082547268529615d4b2ae",
+    "scripts/v4/evals/form-autonomy-fixtures.mjs": "402e5f4c24dd54e62e4c46711e45bdb135f0ebbde44ce320345e5a4e7675a8af"
+  },
+  "modelRounds": 10,
+  "toolCalls": 9,
+  "uniqueToolRequests": 9,
+  "approved": [
+    "browser_open",
+    "browser_form_fill",
+    "browser_form_submit",
+    "browser_form_fill",
+    "browser_form_submit"
+  ],
+  "denied": [],
+  "stagnationStop": false,
+  "toolFailures": [
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a6220f4359b867ee",
+        "name": "browser_form_submit",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool browser_form_submit input failed schema at button: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bf0f254ccdd934e2",
+        "name": "workspace_read",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool workspace_read input failed schema at fileName: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    }
+  ],
+  "trace": [
+    {
+      "event": "state",
+      "seq": 4,
+      "data": {
+        "state": "thinking",
+        "round": 1
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 5,
+      "data": {
+        "id": "chatcmpl-tool-ba265028f900b634",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:63906/"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-ba265028f900b634",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:63906/"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-ba265028f900b634",
+        "name": "browser_open",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_ed80e0ff8df41abe"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 2
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-aa02f1ca21915177",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Allow this isolated application": true,
+            "Applicant name": "Atlas bb04ce78df",
+            "Application attachment": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt3\\home\\workspace\\form-C-fb4792abf603.txt",
+            "Email address": "person-bb04ce78df@example.invalid",
+            "Number of participants": "4"
+          }
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-aa02f1ca21915177",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Allow this isolated application": true,
+            "Applicant name": "Atlas bb04ce78df",
+            "Application attachment": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt3\\home\\workspace\\form-C-fb4792abf603.txt",
+            "Email address": "person-bb04ce78df@example.invalid",
+            "Number of participants": "4"
+          }
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-aa02f1ca21915177",
+        "name": "browser_form_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_84804288affb7899",
+        "formProgress": {
+          "verifiedFields": 5,
+          "recoveries": 0,
+          "strategies": [
+            "live_field"
+          ]
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 3
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-82ceec1373db0df8",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Send application"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-82ceec1373db0df8",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Send application"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-82ceec1373db0df8",
+        "name": "browser_form_submit",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_6731c390d1e2a454"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 4
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-96f8f24d2b694a4a",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Application attachment": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt3\\home\\workspace\\form-C-fb4792abf603.txt",
+            "Review phrase": "CLEAR"
+          }
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-96f8f24d2b694a4a",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Application attachment": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt3\\home\\workspace\\form-C-fb4792abf603.txt",
+            "Review phrase": "CLEAR"
+          }
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-96f8f24d2b694a4a",
+        "name": "browser_form_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_2e069c9de3fe7d17",
+        "formProgress": {
+          "verifiedFields": 2,
+          "recoveries": 0,
+          "strategies": [
+            "live_field"
+          ]
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 5
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a6220f4359b867ee",
+        "name": "browser_form_submit",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a6220f4359b867ee",
+        "name": "browser_form_submit",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool browser_form_submit input failed schema at button: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 6
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-aca744276a8c0476",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Send application"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-aca744276a8c0476",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Send application"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-aca744276a8c0476",
+        "name": "browser_form_submit",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_cf65dd6c31726764"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 7
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b82207b1ed856e0b",
+        "name": "workspace_write",
+        "input": {
+          "fileName": "receipt-C-fb4792abf603.txt",
+          "chars": 62
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b82207b1ed856e0b",
+        "name": "workspace_write",
+        "ok": true,
+        "verified": true,
+        "summary": "receipt-C-fb4792abf603.txt · 62 byte",
+        "receiptId": "rcpt_cc04195f8b8cd49a"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 8
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bf0f254ccdd934e2",
+        "name": "workspace_read",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bf0f254ccdd934e2",
+        "name": "workspace_read",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool workspace_read input failed schema at fileName: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    },
+    {
+      "event": "recovery",
+      "seq": 0,
+      "data": {
+        "tool": "workspace_read",
+        "failureClass": "INVALID_TOOL_INPUT:MAJIN",
+        "action": "none",
+        "advice": [
+          "replan"
+        ],
+        "budget": 2
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 9
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-94464406be437fca",
+        "name": "workspace_read",
+        "input": {
+          "fileName": "receipt-C-fb4792abf603.txt"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-94464406be437fca",
+        "name": "workspace_read",
+        "ok": true,
+        "verified": true,
+        "summary": "receipt-C-fb4792abf603.txt · 62 byte",
+        "receiptId": "rcpt_c9a6b1472d94e7d0"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 10
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "verifying"
+      }
+    }
+  ],
+  "proof": {
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/",
+        "origin": null
+      },
+      {
+        "method": "GET",
+        "path": "/favicon.ico",
+        "origin": null
+      },
+      {
+        "method": "POST",
+        "path": "/submit",
+        "origin": "http://127.0.0.1:63906"
+      },
+      {
+        "method": "POST",
+        "path": "/submit",
+        "origin": "http://127.0.0.1:63906"
+      }
+    ],
+    "submissions": [
+      {
+        "values": {
+          "name": "Atlas bb04ce78df",
+          "email": "person-bb04ce78df@example.invalid",
+          "quantity": "4",
+          "consent": "on"
+        },
+        "uploadBytes": 61,
+        "uploadSha256": "993bd99fb26f617eadc0e6191bfc7de987f60a4969e4d677557f5e0173f4f845",
+        "accepted": false,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+      },
+      {
+        "values": {
+          "name": "Atlas bb04ce78df",
+          "email": "person-bb04ce78df@example.invalid",
+          "quantity": "4",
+          "phrase": "CLEAR",
+          "consent": "on"
+        },
+        "uploadBytes": 61,
+        "uploadSha256": "993bd99fb26f617eadc0e6191bfc7de987f60a4969e4d677557f5e0173f4f845",
+        "accepted": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+      }
+    ],
+    "steps": [],
+    "accepted": {
+      "receipt": "ACCEPT-bcfe39d53c518c8b9f6e921e",
+      "values": {
+        "name": "Atlas bb04ce78df",
+        "email": "person-bb04ce78df@example.invalid",
+        "quantity": "4",
+        "phrase": "CLEAR",
+        "consent": "on"
+      },
+      "uploadSha256": "993bd99fb26f617eadc0e6191bfc7de987f60a4969e4d677557f5e0173f4f845"
+    },
+    "challenge": true
+  },
+  "artifacts": {
+    "fileName": "form-C-fb4792abf603.txt",
+    "receiptName": "receipt-C-fb4792abf603.txt"
+  },
+  "recoveryActions": [],
+  "ordinaryGhostActivationProven": false,
+  "isolatedTestHost": true,
+  "physicalAcceptance": false,
+  "cost": {
+    "currencyAmount": null,
+    "reason": "Provider billing not independently supplied; token telemetry must not be converted to an invented price"
+  }
+}

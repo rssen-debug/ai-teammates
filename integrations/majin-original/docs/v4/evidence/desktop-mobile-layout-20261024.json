@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-24T07:24:29.030Z",
+  "ordinaryHostServesV4": true,
+  "sourceCommit": "98d21f94fac8e58feefa22714abfab03173296dc",
+  "dirtyChanges": "desktop default bounds only; shared UI unchanged",
+  "results": [
+    {
+      "name": "desktop-app",
+      "width": 520,
+      "height": 860,
+      "mobile": false,
+      "sharedV4UI": true,
+      "heading": true,
+      "noSuggestionButtons": true,
+      "inputFocused": true,
+      "sendEnabled": true,
+      "historyOpened": true,
+      "overlayBlocking": false,
+      "nativeWindowProven": false,
+      "isolatedDemoHost": true
+    },
+    {
+      "name": "iphone-layout",
+      "width": 390,
+      "height": 844,
+      "mobile": true,
+      "sharedV4UI": true,
+      "heading": true,
+      "noSuggestionButtons": true,
+      "inputFocused": true,
+      "sendEnabled": true,
+      "historyOpened": true,
+      "overlayBlocking": false,
+      "nativeWindowProven": false,
+      "isolatedDemoHost": true
+    }
+  ]
+}

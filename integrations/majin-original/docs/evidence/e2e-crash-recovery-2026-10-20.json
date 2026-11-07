@@ -1,0 +1,36 @@
+{
+ "schema": "majin.e2e-crash-recovery.v1",
+ "ts": "2026-10-20T06:38:50.179Z",
+ "session": "e2e-12b-crash",
+ "phases": {
+  "checkpointWritten": {
+   "ok": true,
+   "path": "e2e-12b-crash.handoff.json",
+   "goal": "E2E_PROBE: list the nine test steps and mark step 4 in progr",
+   "to": "ollama/smollm2:135m"
+  },
+  "crashResume": {
+   "consumedCheckpoint": true,
+   "goal": "E2E_PROBE: list the nine test steps and mark step 4 in progr",
+   "lastProgress": "E2E_PROBE: steps 1-3 done (tool run fs.list); step 4 in prog",
+   "from": "opencode/longcat-2.5-preview-free",
+   "to": "ollama/smollm2:135m",
+   "idempotent": true,
+   "fileStillExists": true,
+   "fileMarkedConsumed": true
+  },
+  "journalAtomicity": {
+   "found": true,
+   "lines": 4,
+   "completeLines": 4,
+   "tornLines": 0
+  }
+ },
+ "verdict": {
+  "checkpointPersisted": true,
+  "resumeAfterAbruptDeath": true,
+  "resumeIsIdempotent": true,
+  "journalUntorn": true,
+  "allPass": true
+ }
+}

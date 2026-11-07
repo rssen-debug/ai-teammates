@@ -1,0 +1,81 @@
+{
+  "at": "2026-10-24T07:01:51.023Z",
+  "sourceCommit": "52d5d04d2b06fb3df0e7a15a63f58f1ceae5c20b",
+  "kind": "real-Go-unfamiliar-local-form",
+  "passed": false,
+  "checks": {
+    "realModelCompleted": false,
+    "providerUnchanged": true,
+    "browserUpload": true,
+    "browserInteraction": true,
+    "validationRecovered": false,
+    "oneAcceptedRegistration": false,
+    "exactUploadedBytes": false,
+    "savedObservedReceipt": false
+  },
+  "failure": "model round budget exhausted (12); task is incomplete",
+  "status": "failed",
+  "elapsedMs": 46144,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "conversationId": "conv_mvm1vfv2_25955ba4f00f",
+  "successfulActions": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_elements",
+    "browser_upload",
+    "browser_click",
+    "browser_click",
+    "browser_read",
+    "browser_shot",
+    "browser_read",
+    "browser_elements",
+    "browser_read",
+    "browser_read",
+    "browser_shot"
+  ],
+  "toolFailures": [
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "browser.fill cannot set a checkbox — Use browser.click with this exact selector and confirm the checked result. The control was not modified."
+    }
+  ],
+  "oneUseApprovals": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_click",
+    "browser_click"
+  ],
+  "deniedActions": [],
+  "proof": {
+    "submissions": [],
+    "needsSlot": false,
+    "accepted": null
+  },
+  "artifacts": {
+    "uploadName": "genesis-form-upload-0bd613b5f32b.txt",
+    "receiptName": "genesis-form-receipt-0bd613b5f32b.txt"
+  },
+  "physicalPhonePass": false,
+  "fullScenarioAComplete": false,
+  "note": "Controlled dynamic-form/upload/validation acceptance only; external authentication handoff, cancellation and other real-world gates remain separate."
+}

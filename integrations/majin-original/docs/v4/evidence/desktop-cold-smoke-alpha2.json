@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-23T17:31:00.872Z",
+  "status": "PASS",
+  "packagedHost": true,
+  "bundledNode": true,
+  "firstConnection": true,
+  "pairing": true,
+  "verifiedOutput": true,
+  "survivesClientClose": true,
+  "inference": "demo; no production credentials accessed"
+}

@@ -1,0 +1,55 @@
+name: MAJIN V4 CI
+
+on:
+  push:
+    branches: [v4/main]
+  pull_request:
+    branches: [v4/main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v4-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: V4 test suite
+        # Serial on CI on purpose. The suite binds real ports and spawns real
+        # child processes; running files in parallel means several processes
+        # choose ports at once, and a collision is a flake, not a bug. Locally
+        # `npm run v4:test` stays parallel for speed.
+        shell: bash
+        run: |
+          # A failing run used to leave nothing readable outside the runner: the
+          # job log lives in blob storage. Emit the failing lines as annotations,
+          # which the API can read, so a flake can actually be diagnosed.
+          set +e
+          node --test --test-concurrency=1 test/v4/*.test.js > v4-test.out 2>&1
+          code=$?
+          tail -120 v4-test.out
+          if [ $code -ne 0 ]; then
+            fails=$(grep -E '^not ok|error:|failureType' v4-test.out | head -30 | tr '\n' '|')
+            echo "::error title=V4 suite failure::$fails"
+          fi
+          exit $code
+      - name: Acceptance matrix integrity (weights = 100, evidence required)
+        run: npm run v4:progress -- --check
+      - name: Host doctor (must not report a blocking failure)
+        run: node scripts/v4/host-doctor.mjs --json
+        env:
+          MAJIN_HOME: ${{ runner.temp }}/majin-ci
+      - name: Parse all sources
+        run: npm run check
+      - name: No stray non-English literals in shipped code
+        run: npm run i18n

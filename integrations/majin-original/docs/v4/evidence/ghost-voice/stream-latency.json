@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-23T20:29:38.668Z",
+  "kind": "synthetic-loopback-tts-only",
+  "physicalDevicePass": false,
+  "health": {
+    "ok": true,
+    "engine": "kokoro-onnx",
+    "voice": "am_adam",
+    "local": true,
+    "stt": false,
+    "streamingTts": true
+  },
+  "text": "I can help you build and test a small application. First I will inspect the available tools and your working files. Then I will verify the result and report any remaining blockers.",
+  "firstMs": 4270,
+  "streamedMs": 13503,
+  "chunks": 3,
+  "fullMs": 11563,
+  "fullBytes": 494540
+}

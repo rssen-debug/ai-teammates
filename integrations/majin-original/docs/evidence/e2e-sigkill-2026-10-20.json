@@ -1,0 +1,24 @@
+{
+ "schema": "majin.e2e-sigkill.v1",
+ "ts": "2026-10-20T06:35:32.016Z",
+ "kill": {
+  "signal": "SIGKILL",
+  "midGeneration": true,
+  "victimExit": 137
+ },
+ "postKillJournalAudit": {
+  "files": 15,
+  "records": 28,
+  "tornRecords": 0,
+  "tornFiles": []
+ },
+ "postKillLaneAlive": {
+  "ok": true,
+  "elapsedMs": 2138,
+  "reply": "\"Yes,\"\n\n"
+ },
+ "verdict": {
+  "noTornJournalAfterSigkill": true,
+  "laneAliveAfterSigkill": true
+ }
+}

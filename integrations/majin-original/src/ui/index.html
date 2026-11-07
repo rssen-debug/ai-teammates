@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="en" translate="no">
+<head>
+<meta charset="utf-8" />
+<meta name="google" content="notranslate" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MAJIN</title>
+<link rel="icon" type="image/png" href="/logo.png?v=__MAJIN_FAVICON_VERSION__" />
+<link rel="apple-touch-icon" href="/logo.png" />
+<style>
+:root{--bg:#0b0509;--bg2:#160a12;--bg3:#10070e;--ink:#f7dbe9;--dim:#bb8ba3;--cy:#ff8fd0;--pink:#ffc9dd;--cysoft:rgba(255,143,208,.16);--ok:#7ce0b6;--warn:#ffd479;--bad:#ff7a9a;--line:#3a1a2c;--mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,"Roboto Mono",monospace}
+body.light{--bg:#fbf3f7;--bg2:#f5e6ee;--bg3:#fff;--ink:#2b1220;--dim:#8a5f74;--cy:#c2185b;--pink:#e05c9c;--cysoft:rgba(194,24,91,.10);--ok:#0f7a4f;--warn:#8a5b00;--bad:#b3213f;--line:#e8ccd9}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 var(--mono);display:grid;grid-template-rows:auto 1fr auto;overflow:hidden}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.35;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px)}
+body.light::after{opacity:.25;background:repeating-linear-gradient(0deg,rgba(0,0,0,.018) 0 1px,transparent 1px 3px)}
+#app{display:grid;grid-template-columns:214px 1fr 300px;min-height:0}
+body.rail-off #app{grid-template-columns:0 1fr 300px}
+body.pan-off #app{grid-template-columns:214px 1fr 0}
+@media(max-width:960px){#app{grid-template-columns:1fr}#rail,#panel{display:none}}
+header{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);background:radial-gradient(120% 300% at 12% -60%,var(--cysoft),transparent 60%),var(--bg2)}
+header h1{margin:0;font-size:13px;letter-spacing:.32em;color:var(--cy);text-shadow:0 0 12px rgba(87,230,255,.35)}
+.logo{width:22px;height:22px;display:block;flex:0 0 auto;border-radius:5px;box-shadow:0 0 10px rgba(255,143,208,.35)}
+.sub{color:var(--dim);font-size:11px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:11px;color:var(--dim);white-space:nowrap;background:rgba(127,127,127,.04)}
+.chip b{color:var(--ink);font-weight:600}
+.chip.live{color:var(--cy);border-color:var(--line)}
+.spacer{flex:1}
+button{font:12px var(--mono);color:var(--ink);background:rgba(127,180,200,.06);border:1px solid var(--line);border-radius:7px;padding:4px 10px;cursor:pointer}
+button:hover{border-color:var(--cy);background:var(--cysoft);color:var(--cy)}
+button.on{border-color:var(--cy);color:var(--cy)}
+button.danger{color:var(--bad);border-color:var(--bad)}
+.led{display:inline-block;width:7px;height:7px;border-radius:50%;background:#274250;vertical-align:1px;margin-right:5px}
+.led.g{background:var(--ok);box-shadow:0 0 8px var(--ok);animation:bp 2.6s infinite}
+.led.y{background:var(--warn);box-shadow:0 0 8px var(--warn);animation:bp 1.1s infinite}
+.led.r{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+@keyframes bp{50%{opacity:.45}}
+#rail{border-right:1px solid var(--line);padding:10px;overflow:auto;background:var(--bg3)}
+#rail h3,#panel h3{font-size:10px;letter-spacing:.22em;color:var(--dim);margin:14px 0 6px;font-weight:600}
+#rail h3:first-child,#panel h3:first-child{margin-top:0}
+.sess{padding:4px 6px;border-radius:6px;cursor:pointer;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sess:hover{background:var(--bg2);color:var(--ink)}
+.sess.act{background:var(--cysoft);color:var(--cy)}
+.plan{font-size:11px}.plan div{padding:2px 0;color:var(--dim)}
+.plan div.done{color:var(--dim);text-decoration:line-through}.plan div.doing{color:var(--cy)}.plan div.blocked{color:var(--bad)}
+#main{display:grid;grid-template-rows:1fr;min-width:0;min-height:0}
+#scroller{overflow:auto;padding:14px 18px 6px;scroll-behavior:smooth}
+.msg{margin:0 0 12px;max-width:94%}.msg .who{font-size:10px;letter-spacing:.2em;color:var(--dim);margin-bottom:3px}
+.msg .body{white-space:pre-wrap;word-wrap:break-word}
+.msg.user .body{color:var(--ink)}.msg.user .who{color:var(--dim)}
+.msg.majin .body{border-left:1px solid var(--line);padding-left:11px}
+.msg.sys .body{color:var(--dim);font-size:11.5px;border-left:1px dotted var(--line);padding-left:10px}
+.msg.err .body{color:var(--bad);border-left:1px solid var(--bad);padding-left:11px}
+.msg pre{background:var(--bg2);border:1px solid var(--line);border-radius:7px;padding:8px 10px;overflow:auto;font-size:11.5px;white-space:pre-wrap}
+.msg code{background:var(--bg2);padding:1px 4px;border-radius:4px}
+/* parallel task cards (autopilot) — one card per running agent */
+.msg.task{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:linear-gradient(180deg,var(--bg2),transparent)}
+.task-head{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px}
+.task-id{color:var(--cy);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-status{margin-left:auto;padding:2px 8px;border-radius:999px;font-size:10.5px;border:1px solid var(--line);color:var(--dim)}
+.task-status.st-working{color:var(--cy);border-color:var(--cy)}
+.task-status.st-waiting{color:var(--warn);border-color:var(--warn)}
+.task-status.st-done{color:var(--ok);border-color:var(--ok)}
+.task-status.st-error,.task-status.st-stopped{color:var(--bad);border-color:var(--bad)}
+.task-stop{margin-left:6px;background:none;border:1px solid var(--bad);color:var(--bad);border-radius:6px;padding:1px 8px;cursor:pointer;font-size:10.5px}
+.task-stop:disabled{opacity:.35;cursor:default}
+.task-act{margin-top:5px;font-size:11px;opacity:.85}
+.task-tel{margin-top:3px;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.task-ans{margin-top:7px}
+.msg.task.task-done{border-color:var(--ok)}
+.msg.task.task-bad{border-color:var(--bad)}
+.tools{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 0}
+.tl{border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:11px;color:var(--dim);background:var(--bg2);cursor:pointer}
+.tl.run{color:var(--cy);border-color:var(--cy)}.tl.bad{color:var(--bad);border-color:var(--bad)}.tl.good{color:var(--ok)}
+.tl .ms{opacity:.6;margin-left:5px}
+.trace{display:none;margin:6px 0 0;border:1px solid var(--line);border-radius:7px;background:var(--bg2);padding:8px 10px;font-size:11.5px;white-space:pre-wrap;max-height:340px;overflow:auto}
+.trace.open{display:block}
+.foot{font-size:10.5px;color:var(--dim);margin-top:5px}
+.gauge{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--cy)}
+.bar{width:64px;height:4px;background:var(--bg2);border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--cy),var(--pink))}
+.caret::after{content:"▍";color:var(--cy);animation:bp 1s infinite}
+.appr{border:1px solid var(--warn);background:var(--bg2);border-radius:8px;padding:9px 11px;margin:8px 0}
+.appr h4{margin:0 0 4px;font-size:12px;color:var(--warn)}
+#panel{border-left:1px solid var(--line);padding:10px;overflow:auto;background:var(--bg3);min-width:0}
+.row{display:flex;gap:6px;align-items:center;margin:3px 0;font-size:11.5px}
+.row span{color:var(--dim);min-width:74px}
+select,input,textarea{font:11.5px var(--mono);color:var(--ink);background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:3px 6px;min-width:0}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--cy);box-shadow:0 0 8px var(--cysoft)}
+.kv{font-size:11px;color:var(--dim)}.kv b{color:var(--ink);font-weight:600}
+.spark{display:flex;gap:2px;align-items:flex-end;height:26px;margin-top:4px}
+.spark i{flex:1;background:var(--cy);opacity:.55;border-radius:1px;min-height:2px}
+footer{border-top:1px solid var(--line);background:var(--bg2);padding:8px 14px 10px}
+#composer{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+#input{width:100%;min-height:38px;max-height:240px;resize:vertical;padding:9px 11px;font:13px var(--mono);color:var(--ink);background:var(--bg3);border:1px solid var(--line);border-radius:9px}
+#input:focus{border-color:var(--cy);box-shadow:0 0 16px var(--cysoft)}
+.crow{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:var(--dim)}
+.crow .grow{flex:1}
+#send{padding:8px 16px;border-radius:9px;font-size:12px;letter-spacing:.1em}
+#send.busy{color:var(--bad);border-color:var(--bad)}
+.drop{border:1px dashed var(--cy);border-radius:8px;padding:4px 8px;font-size:11px;color:var(--dim)}
+.drop.hot{background:var(--cysoft);color:var(--cy)}
+#toast{position:fixed;right:14px;bottom:74px;display:grid;gap:6px;z-index:9}
+#toast div{border:1px solid var(--line);background:var(--bg3);border-radius:8px;padding:7px 10px;font-size:11.5px;box-shadow:0 6px 24px #000a;animation:fade 5s forwards}
+@keyframes fade{0%,72%{opacity:1}100%{opacity:0}}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px}
+body.simple #panel{display:none}
+body.simple #b-stop{display:none}
+#b-expert.on{color:var(--cy)}
+
+#imagine{ margin:0 0 10px; padding:10px 12px; border:1px solid var(--bd,#2a1620); border-radius:14px; background:var(--bg2,#0e0710); }
+#imagine .core-row{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+#imagine .core{ width:16px; height:16px; border-radius:50%; background:var(--pk,#e0457b); flex:none; }
+#imagine .core.idle{ opacity:.35; }
+#imagine .core.thinking{ animation:imPulse 1.6s ease-in-out infinite; }
+#imagine .core.working{ animation:imPulse .7s ease-in-out infinite; box-shadow:0 0 12px var(--pk,#e0457b); }
+#imagine .core.waiting{ background:var(--warn,#e8b350); opacity:.9; }
+#imagine .core.done{ background:var(--ok,#4fc38a); }
+#imagine .core.error{ background:var(--err,#e05555); opacity:.85; }
+#imagine .core-label{ font-size:12px; color:var(--dim,#a98); letter-spacing:.04em; }
+#imagine .imagine-empty{ font-size:12px; color:var(--dim,#a98); }
+#imagine .steps{ display:flex; flex-direction:column; gap:4px; max-height:220px; overflow:auto; }
+#imagine .step{ display:flex; align-items:flex-start; gap:8px; font-size:12.5px; padding:3px 6px; border-radius:8px; }
+#imagine .step.running{ background:rgba(224,69,123,.08); }
+#imagine .step.ok .step-title{ color:var(--ok,#4fc38a); }
+#imagine .step.fail .step-title{ color:var(--err,#e05555); }
+#imagine .step-icon{ flex:none; }
+#imagine .step-body{ flex:1; min-width:0; }
+#imagine .step-title{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#imagine .step-sub{ font-size:11px; color:var(--dim,#a98); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#imagine .step-time{ flex:none; font-size:10.5px; color:var(--dim,#a98); }
+#imagine .step-detail{ width:100%; margin-top:2px; }
+#imagine .step-detail summary{ cursor:pointer; font-size:11px; color:var(--dim,#a98); }
+#imagine .step-detail pre{ font-size:10.5px; max-height:140px; overflow:auto; padding:6px; background:rgba(0,0,0,.3); border-radius:6px; white-space:pre-wrap; word-break:break-word; }
+@keyframes imPulse{ 0%,100%{ transform:scale(1); opacity:.85; } 50%{ transform:scale(1.35); opacity:1; } }
+@media (prefers-reduced-motion: reduce){ #imagine .core{ animation:none !important; } }
+
+#c-model{ cursor:pointer; }
+#modeldrop{ position:absolute; top:44px; right:120px; z-index:60; width:300px; max-height:60vh; overflow:auto; padding:10px; border:1px solid var(--bd,#2a1620); border-radius:12px; background:var(--bg2,#0e0710); box-shadow:0 12px 40px rgba(0,0,0,.5); }
+#modeldrop .md-list{ margin-top:8px; }
+#onboard{ position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; background:rgba(5,2,4,.82); }
+#ob-card{ width:520px; max-width:92vw; max-height:86vh; overflow:auto; padding:22px 24px; border:1px solid var(--bd,#2a1620); border-radius:18px; background:var(--bg2,#0e0710); box-shadow:0 24px 80px rgba(0,0,0,.6); }
+.ob-title{ margin:0 0 4px; font-size:18px; }
+.ob-sub{ margin:0 0 14px; font-size:13px; color:var(--dim,#a98); }
+.ob-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+.ob-card{ display:flex; flex-direction:column; gap:4px; padding:12px; text-align:left; border:1px solid var(--bd,#2a1620); border-radius:12px; background:transparent; color:inherit; cursor:pointer; }
+.ob-card:hover{ border-color:var(--pk,#e0457b); }
+.ob-card-desc{ font-size:11px; color:var(--dim,#a98); }
+.ob-label{ display:block; margin:10px 0 4px; font-size:12.5px; color:var(--dim,#a98); }
+.ob-input{ width:100%; margin-top:4px; padding:8px 10px; border:1px solid var(--bd,#2a1620); border-radius:9px; background:var(--bg,#0b0509); color:inherit; font:inherit; box-sizing:border-box; }
+.ob-link{ display:inline-block; margin-top:6px; font-size:12px; color:var(--cy,#5fd4d0); background:none; border:0; padding:0; cursor:pointer; text-decoration:none; }
+.ob-go{ margin-top:14px; padding:10px 18px; border:0; border-radius:10px; background:var(--pk,#e0457b); color:#fff; font-weight:600; cursor:pointer; }
+.ob-go:disabled{ opacity:.45; cursor:default; }
+.ob-msg{ margin-top:10px; font-size:12.5px; color:var(--dim,#a98); min-height:1.2em; }
+.ob-models{ margin-top:10px; max-height:300px; overflow:auto; display:flex; flex-direction:column; gap:3px; }
+.ob-model{ padding:7px 10px; text-align:left; border:1px solid transparent; border-radius:8px; background:rgba(255,255,255,.03); color:inherit; font-size:12.5px; cursor:pointer; }
+.ob-model:hover{ border-color:var(--pk,#e0457b); }
+.ob-model.on{ border-color:var(--pk,#e0457b); background:rgba(224,69,123,.12); }
+
+#v-tag{font-size:11px;color:var(--dim,#a98);margin-left:6px;letter-spacing:.05em}
+
+/* Imagination Canvas: a safe, local-first preview of actual HTML files. */
+.preview-panel{margin-top:14px;border:1px solid var(--bd,#34212d);border-radius:13px;overflow:hidden;background:var(--bg2,#0e0710);min-width:0}
+.preview-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;gap:12px;border-bottom:1px solid var(--bd,#34212d);font-size:12px}
+.preview-action,.preview-close{cursor:pointer;border:1px solid var(--bd,#34212d);border-radius:8px;padding:5px 9px;background:var(--bg2,#0e0710);color:inherit;font-size:12px}
+.preview-action{margin:8px 0 0 34px}
+.preview-action:hover,.preview-close:hover{border-color:var(--pk,#e0457b)}
+.preview-action:focus-visible,.preview-close:focus-visible{outline:2px solid var(--pk,#e0457b);outline-offset:2px}
+.preview-frame{display:block;width:100%;height:min(54vh,510px);border:0;background:white;color:#111}
+@media (max-width:600px){.preview-frame{height:360px}.preview-panel{margin:8px 0}}
+.ob-rm{ margin-top:4px; font-size:10.5px; color:var(--err,#e05555); background:none; border:0; cursor:pointer; text-align:left; padding:0 }
+.ob-price{ font-size:10px; color:var(--dim,#a98); margin-left:8px }
+.deck{border-bottom:1px solid var(--line);padding:6px 14px;font-family:var(--mono);font-size:10.5px;color:var(--dim);background:var(--bg2)}
+.deck-title{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--cy);margin-bottom:2px}
+.deck-row{padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.deck-row b{color:var(--ink)}
+.deck-dot{margin-right:4px}
+.task-foot{display:flex;gap:6px;margin-top:8px}
+.task-foot .task-reply{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:8px;color:var(--ink);font:12px var(--sans);padding:6px 8px}
+.task-foot .task-reply:focus{outline:none;border-color:var(--cy)}
+.task-foot .task-send,.task-head .task-pause{background:var(--bg2);border:1px solid var(--line);border-radius:8px;color:var(--dim);font:11px var(--mono);padding:4px 8px;cursor:pointer}
+.task-foot .task-send:hover,.task-head .task-pause:hover{color:var(--ink);border-color:var(--cy)}
+.task-status.st-paused{color:var(--warn);border-color:var(--warn)}
+
+/* ONE CHAT UX — accessible, focused by default, all expert tools preserved. */
+:root{--sans:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;--bg:#100a10;--bg2:#1c111c;--bg3:#150d16;--ink:#fff0f8;--dim:#c9a9bd;--line:#4d3047;--cy:#ff8fbe;--cysoft:rgba(255,111,177,.14)}
+body{font:14px/1.55 var(--sans)}
+body::after{display:none}
+button,select,input,textarea{font-family:var(--sans);font-size:13px}
+button{min-height:32px}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--cy);outline-offset:3px}
+header{min-height:58px;padding:10px 20px;gap:12px}
+header h1{font-size:15px;letter-spacing:.10em;text-shadow:none}
+header .logo{width:30px;height:30px;border-radius:10px}
+#input{font:14.5px/1.6 var(--sans);min-height:54px;padding:14px 16px;border-radius:14px;background:var(--bg2)}
+#send{background:linear-gradient(135deg,#ec539e,#c54eaa);border:0;color:#fff;font-weight:700;font-size:14px;letter-spacing:0;border-radius:12px;min-width:88px;min-height:54px}
+footer{padding:12px 20px 13px;background:var(--bg)}
+#scroller{padding:28px clamp(18px,5vw,72px)}
+.msg{max-width:860px;margin:0 auto 20px}
+.msg .who{letter-spacing:.08em;font-size:11px;font-weight:700}
+.msg .body{line-height:1.65;font-size:14px}
+.msg.majin .body{border-left:2px solid var(--line);padding-left:14px}
+body.simple #app{grid-template-columns:196px minmax(0,1fr)}
+body.simple.rail-off #app{grid-template-columns:0 minmax(0,1fr)}
+body.simple #panel,body.simple #b-panel,
+body.simple #c-route,body.simple #c-moa,body.simple #c-tools,
+body.simple #c-tg,body.simple #c-wa,body.simple #b-mode,
+body.simple #b-test,body.simple #b-voice,body.simple #b-theme,
+body.simple #b-quit,body.simple #tagline{display:none}
+body.simple #rail{padding:17px 12px;background:var(--bg3)}
+body.simple #rail h3:not(:first-of-type),
+body.simple #rail #plan,body.simple #rail #sched,body.simple #rail #mem{display:none}
+body.simple #rail h3:first-of-type{letter-spacing:.1em;font-size:11px}
+body.simple #rail .sess{font-size:13px;line-height:1.45;padding:10px 12px;border-radius:10px}
+body.simple #b-expert{padding:7px 10px;min-height:34px;background:var(--bg3);border-radius:10px}
+body.simple #c-cost{margin-left:auto}
+#c-update:not([hidden]){background:#742348;border:1px solid var(--cy);color:#fff;box-shadow:0 0 0 2px rgba(255,111,177,.15)}
+#onboard[hidden],#modeldrop[hidden],#c-update[hidden]{display:none!important}
+#onboard{background:rgba(11,7,13,.78);backdrop-filter:blur(9px);padding:20px}
+#ob-card{max-width:430px;width:100%;padding:30px;border-radius:23px;border:1px solid #67445e;background:linear-gradient(155deg,#271626,#170e19);box-shadow:0 24px 90px #000a}
+.ob-mark{display:grid;place-items:center;width:48px;height:48px;margin:4px 0 17px;border-radius:16px;background:linear-gradient(135deg,#ed78a9,#7e3e87);color:white;font-size:28px}
+.ob-title{font:700 27px/1.25 var(--sans);letter-spacing:-.035em;margin:0 0 9px;color:var(--ink)}
+.ob-sub{font-size:14px;color:var(--dim);line-height:1.65;margin:0 0 20px}
+.ob-label{font-size:13px;color:var(--ink);font-weight:650;margin:17px 0 5px}
+.ob-input{min-height:48px;padding:12px 13px;font:14px var(--sans);border:1px solid var(--line);background:#100a12;border-radius:12px}
+.ob-go{display:block;width:100%;margin-top:16px;min-height:48px;padding:12px 16px;font:700 14px var(--sans);background:linear-gradient(135deg,#f06aa9,#c850a5);border-radius:12px;color:#fff}
+.ob-go:hover{filter:brightness(1.1);color:#fff}
+.ob-link{font-size:12.5px;color:#ffb0d0}
+.ob-ready{display:flex;align-items:center;gap:10px;background:#22362e;border:1px solid #487b65;padding:12px 14px;border-radius:12px;margin:8px 0 17px;font-size:13px}
+.ob-ready-dot{color:#7ce0b6}
+.ob-choose{margin-top:12px}
+.ob-details{margin-top:20px;font-size:13px;color:var(--dim)}
+.ob-details summary{cursor:pointer;padding:5px 0}
+.ob-options{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:8px 0}
+.ob-skip{display:block;margin:17px auto 0;text-align:center}
+.ob-msg{min-height:1.3em;line-height:1.45;word-wrap:break-word}
+.home{max-width:740px;margin:clamp(40px,12vh,130px) auto 0;text-align:center}
+.home-mark{width:60px;height:60px;object-fit:contain;border-radius:19px;margin-bottom:17px;box-shadow:0 8px 30px rgba(248,97,173,.18)}
+.home h2{font-size:clamp(27px,4vw,40px);font-weight:750;letter-spacing:-.05em;line-height:1.2;margin:0 0 12px}
+.home h2 strong{color:var(--cy)}
+.home p{font-size:15px;color:var(--dim);max-width:460px;margin:0 auto 25px}
+.home-examples{display:flex;flex-wrap:wrap;justify-content:center;gap:9px}
+.home-examples button{padding:12px 16px;min-height:44px;border-radius:999px;background:var(--bg2);color:var(--ink);border-color:var(--line)}
+.home-examples button:hover{border-color:var(--cy);background:var(--cysoft)}
+@media(max-width:960px){body.simple #app{grid-template-columns:minmax(0,1fr)}body.simple #rail{display:none}header{gap:7px;padding:8px 12px}footer{padding:10px 12px}#scroller{padding:22px 16px}}
+@media(max-width:520px){#c-cost{display:none}#ob-card{padding:23px 19px}.home{margin:50px auto 0}.home-examples button{width:100%}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+
+/* Chat artifact affordance: quiet, focused and keyboard reachable. */
+.chat-open-file{display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:4px 9px;min-height:28px;font-size:12px;font-weight:600;border:1px solid var(--line);background:var(--bg2);border-radius:8px;color:var(--cy);vertical-align:middle;letter-spacing:0;cursor:pointer}
+.chat-open-file:hover{border-color:var(--cy);background:var(--cysoft)}
+.chat-open-file:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
+.msg .body{overflow-wrap:anywhere;line-height:1.7}
+.msg .body pre{padding:16px 18px;border-radius:11px;line-height:1.6;background:var(--bg2);color:var(--ink);border:1px solid var(--line)}
+.explorer-show-all{margin-top:10px;padding:10px 14px;border:1px solid var(--cy);border-radius:9px;color:var(--cy);background:transparent}
+
+/* Precise, low-noise activity icons instead of emoji. */
+#imagine .step-icon{display:grid;place-items:center;flex:0 0 28px;height:27px;border-radius:7px;border:1px solid var(--line);color:var(--dim);font:600 9px/1 var(--sans);letter-spacing:.04em;background:var(--bg2)}
+#imagine .step-title{font-weight:550;letter-spacing:-.01em}
+#imagine .step-sub{font-size:11px;opacity:.8}
+
+/* Voice interaction states: readable, subtle, reduced-motion accessible. */
+#mic{min-width:52px;border-radius:999px;transition:box-shadow .2s ease,transform .2s}
+body[data-voice-mode="listening"] #mic{box-shadow:0 0 0 4px rgba(255,143,208,.18);animation:majin-orb 1.4s ease-in-out infinite}
+body[data-voice-mode="speaking"] #mic{box-shadow:0 0 0 4px rgba(124,224,182,.17);animation:majin-orb .85s ease-in-out infinite}
+#mic-state{font-size:11px;color:var(--dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@keyframes majin-orb{50%{transform:scale(1.06);box-shadow:0 0 0 8px rgba(255,143,208,.06)}}
+@media(prefers-reduced-motion:reduce){body[data-voice-mode] #mic{animation:none}}
+#b-narrator{border:1px solid var(--line);background:var(--bg2);color:var(--dim);border-radius:9px;padding:6px 10px;font-size:11px}#b-narrator.on{border-color:var(--cy);color:var(--cy);background:var(--cysoft)}
+/* Voice stage — compact, clear states, always attached to the Talk control. */
+#voice-stage[hidden]{display:none!important}
+#voice-stage{position:fixed;z-index:70;left:50%;bottom:88px;transform:translateX(-50%);width:min(520px,calc(100vw - 28px));min-height:86px;display:flex;align-items:center;gap:18px;padding:18px 22px;border:1px solid rgba(255,143,208,.42);border-radius:24px;background:linear-gradient(135deg,rgba(38,22,39,.97),rgba(15,13,23,.98));box-shadow:0 22px 70px rgba(0,0,0,.58),0 0 36px rgba(255,110,190,.12);backdrop-filter:blur(22px)}
+.voice-orb{width:58px;height:58px;display:flex;align-items:center;justify-content:center;gap:4px;flex-shrink:0;border-radius:50%;background:radial-gradient(circle at 35% 30%,#703f75,#241328 70%);border:1px solid rgba(255,160,220,.3)}
+.voice-orb span{width:4px;height:13px;border-radius:8px;background:#ff91c6;animation:majin-sound 1.05s ease-in-out infinite alternate}
+.voice-orb span:nth-child(2){animation-delay:.14s}.voice-orb span:nth-child(3){animation-delay:.32s}.voice-orb span:nth-child(4){animation-delay:.19s}.voice-orb span:nth-child(5){animation-delay:.4s}
+body[data-voice-mode="speaking"] .voice-orb span{background:#a6efc9;animation-duration:.65s}
+body[data-voice-mode="thinking"] .voice-orb span{animation-duration:1.8s;opacity:.7}
+body[data-voice-mode="paused"] .voice-orb span{animation-play-state:paused;height:5px}
+.voice-stage-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.voice-stage-copy strong{font-size:15px;font-weight:650;color:var(--ink)}
+.voice-stage-copy small{font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#voice-stage-stop{flex-shrink:0;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.06);padding:10px 13px;color:var(--ink);cursor:pointer}
+@keyframes majin-sound{from{height:5px}to{height:31px}}
+@media(prefers-reduced-motion:reduce){.voice-orb span{animation:none}}
+#work-progress[hidden]{display:none!important}
+#work-progress{display:flex;align-items:center;gap:9px;padding:7px 13px;margin:0 0 7px;border:1px solid rgba(255,143,208,.14);background:rgba(255,143,208,.04);border-radius:11px;color:var(--dim);font-size:11px}
+#work-progress .pulse{width:7px;height:7px;border-radius:50%;background:var(--cy);box-shadow:0 0 0 3px rgba(255,143,208,.1);animation:majin-orb 1.4s infinite}
+#work-progress-label{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* MAJIN one-surface design: voice and activity live INSIDE the chat composer.
+   Never float extra panels over the conversation. */
+#composer{display:grid;grid-template-columns:38px minmax(0,1fr) 44px;gap:8px;align-items:center;padding:4px 6px;border:1px solid var(--line);border-radius:20px;background:var(--bg2)}
+#composer #input{min-width:0;background:transparent;border:0;box-shadow:none;padding:9px 4px}
+#composer #input:focus{outline:0}
+#composer .composer-talk{grid-column:1;grid-row:1;width:38px;height:38px;display:grid;place-items:center;min-width:0;padding:0;border:0;border-radius:14px;background:transparent;color:var(--dim);cursor:pointer;transition:color .2s,background .2s}
+#composer .composer-talk:hover,#composer .composer-talk[aria-pressed="true"]{color:var(--cy);background:var(--cysoft)}
+#composer #send{grid-column:3;grid-row:1}
+#composer #voice-stage[hidden],#composer #work-progress[hidden]{display:none!important}
+#composer #voice-stage{grid-column:1 / -1;grid-row:2;position:static;transform:none;bottom:auto;left:auto;width:auto;min-height:0;z-index:auto;margin:0 5px 3px;display:flex;align-items:center;gap:10px;padding:8px 10px;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none}
+#composer .voice-orb{width:32px;height:32px;gap:2px}
+#composer .voice-orb span{width:3px;height:10px}
+#composer .voice-stage-copy{gap:2px}
+#composer .voice-stage-copy strong{font-size:12px}
+#composer .voice-stage-copy small{font-size:11px}
+#composer #voice-stage-stop{padding:3px 8px;background:transparent;border:0;font-size:21px}
+#composer #work-progress{grid-column:1 / -1;grid-row:3;display:flex;gap:8px;align-items:center;padding:5px 10px;margin:0 4px 2px;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent;font-size:11px}
+#composer #work-progress-label{min-width:0;flex:1}
+body[data-voice-mode="listening"] #composer .composer-talk{color:var(--cy)}
+body[data-voice-mode="speaking"] #composer .composer-talk{color:var(--ok)}
+.crow #mic-state:empty{display:none}
+/* Single MAJIN spirit in composer: one surface, never a floating card. */
+#composer{direction:ltr;text-align:left;grid-template-columns:38px minmax(0,1fr) 44px}
+#composer #input{direction:ltr;text-align:left;unicode-bidi:plaintext;justify-self:stretch;width:100%;margin:0;padding:10px 4px;align-self:center}
+#composer #input::placeholder{direction:ltr;text-align:left}
+#composer #voice-stage{grid-column:1/-1;display:flex;flex-direction:column;justify-content:center;gap:5px;align-items:center;min-height:96px;border-top:0;margin:0;padding:0 10px 8px;overflow:visible}
+#composer .voice-orb{position:relative;isolation:isolate;width:58px;height:58px;flex-shrink:0;border:0;background:transparent;overflow:visible;filter:drop-shadow(0 0 12px rgba(232,90,228,.25));transition:transform .28s ease,filter .28s ease}
+#composer .voice-orb .orb-core{position:absolute;inset:11px;border:0;width:auto;height:auto;border-radius:50%;background:radial-gradient(circle at 43% 36%,#fff3ff 0 7%,#ffb4f0 11%,#ee56d0 27%,#823de0 54%,#180d2b 76%);box-shadow:0 0 19px #ea58d97a,0 0 35px #7043d75a;animation:orb-breathe 2.2s ease-in-out infinite}
+#composer .voice-orb .orb-halo{position:absolute;inset:4px;border-radius:50%;border:2px solid rgba(251,107,218,.68);box-shadow:0 0 11px #e054d9a1,inset 0 0 9px #7548eb66;transform:rotate(30deg) skew(15deg,-9deg);animation:orb-drift 3.5s linear infinite}
+#composer .voice-orb .orb-halo-b{inset:0;border-color:#9d88ff8a;transform:rotate(-50deg) skew(-14deg,11deg);animation-duration:4.7s;animation-direction:reverse}
+#composer .voice-orb .orb-spark{position:absolute;left:46%;top:41%;width:8px;height:8px;transform:rotate(45deg);background:#fff;box-shadow:0 0 10px white,0 0 22px #f79af3;clip-path:polygon(50% 0,65% 38%,100% 50%,65% 62%,50% 100%,35% 62%,0 50%,35% 38%);animation:orb-breathe 1.8s ease-in-out infinite}
+#composer .voice-orb span:not(.orb-core):not(.orb-halo):not(.orb-spark){display:none}
+#composer .voice-stage-copy{text-align:center;align-items:center;width:100%}
+#composer .voice-stage-copy strong{font-size:11px;font-weight:560}
+#composer .voice-stage-copy small{font-size:10px;max-width:min(95%,350px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#composer #voice-stage-stop{position:absolute;right:12px;bottom:14px;color:var(--dim)}
+body[data-voice-mode="listening"] #composer .voice-orb{transform:scale(calc(1 + var(--voice-energy,0)*.16));filter:drop-shadow(0 0 17px #e05aff9e)}
+body[data-voice-mode="speaking"] #composer .voice-orb{transform:scale(1.1);filter:drop-shadow(0 0 19px #ffc2f088)}
+body[data-voice-mode="thinking"] #composer .orb-halo{animation-duration:1.45s}
+#composer #input{transition:opacity .2s ease}
+body[data-voice-mode="listening"] #composer #input,body[data-voice-mode="thinking"] #composer #input,body[data-voice-mode="speaking"] #composer #input{opacity:.22}
+@keyframes orb-breathe{50%{transform:scale(1.14);opacity:.75}}
+@keyframes orb-drift{50%{border-radius:43% 57% 54% 46%}}
+@media(prefers-reduced-motion:reduce){#composer .voice-orb *{animation:none!important}}
+
+/* Verification pulse: one tiny inline status in composer, not another panel. */
+#composer #work-progress{position:relative;overflow:hidden;transition:color .2s ease,border-color .2s ease}
+#composer #work-progress[data-phase="verify"]{color:#d6b5ff;border-top-color:rgba(212,138,255,.27)}
+#composer #work-progress[data-phase="verify"] .pulse{background:#d8a6ff;box-shadow:0 0 10px #a855f795}
+#composer #work-progress[data-phase="problem"]{color:#ffa9b4;border-top-color:rgba(255,126,153,.25)}
+#composer #work-progress[data-phase="problem"] .pulse{background:#ff9cae;animation:majin-pulse-hold 1.5s ease-in-out infinite}
+#composer #work-progress[data-phase="active"] .pulse{background:#f39be3}
+@keyframes majin-pulse-hold{50%{opacity:.45;box-shadow:0 0 0 6px rgba(255,126,153,0)}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress .pulse{animation:none}}
+/* One calm pulse of progress INSIDE the existing composer, never another panel. */
+#composer #work-progress{isolation:isolate;min-height:29px;padding:7px 12px 8px;letter-spacing:.005em}
+#composer #work-progress::after{content:"";position:absolute;bottom:0;left:0;width:32%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(248,166,232,.85),transparent);
+  opacity:.7;animation:majin-progress-glide 2.6s cubic-bezier(.4,0,.2,1) infinite}
+#composer #work-progress[data-phase="verify"]::after{background:linear-gradient(90deg,transparent,rgba(211,175,255,.95),transparent)}
+#composer #work-progress[data-phase="problem"]::after{animation-play-state:paused;opacity:.35}
+#composer #work-progress-timer{font-variant-numeric:tabular-nums;min-width:3ch;text-align:right;opacity:.65}
+@keyframes majin-progress-glide{from{transform:translateX(-110%)}to{transform:translateX(420%)}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress::after{animation:none;left:auto;right:0;opacity:.4}}
+/* This round: a single responsive activity ember INSIDE the chat composer.
+   Browser outcome verification is violet; recovery is coral; regular work pink. */
+#composer #work-progress{--ember:#ff86ce;--halo:rgba(255,134,206,.22);transition:color .25s ease,border-color .25s ease;overflow:hidden}
+#composer #work-progress .pulse{flex:none;width:9px;height:9px;position:relative;border:0;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,var(--ember) 55%,transparent 88%);box-shadow:0 0 9px var(--ember),0 0 18px var(--halo);animation:majin-ember 1.6s ease-in-out infinite}
+#composer #work-progress .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--ember);opacity:.4;animation:majin-ember-ring 2.2s ease-out infinite}
+#composer #work-progress[data-phase="verify"]{--ember:#c5a2ff;--halo:rgba(197,162,255,.25)}
+#composer #work-progress[data-phase="problem"]{--ember:#ff968d;--halo:rgba(255,150,141,.24)}
+#composer #work-progress[data-phase="problem"] .pulse{animation-duration:2.8s}
+#composer #work-progress-label{letter-spacing:.01em}
+@keyframes majin-ember{0%,100%{transform:scale(.88);opacity:.66}50%{transform:scale(1.16);opacity:1}}
+@keyframes majin-ember-ring{0%{transform:scale(.7);opacity:.5}100%{transform:scale(1.5);opacity:0}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress .pulse,#composer #work-progress .pulse::after{animation:none!important}}
+/* Inline spirit ember: amber means waiting for a tool, not failure. */
+#composer #work-progress[data-phase="stalled"]{--ember:#ffd197;--halo:rgba(255,209,151,.22)}
+#composer #work-progress[data-phase="stalled"] .pulse{animation-duration:2.5s}
+#composer #work-progress[data-phase="stalled"]::after{opacity:.25;animation-duration:4s}
+/* Small UX refinement: the whole composer responds to keyboard focus.
+   No extra panels, overlays or competing voice surfaces. */
+#composer{transition:border-color .24s ease,box-shadow .24s ease,background-color .24s ease}
+#composer:focus-within{border-color:rgba(255,130,213,.56)!important;box-shadow:0 0 0 1px rgba(255,130,213,.13),0 10px 34px rgba(215,65,167,.1)!important}
+#composer #input:focus{box-shadow:none!important;outline:none!important}
+#composer #send{transition:transform .18s ease,filter .18s ease}
+#composer #send:not(:disabled):hover{transform:translateY(-1px);filter:brightness(1.1)}
+@media(prefers-reduced-motion:reduce){#composer,#composer #send{transition:none!important}}
+/* One understated evidence-glow INSIDE the existing chat composer. */
+#composer #work-progress[data-phase="verified"]{color:#baf5d6;border-top-color:rgba(113,232,185,.22)}
+#composer #work-progress[data-phase="verified"] .pulse{background:#9be5c5;box-shadow:0 0 0 3px rgba(118,225,182,.12);animation:none}
+#composer #work-progress[data-phase="verified"]::after{background:linear-gradient(90deg,transparent,rgba(143,237,199,.85),transparent);animation-duration:1.6s}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="verified"]::after{animation:none}}
+
+/* V1 clarity pass: a thin living thread below the existing composer status.
+   No new panels, fabricated percentages or distracting overlays. */
+#composer #work-progress{position:relative;isolation:isolate;padding-bottom:10px}
+#composer #work-progress::after{content:"";position:absolute;left:8px;right:8px;bottom:2px;height:2px;border-radius:3px;background:linear-gradient(90deg,transparent 0%,rgba(242,103,213,.16) 28%,rgba(255,173,230,.9) 50%,rgba(144,92,244,.22) 72%,transparent 100%);background-size:200% 100%;animation:majin-activity-thread 2.5s linear infinite;pointer-events:none}
+#composer #work-progress[data-phase="stalled"]::after,#composer #work-progress[data-phase="problem"]::after{animation-duration:6s;opacity:.4}
+#composer #work-progress[data-phase="verified"]::after{animation:none;background:linear-gradient(90deg,transparent,#a2e5bd,transparent)}
+@keyframes majin-activity-thread{from{background-position:200% 0}to{background-position:0 0}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress::after{animation:none;background-position:50% 0}}
+
+
+/* MAJIN proof pulse: the existing tiny work indicator becomes a check after
+   an observed browser assertion; no new dashboard, card or floating panel. */
+#composer #work-progress .pulse{position:relative;transition:background .32s ease,box-shadow .32s ease,transform .32s ease}
+#composer #work-progress[data-phase="verified"] .pulse{
+  width:15px;height:15px;border-radius:50%;background:rgba(108,241,184,.2);
+  border:1px solid rgba(144,255,202,.55);box-shadow:0 0 15px rgba(111,255,186,.23);
+  transform:scale(1.08)
+}
+#composer #work-progress[data-phase="verified"] .pulse::before{
+  content:"";position:absolute;left:4px;top:3px;width:5px;height:7px;
+  border-right:2px solid #aafad1;border-bottom:2px solid #aafad1;
+  transform:rotate(42deg);animation:majin-proof-appear .28s ease-out both
+}
+#composer #work-progress[data-phase="problem"] .pulse::before{
+  content:"";position:absolute;inset:-5px;border:1px solid rgba(255,176,132,.28);
+  border-radius:50%;animation:majin-proof-warning 2.5s ease-in-out infinite
+}
+@keyframes majin-proof-appear{from{opacity:0;transform:scale(.55) rotate(42deg)}to{opacity:1;transform:scale(1) rotate(42deg)}}
+@keyframes majin-proof-warning{50%{opacity:.22;transform:scale(1.5)}}
+@media(prefers-reduced-motion:reduce){
+  #composer #work-progress[data-phase="verified"] .pulse::before,
+  #composer #work-progress[data-phase="problem"] .pulse::before{animation:none}
+}
+/* A quiet, unmistakable signal when MAJIN is revising its approach.
+   Lives in the existing composer; no new panel or overlay. */
+#composer #work-progress[data-phase="recover"]{color:#ecc2ff;border-top-color:rgba(214,139,245,.38)}
+#composer #work-progress[data-phase="recover"] .pulse{background:#d5a5ff;box-shadow:0 0 0 4px rgba(177,114,246,.12);animation:majin-rethink 1.6s ease-in-out infinite}
+#composer #work-progress[data-phase="recover"]::after{background:linear-gradient(90deg,transparent,#b87cff,transparent);animation-duration:1.4s}
+@keyframes majin-rethink{50%{opacity:.5;transform:scale(.72);box-shadow:0 0 0 7px rgba(177,114,246,0)}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="recover"] .pulse{animation:none}}
+/* Browsing insight — one quiet lilac pulse in the EXISTING composer,
+   never a new card or overlay. */
+#composer #work-progress[data-phase="grounded"]{color:#d8c5fa;border-top-color:rgba(173,144,232,.22)}
+#composer #work-progress[data-phase="grounded"] .pulse{background:#bd9afa;box-shadow:0 0 0 3px rgba(187,151,244,.13);animation:majin-grounded 1.8s ease-in-out infinite}
+@keyframes majin-grounded{50%{opacity:.56;transform:scale(.77)}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="grounded"] .pulse{animation:none}}
+/* Subtle amber recovery ember: state remains inside the composer, never a new panel. */
+#composer #work-progress[data-phase="blocked"]{--ember:#ffc68a;--halo:rgba(255,198,138,.22);border-top-color:rgba(255,198,138,.23)}
+#composer #work-progress[data-phase="blocked"] #work-progress-label{color:#f7d6ad;transition:color .22s ease}
+#composer #work-progress[data-phase="blocked"] .pulse{animation-duration:2.1s}
+#composer #work-progress[data-phase="blocked"]::after{background:linear-gradient(90deg,transparent,rgba(255,198,138,.8),transparent);animation-duration:3.3s}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="blocked"] .pulse{animation:none!important}}
+
+/* MAJIN inline micro-progress: single subtle light trace, never another card. */
+#composer #work-progress{--trace:linear-gradient(90deg,transparent,#ff8edd 30%,#cdb1ff 70%,transparent)}
+#composer #work-progress:not([hidden])::after{content:"";position:absolute;inset:auto 0 0;width:34%;height:1px;background:var(--trace);opacity:.75;animation:majin-trace-sweep 2.3s ease-in-out infinite;pointer-events:none}
+#composer #work-progress[data-phase="verify"]::after{height:2px;opacity:.95}
+#composer #work-progress[data-phase="stalled"]::after{animation-duration:5s;opacity:.33}
+/* V2 micro-feedback: a single tiny spirit glyph conveys verified vs stalled.
+   No extra panel, toast, or status card. */
+#composer #work-progress[data-phase="verified"] .pulse{width:16px;height:16px;display:grid;place-items:center;flex-shrink:0;border:1px solid rgba(140,207,176,.62);background:rgba(140,207,176,.12);box-shadow:0 0 14px rgba(140,207,176,.25);animation:none}
+#composer #work-progress[data-phase="verified"] .pulse::before{content:"✓";color:var(--ok);font:700 11px/1 system-ui}
+#composer #work-progress[data-phase="verified"] #work-progress-label{color:var(--ok)}
+#composer #work-progress[data-phase="verified"]::after{background:linear-gradient(90deg,transparent,var(--ok),transparent);animation-duration:1.3s}
+#composer #work-progress[data-phase="stalled"] .pulse{width:10px;height:10px;background:#f0b67d;box-shadow:0 0 0 3px rgba(240,182,125,.08);animation-duration:2.6s}
+#composer #work-progress[data-phase="stalled"] #work-progress-label{color:#e1ba95}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="verified"]::after,#composer #work-progress[data-phase="stalled"] .pulse{animation:none!important}}
+@keyframes majin-trace-sweep{from{transform:translateX(-100%)}to{transform:translateX(295%)}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress::after{animation:none!important;width:100%;opacity:.3}}
+/* Single-surface evidence ember: pink arrow = action sent, green tick = proven.
+   Avoid additional cards or panels in the chat viewport. */
+#composer #work-progress[data-phase="action"] .pulse{
+  width:16px;height:16px;display:grid;place-items:center;flex-shrink:0;
+  background:rgba(242,114,205,.11);border:1px solid rgba(242,114,205,.46);
+  box-shadow:0 0 13px rgba(242,114,205,.19);animation:none;
+}
+#composer #work-progress[data-phase="action"] .pulse::before{
+  content:"↗";font:700 12px/1 system-ui;color:#f8a0dc;
+}
+#composer #work-progress[data-phase="action"] #work-progress-label{color:#e6badb}
+#composer #work-progress[data-phase="action"]::after{
+  background:linear-gradient(90deg,transparent,#f29bdd,transparent);
+  opacity:.56;animation-duration:2.2s
+}
+@media(prefers-reduced-motion:reduce){
+  #composer #work-progress[data-phase="action"]::after{animation:none!important}
+}
+/* Structure discovery: one subtle visual cue inside the EXISTING composer. */
+#composer #work-progress[data-phase="structure"]{--trace:linear-gradient(90deg,transparent,#ba92ff 35%,#ff8bcf 70%,transparent);border-top-color:rgba(189,143,255,.18)}
+#composer #work-progress[data-phase="structure"] .pulse{background:#bc95ff;box-shadow:0 0 0 3px rgba(188,149,255,.09),0 0 15px rgba(188,149,255,.32);animation-duration:1.9s}
+#composer #work-progress[data-phase="structure"] #work-progress-label{color:#e1c9f6}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="structure"] .pulse{animation:none!important}}
+/* Round 2026-10-22: a single, subtle recovery shimmer within the existing
+   composer, never a modal, card or a second activity panel. */
+#composer #work-progress[data-phase="recover"]{
+  border-top-color:rgba(195,132,245,.27);
+  background:linear-gradient(90deg,rgba(176,90,224,.035),transparent 70%);
+  transition:border-color .25s ease,background .25s ease;
+}
+#composer #work-progress[data-phase="recover"] .pulse{
+  width:13px;height:13px;flex-shrink:0;background:radial-gradient(circle at 35% 30%,#fff2fc,#cb85f8 44%,#7c45bd 80%);
+  border:1px solid rgba(215,152,245,.43);
+  box-shadow:0 0 0 3px rgba(207,132,243,.07),0 0 17px rgba(195,112,241,.22);
+  animation:majin-recovery-breath 1.75s ease-in-out infinite;
+}
+#composer #work-progress[data-phase="recover"] #work-progress-label{
+  color:#e7d1f6;letter-spacing:.005em;
+}
+@keyframes majin-recovery-breath{
+  0%,100%{transform:scale(.8);opacity:.76}
+  50%{transform:scale(1.07);opacity:1}
+}
+@media(prefers-reduced-motion:reduce){
+  #composer #work-progress[data-phase="recover"] .pulse{animation:none!important;transform:none!important}
+}
+/* Round two: a tiny mint pulse when MAJIN sees changed page controls.
+   Stays in the existing composer; no popup, card or new floating widget. */
+#composer #work-progress[data-phase="delta"]{border-top-color:rgba(116,219,189,.19)}
+#composer #work-progress[data-phase="delta"] .pulse{
+  width:8px;height:8px;flex-shrink:0;background:#94e8d4;
+  box-shadow:0 0 0 3px rgba(141,235,205,.08),0 0 13px rgba(141,235,205,.22);
+  animation:majin-delta-glow 1.65s ease-in-out infinite;
+}
+#composer #work-progress[data-phase="delta"] #work-progress-label{color:#caeadd}
+@keyframes majin-delta-glow{50%{opacity:.45;transform:scale(.74)}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="delta"] .pulse{animation:none!important}}
+/* Round 1 visual: quiet amber 'action sent, not verified' ember in the single composer. */
+#composer #work-progress[data-phase="action"]{color:#e9cdac;border-top-color:rgba(255,188,114,.17)}
+#composer #work-progress[data-phase="action"] .pulse{background:#ffbd83;box-shadow:0 0 0 3px rgba(255,189,131,.08),0 0 12px rgba(255,189,131,.2);animation:majin-action-pulse 1.9s ease-in-out infinite}
+@keyframes majin-action-pulse{50%{transform:scale(.74);opacity:.5}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="action"] .pulse{animation:none}}
+
+/* Small phase glyph, not another status panel. */
+#composer #work-progress-symbol{font-size:12px;line-height:1;color:#e7aad9;opacity:.85;display:inline-block;width:14px;text-align:center;transition:transform .25s ease,color .25s ease}
+#composer #work-progress[data-phase="verify"] #work-progress-symbol{color:#d6adff;transform:rotate(-12deg)}
+#composer #work-progress[data-phase="verified"] #work-progress-symbol{color:#9ff3cb;transform:scale(1.05)}
+#composer #work-progress[data-phase="stalled"] #work-progress-symbol,
+#composer #work-progress[data-phase="problem"] #work-progress-symbol{color:#ffabb4}
+@media(prefers-reduced-motion:reduce){#composer #work-progress-symbol{transition:none}}
+/* Evidence shimmer: tiny, integrated in composer (no extra panel). */
+#composer #work-progress[data-phase="visual"] #work-progress-symbol{color:#f8b5ee;text-shadow:0 0 9px rgba(255,133,224,.66);animation:majin-evidence-bloom .7s ease-out 1}
+#composer #work-progress[data-phase="visual"]::after{background:linear-gradient(90deg,transparent,#ee81de,#b69cff,transparent);height:2px}
+#composer #work-progress[data-phase="delta"] #work-progress-symbol{color:var(--dim);opacity:.7}
+@keyframes majin-evidence-bloom{from{transform:scale(.7);opacity:.35}60%{transform:scale(1.18);opacity:1}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="visual"] #work-progress-symbol{animation:none}}
+
+/* Round 2 visual: the existing inline spirit-thread shows graceful recovery,
+   without adding another box or interrupting text entry. */
+#composer #work-progress[data-phase="recovery"]{
+  color:#e9c4f4;
+  border-top-color:rgba(210,136,255,.22);
+}
+#composer #work-progress[data-phase="recovery"] .pulse{
+  background:#dc9fff;
+  box-shadow:0 0 0 3px rgba(220,159,255,.09),0 0 13px rgba(210,110,255,.35);
+  animation:majin-recovery-breathe 1.25s ease-in-out infinite;
+}
+#composer #work-progress[data-phase="recovery"] #work-progress-symbol{
+  color:#e2b3ff;
+  animation:majin-recovery-tilt 1.7s ease-in-out infinite;
+}
+@keyframes majin-recovery-breathe{50%{transform:scale(.72);opacity:.48}}
+@keyframes majin-recovery-tilt{50%{transform:rotate(-24deg) scale(.88);opacity:.65}}
+@media(prefers-reduced-motion:reduce){
+  #composer #work-progress[data-phase="recovery"] .pulse,
+  #composer #work-progress[data-phase="recovery"] #work-progress-symbol{animation:none!important}
+}
+
+/* Round 3 visual: one quiet proof state inside the existing composer, no new panels. */
+#composer #work-progress[data-phase="verified"]{
+  color:#dcefe3;
+  border-top-color:rgba(142,233,182,.2);
+}
+#composer #work-progress[data-phase="verified"] .pulse{
+  background:#8de5b1;
+  box-shadow:0 0 0 3px rgba(141,229,177,.09),0 0 13px rgba(141,229,177,.32);
+  animation:majin-proof-breathe 1.6s ease-in-out infinite;
+}
+#composer #work-progress[data-phase="verified"] #work-progress-symbol{
+  color:#a6f2c4;
+  animation:majin-proof-arrive .46s cubic-bezier(.22,.8,.22,1) both;
+}
+@keyframes majin-proof-arrive{
+  from{opacity:0;transform:translateY(3px) scale(.75)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes majin-proof-breathe{50%{opacity:.6;transform:scale(.82)}}
+@media(prefers-reduced-motion:reduce){
+  #composer #work-progress[data-phase="verified"] .pulse,
+  #composer #work-progress[data-phase="verified"] #work-progress-symbol{animation:none!important}
+}
+
+/* Round 4: navigation proof stays inside the existing single composer thread. */
+#composer #work-progress[data-phase="navigation"]{color:#e9c6f1;border-top-color:rgba(240,145,218,.16)}
+#composer #work-progress[data-phase="navigation"] #work-progress-symbol{color:#f6aedc;animation:majin-navigation-seek 1.5s ease-in-out infinite}
+#composer #work-progress[data-phase="navigation"] .pulse{background:#f4a6de;box-shadow:0 0 9px rgba(244,166,222,.33)}
+@keyframes majin-navigation-seek{50%{transform:translate(2px,-2px);opacity:.6}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="navigation"] #work-progress-symbol{animation:none}}
+
+/* Quiet heartbeat rail: a single hairline inside the EXISTING chat composer.
+   Inspired by local-first agent trace timelines; no dashboard or extra panel. */
+#composer{position:relative;isolation:isolate}
+#composer:has(#work-progress:not([hidden]))::after{
+  content:'';position:absolute;pointer-events:none;left:18px;right:18px;bottom:0;
+  height:2px;border-radius:10px;opacity:.75;
+  background:linear-gradient(90deg,transparent 0%,#c36eff 26%,#ff98cb 50%,#c36eff 74%,transparent 100%);
+  background-size:220% 100%;animation:majin-trace-flow 2.5s linear infinite;
+}
+#composer:has(#work-progress[data-phase="waiting"]:not([hidden]))::after{
+  background:linear-gradient(90deg,transparent,#efb0d2,#f8d6ed,#efb0d2,transparent);
+  background-size:220% 100%;animation-duration:4.4s;opacity:.55;
+}
+#composer:has(#work-progress[data-phase="stalled"]:not([hidden]))::after{
+  background:rgba(255,168,143,.8);animation:none;opacity:.65;
+}
+@keyframes majin-trace-flow{from{background-position:100% 0}to{background-position:-120% 0}}
+@media(prefers-reduced-motion:reduce){
+  #composer:has(#work-progress:not([hidden]))::after{animation:none}
+}
+
+/* Page distilled: a single subtle violet ember, no additional panel. */
+#composer #work-progress[data-phase="compact"]{--ember:#cba6ff;--halo:rgba(203,166,255,.19);color:#d9c2ff;border-top-color:rgba(203,166,255,.15)}
+#composer #work-progress[data-phase="compact"] .pulse{animation-duration:2.8s;box-shadow:0 0 9px rgba(203,166,255,.25)}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="compact"] .pulse{animation:none}}
+/* Round: restrained focus glow, one chat surface; no additional panels. */
+#composer{transition:border-color .22s ease,box-shadow .22s ease}
+#composer:focus-within{
+  border-color:rgba(244,129,222,.42);
+  box-shadow:0 0 0 1px rgba(255,158,227,.10),0 0 23px rgba(226,98,200,.08);
+}
+@media(prefers-reduced-motion:reduce){#composer{transition:none}}
+/* Round 2: a single micro-shimmer while clicking, never another activity panel. */
+#composer #work-progress[data-phase="action"]::before{
+  content:"";position:absolute;left:0;bottom:0;height:1px;width:32%;
+  border-radius:2px;background:linear-gradient(90deg,transparent,#ffa8e8,#ab91ff,transparent);
+  opacity:.85;pointer-events:none;animation:majin-action-trace 2.1s ease-in-out infinite alternate;
+}
+@keyframes majin-action-trace{from{transform:translateX(-40%);opacity:.2}to{transform:translateX(255%);opacity:.9}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="action"]::before{animation:none;opacity:.3}}
+
+/* One quiet, moving trace UNDER the existing inline task status.
+   No extra UI card or verbose activity text. */
+#composer #work-progress[data-phase="active"]::after,
+#composer #work-progress[data-phase="verify"]::after{
+  content:"";position:absolute;pointer-events:none;left:0;bottom:0;height:1px;width:35%;
+  background:linear-gradient(90deg,transparent,rgba(242,137,223,.85),transparent);
+  animation:majin-trace 2.6s ease-in-out infinite;
+}
+#composer #work-progress[data-phase="verify"]::after{
+  background:linear-gradient(90deg,transparent,rgba(195,155,255,.95),transparent);
+}
+@keyframes majin-trace{from{transform:translateX(-115%);opacity:.2}50%{opacity:1}to{transform:translateX(300%);opacity:.2}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress::after{animation:none;display:none}}
+/* Recovery micro-indicator: one animated ember inside the existing chat row.
+   No modal, extra card or false success state. */
+#composer #work-progress[data-phase="diagnose"] .pulse{
+  background:rgba(245,168,221,.17);border:1px solid rgba(245,168,221,.65);
+  width:15px;height:15px;box-shadow:0 0 14px rgba(238,97,193,.25);
+  animation:majin-diagnose-breathe 1.8s ease-in-out infinite;
+}
+#composer #work-progress[data-phase="diagnose"] #work-progress-symbol{
+  display:inline-block;color:#efa3d9;animation:majin-diagnose-turn 1.3s linear infinite;
+}
+#composer #work-progress[data-phase="diagnose"] #work-progress-label{color:#e7c6e0}
+#composer #work-progress[data-phase="diagnose"]::after{background:linear-gradient(90deg,transparent,#ec88d7,transparent)}
+@keyframes majin-diagnose-breathe{50%{transform:scale(.7);opacity:.55}}
+@keyframes majin-diagnose-turn{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="diagnose"] .pulse,#composer #work-progress[data-phase="diagnose"] #work-progress-symbol{animation:none!important}}
+/* A single quiet mauve proof shimmer in the EXISTING composer line.
+   Open shadow-root verification is distinct from ordinary page clicks. */
+#composer #work-progress[data-phase="shadow-verified"]{color:#d8c4ff;border-top-color:rgba(172,135,242,.3)}
+#composer #work-progress[data-phase="shadow-verified"] .pulse{background:#b9a1ff;box-shadow:0 0 10px rgba(176,126,253,.55);animation:none}
+#composer #work-progress[data-phase="shadow-verified"] #work-progress-symbol{color:#e3cfff;filter:drop-shadow(0 0 5px rgba(185,133,255,.7))}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="shadow-verified"] *{animation:none!important}}
+/* Subtle stagnation awareness: one amber whisper in the EXISTING chat status. */
+#composer #work-progress[data-phase="stagnation"]{color:#f3c89b;border-top-color:rgba(229,162,104,.23)}
+#composer #work-progress[data-phase="stagnation"] .pulse{background:#f4bb7b;box-shadow:0 0 9px rgba(239,179,91,.35);animation:none}
+#composer #work-progress[data-phase="stagnation"] #work-progress-symbol{color:#ffcd92;filter:drop-shadow(0 0 3px rgba(255,173,94,.35))}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="stagnation"] *{animation:none!important}}
+/* V1 micro-polish: the same chat composer, more legible typing and focus.
+   No new panel; respects keyboard navigation and reduced-motion. */
+#composer:focus-within{border-color:rgba(247,120,209,.58)!important;box-shadow:0 0 0 1px rgba(244,123,212,.12),0 0 23px rgba(223,72,180,.12)!important;transition:border-color .24s ease,box-shadow .24s ease}
+#composer #input{direction:ltr;text-align:left;caret-color:#ff91d2;letter-spacing:.005em}
+#composer .composer-talk:focus-visible,#composer #send:focus-visible{outline:2px solid #f3a0e1;outline-offset:3px}
+#composer .composer-talk[aria-pressed="true"]{box-shadow:inset 0 0 0 1px rgba(253,157,226,.38),0 0 18px rgba(238,91,213,.21)}
+@media(prefers-reduced-motion:reduce){#composer:focus-within{transition:none!important}}
+/* Quiet obstruction state: one existing composer status line, no popup or panel. */
+#composer #work-progress[data-phase="obstructed"]{color:#edb6dd;border-top-color:rgba(234,115,198,.26)}
+#composer #work-progress[data-phase="obstructed"] .pulse{background:#ed94d8;box-shadow:0 0 9px rgba(229,111,199,.25);animation:none}
+#composer #work-progress[data-phase="obstructed"] #work-progress-symbol{color:#f3b7e8;filter:drop-shadow(0 0 4px rgba(222,118,210,.25))}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="obstructed"] *{animation:none!important}}
+
+/* Round: one expressive voice cue inside the EXISTING composer, no new panels. */
+#composer .composer-talk{position:relative;isolation:isolate}
+body[data-voice-mode="listening"] #composer .composer-talk::after,
+body[data-voice-mode="speaking"] #composer .composer-talk::after{
+  content:"";position:absolute;inset:2px;border-radius:13px;pointer-events:none;
+  border:1px solid rgba(255,150,224,.64);opacity:.8;
+  box-shadow:0 0 13px rgba(255,111,216,.2);
+  animation:majin-mic-breathe 1.8s ease-in-out infinite;
+}
+body[data-voice-mode="speaking"] #composer .composer-talk::after{
+  border-color:rgba(199,158,255,.75);animation-duration:1.1s;
+}
+@keyframes majin-mic-breathe{
+  0%,100%{transform:scale(.96);opacity:.34}
+  50%{transform:scale(1.07);opacity:.95}
+}
+@media(prefers-reduced-motion:reduce){
+  body[data-voice-mode="listening"] #composer .composer-talk::after,
+  body[data-voice-mode="speaking"] #composer .composer-talk::after{animation:none}
+}
+
+/* Round 2026-10-22: one subtle "verification" shimmer in EXISTING chat status.
+   No additional cards, popups or visual clutter. */
+#composer #work-progress[data-phase="verify"]{
+  position:relative;isolation:isolate;overflow:hidden;
+  color:#e9cbed;border-top-color:rgba(251,128,209,.28);
+}
+#composer #work-progress[data-phase="verify"]::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:-1;
+  background:linear-gradient(92deg,transparent 15%,rgba(234,99,205,.11) 47%,rgba(169,125,255,.1) 54%,transparent 85%);
+  background-size:240% 100%;animation:majin-verify-sweep 2.6s linear infinite;
+}
+#composer #work-progress[data-phase="verify"] #work-progress-symbol{
+  color:#ff93dc;text-shadow:0 0 10px rgba(255,127,216,.55);
+}
+/* Subtle grounded-proof pulse, respecting reduced motion. */
+#composer #work-progress[data-phase="verify"] #work-progress-symbol{animation:majin-proof-breathe 1.8s ease-in-out infinite}
+@keyframes majin-proof-breathe{50%{opacity:.66;text-shadow:0 0 16px rgba(255,127,216,.78)}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="verify"] #work-progress-symbol{animation:none}}
+@keyframes majin-verify-sweep{from{background-position:110% 0}to{background-position:-110% 0}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="verify"]::before{animation:none}}
+/* Recovery stays in the existing one-line composer instead of opening a panel. */
+#composer #work-progress[data-phase="recovery"]{color:#e9cbff;border-top-color:rgba(217,155,255,.32)}
+#composer #work-progress[data-phase="recovery"] .pulse{background:#dca9ff;box-shadow:0 0 0 3px rgba(220,169,255,.12),0 0 12px rgba(220,169,255,.5)}
+#composer #work-progress[data-phase="recovery"]::after{background:linear-gradient(90deg,transparent,#dca9ff,transparent);animation-duration:1.65s}
+#composer #work-progress[data-phase="recovery"] #work-progress-symbol{display:inline-block;animation:majin-recovery-rotate 1.7s ease-in-out infinite}
+@keyframes majin-recovery-rotate{50%{transform:rotate(160deg)}100%{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="recovery"] #work-progress-symbol{animation:none}}
+/* One visual refinement per round: a quiet evidence glow in the existing composer. */
+#composer #work-progress[data-phase="compact"] .pulse{animation:majin-compact-evidence-glow 2.1s ease-in-out infinite;box-shadow:0 0 9px rgba(223,148,248,.23)}
+@keyframes majin-compact-evidence-glow{50%{opacity:.62;transform:scale(.85)}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="compact"] .pulse{animation:none!important;transform:none!important}}
+/* One calm visual improvement: a restrained amber glow on existing stagnation status. */
+#composer #work-progress[data-phase="stagnation"] #work-progress-symbol{animation:majin-stagnation-orbit 2.6s ease-in-out infinite}
+@keyframes majin-stagnation-orbit{50%{opacity:.7;filter:drop-shadow(0 0 5px rgba(255,172,90,.3))}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="stagnation"] #work-progress-symbol{animation:none!important}}
+/* Evidence and recovery feedback stays in MAJIN's existing composer. */
+#composer #work-progress[data-phase="recover"] #work-progress-symbol,
+#composer #work-progress[data-phase="compact"] #work-progress-symbol{animation:majin-evidence-breathe 2.7s ease-in-out infinite}
+@keyframes majin-evidence-breathe{50%{opacity:.68;filter:drop-shadow(0 0 6px rgba(213,143,247,.3))}}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="recover"] #work-progress-symbol,#composer #work-progress[data-phase="compact"] #work-progress-symbol{animation:none!important}}
+/* One visual enhancement: verification and progress within the existing chat composer. */
+#composer #work-progress[data-phase="verify"],#composer #work-progress[data-phase="stagnation"]{transition:border-top-color .18s ease}
+#composer #work-progress[data-phase="verify"]{border-top-color:rgba(226,151,250,.3)}
+#composer #work-progress[data-phase="stagnation"]{border-top-color:rgba(250,180,99,.3)}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="verify"],#composer #work-progress[data-phase="stagnation"]{transition:none!important}}
+/* Rebased progress visibility: gentle amber edge, no extra panel. */
+#composer #work-progress[data-phase="stagnation"]{border-top-color:rgba(255,187,113,.36)}
+@media(prefers-reduced-motion:reduce){#composer #work-progress[data-phase="stagnation"] *{animation:none!important}}
+</style>
+<link rel="stylesheet" href="/phoenix.css" />
+</head>
+<body class="simple">
+<svg class="icon-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 14h8M8 17h5"/></symbol>
+</defs></svg>
+<header>
+  <img class="logo" src="/logo.png" alt="MAJIN" width="22" height="22">
+  <h1 id="brand">MAJIN</h1>
+  <span class="sub" id="tagline"></span>
+  <span class="chip" id="c-route">route <b>–</b></span>
+  <button class="chip" id="c-model" hidden title="the one model that runs everything — click to change"></button>
+  <span class="chip" id="c-moa">MOA <b>–</b></span>
+  <span class="chip" id="c-tools">tools <b>–</b></span>
+  <span class="chip" id="c-cost">$<b>0</b></span>
+  <button class="chip" id="c-update" hidden title="New version available" type="button"></button>
+  <span class="spacer"></span><button id="b-studio" aria-controls="studio" aria-expanded="false"><svg class="icon"><use href="#i-panel"/></svg><span>Workspace</span><span id="task-count" hidden></span></button>
+  <span class="chip" id="c-tg"><i class="led" id="led-tg"></i>telegram</span>
+  <span class="chip" id="c-wa"><i class="led" id="led-wa"></i>whatsapp</span>
+  <button id="b-mode" title="Permission mode — Assist: ask before every write. Approval: ask before risky work. Full auto: never ask.">approval</button>
+  <button id="b-expert" title="Advanced settings and tools" aria-label="Advanced settings">⚙</button> <button id="b-panel" class="on" title="Side panel">⌗</button> <button id="b-quit" title="Quit MAJIN — stops the agent, closes everything (your keys and memory stay)">⏻</button>
+  <button id="b-rail" title="Sidebar" aria-label="Toggle sidebar">☰</button>
+  <button id="b-theme" title="Light / dark">◐</button>
+  <button id="b-voice" title="Speak responses" aria-label="Toggle spoken responses">Voice</button>
+  <button id="b-narrator" type="button" title="Use local Kokoro English narrator when installed; otherwise use system voice" aria-pressed="false">Narrator EN</button>
+  <button id="b-test" title="Run self-test">◎</button>
+  <button id="b-stop" class="danger" title="Emergency stop — abort the running task">■</button>
+  <span id="v-tag" title="the version this window is actually running — never guess again"></span>
+</header>
+
+<div id="app">
+  <div id="rail">
+    <button id="new-chat" class="nav-new"><svg class="icon"><use href="#i-plus"/></svg>New chat<span class="nav-hint">Ctrl N</span></button>
+    <label class="chat-search"><svg class="icon"><use href="#i-search"/></svg><input id="chat-search" type="search" placeholder="Search chats" aria-label="Search chats"/></label>
+    <h3>RECENT</h3><div id="sessions"></div><p id="chat-empty" hidden>No matching chats</p>
+    <div class="rail-actions"><button id="browse-models" class="nav-link"><svg class="icon"><use href="#i-grid"/></svg>Explore models</button><button id="manage-providers" class="nav-link"><svg class="icon"><use href="#i-sliders"/></svg>Providers</button><span class="rail-caption">Your models. Your space.</span></div>
+    <h3>PLAN</h3><div class="plan" id="plan"><div>–</div></div>
+    <h3>SCHEDULE</h3><div id="sched" class="kv">no jobs</div>
+    <h3>MEMORY</h3><div id="mem" class="kv">–</div>
+  </div>
+  <div id="main"><section id="imagine" hidden></section><div id="scroller"></div><footer>
+  <div id="run-state" data-state="idle" hidden><span class="living-orb" aria-hidden="true"><i></i><i></i><i></i></span><span id="run-label">Ready</span><button id="run-details">View activity <span aria-hidden="true">↗</span></button></div>
+  <div id="composer">
+    <button id="mic" class="composer-talk" type="button" title="Start or stop a voice conversation" aria-label="Talk to MAJIN" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 10.5a6.5 6.5 0 0 0 13 0M12 17v4m-4 0h8"/></svg></button>
+    <textarea id="input" placeholder="Message MAJIN" rows="1" aria-label="Message MAJIN"></textarea>
+    <button id="send" type="button" aria-label="Send message" title="Send message" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path class="send-arrow" d="M12 19V5m-6 6 6-6 6 6"/><rect class="send-stop" x="6" y="6" width="12" height="12" rx="2"/></svg></button>
+    <div id="voice-stage" role="region" aria-label="MAJIN voice conversation" hidden>
+      <div class="voice-orb" aria-hidden="true"><span class="orb-core"></span><span class="orb-halo orb-halo-a"></span><span class="orb-halo orb-halo-b"></span><span class="orb-spark"></span></div>
+      <div class="voice-stage-copy"><strong id="voice-stage-label">Listening</strong><small id="voice-caption">Speak naturally</small></div>
+      <button id="voice-stage-stop" type="button" aria-label="End voice conversation" title="End voice call">×</button>
+    </div>
+    <div id="work-progress" role="status" aria-live="polite" hidden><span class="pulse" aria-hidden="true"></span><span id="work-progress-symbol" aria-hidden="true">✦</span><span id="work-progress-label">Starting…</span><span id="work-progress-timer">0s</span></div>
+  </div>
+  <div class="crow"><span id="mic-state" aria-live="polite"></span><span class="grow" id="status" role="status" aria-live="polite">Ready</span><span id="drop" class="drop">drop a file → RE analysis</span></div>
+</footer></div>
+  <aside id="studio" hidden aria-label="Workspace">
+    <div class="studio-heading"><div><span class="eyebrow">MAJIN STUDIO</span><h2>Workspace</h2></div><button id="studio-close" aria-label="Close workspace"><svg class="icon"><use href="#i-close"/></svg></button></div>
+    <div class="studio-tabs" role="tablist" aria-label="Workspace views"><button id="tab-activity" role="tab" aria-selected="true" aria-controls="view-activity" tabindex="0">Activity</button><button id="tab-files" role="tab" aria-selected="false" aria-controls="view-files" tabindex="-1">Files <span id="file-count">0</span></button><button id="tab-preview" role="tab" aria-selected="false" aria-controls="view-preview" tabindex="-1">Preview</button><button id="tab-settings" role="tab" aria-selected="false" aria-controls="view-settings" tabindex="-1">Settings</button></div>
+    <section id="view-activity" class="studio-view" role="tabpanel" aria-labelledby="tab-activity"><div class="section-heading"><h3>Task constellation</h3><span id="studio-task-summary">No active tasks</span></div><p id="task-connection" hidden role="status"></p><div id="studio-tasks"></div><div id="task-detail" hidden></div><div id="activity-mount"></div></section>
+    <section id="view-files" class="studio-view" role="tabpanel" aria-labelledby="tab-files" hidden><div class="studio-empty"><svg class="icon"><use href="#i-file"/></svg><h3>A place for what you make.</h3><p>Files from the current run appear here when a tool reports a real file.</p></div><div id="studio-files"></div></section>
+    <section id="view-preview" class="studio-view" role="tabpanel" aria-labelledby="tab-preview" hidden><div id="studio-preview"><div class="studio-empty"><svg class="icon"><use href="#i-panel"/></svg><h3>From idea to something real.</h3><p>Select a generated file in Files to inspect its contents or preview its HTML.</p></div></div></section>
+    <section id="view-settings" class="studio-view" role="tabpanel" aria-labelledby="tab-settings" hidden><div class="settings-utilities"></div><div id="settings-mount"></div></section>
+  </aside>
+  <div id="panel">
+    <h3>ROUTING</h3><div id="routes"></div>
+    <h3>MOA</h3><div id="moactl"></div>
+    <h3>PERMISSIONS</h3><div id="guardctl"></div>
+    <h3>PROVIDERS</h3><div id="providers"></div>
+    <h3>CHANNELS</h3><div id="chan"></div>
+    <h3>RE</h3><div id="rebox">
+      <div class="row"><input id="re-path" placeholder="path to a file" style="flex:1" /><button id="re-go">analyze</button></div>
+      <div id="re-out" class="kv">drop a file on the composer to analyze it</div>
+    </div>
+    <h3>COST</h3><div id="usage" class="kv"></div>
+  </div>
+</div>
+
+
+<div id="modeldrop" hidden></div>
+<div id="onboard" hidden role="dialog" aria-modal="true" aria-label="MAJIN setup"><div id="ob-card"><div id="ob-body"></div></div></div>
+<div id="toast"></div>
+<script>window.__MAJIN_TOKEN__='__MAJIN_TOKEN__';window.__MAJIN_VERSION__='__MAJIN_VERSION__';</script>
+<script>document.addEventListener('DOMContentLoaded',function(){document.getElementById('v-tag').textContent='v'+window.__MAJIN_VERSION__;});</script>
+<script src="/studio.js"></script>
+<script src="/imagine.js"></script>
+<script src="/onboard.js"></script>
+<script src="/chats.js"></script>
+<script src="/voice-foreground.js"></script>
+<script src="/mindmap.js"></script>
+<script src="/voice-intent.js"></script>
+<script src="/app.js"></script>
+<script src="/panels.js"></script>
+<script src="/marketing.js"></script>
+</body>
+</html>

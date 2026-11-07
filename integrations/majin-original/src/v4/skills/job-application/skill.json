@@ -1,0 +1,10 @@
+{
+  "schema": "majin.v4.skill/v1",
+  "name": "job-application",
+  "title": "Fyll i en jobbansökan utan att skicka in",
+  "summary": "Öppna jobbformuläret i MAJIN:s browser, fyll bara i uppgifter som ägaren redan lämnat och verifiera fälten. Skickar aldrig in.",
+  "requires": ["web"],
+  "tools": ["browser_open", "browser_form", "browser_form_fill"],
+  "experimental": false,
+  "prefers": ["browser_read", "browser_verify"]
+}

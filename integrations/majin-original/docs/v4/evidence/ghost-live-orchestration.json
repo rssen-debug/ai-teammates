@@ -1,0 +1,22 @@
+{
+  "at": "2026-10-23T18:39:58.894Z",
+  "machine": "DESKTOP-C1RSBUA",
+  "status": "PASS",
+  "live": true,
+  "credentialContentsRecorded": false,
+  "provider": "opencode-go",
+  "model": "glm-5.3-flash",
+  "streaming": true,
+  "verifiedBytes": true,
+  "tools": [
+    "workspace_write",
+    "workspace_write",
+    "workspace_read",
+    "workspace_read",
+    "agent_graph"
+  ],
+  "modelCalls": 8,
+  "peakConcurrentModelCalls": 2,
+  "orchestration": true,
+  "turnStatus": "completed"
+}

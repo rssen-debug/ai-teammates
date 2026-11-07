@@ -1,0 +1,24 @@
+{
+  "schema": "majin.v4.skill/v1",
+  "name": "job-search",
+  "title": "Hitta och förbered jobbansökningar",
+  "summary": "Hitta CV:t, läs det, sök riktiga annonser, jämför och förbered ansökningar. Skickar aldrig in utan godkännande.",
+  "requires": [
+    "files",
+    "web"
+  ],
+  "tools": [
+    "fs_search",
+    "document_read",
+    "web_search",
+    "jobs_search",
+    "jobs_match",
+    "jobs_prepare"
+  ],
+  "experimental": false,
+  "prefers": [
+    "browser_open",
+    "browser_click",
+    "browser_fill"
+  ]
+}

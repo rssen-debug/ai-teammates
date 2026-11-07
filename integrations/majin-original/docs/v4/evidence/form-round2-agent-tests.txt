@@ -1,0 +1,26 @@
+✔ spoken turns ask for concise same-language replies without affecting typed turns (62.6844ms)
+✔ model sees diminishing execution bounds without accumulating instructions in history (43.1607ms)
+✔ failure: a throwing tool fails the turn, records a failure receipt, never claims success (25.6207ms)
+✔ failure: schema-breaking tool output is a classified failure, not a pass (26.182ms)
+✔ failure: a hanging tool is cut off by the turn timeout (335.2309ms)
+✔ failure: the tool budget stops a runaway loop instead of spending forever (22.5721ms)
+✔ failure: strict policy pauses for approval and executes nothing until answered (21.1829ms)
+✔ approval resumes the original batch and model after restart without repeating earlier tools (303.6092ms)
+✔ approvals do not reset the model or tool budget and never report premature completion (24.5344ms)
+✔ tampered approval checkpoint executes nothing and remains waiting (21.6602ms)
+✔ resumed approval remains cancellable and linked to its owning session (22.8829ms)
+✔ injection: hostile text cannot escape the workspace or the schema (20.4721ms)
+✔ injection: every hostile message leaves the workspace clean (130.3958ms)
+✔ injection: tool arguments must be JSON objects, never code or arrays (24.6589ms)
+✔ injection: an unknown tool is refused, not invented (23.9134ms)
+✔ delegation: an explicit empty tool allowlist grants no tools (1962.3323ms)
+✔ universal: a new task is composed from a discovered tool, a real file and a read-back (1545.758ms)
+✔ universal: delegation runs a bounded subagent with its own tools and context (1515.8757ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5654.0942

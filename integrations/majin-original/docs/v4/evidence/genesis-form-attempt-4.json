@@ -1,0 +1,87 @@
+{
+  "at": "2026-10-23T21:58:13.714Z",
+  "sourceCommit": "37c0a25b561fc85ea5aa0276e5abb546f0a7283b",
+  "kind": "real-Go-unfamiliar-local-form",
+  "passed": false,
+  "checks": {
+    "realModelCompleted": false,
+    "providerUnchanged": true,
+    "browserUpload": true,
+    "browserInteraction": true,
+    "validationRecovered": false,
+    "oneAcceptedRegistration": false,
+    "exactUploadedBytes": false,
+    "savedObservedReceipt": false
+  },
+  "failure": "model round budget exhausted (12); task is incomplete",
+  "status": "failed",
+  "elapsedMs": 25238,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "conversationId": "conv_mvligsb4_dea02f688504",
+  "successfulActions": [
+    "browser_open",
+    "browser_read",
+    "browser_elements",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_click",
+    "browser_click",
+    "browser_read",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_read"
+  ],
+  "toolFailures": [
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "browser.fill cannot set a checkbox — Use browser.click with this exact selector and confirm the checked result. The control was not modified."
+    },
+    {
+      "name": "browser_click",
+      "summary": "UNKNOWN",
+      "error": "Specify a selector, URL fragment, exact URL path/origin, or title fragment to verify"
+    }
+  ],
+  "oneUseApprovals": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_fill",
+    "browser_click",
+    "browser_click",
+    "browser_click",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill"
+  ],
+  "deniedActions": [],
+  "proof": {
+    "submissions": [],
+    "needsSlot": false,
+    "accepted": null
+  },
+  "artifacts": {
+    "uploadName": "genesis-form-upload-f84b358472dd.txt",
+    "receiptName": "genesis-form-receipt-f84b358472dd.txt"
+  },
+  "physicalPhonePass": false,
+  "fullScenarioAComplete": false,
+  "note": "Controlled dynamic-form/upload/validation acceptance only; external authentication handoff, cancellation and other real-world gates remain separate."
+}
