@@ -371,7 +371,7 @@ export class StuddyServices {
       const message = this.db.messages.append({
         sessionId: session.id,
         role: 'buddy',
-        text: 'Ingen AI är ansluten ännu. Skriv /api i chatten för att välja tjänst och lägga in din nyckel.',
+        text: 'Ingen AI-provider är ansluten ännu. Skriv /api i chatten för att välja tjänst och lägga in din nyckel.',
         mode,
       });
       return ok({ message, degraded: true, error: 'NO_PROVIDER', trimmed: false, notice: null });
