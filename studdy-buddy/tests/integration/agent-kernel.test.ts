@@ -108,24 +108,36 @@ describe('unified agent through the CLI', () => {
     expect(result.steps[0]?.detail).toContain('application.observe');
   });
 
-  it('does not claim success when the granted scope still cannot reach the host', async () => {
+  it('only reports a desktop step as achieved when it is actually proven', async () => {
+    // The host decides whether a real desktop is reachable (headless Linux here,
+    // an interactive session on Windows). Both outcomes are legitimate; what is
+    // not legitimate is success without evidence, or a silent failure.
     const fetchImpl = (async () => planResponse([
       { tool: 'windows.list', arguments: {}, claim: 'list every open window' },
     ])) as unknown as typeof fetch;
     await configureProvider(fetchImpl);
 
     const code = await runCli(['agent', 'what windows do I have open', '--json'], io(), { dataDir: dir, fetchImpl });
-    expect(code).toBe(1);
     const result = JSON.parse(out[0]!) as {
       achieved: boolean;
-      steps: { state: string; verified: boolean; detail: string }[];
+      steps: { state: string; verified: boolean; detail: string; operationId: string | null }[];
     };
-    expect(result.achieved).toBe(false);
-    expect(result.steps[0]?.verified).toBe(false);
-    // Whatever the host says, it must never be reported as completed, and the
-    // detail must be the real adapter/host message rather than a generic pass.
-    expect(result.steps[0]?.state).not.toBe('COMPLETED');
-    expect(result.steps[0]?.detail.length).toBeGreaterThan(0);
+    const step = result.steps[0];
+    expect(step).toBeDefined();
+
+    if (result.achieved) {
+      // A pass must carry a real operation id from the tool layer.
+      expect(code).toBe(0);
+      expect(step!.state).toBe('COMPLETED');
+      expect(step!.verified).toBe(true);
+      expect(step!.operationId).toMatch(/^kernel-[a-f0-9]{40}$/);
+    } else {
+      expect(code).toBe(1);
+      expect(step!.verified).toBe(false);
+      expect(step!.state).not.toBe('COMPLETED');
+      // The reason must be the real host/adapter message, never an empty string.
+      expect(step!.detail.length).toBeGreaterThan(0);
+    }
   });
 
   it('contradicts a claim about a file the tool never wrote', async () => {
