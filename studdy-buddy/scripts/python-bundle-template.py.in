@@ -158,8 +158,18 @@ def cmd_extract(args: list[str]) -> int:
                     continue
                 if os.path.lexists(dest):
                     os.remove(dest)
-                os.symlink(m.linkname, dest)
-                links += 1
+                try:
+                    os.symlink(m.linkname, dest)
+                    links += 1
+                except (OSError, NotImplementedError):
+                    # Windows utan utvecklarläge får inte skapa symlänkar.
+                    # Kopiera innehållet i stället för att tappa filen tyst.
+                    linked = os.path.join(os.path.dirname(dest), m.linkname)
+                    if os.path.isfile(linked):
+                        shutil.copyfile(linked, dest)
+                        total += 1
+                    else:
+                        print(f"Kunde inte återskapa länk: {m.name}", file=sys.stderr)
                 continue
             if not m.isfile():
                 continue

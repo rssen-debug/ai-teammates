@@ -78,6 +78,11 @@ jobs:
           test -f /tmp/bundle-out/studdy-buddy/package.json
           # Den committade filen måste vara samma format som generatorn gör.
           head -1 bundles/studdy-buddy-all.py | grep -q '^#!'
+          # Och den får inte ha vuxit: då har den svalt sig själv igen.
+          size=$(wc -c < bundles/studdy-buddy-all.py)
+          if [ "$size" -gt 4000000 ]; then
+            echo "Bundlen är $size byte - den innehåller troligen sig själv."; exit 1
+          fi
 
       - name: Built CLI smoke test
         shell: bash

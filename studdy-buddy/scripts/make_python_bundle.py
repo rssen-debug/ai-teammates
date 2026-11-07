@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from datetime import datetime, timezone
 import os
 import gzip
 import io
@@ -33,8 +34,10 @@ CLI_BUNDLE = ROOT / "dist" / "cli" / "studdy.mjs"
 VERSION_FILE = ROOT / "package.json"
 
 # Ska aldrig med: det är genererat, installerat eller för stort.
+# "bundles" får aldrig vara med: filen skulle då innehålla sig själv och växa
+# för varje bygge (2,8 MB -> 5,7 MB upptäcktes genom att titta på storleken).
 EXCLUDE_DIRS = {"node_modules", ".git", "dist", "build", "coverage", ".next",
-                ".turbo", ".vitest", ".cache", "__pycache__"}
+                ".turbo", ".vitest", ".cache", "__pycache__", "bundles"}
 
 
 def version() -> str:
@@ -123,8 +126,7 @@ def main() -> int:
     template = TEMPLATE.read_text(encoding="utf-8")
     substitutions = {
         "@@VERSION@@": ver,
-        "@@BUILT@@": subprocess.run(["date", "-u", "+%Y-%m-%d %H:%M UTC"],
-                                    capture_output=True, text=True).stdout.strip(),
+        "@@BUILT@@": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "@@FILE_COUNT@@": str(len(included)),
         "@@RAW_BYTES@@": str(raw_bytes),
         "@@SKIPPED@@": str(len(skipped)),
