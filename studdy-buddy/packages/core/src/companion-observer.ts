@@ -5,18 +5,24 @@ import type { UiSnapshot } from '@studdy/shared';
  // ChatGPT is a normal browser page that may be observed when the user chose broad
  // desktop observation. Authentication, private browsing and intimate content are
  // not suitable for unattended context hints or raw-title display.
-const PRIVATE_WINDOW = /bank|login|sign.?in|password|lösenord|vault|1password|bitwarden|keepass|incognito|inprivate|private browsing|privat fönster|whatsapp|signal|telegram|discord|gmail|outlook|porn|erome|onlyfans|adult content|xxx|nsfw|sex video/i;
+const SENSITIVE_WINDOW = /bank|login|sign.?in|password|lösenord|vault|1password|bitwarden|keepass|incognito|inprivate|private browsing|privat fönster|whatsapp|signal|telegram|discord|gmail|outlook|porn|erome|onlyfans|adult content|xxx|nsfw|sex video/i;
 const CONVERSATION_WINDOW = /chatgpt|claude|gemini|copilot|perplexity/i;
 const ERROR_TERMS = /\b(error|failed|failure|invalid|unreachable|timeout|denied|exception|felaktig|misslyckades|ogiltig|kunde inte|destination host unreachable|request timed out|syntax error)\b/i;
 
+/** Observation is allowed for any foreground application the user granted.
+ * Access does not imply consent to publish titles, store content, or interject.
+ */
 export function allowedObservationTitle(title: string): boolean {
-  return title.length > 0 && !PRIVATE_WINDOW.test(title);
+  return title.trim().length > 0;
+}
+export function isSensitiveWindow(title: string): boolean {
+  return SENSITIVE_WINDOW.test(title);
 }
 
 /** Browser tab titles may contain private queries or intimate content. Never
  * print a raw browser tab title, even when UI observation is otherwise allowed. */
 export function safeWindowLabel(title: string, processName = ''): string {
-  if (!allowedObservationTitle(title)) return 'Privat fönster';
+  if (isSensitiveWindow(title)) return 'Privat fönster';
   if (/chrome|msedge|firefox|brave|opera|vivaldi/i.test(processName) ||
       /\b(?:Google Chrome|Microsoft Edge|Firefox|Brave|Opera|Vivaldi)\b/i.test(title)) {
     return 'Webbläsare' + (CONVERSATION_WINDOW.test(title) ? ' · AI-chatt' : '');
@@ -33,11 +39,11 @@ export interface CompanionHint {
 
 /** Only fixed, local text classification. The raw UI tree is never logged. */
 export function detectCompanionHint(snapshot: UiSnapshot, title: string): CompanionHint | null {
-  if (!snapshot.accessible || !allowedObservationTitle(title) || CONVERSATION_WINDOW.test(title)) return null;
+  if (!snapshot.accessible || isSensitiveWindow(title) || CONVERSATION_WINDOW.test(title)) return null;
   const candidates = snapshot.elements
     .filter(e => /^(text|statictext|alert|status|document|edit|label)$/i.test(e.role))
     .map(e => (e.name || e.value || '').slice(0, 220).trim())
-    .filter(t => t.length >= 6 && t.length <= 220 && ERROR_TERMS.test(t) && !PRIVATE_WINDOW.test(t));
+    .filter(t => t.length >= 6 && t.length <= 220 && ERROR_TERMS.test(t) && !SENSITIVE_WINDOW.test(t));
   if (!candidates.length) return null;
   const value = candidates[0]!;
   const signature = createHash('sha256').update(title + '\0' + value).digest('hex').slice(0, 20);
@@ -56,7 +62,7 @@ export function detectCompanionHint(snapshot: UiSnapshot, title: string): Compan
  * Labels are fixed templates and never contain the raw observed text.
  */
 export function detectContextHint(snapshot: UiSnapshot, title: string): CompanionHint | null {
-  if (!snapshot.accessible || !allowedObservationTitle(title)) return null;
+  if (!snapshot.accessible || isSensitiveWindow(title) || CONVERSATION_WINDOW.test(title)) return null;
   const safeElements = snapshot.elements.filter(e =>
     /^(text|statictext|document|label|heading|tab)$/i.test(e.role) &&
     !/(password|secret|token|api.?key|auth|otp|credit.?card|personnummer|bank)/i.test(e.name ?? '') &&
