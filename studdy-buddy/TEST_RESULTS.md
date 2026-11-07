@@ -87,3 +87,45 @@ headless Linux kräver BLOCKED, riktig desktop kräver konsekvent bevis
 - **Windows native:** tidigare verkligt CI-bevis (Notepad launch → window → snapshot) finns i run 42313457560. Denna Linux-runda kördes inte på Windows.
 
 Ingen nyckel från användaren har sparats i repo eller testdata.
+
+## Unified agent — vad som faktiskt kördes i denna runda
+
+### Ny kod som testas på riktigt
+
+| Fil | Tester | Vad de bevisar |
+| --- | --- | --- |
+| `tests/unit/kernel-queue.test.ts` | 9 | Köstatus överlever processer, atomisk skrivning, dedupe, dependency-gating, lease-återhämtning, en ägare per effekt, osäker effekt körs aldrig om |
+| `tests/unit/kernel-supervisor.test.ts` | 19 | Blockerade uppgifter isoleras, watchdog fäller tyst handler, budgetar, STOP-fil, två workers delar kö utan dubbelkörning, redigering av hemligheter, lane-policy |
+| `tests/unit/kernel-verify.test.ts` | 8 | Påstående utan bevis = `unverified`; påhittat operations-id = `unverified`; saknad fil = `contradicted`; fel read-back = `contradicted`; BLOCKED = aldrig PASS |
+| `tests/integration/kernel-cli.test.ts` | 7 | Byggd CLI i separata processer: enqueue → run → get, dedupe, STOP, reconcile med bevis, verify |
+| `tests/integration/agent-kernel.test.ts` | 9 | Plan från modell mot riktig katalog, påhittat verktyg förkastas, behörighetsvägran blir `FAILED_FINAL`, overifierat påstående blir inte klart, direkt instruktion utan provider |
+| `tests/integration/omega-bridge.test.ts` | 5 | Omegas riktiga Python-svit körs och importeras; saknad Python/skript/rapport blir `BLOCKED`, aldrig PASS |
+
+### Faktisk utskrift från byggd CLI
+
+```
+$ studdy omega selftest
+PASS=11  FAIL=0  BLOCKED=8  NOT TESTED=4
+Importerat till kernelloggen: 11 bevis, 12 blockerade, 0 misslyckade.
+
+$ studdy agent "run time.now"
+  1. time.now         COMPLETED        PASS
+     run time.now (verified: tool-operation)
+Klart: all 1 step(s) completed
+```
+
+### Siffror
+
+- `npm test`: **467 passed / 51 filer**
+- `npm run lint`: 0 problem
+- `npm run typecheck`: 0 fel
+- `npm run build` + `npm run package:cli`: OK
+
+### Inte verifierat (årligt)
+
+- Native desktop-scenarier på riktig Windows/Linux-desktop: BLOCKED i denna sandbox.
+- Live-modellsplanering mot Kilo: sandboxens egress når inte API:et. Planeraren testas
+  med lokal providersvar, men routern, kön, supervisorn och verifieringen är riktig kod.
+- MAJIN V6:s egen svit i `integrations/majin-original`: 31/36 passerar; 5 felar på att
+  det importerade trädet saknar `zod` (ingen `npm install` där). Det är en känd miljöbrist,
+  inte en tyst pass — kerneln i `packages/agent-core` är porten av samma logik och grön.

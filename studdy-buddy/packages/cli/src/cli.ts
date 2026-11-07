@@ -8,6 +8,7 @@ import { maskKey } from '@studdy/ai-router';
 import { voiceSettingsSchema, type ProviderConfig } from '@studdy/shared';
 import { neuralVoiceFor, synthesizeNeural } from '@studdy/voice-engine';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
+import { runKernelCommand, runToolsCommand, runOmegaCommand } from './kernel-commands.js';
 
 export interface CliIO {
   out: (text: string) => void;
@@ -27,6 +28,16 @@ const CLI_FLAGS = {
   once: { type: 'boolean' as const }, stdin: { type: 'boolean' as const },
   app: { type: 'string' as const }, 'no-write': { type: 'boolean' as const },
   headed: { type: 'boolean' as const },
+  kind: { type: 'string' as const }, tool: { type: 'string' as const },
+  args: { type: 'string' as const }, priority: { type: 'string' as const },
+  'dedupe-key': { type: 'string' as const }, 'effect-key': { type: 'string' as const },
+  irreversible: { type: 'boolean' as const }, 'max-tasks': { type: 'string' as const },
+  'max-runtime-ms': { type: 'string' as const }, 'worker-id': { type: 'string' as const },
+  state: { type: 'string' as const }, limit: { type: 'string' as const },
+  outcome: { type: 'string' as const }, evidence: { type: 'string' as const },
+  statement: { type: 'string' as const }, readback: { type: 'string' as const },
+  path: { type: 'string' as const }, 'operation-id': { type: 'string' as const },
+  detail: { type: 'string' as const },
   version: { type: 'boolean' as const, short: 'v' }, help: { type: 'boolean' as const, short: 'h' },
 };
 
@@ -48,6 +59,11 @@ Användning:
   studdy provider test | probe   Live-test / uppmätta modellförmågor
   studdy status                  Kompakt dashboard
   studdy doctor                  Lokal hälsokontroll
+  studdy agent "mål"            Autonomt: planera → kö → köra → verifiera
+  studdy kernel status|enqueue|run|list|get|events  Autonom, spårbar arbetskö
+  studdy kernel cancel|retry|reconcile|verify  Ägarbeslut och beviskontroll
+  studdy omega selftest|results  Omegas riktiga acceptanssvit + importerade domar
+  studdy tools                   Verktyg workern faktiskt kan köra
   studdy selftest                Kör riktiga Windows-tester och skriv anonym rapport
   studdy prove [--app "App"]     Bevisa live: starta, läs, skriv, skärmbild
   studdy open "Google Chrome"    Starta valfri app, verifierat
@@ -163,6 +179,67 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
           '', `${p.violet('Nivå ' + ledger.level)}  ${p.dim(ledger.verified + ' verifierade skills')}  ${p.dim(snapshot.concepts.length + ' begrepp')}`,
         ], color));
         return 0;
+      }
+      case 'agent': {
+        const goal = positional.slice(1).join(' ').trim();
+        if (!goal) { io.err('Ange ett mål, t.ex.: studdy agent "run time.now"'); return 2; }
+        if (!json) io.out(`Mål: ${goal}\nPlanerar…`);
+        const result = await runtime.runGoal(goal);
+        if (json) {
+          // Verification is aggregated so a caller can trust `achieved`.
+          out({
+            achieved: result.achieved,
+            reason: result.reason,
+            workerId: result.workerId,
+            plan: { source: result.plan.source, note: result.plan.note, steps: result.plan.steps.map((s2) => ({ tool: s2.tool, claim: s2.claim })) },
+            steps: result.steps.map((s2) => ({
+              index: s2.index, tool: s2.tool, state: s2.state, taskId: s2.taskId,
+              operationId: s2.operationId, verified: s2.verification?.verified ?? false,
+              verification: s2.verification?.state ?? null, detail: s2.detail,
+            })),
+          });
+          return result.achieved ? 0 : 1;
+        }
+        io.out(`Plan: ${result.plan.source}${result.plan.note ? ` (${result.plan.note})` : ''}`);
+        if (!result.steps.length) {
+          io.err(`Inget arbete köades: ${result.reason}`);
+          return 1;
+        }
+        for (const step of result.steps) {
+          const mark = step.verification?.verified ? p.mint('PASS') : step.state === 'COMPLETED' ? p.violet('OVERIFIERAD') : p.red('FAIL');
+          io.out(`  ${step.index + 1}. ${step.tool.padEnd(16)} ${step.state.padEnd(16)} ${mark}`);
+          io.out(`     ${step.detail}`);
+          for (const reason of step.verification?.reasons ?? []) io.out(`     · ${reason}`);
+        }
+        io.out('');
+        io.out(result.achieved
+          ? `Klart: ${result.reason}`
+          : `Inte klart: ${result.reason}`);
+        io.out(p.dim(`Spårat som worker ${result.workerId}. Se: studdy kernel status`));
+        return result.achieved ? 0 : 1;
+      }
+      case 'kernel': {
+        return await runKernelCommand({
+          args: positional.slice(1),
+          flags: flags as Record<string, unknown>,
+          runtime,
+          io: { out: (value) => out(value), err: (text) => io.err(text), json },
+        });
+      }
+      case 'omega': {
+        return await runOmegaCommand({
+          args: positional.slice(1),
+          flags: flags as Record<string, unknown>,
+          runtime,
+          io: { out: (value) => out(value), err: (text) => io.err(text), json },
+        });
+      }
+      case 'tools': {
+        return await runToolsCommand({
+          flags: flags as Record<string, unknown>,
+          runtime,
+          io: { out: (value) => out(value), err: (text) => io.err(text), json },
+        });
       }
       case 'doctor': {
         const native = await runtime.nativeStatus();
