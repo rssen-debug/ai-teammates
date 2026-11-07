@@ -165,6 +165,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text === '/autostart' || text.startsWith('/autostart ')) {
         const arg = text.slice('/autostart'.length).trim().toLowerCase();
         const mode = arg === 'on' ? true : arg === 'off' ? false : null;
+        if (mode !== null) runtime.services.db.checkpoints.set('buddy.autostart.opted-out.v1', mode === false);
         const result = configureLoginAutostart(mode);
         log(result.ok ? (result.enabled ? p.mint('● Autostart på · ') : p.dim('○ Autostart av · ')) + result.detail
           : p.amber(result.detail));
