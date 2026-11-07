@@ -106,6 +106,23 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text === '/models') {
         const active = runtime.services.activeProvider();
         log(active ? `Aktiv: ${active.name} · ${active.modelId} · ${active.hasApiKey ? 'API-nyckel sparad' : 'saknar nyckel'}\nByt: /model <modell-id> · Byt tjänst/nyckel: /api` : 'Ingen AI ansluten. Skriv /api och välj en tjänst.');
+      } else if (text === '/model') {
+        const active = runtime.services.activeProvider();
+        if (!active) log(p.amber('Anslut AI först med /api.'));
+        else {
+          const choices = modelChoices(active.id, active.modelId);
+          log(box('Välj modell', [...choices.map((id, i) => String(i + 1) + '  ' + id + (id === active.modelId ? '  (aktiv)' : '')), '', 'Eller skriv ett modell-ID · Enter avbryter'], color));
+          output.write('Modell › ');
+          const chosen = ((await nextLine()) ?? '').trim();
+          const index = Number(chosen);
+          const modelId = Number.isInteger(index) && index > 0 && index <= choices.length ? choices[index - 1]! : chosen;
+          if (!modelId) log(p.dim('Ingen ändring.'));
+          else if (!/^[a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,179}$/.test(modelId)) log(p.amber('Ogiltigt modell-ID.'));
+          else {
+            const result = runtime.services.saveProvider({ id: active.id, modelId });
+            log(result.ok ? p.mint('Aktiv modell: ' + modelId + '. Sparad till nästa start.') : p.red(result.error.message));
+          }
+        }
       } else if (text.startsWith('/model ')) {
         const modelId = text.slice(7).trim();
         if (!modelId || /[\\r\\n]/.test(modelId) || modelId.length > 180) { log(p.amber('Ange ett giltigt modell-id.')); }
@@ -118,9 +135,12 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
           }
         }
       } else if (text === '/api' || text === '/setup') {
-        log('Välj tjänst: kilo / deepseek / openrouter / opencode (eller skriv avbryt)');
-        output.write('Tjänst › ');
-        const preset = ((await nextLine()) ?? '').trim().toLowerCase();
+        const providers = ['kilo', 'deepseek', 'openrouter', 'opencode'];
+        log(box('Anslut AI', providers.map((name, i) => String(i + 1) + '  ' + name), color));
+        output.write('Välj tjänst (1–4) › ');
+        const value = ((await nextLine()) ?? '').trim().toLowerCase();
+        const index = Number(value);
+        const preset = Number.isInteger(index) && index > 0 && index <= providers.length ? providers[index - 1]! : value;
         if (preset === 'avbryt' || !preset) { log('Avbrutet.'); }
         else if (!['kilo', 'deepseek', 'openrouter', 'opencode'].includes(preset)) log(p.amber('Okänd tjänst. Skriv /api och välj från listan.'));
         else {
