@@ -188,7 +188,7 @@ export function likelySpeakerEcho(input:string, lastOutput:string):boolean {
 }
 
 export async function runContinuousVoice(
-  runtime: Pick<StuddyRuntime,'chat'|'runDesktopGoal'> & { services: StuddyRuntime['services']; chatWithScreen?: StuddyRuntime['chatWithScreen']; voiceScreenContext?: StuddyRuntime['voiceScreenContext'] },
+  runtime: Pick<StuddyRuntime,'chat'|'runDesktopGoal'> & { services: StuddyRuntime['services']; chatWithScreen?: StuddyRuntime['chatWithScreen']; voiceScreenContext?: StuddyRuntime['voiceScreenContext']; routeUserIntent?: StuddyRuntime['routeUserIntent'] },
   status: VoiceStatus,
   options: { input?: VoiceInput; playback?: VoicePlayback; maxTurns?:number }={},
 ):Promise<void>{
@@ -200,9 +200,8 @@ export async function runContinuousVoice(
   }
   const input=options.input??new WindowsContinuousInput();
   const player=options.playback??new SpeechPlayer();
-  // This is an English-first voice product. The text model receives the same
-  // English preference; local CPU voices are selected from actual SAPI inventory.
-  runtime.services.db.checkpoints.set('buddy.chat.language.v1','en-US');
+  // Preserve the user's selected chat language; voice must not silently reset it.
+  const language=runtime.services.db.checkpoints.get<string>('buddy.chat.language.v1')??'sv-SE';
   const installed=options.playback ? [] : await listInstalledWindowsVoices();
   const preferred=runtime.services.db.checkpoints.get<string>('buddy.voice.voiceId.v1')??'';
   const voiceId=options.playback ? preferred : chooseEnglishNarrator(installed,preferred);
@@ -211,7 +210,7 @@ export async function runContinuousVoice(
   const chosenProvider=runtime.services.db.checkpoints.get<string>('buddy.voice.provider.v1');
   const provider=chosenProvider==='windows-native'?'windows-native':'windows-neural';
   const settings=voiceSettingsSchema.parse({
-    enabled:true,provider,language:'en-US',
+    enabled:true,provider,language,
     speed:runtime.services.db.checkpoints.get<string>('buddy.voice.style.v1')==='normal'?1.04:0.92,
     voiceId:provider==='windows-neural'?preferred:voiceId,
   });
@@ -255,10 +254,15 @@ export async function runContinuousVoice(
         pending=speaking.speak(reply).catch(error=>status('Röstfel: '+String(error).slice(0,160))).finally(()=>{pending=null;});
         continue;
       }
-      const command=/^(?:buddy[,]?\s*)?(?:do|gör)\s+(.{3,600})$/i.exec(heard);
+      // Spoken commands use the exact same model-driven task routing as typed
+      // commands. Do not require "Buddy do" or hardcode app/verb names.
       let response='';
-      if(command){
-        const report=await runtime.runDesktopGoal(command[1]!,e=>
+      const route=runtime.routeUserIntent
+        ? await runtime.routeUserIntent(heard)
+        : {kind:'chat' as const,goal:heard,reason:'No task router'};
+      if(route.kind==='desktop'){
+        status('● Buddy · planerar datoruppgift från röstkommandot');
+        const report=await runtime.runDesktopGoal(route.goal,e=>
           status((e.ok?'● ':'○ ')+e.action+' · '+e.detail));
         response=report.summary;
       }else{
