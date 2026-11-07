@@ -1,6 +1,6 @@
 import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
-import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
+import { StuddyRuntime, extractChatGPTMessage, prepareChatGPTDraft, sendApprovedChatGPTDraft, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
 import { SLASH_COMMANDS, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
 import { liveLines, compactLivePrompt } from './live-ui.js';
@@ -364,6 +364,27 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(h.status.running ? `ws://${h.status.host}:${h.status.port}\nToken: ${h.token}` : h.status.detail);
       } else if (text.startsWith('/')) log('Okänt kommando. /help');
       else {
+        const outboundMessage = extractChatGPTMessage(text);
+        if (outboundMessage) {
+          log(p.dim('● Buddy · letar efter ChatGPTs riktiga skrivfält och kontrollerar det'));
+          const allowed = runtime.services.permissions.isGranted('computer.actions') &&
+            runtime.services.permissions.isGranted('application.observe');
+          if (!allowed) log(p.amber('Datorstyrning/observation är inte tillåten. Se /access.'));
+          else {
+            const draft = await prepareChatGPTDraft(outboundMessage, runtime.adapter);
+            if (!draft.ok) log(p.amber('○ ' + draft.detail));
+            else {
+              log(p.mint('● ' + draft.detail));
+              log(p.dim('Meddelande: ' + outboundMessage));
+              output.write('Vill du skicka just detta meddelande? Skriv ja/yes › ');
+              const choice = ((await nextLine()) ?? '').trim().toLowerCase();
+              if (choice === 'ja' || choice === 'yes') {
+                const sent = await sendApprovedChatGPTDraft(draft, outboundMessage, runtime.adapter);
+                log(sent.ok ? p.mint('● ' + sent.detail) : p.amber('○ ' + sent.detail));
+              } else log(p.dim('Inte skickat. Utkastet finns kvar i ChatGPT.'));
+            }
+          }
+        } else {
         const goal = naturalDesktopGoal(text);
         if (goal) {
           log(p.dim('● Buddy · Kilo planerar ett verkligt datorsteg'));
@@ -377,6 +398,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
           if (result.ok) log(p.violet('studdy › ') + result.data.message.text);
           else log(p.red(result.error.message));
           if (!result.ok || result.data.degraded) runtime.journal.record('cli.chat', result.ok ? result.data.error ?? 'provider failed' : result.error.message, 'warn');
+        }
         }
       }
     } catch (error) {
