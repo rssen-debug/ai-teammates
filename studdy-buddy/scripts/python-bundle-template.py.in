@@ -325,6 +325,13 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    # Windows använder cp1252 som standard, vilket gör "Källfiler" till skräp i
+    # terminalen och i rör. Tvinga UTF-8 oavsett plattform.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass    # Python < 3.7 eller omdirigerad ström: hoppa över
     try:
         raise SystemExit(main(sys.argv[1:]))
     except BrokenPipeError:

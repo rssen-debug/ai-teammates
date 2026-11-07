@@ -84,18 +84,6 @@ jobs:
             echo "Bundlen är $size byte - den innehåller troligen sig själv."; exit 1
           fi
 
-      - name: Diagnose test failure (temporary)
-        if: failure() && matrix.os == 'windows-latest'
-        shell: bash
-        continue-on-error: true
-        run: |
-          set +e
-          npx vitest run --reporter=basic > /tmp/t.txt 2>&1
-          grep -nE "FAIL|AssertionError|Error:|✗|×" /tmp/t.txt | head -40 > /tmp/short.txt || true
-          while IFS= read -r line; do
-            echo "::error title=vitest::$line"
-          done < /tmp/short.txt
-
       - name: Built CLI smoke test
         shell: bash
         env:
