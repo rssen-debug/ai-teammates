@@ -112,6 +112,15 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(box(dots(color, metrics.level, s.observing) + '  BUDDY LIVE · mätt aktivitet', liveLines(s, metrics, {
           providerConnected: Boolean(active?.hasApiKey), issues: issues.count,
         }), color));
+      } else if (text === '/context' || text === '/what') {
+        await runtime.observer.tick();
+        const context = runtime.voiceScreenContext();
+        log(box('Vad Buddy kan använda i ditt samtal', [
+          'Fönster: ' + context.label,
+          'Bevis: ' + context.proof,
+          context.text ? 'Observerad text: ' + context.text : 'Ingen skärmtext delas med Kilo i det här läget.',
+          'Endast pågående samtal får den här kontexten; den läggs inte automatiskt i Obsidian.',
+        ], color));
       } else if (text === '/voice' || text === '/voice live') {
         log(p.mint('Startar kontinuerlig röst · Kilo-molnmodell + Windows CPU-tal (inga extra API-nycklar).'));
         await runContinuousVoice(runtime, log);
