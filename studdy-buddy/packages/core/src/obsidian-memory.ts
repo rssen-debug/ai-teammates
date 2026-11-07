@@ -112,6 +112,18 @@ export class ObsidianMemory {
     return true;
   }
 
+  /**
+   * Autopilot: learn a durable fact from a normal message, with no /remember.
+   * Returns the stored fact when something was learned, otherwise null, so the
+   * caller can show it once and the user can correct it.
+   */
+  rememberProfileAuto(message: string): string | null {
+    const fact = extractProfileFact(message);
+    if (!fact) return null;
+    if (!isNewFact(fact, this.profileFacts())) return null;
+    return this.rememberProfile(fact) ? fact : null;
+  }
+
   /** Retrieve a tiny, relevant subset from prior days for better continuity. */
   recall(question: string, maxChars = 1300): string[] {
     const query = new Set(this.scrub(question).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []);
@@ -142,4 +154,91 @@ export class ObsidianMemory {
     }
     return results;
   }
+}
+
+/**
+ * Autopilot profile learning.
+ *
+ * The user was explicit: "I should never have to write /remember, it should be
+ * autopilot." So the app now extracts durable facts about the person from the
+ * conversation itself, with rules strict enough that it cannot fill the profile
+ * with noise or secrets:
+ *
+ *   - only first-person statements ("jag pluggar till nätverkstekniker",
+ *     "my exam is in March", "I prefer short answers")
+ *   - never anything containing a credential, e-mail address, phone number,
+ *     personal number, or URL
+ *   - never a question (a question is a request, not a fact)
+ *   - at most one new fact per turn, at most 40 stored, newest last
+ *   - everything is shown in /profile and can be deleted by editing one file
+ *
+ * This is extraction, not inference. It never guesses a fact the user did not
+ * state, because a wrong "memory" about a person is worse than no memory.
+ */
+
+const SECRET = /\b(?:sk|pk|ghp|gho|ghu|ghs|github_pat)[-_][A-Za-z0-9_-]{8,}|\beyJ[A-Za-z0-9_-]{10,}|api[_\s-]?key|token|password|lösenord|passcode|otp|personnummer|\b\d{6}[-+]?\d{4}\b|@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|https?:\/\//i;
+
+/** Sentence splitter that keeps abbreviations from creating fake facts. */
+function sentences(text: string): string[] {
+  return text
+    .replace(/\s+/g, ' ')
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 8 && s.length <= 200);
+}
+
+/**
+ * A durable fact must be *about the speaker*, so the sentence has to start with
+ * the first person, not merely contain it. "den här appen fungerar inte som jag
+ * vill" contains "jag" but says nothing about the person; storing it would be
+ * the automatic-memory equivalent of a bad summariser.
+ */
+const FIRST_PERSON = /^(?:ja|nej|okej|alltså|liksom|well|so|okay)[, ]+\s*(?:jag|i'm|i am|my|min|mitt|mina|mig|me)\b/i;
+const FIRST_PERSON_LOOSE = /\b(?:jag|mig|min|mitt|mina|i'm|i am|my|me)\b/i;
+const IDENTITY = /\b(?:jag\s+(?:är|pluggar|studerar|läser|jobbar|arbetar|bor|heter|gilllar|föredrar|vill|behöver|har|siktar)|i\s+(?:am|study|work|live|prefer|need|have|want)|my\s+(?:name|exam|course|goal|level|job|deadline))\b/i;
+const PREFERENCE = /\b(?:föredrar|föredra|vill ha|gillar|ogillar|föredrar|prefers?|likes?|dislikes?|always|alltid|hellre)\b/i;
+
+/**
+ * Returns the durable fact contained in one user message, or null.
+ * Pure function: same input always gives the same output, so it is testable.
+ */
+export function extractProfileFact(message: string): string | null {
+  const text = message.trim();
+  if (text.length < 10 || text.length > 400) return null;
+  if (text.endsWith('?')) return null;
+  if (SECRET.test(text)) return null;
+  for (const sentence of sentences(text)) {
+    if (sentence.endsWith('?')) continue;
+    if (SECRET.test(sentence)) continue;
+    if (!FIRST_PERSON.test(sentence) && !FIRST_PERSON_LOOSE.test(sentence)) continue;
+    // Starts with a third party ("appen", "det", "den här …") => not about the user.
+    if (!FIRST_PERSON.test(sentence) && /^(?:den|det|de|den här|det här|this|that|it|the app|appen)\b/i.test(sentence)) continue;
+    if (!IDENTITY.test(sentence) && !PREFERENCE.test(sentence)) continue;
+    // Strip leading filler so the stored fact reads as a statement.
+    return sentence
+      .replace(/^(?:ja|nej|okej|alltså|liksom|well|so|okay)[, ]+/i, '')
+      .replace(/[.!]+$/, '')
+      .trim()
+      .slice(0, 180);
+  }
+  return null;
+}
+
+/** True when this fact is worth storing next to the facts we already have. */
+export function isNewFact(fact: string, existing: string[]): boolean {
+  const normalise = (s: string) => s.toLocaleLowerCase('sv-SE').replace(/[^\p{L}\p{N} ]/gu, '').replace(/\s+/g, ' ').trim();
+  const candidate = normalise(fact);
+  if (!candidate) return false;
+  const words = new Set(candidate.split(' ').filter((w) => w.length > 3));
+  if (!words.size) return false;
+  for (const item of existing) {
+    const known = normalise(item);
+    if (known === candidate) return false;
+    const knownWords = new Set(known.split(' ').filter((w) => w.length > 3));
+    let shared = 0;
+    for (const word of words) if (knownWords.has(word)) shared += 1;
+    // 70% overlap means it is the same fact said differently.
+    if (shared / words.size >= 0.7) return false;
+  }
+  return true;
 }

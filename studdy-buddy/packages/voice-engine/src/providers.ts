@@ -9,13 +9,15 @@ import { chunkForSpeech, toSpokenText } from './pronunciation.js';
  * what it can and cannot do, and `listVoices` returns *configured* availability
  * rather than pretending a cloud key exists.
  *
+ *  - windows-neural: Windows' neural voices through the Edge read-aloud service.
+ *    Needs a network connection, needs no key, sounds like a person. Default.
  *  - windows-native: uses the OS SAPI voices via PowerShell. Works offline on
- *    Windows out of the box (no key), which is the default fallback.
+ *    Windows out of the box (no key), and is the fallback when neural fails.
  *  - openai-compatible: POST /audio/speech.
  *  - elevenlabs: POST /v1/text-to-speech/{voiceId}.
  */
 
-export type TtsProviderId = 'windows-native' | 'openai-compatible' | 'elevenlabs' | 'none';
+export type TtsProviderId = 'windows-neural' | 'windows-native' | 'openai-compatible' | 'elevenlabs' | 'none';
 
 export interface TtsRequest {
   text: string;

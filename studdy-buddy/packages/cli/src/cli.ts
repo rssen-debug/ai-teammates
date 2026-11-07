@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { StuddyRuntime, summarizeSnapshot, SpeechPlayer, proveLive, type RuntimeOptions } from '@studdy/core';
 import { maskKey } from '@studdy/ai-router';
 import { voiceSettingsSchema, type ProviderConfig } from '@studdy/shared';
+import { neuralVoiceFor, synthesizeNeural } from '@studdy/voice-engine';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
 
 export interface CliIO {
@@ -17,6 +18,7 @@ export interface CliOptions extends RuntimeOptions { cwd?: string; version?: str
 const CLI_FLAGS = {
   json: { type: 'boolean' as const }, 'no-color': { type: 'boolean' as const },
   'key-stdin': { type: 'boolean' as const }, 'token-stdin': { type: 'boolean' as const },
+  'sapi': { type: 'boolean' as const }, 'voice': { type: 'string' as const },
   yes: { type: 'boolean' as const }, enable: { type: 'boolean' as const },
   port: { type: 'string' as const }, 'base-url': { type: 'string' as const },
   model: { type: 'string' as const }, 'vision-model': { type: 'string' as const },
@@ -66,7 +68,8 @@ Användning:
   studdy memory                  Skriv/synka Obsidian-minne
   studdy progress | readiness    Lärande och readiness
   studdy history | logs          Historik / bounded logg
-  studdy voice "text"            Lokal uppläsning (Windows/macOS/Linux)
+  studdy voice <text>   Läs upp med naturlig neural röst (--sapi för offline)
+  studdy voice-check    Bevisa att neural röst faktiskt syntetiserar (--voice ID)
   studdy models                  Providerprofil
   studdy reset --yes             Rensa lokal chatthistorik
 
@@ -291,9 +294,38 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
       }
       case 'voice': {
         const text = positional.slice(1).join(' ');
+        const wantsSapi = flags['sapi'] === true;
         const player = new SpeechPlayer();
-        const r = await player.speak(text, voiceSettingsSchema.parse({ enabled: true, provider: 'windows-native' }));
-        out(r); return r.ok ? 0 : 1;
+        const r = await player.speak(text, voiceSettingsSchema.parse({
+          enabled: true,
+          // Neural by default: it is the natural voice and needs no key or install.
+          provider: wantsSapi ? 'windows-native' : 'windows-neural',
+        }));
+        // Say which engine actually produced the audio, and why it fell back.
+        // Reporting "ok" without naming the engine hides a robotic downgrade.
+        out({
+          ok: r.ok,
+          engine: player.lastEngine,
+          providerNote: wantsSapi ? 'SAPI (offline)' : 'neural (Edge read-aloud, requires network)',
+          fallenBackBecause: player.lastEngine === 'sapi' ? player.lastNeuralError : null,
+          error: r.error,
+        });
+        return r.ok ? 0 : 1;
+      }
+      case 'voice-check': {
+        // Proof command: synthesises the real voice and reports the real bytes.
+        // Never writes audio to disk and never counts "the code compiled" as proof.
+        if (process.platform !== 'win32') {
+          out({ ok: false, blocked: true, detail: 'Neurala röster kräver Windows. Ingen syntes försöktes.' });
+          return 2;
+        }
+        const voice = neuralVoiceFor('en-US', typeof flags.voice === 'string' ? flags.voice : '');
+        const started = Date.now();
+        const result = await synthesizeNeural('Studdy Buddy voice check, one two three.', voice.id, { speed: 1, volume: 1 });
+        out(result.ok
+          ? { ok: true, voice: voice.id, bytes: result.audio.length, ms: Date.now() - started, played: false, note: 'Kör "studdy voice <text>" för att höra den.' }
+          : { ok: false, voice: voice.id, error: result.error, ms: Date.now() - started });
+        return result.ok ? 0 : 1;
       }
       case 'models': out(runtime.services.activeProvider()); return 0;
       case 'reset': {

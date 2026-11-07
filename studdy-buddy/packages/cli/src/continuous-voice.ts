@@ -131,6 +131,12 @@ export async function runContinuousVoice(
   status: VoiceStatus,
   options: { input?: VoiceInput; playback?: VoicePlayback; maxTurns?:number }={},
 ):Promise<void>{
+  // The microphone permission is now enforced, not decorative. Without it the
+  // mode stops with a clear instruction instead of silently listening.
+  if(!options.input && !runtime.services.permissions.isGranted('microphone')){
+    status('○ Mikrofonen är inte tillåten. Kör /access microphone on (eller /access all) och försök igen.');
+    return;
+  }
   const input=options.input??new WindowsContinuousInput();
   const player=options.playback??new SpeechPlayer();
   // This is an English-first voice product. The text model receives the same
@@ -139,12 +145,18 @@ export async function runContinuousVoice(
   const installed=options.playback ? [] : await listInstalledWindowsVoices();
   const preferred=runtime.services.db.checkpoints.get<string>('buddy.voice.voiceId.v1')??'';
   const voiceId=options.playback ? preferred : chooseEnglishNarrator(installed,preferred);
+  // Neural voice by default: it is what makes the assistant sound like a person
+  // without any key or download. The stored choice can pin either engine.
+  const chosenProvider=runtime.services.db.checkpoints.get<string>('buddy.voice.provider.v1');
+  const provider=chosenProvider==='windows-native'?'windows-native':'windows-neural';
   const settings=voiceSettingsSchema.parse({
-    enabled:true,provider:'windows-native',language:'en-US',
+    enabled:true,provider,language:'en-US',
     speed:runtime.services.db.checkpoints.get<string>('buddy.voice.style.v1')==='normal'?1.04:0.92,
-    voiceId,
+    voiceId:provider==='windows-neural'?preferred:voiceId,
   });
-  status(voiceId ? '● English narrator: '+voiceId : '○ English Windows voice fallback; premium neural narrator not installed.');
+  status(provider==='windows-neural'
+    ? '● Röst: neural ('+(preferred||'standard')+') · kräver nät · fallback till SAPI om det misslyckas'
+    : '● Röst: '+(voiceId||'Windows SAPI')+' · fungerar offline');
   const speaking=options.playback??{
     stop:()=>player.stop(),
     speak:async(text:string)=>{

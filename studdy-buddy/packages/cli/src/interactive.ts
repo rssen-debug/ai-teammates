@@ -8,6 +8,7 @@ import { configureLoginAutostart } from './login-autostart.js';
 import { runVoiceMode } from './voice-mode.js';
 import { runContinuousVoice, listInstalledWindowsVoices } from './continuous-voice.js';
 import { naturalDesktopGoal } from './natural-action.js';
+import { NEURAL_VOICES, neuralVoiceFor } from '@studdy/voice-engine';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -133,16 +134,72 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(p.mint('Startar kontinuerlig röst · Kilo-molnmodell + Windows CPU-tal (inga extra API-nycklar).'));
         await runContinuousVoice(runtime, log);
       } else if (text === '/voice voices') {
-        const names = await listInstalledWindowsVoices();
-        log(names.length ? 'Installerade CPU-röster:\n' + names.map(name => '• ' + name).join('\n') :
-          'Inga installerade Windows SAPI-röster kunde verifieras.');
+        // Two different things, said plainly: the natural neural voices that
+        // need no download, and the offline SAPI voices that need none either.
+        const neural = NEURAL_VOICES.map(v => '• ' + v.id + '  ' + v.label);
+        const sapi = await listInstalledWindowsVoices();
+        log('Naturliga röster (Edge-motorn, ingen nedladdning, kräver nät):\n' + neural.join('\n') +
+          (sapi.length ? '\n\nOffline-reserv (SAPI, fungerar utan nät):\n' + sapi.map(n => '• ' + n).join('\n')
+            : '\n\nOffline-reserv: inga SAPI-röster kunde verifieras.'));
       } else if (text.startsWith('/voice voice ')) {
         const name = text.slice('/voice voice '.length).trim();
-        const names = await listInstalledWindowsVoices();
-        if (!names.includes(name)) log(p.amber('Rösten finns inte i installerade Windows-röster. Visa med /voice voices.'));
-        else {
-          runtime.services.db.checkpoints.set('buddy.voice.voiceId.v1', name);
-          log(p.mint('Vald CPU-röst: ' + name));
+        const resolved = neuralVoiceFor(runtime.services.db.checkpoints.get<string>('buddy.chat.language.v1') ?? 'sv-SE', name);
+        const triesNeural = NEURAL_VOICES.some(v => v.id === name || v.label.toLowerCase().startsWith(name.toLowerCase()));
+        if (triesNeural) {
+          runtime.services.db.checkpoints.set('buddy.voice.voiceId.v1', resolved.id);
+          runtime.services.db.checkpoints.set('buddy.voice.provider.v1', 'windows-neural');
+          log(p.mint('Vald röst: ' + resolved.label + ' (' + resolved.id + ').'));
+        } else {
+          const names = await listInstalledWindowsVoices();
+          if (!names.includes(name)) log(p.amber('Rösten finns inte. Visa naturliga och installerade röster med /voice voices.'));
+          else {
+            runtime.services.db.checkpoints.set('buddy.voice.voiceId.v1', name);
+            runtime.services.db.checkpoints.set('buddy.voice.provider.v1', 'windows-native');
+            log(p.mint('Vald offline-röst (SAPI): ' + name));
+          }
+        }
+      } else if (text === '/access' || text.startsWith('/access ')) {
+        // One place to see and change every permission. Before this, the only
+        // way to grant or revoke anything was `studdy setup`, which is one-shot
+        // and silent about what it actually turned on.
+        const keys = runtime.permissions();
+        const wanted = text.slice('/access'.length).trim().toLowerCase();
+        if (!wanted) {
+          const rows = keys.map(k => (k.granted ? '● ' : '○ ') + k.key.padEnd(20) + ' ' + (k.granted ? 'beviljad' : 'nekad'));
+          log(box('Behörigheter — ' + keys[0]?.mode, [
+            ...rows,
+            '',
+            'Slå på allt:   /access all',
+            'Stäng av allt: /access none',
+            'En sak:        /access computer.actions on   (eller off)',
+            '',
+            'OS-behörigheter (Windows-tillgänglighet) kan appen inte ge sig själv — de sätts i Windows.',
+          ], color));
+        } else if (wanted === 'all' || wanted === 'none') {
+          const grant = wanted === 'all';
+          for (const k of keys) runtime.setPermission(k.key, grant);
+          log(p.mint(grant ? 'Alla app-behörigheter beviljade. Windows-behörigheter sätts fortfarande i Windows.' :
+            'Alla app-behörigheter avstängda.'));
+        } else {
+          const [key, state] = wanted.split(/\s+/);
+          const known = keys.find(k => k.key === key);
+          if (!known) log(p.amber('Okänd behörighet: ' + key + '. Kör /access för listan.'));
+          else if (state !== 'on' && state !== 'off') log(p.amber('Skriv /access ' + key + ' on|off'));
+          else {
+            runtime.setPermission(known.key, state === 'on');
+            log(p.mint(known.key + ': ' + (state === 'on' ? 'beviljad' : 'nekad')));
+          }
+        }
+      } else if (text === '/proactive' || text.startsWith('/proactive ')) {
+        const wanted = text.slice('/proactive'.length).trim().toUpperCase();
+        if (wanted === 'OFF' || wanted === 'QUIET' || wanted === 'NORMAL') {
+          runtime.services.db.checkpoints.set('buddy.proactive.v1', wanted);
+          const status = runtime.proactiveStatus();
+          log(p.mint('Proaktivitet: ' + wanted + ' · ' + (status.allowed ? 'får ta initiativ nu' : 'tyst nu — ' + status.reason)));
+        } else {
+          const status = runtime.proactiveStatus();
+          log('Proaktivitet: ' + status.mode + ' · tysta timmar 22–07 · aldrig under prov.\n' +
+            'Byt med /proactive off | quiet | normal. Nu: ' + (status.allowed ? 'får ta initiativ' : 'tyst (' + status.reason + ')'));
         }
       } else if (text === '/voice style documentary' || text === '/voice style normal') {
         const documentary = text.endsWith('documentary');
