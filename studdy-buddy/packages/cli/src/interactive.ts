@@ -1,6 +1,6 @@
 import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
-import { StuddyRuntime, extractChatGPTMessage, prepareChatGPTDraft, sendApprovedChatGPTDraft, type RuntimeOptions } from '@studdy/core';
+import { StuddyRuntime, extractChatGPTMessage, isChatGPTConversationRequest, prepareChatGPTDraft, sendApprovedChatGPTDraft, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
 import { SLASH_COMMANDS, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
 import { liveLines, compactLivePrompt } from './live-ui.js';
@@ -376,7 +376,12 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(h.status.running ? `ws://${h.status.host}:${h.status.port}\nToken: ${h.token}` : h.status.detail);
       } else if (text.startsWith('/')) log('Okänt kommando. /help');
       else {
-        const outboundMessage = extractChatGPTMessage(text);
+        let outboundMessage = extractChatGPTMessage(text);
+        if (!outboundMessage && isChatGPTConversationRequest(text)) {
+          log(p.mint('● Buddy · Jag kan använda ChatGPTs faktiska skrivfält. Vad vill du att jag ska säga?'));
+          output.write('Meddelande till ChatGPT › ');
+          outboundMessage = ((await nextLine()) ?? '').trim().slice(0, 500) || null;
+        }
         if (outboundMessage) {
           log(p.dim('● Buddy · letar efter ChatGPTs riktiga skrivfält och kontrollerar det'));
           const allowed = runtime.services.permissions.isGranted('computer.actions') &&

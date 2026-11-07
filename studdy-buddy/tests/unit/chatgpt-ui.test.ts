@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { extractChatGPTMessage, prepareChatGPTDraft, sendApprovedChatGPTDraft } from '../../packages/core/src/chatgpt-ui.js';
+import { extractChatGPTMessage, isChatGPTConversationRequest, prepareChatGPTDraft, sendApprovedChatGPTDraft } from '../../packages/core/src/chatgpt-ui.js';
 
 const w={id:'chrome1',title:'Repo status verifiering - Google Chrome',processName:'chrome.exe',focused:false,minimized:false};
 const el=(ref:string,role:string,name:string,value:string|null='')=>({ref,role,name,value,enabled:true,stale:false});
@@ -24,6 +24,13 @@ describe('ChatGPT native UI message workflow',()=>{
     expect(extractChatGPTMessage('skicka till ChatGPT: Vad är OSI?')).toBe('Vad är OSI?');
     expect(extractChatGPTMessage('write to ChatGPT hello')).toBe('hello');
     expect(extractChatGPTMessage('skriv en dikt om chat gpt')).toBeNull();
+  });
+  it('recognizes natural conversation invitation without fabricating a message',()=>{
+    expect(isChatGPTConversationRequest('snacka med chat')).toBe(true);
+    expect(isChatGPTConversationRequest('snacka med ChatGPT')).toBe(true);
+    expect(isChatGPTConversationRequest('can you talk with ChatGPT')).toBe(true);
+    expect(extractChatGPTMessage('snacka med chat')).toBeNull();
+    expect(isChatGPTConversationRequest('prata med mig om ChatGPT')).toBe(false);
   });
   it('drafts only in a verified ChatGPT edit element and never sends without confirmation',async()=>{
     const f=fake();
