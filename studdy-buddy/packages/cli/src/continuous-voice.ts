@@ -75,6 +75,24 @@ export class WindowsContinuousInput implements VoiceInput {
   }
   close():void { const child=this.child; this.child=null; if(child && !child.killed) child.kill(); }
 }
+export async function listInstalledWindowsVoices(platform=process.platform):Promise<string[]>{
+  if(platform!=='win32')return [];
+  const command=Buffer.from([
+    'Add-Type -AssemblyName System.Speech',
+    '$s=New-Object System.Speech.Synthesis.SpeechSynthesizer',
+    'try { $s.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name } } finally { $s.Dispose() }',
+  ].join('\n'),'utf16le').toString('base64');
+  return new Promise(resolve=>{
+    const child=spawn('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',command],
+      {windowsHide:true,shell:false,stdio:['ignore','pipe','ignore']});
+    let body='',done=false;
+    const finish=(names:string[])=>{if(done)return;done=true;clearTimeout(timer);resolve(names);};
+    const timer=setTimeout(()=>{child.kill();finish([]);},6000);
+    child.stdout.setEncoding('utf8').on('data',(chunk:string)=>{body=(body+chunk).slice(0,4000);});
+    child.once('error',()=>finish([]));
+    child.once('close',code=>finish(code===0?body.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,25):[]));
+  });
+}
 export const isVoiceStop=(text:string)=>/^(?:stop|stop voice|exit voice|end voice|avsluta|avsluta röst|stopp|stopp röst)$/i.test(text.trim());
 const normalize=(s:string)=>s.toLocaleLowerCase('en-US').replace(/[^\p{L}\p{N} ]/gu,'').trim();
 /** Heuristic acoustic-echo guard, not a claim to perfect echo cancellation. */
@@ -93,7 +111,8 @@ export async function runContinuousVoice(
   const settings=voiceSettingsSchema.parse({
     enabled:true,provider:'windows-native',
     language:runtime.services.db.checkpoints.get<string>('buddy.chat.language.v1')==='en-US'?'en-US':'sv-SE',
-    speed:1.04,
+    speed:runtime.services.db.checkpoints.get<string>('buddy.voice.style.v1')==='documentary'?0.92:1.04,
+    voiceId:runtime.services.db.checkpoints.get<string>('buddy.voice.voiceId.v1')??'',
   });
   const speaking=options.playback??{
     stop:()=>player.stop(),
