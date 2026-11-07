@@ -205,8 +205,9 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
         const voice = await check('microphone', async () => {
           const result = await probeWindowsVoice();
           return { status: result.microphone === 'ready' ? 'pass' : result.microphone === 'not-tested' ? 'not-tested' : 'fail',
-            engineLanguage: result.recognizer, code: result.microphone === 'ready' ? 'MIC_READY' :
-              result.detail.includes('taligenkännare är installerad') ? 'NO_RECOGNIZER' : 'MIC_UNAVAILABLE' };
+            engineLanguage: result.recognizer,
+            code: result.microphone === 'ready' ? 'MIC_READY' : (result.errorCode ?? 'MIC_UNAVAILABLE'),
+            stage: result.stage ?? null };
         });
         const provider = runtime.services.activeProvider();
         const report = {
