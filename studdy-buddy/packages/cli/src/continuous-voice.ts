@@ -24,7 +24,7 @@ const SCRIPT = [
   'Add-Type -AssemblyName System.Speech',
   '$installed=[System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers()',
   'if ($installed.Count -eq 0) { Write-Output "ERROR:NO_RECOGNIZER"; exit 3 }',
-  '$en=$installed | Where-Object { $_.Culture.Name -eq "en-US" } | Select-Object -First 1',
+  '$en=$installed | Where-Object { $_.Culture.Name -eq "__BUDDY_LANGUAGE__" } | Select-Object -First 1',
   'if ($null -eq $en) { $en=$installed[0] }',
   '$r=New-Object System.Speech.Recognition.SpeechRecognitionEngine($en)',
   'try {',
@@ -52,12 +52,13 @@ export class WindowsContinuousInput implements VoiceInput {
   private child: ChildProcessWithoutNullStreams | null = null;
   private readonly platform: string;
   private readyCallback: (() => void) | null = null;
-  constructor(platform=process.platform) { this.platform=platform; }
+  constructor(platform=process.platform, private readonly language='sv-SE') { this.platform=platform; }
   onReady(notify: () => void): void { this.readyCallback=notify; }
   async *listen(): AsyncIterable<string> {
     if (this.platform!=='win32') throw new Error('Live voice kräver Windows System.Speech på den här versionen.');
     if (this.child) throw new Error('Mikrofonen används redan av Buddy.');
-    const cmd=Buffer.from(SCRIPT,'utf16le').toString('base64');
+    const target=/^[a-z]{2}-[A-Z]{2}$/.test(this.language)?this.language:'sv-SE';
+    const cmd=Buffer.from(SCRIPT.replace('__BUDDY_LANGUAGE__',target),'utf16le').toString('base64');
     const child=spawn('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',cmd],
       {windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']});
     this.child=child;
@@ -198,10 +199,10 @@ export async function runContinuousVoice(
     status('○ Mikrofonen är inte tillåten. Kör /access microphone on (eller /access all) och försök igen.');
     return;
   }
-  const input=options.input??new WindowsContinuousInput();
-  const player=options.playback??new SpeechPlayer();
-  // Preserve the user's selected chat language; voice must not silently reset it.
+  // Preserve the user's selected chat language in ASR, the AI and playback.
   const language=runtime.services.db.checkpoints.get<string>('buddy.chat.language.v1')??'sv-SE';
+  const input=options.input??new WindowsContinuousInput(process.platform,language);
+  const player=options.playback??new SpeechPlayer();
   const installed=options.playback ? [] : await listInstalledWindowsVoices();
   const preferred=runtime.services.db.checkpoints.get<string>('buddy.voice.voiceId.v1')??'';
   const voiceId=options.playback ? preferred : chooseEnglishNarrator(installed,preferred);
