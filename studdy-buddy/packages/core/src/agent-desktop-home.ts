@@ -8,7 +8,7 @@ import { join } from 'node:path';
  */
 export function configureAgentDesktopHome(
   env: NodeJS.ProcessEnv = process.env,
-  platform = process.platform,
+  platform: string = process.platform,
 ): { configured: boolean; path: string | null; detail: string } {
   if (env.AGENT_DESKTOP_HOME?.trim()) {
     return { configured: true, path: env.AGENT_DESKTOP_HOME.trim(), detail: 'Explicit native helper state location' };
