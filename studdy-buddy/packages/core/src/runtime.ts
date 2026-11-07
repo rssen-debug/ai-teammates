@@ -26,6 +26,7 @@ import { VerifiedSkillLedger } from './verified-skills.js';
 import { AGENT_SYSTEM, runAgent, type Activity, type AgentReport } from './desktop-agent.js';
 import { openKernel, Supervisor, buildHandlers, type OpenKernel } from '@studdy/agent-core';
 import { createKernelInvoker, type KernelInvoker } from './kernel-runtime.js';
+import { runGoal, type AgentRunResult } from './agent-kernel.js';
 import { parseLaunchIntent, isInboxRequest, isStartLiveRequest, isLiveQuestion, isAccessQuestion, isScreenQuestion } from './chat-intents.js';
 
 export interface RuntimeOptions {
@@ -111,6 +112,24 @@ export class StuddyRuntime {
       this.kernelInvokerStore = createKernelInvoker({ services: this.services, adapter: this.adapter, allow });
     }
     return this.kernelInvokerStore;
+  }
+
+  /**
+   * The unified autonomous entry point: plan -> durable queue -> supervised
+   * execution -> verification. No unbounded loop, no unverified "done".
+   */
+  async runGoal(goal: string, options: { maxSteps?: number; planTimeoutMs?: number; onStep?: (step: unknown) => void } = {}): Promise<AgentRunResult> {
+    const workerId = `agent-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+    const { supervisor, invoker } = this.kernelSupervisor(workerId);
+    const provider = this.services.activeProvider();
+    return runGoal(goal, {
+      router: this.services.router,
+      provider,
+      invoker,
+      supervisor,
+      planTimeoutMs: options.planTimeoutMs,
+      onStep: options.onStep,
+    });
   }
 
   /** Builds a supervisor wired to the real tool invoker for this runtime. */

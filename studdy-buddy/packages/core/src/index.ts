@@ -8,6 +8,7 @@ export * from './capability-proof.js';
 export * from './companion-observer.js';
 export * from './windows-app-catalog.js';
 export * from './kernel-runtime.js';
+export * from './agent-kernel.js';
 export * from './obsidian-memory.js';
 export * from './study-vault.js';
 export * from './browser-bridge.js';
