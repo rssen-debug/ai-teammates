@@ -105,18 +105,27 @@ export class LiveObserver {
         this.activity = result.error.slice(0, 160);
         return this.status();
       }
-      const active = result.windows.find(w => !w.minimized && w.focused && allowedObservationTitle(w.title) && !/studdy|node|terminal/i.test(w.title))
-        ?? result.windows.find(w => !w.minimized && allowedObservationTitle(w.title) && w.appKind !== 'OTHER');
-      if (!active) {
+      // Never silently substitute a different background app for a focused
+      // private window. The status must describe what was ACTUALLY observed.
+      const focused = result.windows.find(w => !w.minimized && w.focused);
+      if (!focused) {
         this.state = 'no-window';
-        this.activity = 'Väntar på ett läsbart, tillåtet fönster';
+        this.activity = 'Inget aktivt fönster bekräftat';
         return this.status();
       }
-      if (!allowedObservationTitle(active.title)) {
+      if (!allowedObservationTitle(focused.title)) {
         this.state = 'private';
-        this.activity = 'Privat fönster · pausad';
+        this.window = null;
+        this.snapshot = null;
+        this.activity = 'Privat fönster · observation pausad';
         return this.status();
       }
+      if (/studdy|node|terminal/i.test(focused.title)) {
+        this.state = 'no-window';
+        this.activity = 'Eget terminalfönster · inga externa UI-element lästa';
+        return this.status();
+      }
+      const active = focused;
       const snapshot = await adapter.snapshot(active.id);
       if (this.stopped) return this.status();
       this.window = active;
@@ -127,6 +136,8 @@ export class LiveObserver {
         this.activity = `Läser ${snapshot.elements.length} UI-element i ${active.title.slice(0, 60)}`;
         const proof = createHash('sha256').update(active.processName || active.appKind).digest('hex').slice(0, 20);
         services.db.observations.record('agent.uia.heartbeat', { kind: active.appKind, proof, elementCount: snapshot.elements.length });
+        const count = services.db.checkpoints.get<number>('buddy.live.verified-observations.v1') ?? 0;
+        services.db.checkpoints.set('buddy.live.verified-observations.v1', Math.min(999999999, count + 1));
         new VerifiedSkillLedger(services.db.checkpoints).record('observe:' + proof, true);
         const hint = detectCompanionHint(snapshot, active.title);
         if (hint && !this.signatures.has(hint.signature)) {
