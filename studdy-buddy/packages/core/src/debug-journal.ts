@@ -22,6 +22,17 @@ export class DebugJournal {
     }
   }
 
+  /** Local-only summarized diagnostics; returns sanitized entries, not raw errors. */
+  summary(limit = 5): { count: number; recent: string[] } {
+    try {
+      const rows = readFileSync(this.path, 'utf8').split(/\r?\n/)
+        .filter(line => /^- \d{4}-\d\d-\d\dT/.test(line));
+      return { count: rows.length, recent: rows.slice(-Math.max(0, Math.min(20, limit))).map(line => safe(line)) };
+    } catch {
+      return { count: 0, recent: [] };
+    }
+  }
+
   record(source: string, error: unknown, severity: 'error' | 'warn' = 'error'): void {
     if (this.busy) return;
     this.busy = true;
