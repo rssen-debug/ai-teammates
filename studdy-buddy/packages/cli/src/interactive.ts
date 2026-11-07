@@ -2,6 +2,7 @@ import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
 import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
+import { SLASH_COMMANDS, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -12,7 +13,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   const runtime = new StuddyRuntime(options);
   const color = supportsColor(process.env, { isTTY: terminal });
   const p = palette(color);
-  const rl = readline.createInterface({ input, output: output as NodeJS.WritableStream, terminal });
+  const rl = readline.createInterface({ input, output: output as NodeJS.WritableStream, terminal, completer: slashCompletions });
   // Install line handlers before the first await: a pipe can deliver its whole
   // script and EOF while nativeStatus() is still running.
   const lines: string[] = [];
@@ -28,7 +29,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
     statusLine('Full åtkomst', true, color, changed ? 'beviljad' : 'tidigare konfigurerad'),
     statusLine('AI', Boolean(provider?.hasApiKey), color, provider?.hasApiKey ? `${provider.name} · ${provider.modelId}` : 'Anslut med /api'),
     statusLine('Native helper', native.available, color, native.detail),
-    '', p.dim('Skriv ett meddelande eller /api · /models · /status · /help'),
+    '', p.dim('Skriv naturligt · / öppnar kommandomenyn · Tab kompletterar'),
   ], color));
   if (runtime.services.permissions.isGranted('application.observe')) runtime.observer.start();
   let lastState = runtime.liveStatus().state;
@@ -48,12 +49,22 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   for (;;) {
     const line = await nextLine();
     if (line === null) break;
-    const text = line.trim();
+    let text = line.trim();
     if (!text) { rl.prompt(); continue; }
+    if (text === '/') {
+      log(box('Kommandon  ·  välj nummer', SLASH_COMMANDS.map((item, i) => String(i + 1).padStart(2) + '   ' + item.command.padEnd(12) + item.description), color));
+      output.write('Välj › ');
+      const choice = ((await nextLine()) ?? '').trim();
+      const index = Number(choice);
+      text = Number.isInteger(index) && index > 0 && index <= SLASH_COMMANDS.length
+        ? SLASH_COMMANDS[index - 1]!.command
+        : SLASH_COMMANDS.find(item => item.command === choice)?.command ?? '';
+      if (!text) { log(p.dim('Stängt.')); rl.prompt(); continue; }
+    }
     if (text === '/exit' || text === '/quit') break;
     try {
       if (text === '/help') {
-        log('Chatt: skriv som vanligt.\n/api  Anslut AI-nyckel\n/models  Se provider och modell\n/model <modell-id>  Byt modell utan att skriva in nyckeln igen\n/status  Live-status\n/prove  Testa datorstyrning i Anteckningar\n/open <app>  Öppna program\n/windows  Lista fönster\n/snapshot <id>  Läs fönster\n/progress  Skills\n/memory  Minne\n/bridge  Webbläsarkoppling\n/exit  Avsluta');
+        log('Skriv / för en väljbar meny, Tab för komplettering, eller prata naturligt.\n' + SLASH_COMMANDS.map(item => item.command.padEnd(12) + item.description).join('\n'));
       } else if (text === '/status') {
         await runtime.observer.tick();
         const s = runtime.liveStatus();
