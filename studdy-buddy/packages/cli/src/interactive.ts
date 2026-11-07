@@ -82,6 +82,27 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(runtime.services.memory?.rememberProfile(fact)
           ? p.mint('Sparat i ditt personliga minne. Det används som kontext i framtida samtal.')
           : p.amber('Kunde inte spara. Lägg inte API-nycklar eller lösenord i personliga minnen.'));
+      } else if (text === '/goal' || text === '/goals') {
+        log(box('Dina mål', [goalSummary(runtime.services.db.checkpoints), '', '1  Lägg till mål', '2  Markera mål som klart', '3  Stäng'], color));
+        output.write('Välj › ');
+        const choice = ((await nextLine()) ?? '').trim();
+        if (choice === '1') {
+          output.write('Vad vill du uppnå? › ');
+          const title = (await nextLine()) ?? '';
+          const goal = addGoal(runtime.services.db.checkpoints, title);
+          log(goal ? p.mint('Sparat mål #' + goal.id + ': ' + goal.title) : p.amber('Inget mål sparades.'));
+        } else if (choice === '2') {
+          output.write('Nummer på klart mål › ');
+          const id = ((await nextLine()) ?? '').replace(/^#/, '').trim();
+          log(completeGoal(runtime.services.db.checkpoints, id) ? p.mint('Målet markerat som klart.') : p.amber('Målet hittades inte eller är redan klart.'));
+        } else log(p.dim('Stängt.'));
+      } else if (text.startsWith('/goal add ') || /^mitt mål är att /i.test(text)) {
+        const title = text.startsWith('/goal add ') ? text.slice(10) : text.replace(/^mitt mål är att /i, '');
+        const goal = addGoal(runtime.services.db.checkpoints, title);
+        log(goal ? p.mint('Sparat mål #' + goal.id + ': ' + goal.title) : p.amber('Inget mål sparades.'));
+      } else if (text.startsWith('/goal done ')) {
+        const id = text.slice(11).replace(/^#/, '').trim();
+        log(completeGoal(runtime.services.db.checkpoints, id) ? p.mint('Målet markerat som klart.') : p.amber('Målet hittades inte eller är redan klart.'));
       } else if (text === '/models') {
         const active = runtime.services.activeProvider();
         log(active ? `Aktiv: ${active.name} · ${active.modelId} · ${active.hasApiKey ? 'API-nyckel sparad' : 'saknar nyckel'}\nByt: /model <modell-id> · Byt tjänst/nyckel: /api` : 'Ingen AI ansluten. Skriv /api och välj en tjänst.');
