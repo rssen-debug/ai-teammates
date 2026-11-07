@@ -75,11 +75,10 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       }
     }
     for (const hint of runtime.takeProactiveHints()) {
-      // This message is based on a measured UI error, not AI speculation.
-      log(p.mint('● Buddy upptäckte ett fel i ett tillåtet fönster.') +
-        ' Vill du att jag hjälper dig felsöka? Jag ändrar inget utan att du ber mig.');
+      // Only grounded, deduplicated, local UI classifications are shown.
+      // Never emit raw screen text, private data, or speculative thoughts.
+      log(p.mint('● Buddy · ') + hint.question);
       rl.prompt(true);
-      void hint; // The raw error text is deliberately not printed.
     }
   }, 1000);
   rl.setPrompt(p.mint('du › '));
