@@ -11,10 +11,18 @@ export type ChatUiAdapter = Pick<DesktopAccessibilityAdapter,'listWindows'|'snap
 
 /** User intent parsing, not a claim that a message was transmitted. */
 export function extractChatGPTMessage(input: string): string | null {
-  const text=input.trim();
-  const m=/^(?:(?:buddy[,! ]+)?(?:kan du|snälla|please)\s+)?(?:skriv|skicka|säg|write|send|say)\s+(?:till\s+|to\s+)?(?:chat\s*gpt|chatgpt)\s*(?::|-|att|that)?\s+(.+)$/i.exec(text);
-  const message=m?.[1]?.trim();
-  return message && message.length <= 500 ? message : null;
+  const text=input.trim().replace(/[.!]$/,'').trim();
+  const command=/^(?:(?:hey\s+)?buddy[,! ]+\s*)?(?:(?:kan du|skulle du kunna|snälla|please|can you|could you)\s+)?(?:skriv|skriva|skicka|säg|write|send|say)\s+(.+)$/i.exec(text);
+  if (!command) return null;
+  const content=command[1]!.trim();
+  if (/^(?:(?:till|to|i|in)\s+)?(?:chat\s*gpt|chatgpt|chatten|chat)$/i.test(content)) return null;
+  // "skriv till chat gpt hej" / "send to ChatGPT: hello"
+  const receiverFirst=/^(?:(?:till|to|i|in)\s+)?(?:chat\s*gpt|chatgpt|chatten|chat)\s*(?::|-|\s+att|\s+that)?\s+(.+)$/i.exec(content);
+  // "skriv hej till chat" / "write hello to ChatGPT".
+  const messageFirst=/^(.+?)\s+(?:till|to|i|in)\s+(?:chat\s*gpt|chatgpt|chatten|chat)$/i.exec(content);
+  const raw=(receiverFirst?.[1]??messageFirst?.[1]??'').trim().replace(/^["“”']|["“”']$/g,'').trim();
+  if (!raw || raw.length>500 || /^(?:till|to|i|in)\s*$/i.test(raw)) return null;
+  return raw;
 }
 /** A conversation request without actual words is not a message to send.
  * Treat it as an interactive request, not as a claim that desktop tools fail.
@@ -25,12 +33,12 @@ export function isChatGPTConversationRequest(input: string): boolean {
 function editable(e: UiElementInfo): boolean {
   const label=e.name.trim();
   return e.enabled && !e.stale && /^@[^:]+:e\d+$/i.test(e.ref) &&
-    /^(?:edit|textbox|text field|text input|textarea|entry)$/i.test(e.role) &&
-    /(?:ask anything|ask chatgpt|message chatgpt|send a message|fråga chatgpt|skriv ett meddelande|message|prompt|chatgpt)/i.test(label) &&
+    /^(?:edit|textbox|text field|text input|text area|textarea|entry|editable text|combo box)$/i.test(e.role) &&
+    /(?:ask anything|ask chatgpt|message chatgpt|send a message|fråga chatgpt|fråga vad som helst|skriv ett meddelande|message|prompt|chatgpt)/i.test(label) &&
     !/(?:password|lösenord|api.?key|token|secret|search)/i.test(label);
 }
 function provesChatGPT(elements: UiElementInfo[]): boolean {
-  return elements.some(e=>/(?:^ChatGPT$|^chatgpt\.com$|^Ny chatt$|^New chat$|^Fråga ChatGPT$|^Ask ChatGPT$|^Ask anything$)/i.test(e.name.trim()));
+  return elements.some(e=>/(?:^ChatGPT$|^chatgpt\.com(?:\/|$)|^Ny chatt$|^New chat$|^Fråga ChatGPT$|^Ask ChatGPT$|^Ask anything$)/i.test(e.name.trim()) || /^https:\/\/chatgpt\.com(?:\/|$)/i.test((e.value ?? '').trim()));
 }
 /** Uses real native accessible UI references. Never types into an arbitrary
  * Chrome window. Checks that the active page really exposes ChatGPT controls.
