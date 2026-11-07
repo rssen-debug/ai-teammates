@@ -47,6 +47,13 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   rl.on('close', () => { closed = true; if (waiting) { const resolve = waiting; waiting = null; resolve(null); } });
   const nextLine = (): Promise<string | null> => lines.length ? Promise.resolve(lines.shift()!) : closed ? Promise.resolve(null) : new Promise(resolve => { waiting = resolve; });
   const changed = runtime.configureFullAccess();
+  // The user explicitly requested hands-off Windows login startup. Install a
+  // per-user entry only for an actual interactive Windows session. Never do
+  // this in CI/piped scripts, and persist an explicit /autostart off choice.
+  if (terminal && process.platform === 'win32' &&
+      runtime.services.db.checkpoints.get<boolean>('buddy.autostart.opted-out.v1') !== true) {
+    configureLoginAutostart(true);
+  }
   const provider = runtime.services.activeProvider();
   const native = await runtime.nativeStatus();
   log(box(`${dots(color, runtime.ledger().level(), runtime.liveStatus().observing)}  Studdy Buddy`, [
