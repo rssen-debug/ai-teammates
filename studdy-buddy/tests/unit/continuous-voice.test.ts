@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runContinuousVoice, isVoiceStop, likelySpeakerEcho, WindowsContinuousInput, listInstalledWindowsVoices } from '../../packages/cli/src/continuous-voice.js';
+import { runContinuousVoice, isVoiceStop, likelySpeakerEcho, WindowsContinuousInput, listInstalledWindowsVoices, chooseEnglishNarrator } from '../../packages/cli/src/continuous-voice.js';
 import { WindowsNativeProvider } from '../../packages/voice-engine/src/providers.js';
 import { voiceSettingsSchema } from '@studdy/shared';
 
 const runtime = () => ({
   services: { db: { checkpoints: { get: (key:string) =>
-    key === 'buddy.chat.language.v1' ? 'en-US' : key === 'buddy.voice.style.v1' ? 'documentary' : '' } } },
+    key === 'buddy.chat.language.v1' ? 'en-US' : key === 'buddy.voice.style.v1' ? 'documentary' : '', set:vi.fn() } } },
   chat: vi.fn(async (text:string)=>({ok:true,data:{message:{text:'Response for '+text}}})),
   runDesktopGoal: vi.fn(async()=>({complete:false,blocked:true,summary:'Not verified',events:[]})),
 });
@@ -48,6 +48,12 @@ describe('continuous CPU voice through Kilo',()=>{
       playback:{speak:async()=>{},stop:()=>{}},maxTurns:2});
     expect(rt.runDesktopGoal).toHaveBeenCalledOnce();
     expect(rt.chat).not.toHaveBeenCalled();
+  });
+  it('auto-selects a real installed male neural narrator before old standard voices',()=>{
+    expect(chooseEnglishNarrator(['Microsoft David Desktop','Kokoro Michael (en-US)'])).toBe('Kokoro Michael (en-US)');
+    expect(chooseEnglishNarrator(['Microsoft David Desktop'])).toBe('Microsoft David Desktop');
+    expect(chooseEnglishNarrator(['Microsoft David Desktop'],'Microsoft David Desktop')).toBe('Microsoft David Desktop');
+    expect(chooseEnglishNarrator([])).toBe('');
   });
   it('recognizes voice stop and likely speaker echo',()=>{
     expect(isVoiceStop('stop voice')).toBe(true);
