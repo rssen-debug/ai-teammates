@@ -39,7 +39,7 @@ describe('privacy-bounded long-term work patterns',()=>{
     expect(saved.find(p=>p.kind==='code')?.periods).toBe(1);
     const content=readFileSync(join(dir,'Obsidian-Vault','Activity.md'),'utf8');
     expect(content).not.toContain('Password');
-    expect(content).toContain('observation periods');
+    expect(content).toContain('observation period per UTC hour');
   });
 });
 describe('screen-grounded live voice',()=>{
