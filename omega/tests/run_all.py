@@ -24,6 +24,7 @@ the machine, not a defect.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -127,6 +128,43 @@ def suite_bridge_selftest() -> dict:
             "failures": re.findall(r"^\s*FAIL\s+(.+?)\s{2,}(.*)$", text, re.MULTILINE)[:8]}
 
 
+def suite_benchmarks() -> dict:
+    """The reproducible capability benchmarks that produce level axis E.
+
+    Run with --json so stdout is parseable, and with no --report so the runner
+    also refreshes the copy in the owner's real data directory — which is where
+    `buddy level` reads axis E from. Running the tests therefore keeps the level
+    evidence current instead of leaving it stale.
+    """
+    runner = OMEGA / "benchmarks" / "runner.py"
+    if not runner.is_file():
+        return {"suite": "capability benchmarks", "status": "BLOCKED", "detail": f"{runner} missing"}
+    rc, out, err = _run([sys.executable, str(runner), "--json"], OMEGA, timeout=900)
+    doc: dict = {}
+    with contextlib.suppress(Exception):
+        doc = json.loads(out)
+    if not doc:
+        return {"suite": "capability benchmarks", "status": "FAIL",
+                "detail": f"the runner produced no parseable report (rc={rc})",
+                "failures": [(err or out)[-400:]]}
+    m = doc.get("metric") or {}
+    run_n = int(m.get("run") or 0)
+    passed = float(m.get("passed") or 0.0)
+    failures = int(m.get("failures") or 0)
+    skipped_n = int(m.get("skipped") or 0)
+    axis = round(passed / run_n, 3) if run_n else None
+    status = "FAIL" if (rc != 0 or failures) else ("PASS" if run_n else "BLOCKED")
+    detail = f"axis E = {axis} ({passed}/{run_n} tasks)" if run_n else "no benchmark could run on this host"
+    if skipped_n:
+        detail += f" — {skipped_n} skipped here, excluded from the denominator"
+    return {"suite": "capability benchmarks", "status": status, "detail": detail,
+            "counts": {"run": run_n, "passed": round(passed, 3), "failures": failures,
+                       "skipped": skipped_n, "axis_e": axis},
+            "failures": [f"{t['id']} {t['name']}: {str(t.get('detail'))[:150]}"
+                         for t in doc.get("tasks", []) if t.get("status") == "fail"][:12],
+            "report": doc.get("report_path", "")}
+
+
 def suite_majin_v6() -> dict:
     if not MAJIN.is_dir():
         return {"suite": "majin v6", "status": "BLOCKED", "detail": f"{MAJIN} not present"}
@@ -171,6 +209,7 @@ def main(argv: list[str] | None = None) -> int:
 
     results = [suite_unittest(a.quick)]
     results.append(suite_selftest(selftest_report))
+    results.append(suite_benchmarks())
     if not a.quick:
         results.append(suite_bridge_selftest())
     results.append(suite_majin_v6())

@@ -951,6 +951,83 @@ def classify_error(e: BaseException) -> tuple[str, str]:
     return "unknown", "Inspect the error, try a different approach, or escalate."
 
 
+def stem(word: str) -> str:
+    """Conservative suffix stemming for tool routing.
+
+    The registry used to match whole tokens exactly, so a person asking about
+    "files" never reached a tool named `file_list`, and "processes" never reached
+    `process_kill`. Regular plural handling is the single highest-value
+    normalisation here. It is deliberately narrow — only regular English
+    suffixes, never a rewrite that could merge two unrelated words.
+    """
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 4 and word.endswith("es") and word[-3] in "sxzo":
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+#: How people phrase an action → the vocabulary tool names and descriptions
+#: actually use. This is general verb bridging, not a per-query lookup table:
+#: "find the file", "search the file" and "locate the file" are one intent, and a
+#: keyword router that cannot see that sends the agent to the wrong tool.
+#: Synonyms are scored well below direct matches (see `_WEIGHT_SYNONYM`) so they
+#: broaden recall without ever outranking a tool that literally matches.
+ROUTING_SYNONYMS: dict[str, frozenset] = {
+    "find": frozenset({"search", "list", "locate"}),
+    "search": frozenset({"find", "locate"}),
+    "locate": frozenset({"find", "search"}),
+    "open": frozenset({"launch", "start", "navigate"}),
+    "launch": frozenset({"open", "start", "run"}),
+    "start": frozenset({"launch", "run"}),
+    "run": frozenset({"execute", "start"}),
+    "execute": frozenset({"run"}),
+    "schedule": frozenset({"queue", "task", "delay"}),
+    "queue": frozenset({"schedule", "task"}),
+    "remember": frozenset({"memory", "save"}),
+    "recall": frozenset({"memory", "search"}),
+    "know": frozenset({"memory"}),
+    "knowledge": frozenset({"memory"}),
+    "kill": frozenset({"terminate", "stop"}),
+    "terminate": frozenset({"kill", "stop"}),
+    "delete": frozenset({"trash", "remove"}),
+    "remove": frozenset({"delete", "trash"}),
+    "fix": frozenset({"patch", "repair"}),
+    "repair": frozenset({"fix", "patch"}),
+    "change": frozenset({"patch", "edit", "replace"}),
+    "edit": frozenset({"patch", "write"}),
+    "show": frozenset({"read", "list"}),
+    "grab": frozenset({"capture"}),
+    "capture": frozenset({"grab", "screenshot"}),
+    "photo": frozenset({"screenshot", "capture"}),
+    "screenshot": frozenset({"capture", "screen"}),
+    "command": frozenset({"shell", "terminal"}),
+    "shell": frozenset({"command", "terminal"}),
+    "terminal": frozenset({"shell", "command"}),
+    "diagnose": frozenset({"diagnostic", "check"}),
+    "check": frozenset({"verify", "test"}),
+    "verify": frozenset({"check", "test"}),
+    "install": frozenset({"dependency", "setup"}),
+    "configure": frozenset({"setup", "setting"}),
+    "background": frozenset({"autopilot", "task"}),
+    "autopilot": frozenset({"background", "task"}),
+    "application": frozenset({"app", "program"}),
+    "program": frozenset({"app", "application"}),
+    "website": frozenset({"browser", "web", "url"}),
+    "web": frozenset({"browser", "website"}),
+    "url": frozenset({"web", "browser", "fetch"}),
+    "page": frozenset({"browser", "web", "dom"}),
+    "job": frozenset({"application", "task"}),
+    "cv": frozenset({"resume", "application"}),
+}
+
+#: Relative weight of each way a query word can reach a tool. A literal word beat
+#: a stem beats a synonym, so broadening recall never reorders a direct hit.
+_WEIGHT_LITERAL, _WEIGHT_STEM, _WEIGHT_SYNONYM = 1.0, 0.9, 0.45
+
+
 class Registry:
     def __init__(self) -> None:
         self.tools: dict[str, ToolSpec] = {}
@@ -968,17 +1045,38 @@ class Registry:
         return [t for t in self.tools.values() if t.core]
 
     def search(self, query: str, limit: int = 8) -> list[ToolSpec]:
-        words = [w for w in re.findall(r"[\wåäöÅÄÖ]+", query.lower()) if len(w) > 1]
+        """Rank tools against how a person actually phrased the request.
+
+        Each query word contributes in three ways — literally, stemmed, and
+        through a synonym — at descending weights, and tool names/descriptions are
+        stemmed the same way. That is what lets "find files whose name matches"
+        reach `file_search` and "schedule background work" reach `task_create`
+        instead of losing to whatever tool happens to contain the literal word.
+        """
+        raw = [w for w in re.findall(r"[\wåäöÅÄÖ]+", query.lower()) if len(w) > 1]
+        words: list[tuple[str, float]] = []
+        for w in raw:
+            words.append((w, _WEIGHT_LITERAL))
+            st = stem(w)
+            if st != w:
+                words.append((st, _WEIGHT_STEM))
+            for syn in ROUTING_SYNONYMS.get(w, frozenset()) | ROUTING_SYNONYMS.get(st, frozenset()):
+                words.append((syn, _WEIGHT_SYNONYM))
         scored = []
         for t in self.tools.values():
             if t.core:
                 continue
-            name_t = set(re.split(r"[_\W]+", t.name.lower()))
-            desc_t = set(re.findall(r"[\wåäö]+", t.description.lower()))
+            name_raw = set(re.split(r"[_\W]+", t.name.lower()))
+            name_t = name_raw | {stem(x) for x in name_raw}
+            desc_raw = set(re.findall(r"[\wåäö]+", t.description.lower()))
+            desc_t = desc_raw | {stem(x) for x in desc_raw}
+            name_low = t.name.lower()
+            cat = t.category.lower()
             s = 0.0
-            for w in words:
-                s += 3 * (w in name_t) + 2 * (w == t.category) + 1 * (w in desc_t) + 0.5 * any(w in x for x in desc_t if len(w) > 3)
-                s += 1.5 * (w in t.name.lower())
+            for w, weight in words:
+                s += weight * (3 * (w in name_t) + 2 * (w == cat) + 1 * (w in desc_t)
+                               + 0.5 * any(w in x for x in desc_t if len(w) > 3))
+                s += weight * 1.5 * (w in name_low)
             if s > 0:
                 scored.append((s, t))
         scored.sort(key=lambda x: -x[0])
@@ -1774,7 +1872,19 @@ class Memory:
 
     def search(self, query: str, kind: str | None = None, limit: int = 6, touch: bool = True,
                scope: str | None = None, kinds: tuple | None = None) -> list[dict]:
-        """Hybrid retrieval. Counts itself so capability can be measured."""
+        """Hybrid retrieval.
+
+        `touch=True` (the default) records the retrieval as evidence: it bumps each
+        returned row's `uses` and the `memory_searches`/`memory_hits` counters that
+        capability axis D and the level's evidence cap are computed from. That is
+        what the `memory_search` tool does, so a real agent run is measured.
+
+        `touch=False` reads without recording. Every internal and harness path uses
+        it — `context_for()`, the system-prompt build, the self-test, the acceptance
+        suite, the benchmarks, and `buddy memory search`. It has to: if running the
+        test suite incremented those counters, running the test suite would raise the
+        level, which is the one thing the level must not be able to do.
+        """
         where, params = [], []
         if kind:
             where.append("kind=?")
@@ -1787,7 +1897,8 @@ class Memory:
             params.append(scope)
         sql = "SELECT * FROM memories" + (f" WHERE {' AND '.join(where)}" if where else "")
         rows = self.s.q(sql, tuple(params))
-        self.s.stat_add("memory_searches")
+        if touch:
+            self.s.stat_add("memory_searches")
 
         qt = set(_tokens(query))
         qtri = _trigrams(query)
@@ -1824,8 +1935,12 @@ class Memory:
             scored.append((score, r))
         scored.sort(key=lambda x: (-x[0], -x[1]["updated"]))
         out = [r for _, r in scored[:limit]]
-        if out:
-            self.s.stat_add("memory_hits", len(out))
+        if out and touch:
+            # One per search that found something — NOT one per row. Axis D divides
+            # this by memory_searches to get a hit rate, so accumulating `len(out)`
+            # produced a ratio of up to 6.0 that the level then clamped to 1.0,
+            # which made the axis read as "perfect retrieval" after a single search.
+            self.s.stat_add("memory_hits")
         if touch and out:
             self.s.x(f"UPDATE memories SET uses=uses+1 WHERE id IN ({','.join('?' * len(out))})", tuple(r["id"] for r in out))
         return out
@@ -3023,7 +3138,7 @@ def build_tools(app: "Buddy") -> None:
         return {"tab": t["title"], "url": t["url"], "text": clip(v, int(a.get("max_chars", 8000)))}
 
     reg(name="browser_dom_text", category="browser", risk=Risk.OBSERVE, observes=True, available=cdp_ok, progress="Reading page",
-        description="Read innerText of a CSS selector (default body) from a tab via CDP.",
+        description="Read the text of a web page (innerText of a CSS selector, default body) from a browser tab via CDP.",
         parameters=schema_obj({"selector": {"type": "string"}, "tab_title_contains": {"type": "string"}, "max_chars": {"type": "integer"}}), handler=h_dom)
 
     def h_dom_click(a: dict, ctx: ToolContext) -> dict:
@@ -3328,7 +3443,7 @@ def build_tools(app: "Buddy") -> None:
         return {"path": str(p), "file_types": exts, "files": files, "project_markers": marks, "suggested_test_command": t if isinstance(t, str) else (" ".join(t) if t else None)}
 
     reg(name="dev_analyze_project", category="dev", risk=Risk.OBSERVE, observes=True, timeout=60, progress="Analyzing project",
-        description="Summarize a project folder: file types, files, build/test markers, suggested test command.",
+        description="Summarize a project, repository or codebase: file types, files, build/test markers, suggested test command.",
         parameters=schema_obj({"path": {"type": "string"}}, ["path"]), handler=h_analyze)
 
     def h_tests(a: dict, ctx: ToolContext) -> dict:
@@ -3374,7 +3489,7 @@ def build_tools(app: "Buddy") -> None:
     # ═════ memory ═════
     mem = app.memory
     reg(name="memory_search", category="memory", core=True, risk=Risk.OBSERVE, observes=True, progress="Checking memory",
-        description="Search persistent memory (preferences, verified procedures, known fixes, project goals). Verified procedures rank highest.",
+        description="Search persistent memory to recall what you already know: preferences, verified procedures, known fixes, project goals. Verified procedures rank highest.",
         parameters=schema_obj({"query": {"type": "string"}, "kind": {"type": "string", "enum": list(Memory.KINDS)}, "limit": {"type": "integer"}}, ["query"]),
         handler=lambda a, c: {"memories": [{k: m[k] for k in ("id", "kind", "title", "content", "status")} for m in mem.search(a["query"], a.get("kind"), int(a.get("limit", 6)))]})
     reg(name="memory_save", category="memory", risk=Risk.OBSERVE, progress="Saving to memory",
@@ -4964,7 +5079,7 @@ class Buddy:
 
     # ── slash commands ──
     HELP = """/help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
-/memory [list|search Q|forget ID|export|clear]  /doctor  /pause  /resume  /stop  /quit
+/memory [list|search Q|forget ID|export|clear]  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
 /grants [revoke]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
 Just talk normally — Buddy decides when to use tools. Say "stop" at any time."""
@@ -6475,6 +6590,419 @@ def cmd_deps(rest: list[str]) -> int:
     return 1 if miss_req else 0
 
 
+def _shutdown(app: Any) -> None:
+    with contextlib.suppress(Exception):
+        asyncio.run(app.close())
+
+
+def cmd_memory(rest: list[str]) -> int:
+    """Long-term memory from the CLI, not only from inside a conversation.
+
+    Every read path uses `touch=False`. Inspecting your own memory must not count
+    as a retrieval, because retrieval hit-rate is capability axis D — a command
+    that inflated it would let curiosity raise the level.
+    """
+    usage = ("usage: buddy memory [list [KIND] | search TEXT | show ID | forget ID |\n"
+             "                        stats | export | clear --yes]")
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "list").lower()
+        args = rest[1:]
+        if action in ("list", "ls"):
+            kind = args[0] if args and not args[0].startswith("-") else None
+            rows = app.memory.list(kind=kind, limit=int(_flag(args, "--limit", "50")))
+            if not rows:
+                print("  (nothing stored yet)")
+                return 0
+            for m in rows:
+                print(f"  #{m['id']:<5} [{m['kind']}/{m['status']}] {m['title']}: {clip(m['content'], 88)}")
+            total = app.store.one("SELECT COUNT(*) AS n FROM memories")["n"]
+            print(f"\n  {len(rows)} shown · {total} stored" + (f" · kind={kind}" if kind else ""))
+            return 0
+        if action in ("search", "find"):
+            q = " ".join(a for a in args if not a.startswith("--")).strip()
+            if not q:
+                print("usage: buddy memory search <text>")
+                return 2
+            rows = app.memory.search(q, limit=int(_flag(args, "--limit", "10")), touch=False)
+            if not rows:
+                print(f"  nothing matched {q!r}")
+                return 0
+            for m in rows:
+                print(f"  #{m['id']:<5} [{m['kind']}/{m['status']}] {m['title']}: {clip(m['content'], 88)}")
+            print(C.c(C.DIM, "\n  inspected with touch=False: looking at memory does not count as a retrieval"))
+            return 0
+        if action == "show":
+            if not args or not args[0].isdigit():
+                print("usage: buddy memory show ID")
+                return 2
+            r = app.store.one("SELECT * FROM memories WHERE id=?", (int(args[0]),))
+            if not r:
+                print(f"  no memory with id {args[0]}")
+                return 1
+            print(f"  #{r['id']} · {r['kind']} · status={r['status']}")
+            print(f"  title : {r['title']}")
+            print(f"  tags  : {r['tags'] or '-'}   scope: {r['scope'] or '-'}   uses: {r['uses']}")
+            print(f"  created: {time.strftime('%Y-%m-%d %H:%M', time.localtime(r['created']))}"
+                  f"   updated: {time.strftime('%Y-%m-%d %H:%M', time.localtime(r['updated']))}")
+            if r["provenance"]:
+                print(f"  provenance: {clip(r['provenance'], 300)}")
+            print("  " + "-" * 60)
+            print(r["content"])
+            return 0
+        if action == "forget":
+            if not args or not args[0].isdigit():
+                print("usage: buddy memory forget ID")
+                return 2
+            r = app.store.one("SELECT title FROM memories WHERE id=?", (int(args[0]),))
+            if not r:
+                print(f"  no memory with id {args[0]}")
+                return 1
+            app.memory.delete(int(args[0]))
+            print(f"  deleted #{args[0]} ({r['title']})")
+            return 0
+        if action == "stats":
+            st = app.memory.stats()
+            print(f"  total      {st['total']}")
+            print(f"  by kind    {jdump(st['by_kind'])}")
+            print(f"  by status  {jdump(st['by_status'])}")
+            searches, hits = st["searches"], st["hits"]
+            rate = (hits / searches) if searches else None
+            print(f"  retrieval  {hits} hits / {searches} searches"
+                  + (f" = {rate:.2f}" if rate is not None else " (nothing measured yet)"))
+            print(C.c(C.DIM, "  this hit-rate is capability axis D — it only moves on real agent runs"))
+            return 0
+        if action == "export":
+            n = app.memory.export_obsidian(DIRS["export"])
+            print(f"  exported {n} note(s) to {DIRS['export']} (Obsidian-compatible Markdown)")
+            return 0
+        if action == "clear":
+            if "--yes" not in args:
+                print("  this deletes every memory and the whole conversation history.")
+                print("  re-run with --yes if that is really what you want.")
+                return 2
+            app.memory.forget_all()
+            print("  all memories and conversation history deleted")
+            return 0
+        print(usage)
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_tasks(rest: list[str]) -> int:
+    """The durable background queue, from the CLI."""
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "list").lower()
+        args = rest[1:]
+        if action in ("list", "ls"):
+            rows = app.tasks.list(int(_flag(args, "--limit", "20")))
+            if not rows:
+                print("  no background tasks")
+                return 0
+            for t in rows:
+                err = f"  ← {clip(t['error'] or '', 70)}" if t.get("error") else ""
+                print(f"  {t['id']}  {t['state']:<10} {clip(t['title'] or '', 44)}{err}")
+            return 0
+        if action in ("status", "show"):
+            if not args:
+                print("usage: buddy tasks status ID")
+                return 2
+            t = app.tasks.get(args[0])
+            if not t:
+                print(f"  no task {args[0]}")
+                return 1
+            print(jdump({k: t[k] for k in ("id", "title", "state", "attempts", "step_idx", "run_at",
+                                           "created", "updated", "heartbeat", "owner_pid", "error",
+                                           "error_class", "result") if k in t}))
+            ck = app.tasks.last_checkpoint(args[0])
+            print(f"  last checkpoint: step {ck['step_idx']}" if ck else "  no checkpoint yet")
+            return 0
+        if action == "cancel":
+            if not args:
+                print("usage: buddy tasks cancel ID")
+                return 2
+            ok = app.tasks.cancel(args[0])
+            print("  cancelled" if ok else "  not cancellable (already finished, or unknown id)")
+            return 0 if ok else 1
+        if action == "retry":
+            if not args:
+                print("usage: buddy tasks retry ID")
+                return 2
+            ok = app.tasks.retry(args[0])
+            print("  re-queued" if ok else "  not retryable (only failed, blocked or cancelled tasks are)")
+            return 0 if ok else 1
+        if action in ("create", "add"):
+            goal = " ".join(a for a in args if not a.startswith("--")).strip()
+            if not goal:
+                print("usage: buddy tasks create GOAL")
+                return 2
+            tid = app.tasks.create(clip(goal, 80), {"kind": "agent", "goal": goal})
+            print(f"  queued {tid}")
+            print(C.c(C.DIM, "  background work may only use scopes already granted 'always' — see `buddy grants`"))
+            print(C.c(C.DIM, "  it runs while a Buddy session is alive; `buddy` then leave it open"))
+            return 0
+        print("usage: buddy tasks [list | status ID | cancel ID | retry ID | create GOAL]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_grants(rest: list[str]) -> int:
+    """Standing permissions. Security-relevant, so the current state is the default."""
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "show").lower()
+        args = rest[1:]
+        if action in ("show", "list"):
+            grants = app.perms.all()
+            print("  standing permissions:")
+            for scope in ("observe", "input", "write", "exec", "sensitive"):
+                mode = grants.get(scope)
+                mark = C.c(C.G, "●") if mode == "always" else (C.c(C.R, "●") if mode == "deny" else C.c(C.DIM, "○"))
+                print(f"    {mark} {scope:<10} {mode or 'asks every time'}")
+            extra = {k: v for k, v in grants.items()
+                     if k not in ("observe", "input", "write", "exec", "sensitive")}
+            for k, v in sorted(extra.items()):
+                print(f"    ● {k:<10} {v}")
+            print(C.c(C.DIM, "\n  SENSITIVE actions always ask, in every mode. Background work has nobody to ask,"))
+            print(C.c(C.DIM, "  so it is refused unless a scope is granted 'always'."))
+            return 0
+        if action == "set":
+            if len(args) < 2:
+                print("usage: buddy grants set SCOPE always|deny|ask")
+                return 2
+            scope, mode = args[0].lower(), args[1].lower()
+            if mode not in ("always", "deny", "ask"):
+                print("  mode must be always, deny or ask (ask removes the standing grant)")
+                return 2
+            app.perms.set(scope, None if mode == "ask" else mode)
+            print(f"  {scope} → {mode}")
+            if mode == "always":
+                print(C.c(C.Y, f"  '{scope}' will now run without asking, including in background tasks."))
+            return 0
+        if action == "revoke":
+            app.perms.revoke_all()
+            print("  all standing permissions revoked — everything asks again")
+            return 0
+        print("usage: buddy grants [show | set SCOPE always|deny|ask | revoke]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_models(rest: list[str]) -> int:
+    """Model routing: what the gateway really offers, and what each role uses."""
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "show").lower()
+        args = rest[1:]
+        if action in ("show", "list"):
+            roles = app.settings.get("models") or {}
+            print("  role → model:")
+            for r in Router.ROLES:
+                print(f"    {r:<10} {roles.get(r) or C.c(C.DIM, '(gateway default)')}")
+            ladder = app.router.ladder()
+            print(f"\n  fallback ladder: {ladder or 'none offered'}")
+            if not app.gateway.key():
+                print(C.c(C.Y, "\n  no API key — the gateway cannot be queried for its real model list."))
+                print(C.c(C.DIM, "  run `buddy key set` first."))
+                return 1
+            ids = sorted(app.gateway.model_ids())
+            print(f"\n  the gateway offers {len(ids)} model(s):")
+            print("    " + ", ".join(ids[:40]) + (" …" if len(ids) > 40 else ""))
+            print(C.c(C.DIM, "\n  Omega only routes to models the gateway actually lists — it never invents one."))
+            return 0
+        if action == "set":
+            if len(args) < 2 or args[0] not in Router.ROLES:
+                print(f"usage: buddy models set ROLE MODEL_ID   (roles: {', '.join(Router.ROLES)})")
+                return 2
+            role, mid = args[0], args[1]
+            known = set(app.gateway.model_ids())
+            if known and mid not in known:
+                print(C.c(C.R, f"  the gateway does not offer {mid!r}, so it is not being set."))
+                print("  real options: " + ", ".join(sorted(known)[:25]))
+                return 1
+            m = app.settings.get("models") or {}
+            m[role] = mid
+            app.settings.set("models", m)
+            print(f"  {role} → {mid}" + ("" if known else C.c(C.Y, "  (unverified: no key, so the id could not be checked)")))
+            return 0
+        if action == "ping":
+            if not app.gateway.key():
+                print("  no API key configured — run `buddy key set`")
+                return 1
+            try:
+                ok, detail = app.gateway.ping(app.router.resolve(args[0] if args else "chat"))
+            except GatewayError as e:
+                print(f"  gateway error ({e.kind}): {clip(str(e), 200)}")
+                return 1
+            print(("  reachable: " if ok else "  NOT reachable: ") + str(detail))
+            return 0 if ok else 1
+        print("usage: buddy models [show | set ROLE MODEL_ID | ping [ROLE]]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_skills(rest: list[str]) -> int:
+    """Verified skills: what has been tested and approved, and what is active."""
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "list").lower()
+        args = rest[1:]
+        if action in ("list", "ls"):
+            rows = app.skills.list()
+            if not rows:
+                print("  no skills yet — they are proposed from work that actually succeeded,")
+                print("  then tested, then approved by you before they become a tool.")
+                return 0
+            for sk in rows:
+                print(f"  {sk['name']} v{sk['version']} [{sk['status']}] {clip(sk.get('description') or '', 60)}")
+            print(C.c(C.DIM, "\n  a skill runs through the same permission gate as any other tool"))
+            return 0
+        if action in ("show", "status"):
+            if not args:
+                print("usage: buddy skills show NAME")
+                return 2
+            row = app.skills._row(args[0])
+            if not row:
+                print(f"  no skill named {args[0]}")
+                return 1
+            print(jdump({k: row[k] for k in row if k not in ("code",)}))
+            return 0
+        if action == "rollback":
+            if not args:
+                print("usage: buddy skills rollback NAME")
+                return 2
+            out = asyncio.run(app.skills.rollback(args[0]))
+            print("  " + jdump(out))
+            return 0 if out.get("ok", True) else 1
+        print("usage: buddy skills [list | show NAME | rollback NAME]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_key(rest: list[str]) -> int:
+    """The Kilo Code credential. Never printed, never written to a plain file."""
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "status").lower()
+        if action in ("status", "show"):
+            from_env = bool(os.environ.get("KILO_API_KEY"))
+            stored = app.vault.get("kilo_api_key")
+            if from_env:
+                print("  ● key present in the environment (KILO_API_KEY)")
+            if stored:
+                print(f"  ● key stored in the vault ({_vault_location()})")
+            if not from_env and not stored:
+                print("  ○ no key configured")
+                print("    set one with:  buddy key set")
+                print("    or export:     KILO_API_KEY=... (environment wins over the vault)")
+                return 1
+            print(C.c(C.DIM, "  the value is never printed. On Windows it is sealed with DPAPI."))
+            return 0
+        if action == "set":
+            import getpass
+            k = getpass.getpass("KiloCode API key (hidden, not stored in shell history): ").strip()
+            if not k:
+                print("  nothing entered; the existing key is unchanged")
+                return 1
+            app.vault.set("kilo_api_key", k)
+            print(f"  saved to {_vault_location()}")
+            try:
+                ok, detail = app.gateway.ping(app.router.resolve("chat"))
+            except GatewayError as e:
+                print(C.c(C.R, f"  stored, but the gateway rejected it ({e.kind}): {clip(str(e), 160)}"))
+                return 1
+            if ok:
+                print(C.c(C.G, f"  verified against the live gateway: {detail}"))
+                return 0
+            print(C.c(C.Y, f"  stored, but a live check did not succeed: {clip(str(detail), 160)}"))
+            return 1
+        if action == "clear":
+            if "--yes" not in rest[1:]:
+                print("  this removes the stored key. Re-run with --yes to confirm.")
+                return 2
+            app.vault.delete("kilo_api_key")
+            print("  stored key removed" + ("  (KILO_API_KEY is still set in the environment)"
+                                           if os.environ.get("KILO_API_KEY") else ""))
+            return 0
+        print("usage: buddy key [status | set | clear --yes]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def _vault_location() -> str:
+    return "DPAPI, per-user" if IS_WIN else str(HOME / "vault (obfuscated, not plaintext)")
+
+
+def _flag(args: list[str], name: str, default: str) -> str:
+    """Read `--name VALUE` or `--name=VALUE` out of a CLI argument list."""
+    for i, a in enumerate(args):
+        if a == name and i + 1 < len(args):
+            return args[i + 1]
+        if a.startswith(name + "="):
+            return a.split("=", 1)[1]
+    return default
+
+
+def cmd_accept(rest: list[str]) -> int:
+    """Run the 20 mandated end-to-end acceptance scenarios.
+
+    This must run in a **child process**: `acceptance.py` points BUDDY_HOME at a
+    scratch directory at import time, and by then this process has already
+    resolved the owner's real HOME. Running it in-process would quietly execute
+    the acceptance suite against the owner's real data.
+    """
+    runner = SOURCE_FILE.parent / "acceptance.py"
+    if not runner.is_file():
+        print(f"the acceptance runner is missing: {runner}")
+        return 1
+    return subprocess.call([sys.executable, str(runner), *rest])
+
+
+def cmd_bench(rest: list[str]) -> int:
+    """Run the reproducible capability benchmarks that feed level axis E.
+
+    Also a child process, so the benchmarks run against a disposable data
+    directory and can never disturb the owner's memory, tasks or settings. The
+    report is written into the real home, which is where `omega/level.py` reads
+    axis E from — so `buddy bench` followed by `buddy level` shows the axis move
+    from unmeasured to measured.
+    """
+    runner = SOURCE_FILE.parent / "benchmarks" / "runner.py"
+    if not runner.is_file():
+        print(f"the benchmark runner is missing: {runner}")
+        return 1
+    ensure_dirs()
+    args = [sys.executable, str(runner)]
+    if not any(a.startswith("--report") for a in rest):
+        args += ["--report", str(HOME / "last_benchmark_report.json")]
+    args += rest
+    rc = subprocess.call(args)
+    report = HOME / "last_benchmark_report.json"
+    if report.is_file() and "--json" not in rest:
+        with contextlib.suppress(Exception):
+            app = Buddy(headless=True)
+            try:
+                lv = app.measure_level(record=False)
+                if not isinstance(lv, dict):
+                    axis_e = next((a for a in lv.axes if a.key == "E"), None)
+                    if axis_e is not None and axis_e.measured:
+                        print(C.c(C.G, f"\n  axis E measured: {axis_e.note}"))
+                    measured = sum(1 for a in lv.axes if a.measured)
+                    print(C.c(C.DIM, f"  capability level {lv.level}/100 ({lv.tier}) · score {lv.score:.3f} · "
+                                     f"{measured}/{len(lv.axes)} axes measured\n"))
+            finally:
+                with contextlib.suppress(Exception):
+                    asyncio.run(app.close())
+    return rc
+
+
 def cmd_test(rest: list[str]) -> int:
     """Run every automated suite and report each one separately."""
     runner = SOURCE_FILE.parent / "tests" / "run_all.py"
@@ -6548,7 +7076,7 @@ STUDDY BUDDY OMEGA — one agent, one command
 
 Diagnostics and proof
   buddy doctor [section]    real diagnostics. sections: runtime gateway desktop voice browser
-                            memory autopilot majin level subsystems
+                            memory autopilot tasks majin level subsystems
   buddy status [--json]     operational state: key, models, memory, tasks, grants, MAJIN, level
   buddy test [--quick]      every automated suite, each reported separately
   buddy prove               self-test + live Windows/AI scenarios (needs Windows + a Kilo key)
@@ -6556,6 +7084,13 @@ Diagnostics and proof
                             evidence written to disk. Each reports PASS / FAIL / BLOCKED /
                             NOT TESTED — BLOCKED means this machine cannot prove it, and it is
                             never upgraded to a pass. --list shows them, --json is machine-readable.
+  buddy bench [ID ...]      reproducible capability benchmarks. These are the evidence behind
+                            level axis E; a task this host cannot run is skipped and excluded,
+                            never counted as a failure. --list shows them, --json is machine-readable.
+  buddy deps [--json]       the dependency list and the Python version policy the product itself
+                            declares — the installer reads this, so the two cannot drift apart.
+  buddy autostart on|off|status
+                            start Buddy (minimised) when you log in. Windows only.
   buddy self-test           automated acceptance tests in an isolated data dir
   buddy voice-test          real microphone + speaker test
   buddy level [--history]   measured capability level 1–100 and the evidence behind it
@@ -6565,10 +7100,30 @@ Control
   buddy update [--apply]    check, back up, update, verify, roll back on failure
 
 Memory
+  buddy memory [list|search TEXT|show ID|forget ID|stats|export|clear --yes]
+                            your long-term memory. Reads never count as a retrieval, so
+                            looking at it cannot inflate the level.
   buddy migrate scan        what legacy data actually exists on this machine
   buddy migrate plan        dry-run import plan (default; writes nothing)
   buddy migrate run --yes   import, with a verified backup first
+  buddy migrate verify      re-check an import: record counts, provenance and retrieval
   buddy migrate rollback --backup PATH
+
+Work, permissions and models
+  buddy tasks [list|status ID|cancel ID|retry ID|create GOAL]
+                            the durable background queue and its checkpoints
+  buddy grants [show|set SCOPE always|deny|ask|revoke]
+                            standing permissions. SENSITIVE actions always ask, in every
+                            mode; background work is refused unless a scope is granted.
+  buddy models [show|set ROLE ID|ping]
+                            real gateway models and per-role routing. A model the gateway
+                            does not offer is refused rather than silently accepted.
+  buddy key [status|set|clear --yes]
+                            the Kilo Code credential. Never printed; sealed with DPAPI on
+                            Windows. `set` verifies it against the live gateway.
+  buddy skills [list|show NAME|rollback NAME]
+                            tested, approved skills. They run through the same permission
+                            gate as every other tool.
 
 MAJIN V6 subsystem
   buddy majin status        is MAJIN connected, and with which owner grants
@@ -6610,6 +7165,14 @@ def main(argv: Optional[list[str]] = None) -> int:
             "voice-test": lambda r: _voice_test_cmd(),
             "autostart": cmd_autostart,
             "deps": cmd_deps,
+            "accept": cmd_accept,
+            "bench": cmd_bench,
+            "memory": cmd_memory,
+            "tasks": cmd_tasks,
+            "grants": cmd_grants,
+            "models": cmd_models,
+            "skills": cmd_skills,
+            "key": cmd_key,
             "help": lambda r: (print(USAGE), 0)[1],
             "--help": lambda r: (print(USAGE), 0)[1],
             "version": lambda r: (print(f"Studdy Buddy Omega {APP_VERSION}"), 0)[1],
