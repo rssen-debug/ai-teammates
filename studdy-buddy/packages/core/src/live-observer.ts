@@ -56,6 +56,9 @@ export class LiveObserver {
 
   stop(): void {
     this.stopped = true;
+    this.state = 'off';
+    this.activity = 'Observation stoppad';
+    this.cachedStatus = { ...this.cachedStatus, state: 'off', observing: false, windowTitle: null, windowId: null, elementCount: 0, activity: this.activity };
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
   }
@@ -120,7 +123,7 @@ export class LiveObserver {
         this.activity = 'Privat fönster · observation pausad';
         return this.status();
       }
-      if (/studdy|node|terminal/i.test(focused.title)) {
+      if (/studdy|node|terminal|cmd\.exe|powershell|pwsh/i.test(focused.title)) {
         this.state = 'no-window';
         this.activity = 'Eget terminalfönster · inga externa UI-element lästa';
         return this.status();
