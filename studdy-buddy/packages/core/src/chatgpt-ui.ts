@@ -16,6 +16,12 @@ export function extractChatGPTMessage(input: string): string | null {
   const message=m?.[1]?.trim();
   return message && message.length <= 500 ? message : null;
 }
+/** A conversation request without actual words is not a message to send.
+ * Treat it as an interactive request, not as a claim that desktop tools fail.
+ */
+export function isChatGPTConversationRequest(input: string): boolean {
+  return /^(?:(?:buddy[,! ]+)?(?:kan du|snälla|please)\s+)?(?:snacka|prata|konversera|chatta|talk|chat|converse)\s+(?:med\s+|with\s+)?(?:chat\s*gpt|chatgpt|chat)(?:\s+(?:nu|lite))?[.!?]?$/i.test(input.trim());
+}
 function editable(e: UiElementInfo): boolean {
   const label=e.name.trim();
   return e.enabled && !e.stale && /^@[^:]+:e\d+$/i.test(e.ref) &&
