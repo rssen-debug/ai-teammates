@@ -63,10 +63,10 @@ describe('continuous CPU voice through Kilo',()=>{
   });
   it('selects configured Windows voice and documentary rate in the generated local TTS command',()=>{
     const settings=voiceSettingsSchema.parse({enabled:true,provider:'windows-native',language:'en-US',
-      speed:0.92,voiceId:'Microsoft David Desktop'});
+      speed:0.7,voiceId:'Microsoft David Desktop'});
     const command=new WindowsNativeProvider('win32').buildCommand({text:'Hello',settings});
     expect(command.command).toBe('powershell.exe');
     expect(command.args.join(' ')).toContain("SelectVoice('Microsoft David Desktop')");
-    expect(command.args.join(' ')).toContain('$s.Rate = -0');
+    expect(command.args.join(' ')).toContain('$s.Rate = -1');
   });
 });
