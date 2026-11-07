@@ -6,6 +6,7 @@ import { voiceSettingsSchema } from '@studdy/shared';
 export interface VoiceInput {
   listen(): AsyncIterable<string>;
   close(): void;
+  onReady?(notify: () => void): void;
 }
 export interface VoicePlayback {
   speak(text: string): Promise<void>;
@@ -50,7 +51,9 @@ const SCRIPT = [
 export class WindowsContinuousInput implements VoiceInput {
   private child: ChildProcessWithoutNullStreams | null = null;
   private readonly platform: string;
+  private readyCallback: (() => void) | null = null;
   constructor(platform=process.platform) { this.platform=platform; }
+  onReady(notify: () => void): void { this.readyCallback=notify; }
   async *listen(): AsyncIterable<string> {
     if (this.platform!=='win32') throw new Error('Live voice kräver Windows System.Speech på den här versionen.');
     if (this.child) throw new Error('Mikrofonen används redan av Buddy.');
@@ -59,22 +62,20 @@ export class WindowsContinuousInput implements VoiceInput {
       {windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']});
     this.child=child;
     child.stdin.end();
-    let errorText='', closed=false, ready=false;
+    let errorText='', ready=false;
     child.stderr.setEncoding('utf8');
     child.stderr.on('data',(chunk:string)=>{errorText=(errorText+chunk).slice(-500);});
-    child.once('error',()=>{closed=true;});
-    child.once('close',()=>{closed=true;});
+    child.once('error',(e)=>{errorText='POWERSHELL_START_FAILED: '+e.message;});
     const lineReader=createInterface({input:child.stdout,crlfDelay:Infinity});
     try {
       for await (const line of lineReader) {
-        if (line==='READY'){ready=true;continue;}
+        if (line==='READY'){ready=true;this.readyCallback?.();continue;}
         if (line.startsWith('ERROR:')) throw new Error('Windows taligenkänning: '+line.slice(6,140));
         if (!line.startsWith('HEARD:')) continue;
         const text=Buffer.from(line.slice(6),'base64').toString('utf8').trim().slice(0,700);
         if (text && ready) yield text;
       }
-      if (!closed && !ready) throw new Error('Windows mikrofon kunde inte öppnas.');
-      if (!ready) throw new Error('Taligenkänning kunde inte starta. '+errorText.slice(0,180));
+      if (!ready) throw new Error('Windows taligenkänning kunde inte starta: '+errorText.slice(0,220)+'. Testa /voice doctor.');
     } finally {
       lineReader.close();
       this.close();
@@ -82,6 +83,66 @@ export class WindowsContinuousInput implements VoiceInput {
   }
   close():void { const child=this.child; this.child=null; if(child && !child.killed) child.kill(); }
 }
+
+export interface VoiceHealth {
+  microphone: 'ready' | 'unavailable' | 'not-tested';
+  recognizer: string | null;
+  detail: string;
+}
+/** Probe the actual configured Windows microphone and installed recognizer.
+ * This does not record any audio and cannot test the user's sound quality.
+ * No claims of a successful microphone connection are made until the native
+ * speech engine has opened the default audio capture device.
+ */
+export async function probeWindowsVoice(platform=process.platform): Promise<VoiceHealth> {
+  if (platform!=='win32')
+    return {microphone:'not-tested',recognizer:null,detail:'Windows talmotor kan bara testas på Windows.'};
+  const code=[
+    '$ErrorActionPreference="Stop"',
+    'try {',
+    'Add-Type -AssemblyName System.Speech',
+    '$rec=[System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers()',
+    'if($rec.Count -eq 0){Write-Output "ERROR:NO_RECOGNIZER";exit 3}',
+    '$en=$rec | Where-Object {$_.Culture.Name -eq "en-US"} | Select-Object -First 1',
+    'if($null -eq $en){$en=$rec[0]}',
+    '$engine=New-Object System.Speech.Recognition.SpeechRecognitionEngine($en)',
+    'try {',
+    ' $engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))',
+    ' $engine.SetInputToDefaultAudioDevice()',
+    ' Write-Output ("READY:"+$en.Culture.Name)',
+    '} finally {$engine.Dispose()}',
+    '} catch { Write-Output ("ERROR:"+$_.Exception.GetType().Name);exit 4 }',
+  ].join('\n');
+  const encoded=Buffer.from(code,'utf16le').toString('base64');
+  return new Promise(resolve=>{
+    const child=spawn('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',encoded],
+      {windowsHide:true,shell:false,stdio:['ignore','pipe','pipe']});
+    let stdout='',stderr='',completed=false;
+    const finish=(health:VoiceHealth)=>{
+      if(completed)return;completed=true;clearTimeout(timer);resolve(health);
+    };
+    const timer=setTimeout(()=>{
+      child.kill();
+      finish({microphone:'unavailable',recognizer:null,detail:'Mikrofontestet svarade inte.'});
+    },10000);
+    child.stdout.setEncoding('utf8').on('data',(chunk:string)=>{stdout=(stdout+chunk).slice(-1200);});
+    child.stderr.setEncoding('utf8').on('data',(chunk:string)=>{stderr=(stderr+chunk).slice(-500);});
+    child.once('error',e=>finish({microphone:'unavailable',recognizer:null,detail:'PowerShell startfel: '+e.message}));
+    child.once('close',()=>{
+      const lines=stdout.trim().split(/\r?\n/);
+      const ready=lines.find(line=>line.startsWith('READY:'));
+      if(ready)return finish({microphone:'ready',recognizer:ready.slice(6),
+        detail:'Windows System.Speech kunde öppna standardmikrofonen och en installerad taligenkännare.'});
+      const code=lines.find(line=>line.startsWith('ERROR:'))?.slice(6);
+      finish({microphone:'unavailable',recognizer:null,
+        detail:code==='NO_RECOGNIZER'
+          ? 'Ingen Windows System.Speech-taligenkännare är installerad. Installera engelskt talstöd i Windows.'
+          : 'Windows kunde inte öppna mikrofonen ('+(code||stderr.trim()||'okänt fel')+
+            '). Kontrollera standardmikrofon, Windows mikrofonsekretess och att en annan app inte låser enheten.'});
+    });
+  });
+}
+
 export async function listInstalledWindowsVoices(platform=process.platform):Promise<string[]>{
   if(platform!=='win32')return [];
   const command=Buffer.from([
@@ -166,7 +227,8 @@ export async function runContinuousVoice(
   };
   let lastOutput='', pending:Promise<void>|null=null, turns=0, lastWasSpeaking=false;
   const bound=Math.max(1,Math.min(options.maxTurns??60,150));
-  status('● LIVE VOICE · mikrofon aktiv · Windows CPU-tal ↔ Kilo ↔ Windows-röst');
+  input.onReady?.(() => status('● LIVE VOICE · Windows-mikrofon öppnad och taligenkänning redo'));
+  status('○ VOICE · startar mikrofonen · ännu inte verifierad');
   status('Prata normalt. Buddy använder verifierad skärmkontext när den kan läsas. Säg "stop voice" för att avsluta.');
   try {
     for await (const heard of input.listen()) {
@@ -211,6 +273,9 @@ export async function runContinuousVoice(
         status('Röstfel: '+String(error).slice(0,160));
       }).finally(()=>{pending=null;});
     }
+  } catch (error) {
+    status('○ VOICE FEL · '+(error instanceof Error ? error.message : String(error)).slice(0,240));
+    status('Kör /voice doctor för att testa Windows mikrofon, språk och talmotor.');
   } finally {
     input.close();
     speaking.stop();
