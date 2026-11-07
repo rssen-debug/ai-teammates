@@ -21,3 +21,5 @@ export * from './open-external.js';
 export * from './runtime.js';
 export * from './live-observer.js';
 export * from './live-proof.js';
+
+export * from './desktop-agent.js';

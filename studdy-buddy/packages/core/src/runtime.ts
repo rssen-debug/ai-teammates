@@ -21,6 +21,7 @@ import { configureCliFullAccess, FULL_DESKTOP_SCOPES } from './auto-setup.js';
 import { findStartMenuApp } from './windows-app-catalog.js';
 import { openExternal } from './open-external.js';
 import { VerifiedSkillLedger } from './verified-skills.js';
+import { AGENT_SYSTEM, runAgent, type Activity, type AgentReport } from './desktop-agent.js';
 import { parseLaunchIntent, isInboxRequest, isStartLiveRequest, isLiveQuestion, isAccessQuestion, isScreenQuestion } from './chat-intents.js';
 
 export interface RuntimeOptions {
@@ -271,6 +272,33 @@ export class StuddyRuntime {
     const path = writeStudyVault(this.services.db, this.dataDir);
     this.ledger().record('memory:export', true);
     return path;
+  }
+
+  /** User-triggered, bounded AI-planned desktop task using the configured Kilo provider.
+   * This is not background permission to make purchases or send messages.
+   */
+  async runDesktopGoal(goal: string, onEvent?: (event: Activity) => void): Promise<AgentReport> {
+    const provider = this.services.activeProvider();
+    if (!provider?.hasApiKey) return { complete: false, blocked: true, summary: 'Anslut Kilo via /api först.', events: [] };
+    if (!this.services.permissions.isGranted('computer.actions') || !this.services.permissions.isGranted('application.observe') ||
+        !this.services.permissions.isGranted('provider.dataShare')) {
+      return { complete: false, blocked: true, summary: 'Datorstyrning, observation eller AI-delning saknar godkännande.', events: [] };
+    }
+    return runAgent(goal, this.adapter, async (requestedGoal, observations, step) => {
+      const response = await this.services.router.complete(provider, {
+        task: 'troubleshoot', jsonMode: true, cacheable: false, maxTokens: 650,
+        messages: [
+          { role: 'system', content: AGENT_SYSTEM },
+          { role: 'user', content: JSON.stringify({ goal: requestedGoal, step, observations }) },
+        ],
+      });
+      return response.text;
+    }, event => {
+      onEvent?.(event);
+      if (!event.ok) this.journal.record('desktop-agent.' + event.action, event.detail, 'warn');
+      if (event.ok && ['click', 'type', 'press'].includes(event.action))
+        this.ledger().record('desktop-agent:' + event.action, true);
+    }, 8);
   }
 
   /** Natural chat with deterministic local intents (launch/access/live/screen/inbox). */

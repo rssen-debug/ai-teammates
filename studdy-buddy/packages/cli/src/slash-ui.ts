@@ -15,6 +15,8 @@ export const SLASH_COMMANDS = [
   { command: '/model', description: 'Välj modell i meny' },
   { command: '/models', description: 'Visa aktiv modell' },
   { command: '/goal', description: 'Dina mål och nästa steg' },
+  { command: '/do', description: 'Kilo planerar och utför en verifierad datoruppgift' },
+  { command: '/voice', description: 'Prata med Kilo med Windows-mikrofon' },
   { command: '/status', description: 'Vad Buddy faktiskt gör' },
   { command: '/live', description: 'Livepanel med verkliga observationer' },
   { command: '/debug', description: 'Visa lokala fel från debuggern' },
