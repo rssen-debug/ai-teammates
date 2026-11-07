@@ -15,7 +15,8 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe('CLI presentation', () => {
   it('renders five dots and a box without ANSI when color is off', () => {
-    expect(dots(false)).toBe('● ● ● ● ●');
+    expect(dots(false)).toBe('○ ○ ○ ○ ○');
+    expect(dots(false, 1, true)).toBe('● ○ ○ ○ ○');
     const rendered = box('Test', ['rad ett', 'rad två'], false);
     expect(rendered).toContain('╭─ Test');
     expect(rendered).toContain('│ rad ett');
