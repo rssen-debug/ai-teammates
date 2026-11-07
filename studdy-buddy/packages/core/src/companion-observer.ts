@@ -1,11 +1,27 @@
 import { createHash } from 'node:crypto';
 import type { UiSnapshot } from '@studdy/shared';
 
-const PRIVATE_WINDOW = /bank|login|sign.?in|password|lösenord|vault|1password|bitwarden|keepass|incognito|inprivate|private browsing|privat fönster|whatsapp|signal|telegram|discord|gmail|outlook|chatgpt/i;
+// App access and proactive content analysis are different permissions.
+ // ChatGPT is a normal browser page that may be observed when the user chose broad
+ // desktop observation. Authentication, private browsing and intimate content are
+ // not suitable for unattended context hints or raw-title display.
+const PRIVATE_WINDOW = /bank|login|sign.?in|password|lösenord|vault|1password|bitwarden|keepass|incognito|inprivate|private browsing|privat fönster|whatsapp|signal|telegram|discord|gmail|outlook|porn|erome|onlyfans|adult content|xxx|nsfw|sex video/i;
+const CONVERSATION_WINDOW = /chatgpt|claude|gemini|copilot|perplexity/i;
 const ERROR_TERMS = /\b(error|failed|failure|invalid|unreachable|timeout|denied|exception|felaktig|misslyckades|ogiltig|kunde inte|destination host unreachable|request timed out|syntax error)\b/i;
 
 export function allowedObservationTitle(title: string): boolean {
   return title.length > 0 && !PRIVATE_WINDOW.test(title);
+}
+
+/** Browser tab titles may contain private queries or intimate content. Never
+ * print a raw browser tab title, even when UI observation is otherwise allowed. */
+export function safeWindowLabel(title: string, processName = ''): string {
+  if (!allowedObservationTitle(title)) return 'Privat fönster';
+  if (/chrome|msedge|firefox|brave|opera|vivaldi/i.test(processName) ||
+      /\b(?:Google Chrome|Microsoft Edge|Firefox|Brave|Opera|Vivaldi)\b/i.test(title)) {
+    return 'Webbläsare' + (CONVERSATION_WINDOW.test(title) ? ' · AI-chatt' : '');
+  }
+  return title.replace(/[\r\n\t]/g, ' ').slice(0, 70);
 }
 
 export interface CompanionHint {
@@ -17,7 +33,7 @@ export interface CompanionHint {
 
 /** Only fixed, local text classification. The raw UI tree is never logged. */
 export function detectCompanionHint(snapshot: UiSnapshot, title: string): CompanionHint | null {
-  if (!snapshot.accessible || !allowedObservationTitle(title)) return null;
+  if (!snapshot.accessible || !allowedObservationTitle(title) || CONVERSATION_WINDOW.test(title)) return null;
   const candidates = snapshot.elements
     .filter(e => /^(text|statictext|alert|status|document|edit|label)$/i.test(e.role))
     .map(e => (e.name || e.value || '').slice(0, 220).trim())
