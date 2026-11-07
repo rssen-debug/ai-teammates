@@ -4,6 +4,7 @@ import type { StuddyServices } from './services.js';
 import type { DesktopAccessibilityAdapter } from './desktop-adapter.js';
 import { safeWindowLabel, detectCompanionHint, detectContextHint, type CompanionHint } from './companion-observer.js';
 import { VerifiedSkillLedger } from './verified-skills.js';
+import { ActivityTimeline } from './activity-timeline.js';
 
 export type ObservationState = 'starting' | 'active' | 'off' | 'private' | 'unavailable' | 'no-window';
 
@@ -131,6 +132,11 @@ export class LiveObserver {
         (!w.processName.trim() && /(?:cmd\.exe|powershell|studdy buddy)/i.test(w.title));
       const foreground = windows.find(w => w.focused && !w.minimized);
       this.foregroundWindow = foreground ? safeWindowLabel(foreground.title, foreground.processName) : null;
+      // Only the actual focused window earns dwell time. The CLI window,
+      // background snapshots and merely open tabs never count as viewing.
+      if (foreground && !isTerminal(foreground)) {
+        new ActivityTimeline(services.db.checkpoints, this.clock).record(foreground.title, foreground.processName, true);
+      }
       this.allOpenWindows = windows.filter(w => !isTerminal(w))
         .map(w => safeWindowLabel(w.title, w.processName) + (w.minimized ? ' (minimerad)' : ''));
       const candidates = windows.filter(w => !isTerminal(w) && !w.minimized);
