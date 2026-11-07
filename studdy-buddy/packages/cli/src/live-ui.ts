@@ -40,7 +40,7 @@ export function liveLines(
  */
 export function compactLivePrompt(live: LiveStatus, level: number): string {
   const label = live.observing
-    ? (live.windowTitle ?? 'Program').replace(/[\r\n\x1b\x00-\x1f]/g, '').slice(0, 28)
+    ? (live.windowTitle ?? 'Program').replace(/\s+/g, ' ').replaceAll(String.fromCharCode(27), '').slice(0, 28)
     : live.state === 'private' ? 'Privat fönster' : live.state === 'starting' ? 'Startar' : live.state === 'no-window' ? 'Väntar' : live.state === 'off' ? 'Pausad' : 'Ej tillgänglig';
   const count = live.observing ? Math.max(0, live.elementCount) : 0;
   return (live.observing ? '● LIVE' : '○ ' + live.state.toUpperCase()) +
