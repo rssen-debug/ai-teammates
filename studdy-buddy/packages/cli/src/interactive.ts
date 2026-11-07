@@ -45,7 +45,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   const changed = runtime.configureFullAccess();
   const provider = runtime.services.activeProvider();
   const native = await runtime.nativeStatus();
-  log(box(`${dots(color)}  Studdy Buddy`, [
+  log(box(`${dots(color, runtime.ledger().level(), runtime.liveStatus().observing)}  Studdy Buddy`, [
     statusLine('Full åtkomst', true, color, changed ? 'beviljad' : 'tidigare konfigurerad'),
     statusLine('AI', Boolean(provider?.hasApiKey), color, provider?.hasApiKey ? `${provider.name} · ${provider.modelId}` : 'Anslut med /api'),
     statusLine('Native helper', native.available, color, native.detail),
@@ -109,7 +109,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         const metrics = runtime.liveMetrics();
         const issues = runtime.journal.summary();
         const active = runtime.services.activeProvider();
-        log(box('BUDDY LIVE · mätt aktivitet', liveLines(s, metrics, {
+        log(box(dots(color, metrics.level, s.observing) + '  BUDDY LIVE · mätt aktivitet', liveLines(s, metrics, {
           providerConnected: Boolean(active?.hasApiKey), issues: issues.count,
         }), color));
       } else if (text === '/debug') {
@@ -127,6 +127,15 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
           'Debugger: ' + info.debuggerPath,
           'Minnet är lokalt och kan granskas av dig.',
         ], color));
+      } else if (/^(?:snacka|prata|svara|skriv) alltid engelska(?: med mig)?[.!]?$/i.test(text) ||
+                 /^always (?:speak|reply|respond|write) (?:in )?english(?: to me)?[.!]?$/i.test(text)) {
+        runtime.services.db.checkpoints.set('buddy.chat.language.v1', 'en-US');
+        runtime.services.memory?.rememberProfile('Prefers English in all conversations');
+        log(p.mint('English is now your saved default language.'));
+      } else if (/^(?:snacka|prata|svara|skriv) alltid svenska(?: med mig)?[.!]?$/i.test(text) ||
+                 /^always (?:speak|reply|respond|write) (?:in )?swedish(?: to me)?[.!]?$/i.test(text)) {
+        runtime.services.db.checkpoints.set('buddy.chat.language.v1', 'sv-SE');
+        log(p.mint('Svenska är nu ditt sparade standardspråk.'));
       } else if (text === '/profile') {
         const facts = runtime.services.memory?.profileFacts() ?? [];
         log(facts.length ? 'Dina sparade minnen:\n' + facts.map(fact => '• ' + fact).join('\n') : 'Inga personliga minnen ännu. Skriv /remember <fakta> eller ”kom ihåg att …”.');
