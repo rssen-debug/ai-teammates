@@ -1,13 +1,12 @@
 import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
-import { StuddyRuntime, extractChatGPTMessage, isChatGPTConversationRequest, prepareChatGPTDraft, sendApprovedChatGPTDraft, type RuntimeOptions } from '@studdy/core';
+import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
 import { SLASH_COMMANDS, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
 import { liveLines, compactLivePrompt } from './live-ui.js';
 import { configureLoginAutostart } from './login-autostart.js';
 import { runVoiceMode } from './voice-mode.js';
 import { runContinuousVoice, listInstalledWindowsVoices, probeWindowsVoice } from './continuous-voice.js';
-import { naturalDesktopGoal } from './natural-action.js';
 import { NEURAL_VOICES, neuralVoiceFor } from '@studdy/voice-engine';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
@@ -376,46 +375,21 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(h.status.running ? `ws://${h.status.host}:${h.status.port}\nToken: ${h.token}` : h.status.detail);
       } else if (text.startsWith('/')) log('Okänt kommando. /help');
       else {
-        let outboundMessage = extractChatGPTMessage(text);
-        if (!outboundMessage && isChatGPTConversationRequest(text)) {
-          log(p.mint('● Buddy · Jag kan använda ChatGPTs faktiska skrivfält. Vad vill du att jag ska säga?'));
-          output.write('Meddelande till ChatGPT › ');
-          outboundMessage = ((await nextLine()) ?? '').trim().slice(0, 500) || null;
-        }
-        if (outboundMessage) {
-          log(p.dim('● Buddy · letar efter ChatGPTs riktiga skrivfält och kontrollerar det'));
-          const allowed = runtime.services.permissions.isGranted('computer.actions') &&
-            runtime.services.permissions.isGranted('application.observe');
-          if (!allowed) log(p.amber('Datorstyrning/observation är inte tillåten. Se /access.'));
-          else {
-            const draft = await prepareChatGPTDraft(outboundMessage, runtime.adapter);
-            if (!draft.ok) log(p.amber('○ ' + draft.detail));
-            else {
-              log(p.mint('● ' + draft.detail));
-              log(p.dim('Meddelande: ' + outboundMessage));
-              output.write('Vill du skicka just detta meddelande? Skriv ja/yes › ');
-              const choice = ((await nextLine()) ?? '').trim().toLowerCase();
-              if (choice === 'ja' || choice === 'yes') {
-                const sent = await sendApprovedChatGPTDraft(draft, outboundMessage, runtime.adapter);
-                log(sent.ok ? p.mint('● ' + sent.detail) : p.amber('○ ' + sent.detail));
-              } else log(p.dim('Inte skickat. Utkastet finns kvar i ChatGPT.'));
-            }
-          }
-        } else {
-        const goal = naturalDesktopGoal(text);
-        if (goal) {
-          log(p.dim('● Buddy · Kilo planerar ett verkligt datorsteg'));
-          const report = await runtime.runDesktopGoal(goal, event =>
+        // One model-directed tool route for every application, not per-app regexes.
+        const route = await runtime.routeUserIntent(text);
+        if (route.kind === 'desktop') {
+          log(p.dim('● Buddy · Kilo planerar och utför datoruppgiften'));
+          const report = await runtime.runDesktopGoal(route.goal, event =>
             log((event.ok ? p.mint('● ') : p.amber('○ ')) +
               event.step + ' · ' + event.action + ' · ' + event.detail));
           log((report.complete ? p.mint('Verifierat: ') : p.amber('Inte slutfört: ')) + report.summary);
         } else {
-          log(p.dim('○ Buddy arbetar · tolkar förfrågan och inväntar verifierat svar...'));
+          log(p.dim('○ Buddy arbetar · inväntar svar...'));
           const result = await runtime.chatWithScreen(text);
           if (result.ok) log(p.violet('studdy › ') + result.data.message.text);
           else log(p.red(result.error.message));
-          if (!result.ok || result.data.degraded) runtime.journal.record('cli.chat', result.ok ? result.data.error ?? 'provider failed' : result.error.message, 'warn');
-        }
+          if (!result.ok || result.data.degraded)
+            runtime.journal.record('cli.chat', result.ok ? result.data.error ?? 'provider failed' : result.error.message, 'warn');
         }
       }
     } catch (error) {
