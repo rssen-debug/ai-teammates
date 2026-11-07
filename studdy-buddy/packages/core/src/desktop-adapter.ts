@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { configureAgentDesktopHome } from './agent-desktop-home.js';
 import { existsSync, statSync } from 'node:fs';
 import type { SupportedAppKind, UiElementInfo, UiSnapshot, WindowInfo } from '@studdy/shared';
 
@@ -80,6 +81,7 @@ export class DesktopAccessibilityAdapter {
     this.binary = config.binary ?? 'agent-desktop';
     this.timeoutMs = config.timeoutMs ?? 8000;
     this.platform = config.platform ?? process.platform;
+    if (!config.runner) configureAgentDesktopHome(process.env, this.platform);
   }
 
   async status(): Promise<AdapterStatus> {
