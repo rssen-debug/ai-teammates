@@ -48,6 +48,7 @@ export class StuddyRuntime {
   private bridge: BrowserBridgeServer | null = null;
   private lastSelection: SelectionContext | null = null;
   private proactiveHints: CompanionHint[] = [];
+  private lastProactiveAt = 0;
   private readonly platform: string;
 
   constructor(options: RuntimeOptions = {}) {
@@ -70,10 +71,14 @@ export class StuddyRuntime {
       services: this.services,
       adapter: this.adapter,
       onHint: (hint) => {
-        // Only an observed, locally classified error can trigger outreach.
-        // Keep raw UI data out of logs; the user must approve any corrective action.
+        // Proactive events are deduplicated by the observer and rate-limited
+        // here, so switching between programs does not flood the live CLI.
+        const now = Date.now();
+        const cooldownMs = hint.kind === 'error' ? 60_000 : 15 * 60_000;
+        if (now - this.lastProactiveAt < cooldownMs) return;
+        this.lastProactiveAt = now;
         this.proactiveHints.push(hint);
-        if (this.proactiveHints.length > 8) this.proactiveHints.shift();
+        if (this.proactiveHints.length > 2) this.proactiveHints.shift();
         if ((hint.kind ?? 'error') === 'error') {
           this.journal.record('observer.hint', 'UI_ERROR_DETECTED', 'warn');
         }
