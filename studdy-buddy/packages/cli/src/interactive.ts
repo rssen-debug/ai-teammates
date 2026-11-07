@@ -168,7 +168,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
           secretInputActive = true;
           let key = '';
           try {
-            key = await secret(rl, nextLine, 'API-nyckel (dold): ', output, terminal);
+            key = await readApiKey(nextLine, 'Klistra in API-nyckel (synlig): ', output);
           } finally {
             secretInputActive = false;
           }
@@ -225,31 +225,18 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   rl.close();
 }
 
-/** Consume the SAME queued readline line as ordinary commands.
- * Disable terminal echo while the API key is entered; never ask readline a
- * second question or independently toggle raw mode (both can deadlock on Windows).
+/** API keys are visible while pasted, by explicit user request. This is just
+ * the existing readline queue: no rl.question, echo override, or raw-mode
+ * toggles. Never log, persist or echo the key from application code.
+ * The terminal itself will echo input, as it does for ordinary chat.
  */
-async function secret(
-  rl: readline.Interface,
+async function readApiKey(
   nextLine: () => Promise<string | null>,
   prompt: string,
   output: { write(text: string): unknown },
-  terminal: boolean,
 ): Promise<string> {
-  const mutable = rl as unknown as { _writeToOutput?: (text: string) => void };
-  const old = mutable._writeToOutput;
   output.write(prompt);
-  // readline still receives each key and fires our single 'line' handler.
-  // Only echo is hidden. Restore it on Enter, EOF and errors.
-  if (terminal) mutable._writeToOutput = () => {};
-  try {
-    return ((await nextLine()) ?? '').trim();
-  } finally {
-    if (terminal) {
-      mutable._writeToOutput = old;
-      output.write('\n');
-    }
-  }
+  return ((await nextLine()) ?? '').trim();
 }
 
 /** Recognise explicit natural-language model requests without hijacking ordinary chat.
