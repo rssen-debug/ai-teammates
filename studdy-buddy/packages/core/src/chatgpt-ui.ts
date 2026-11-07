@@ -1,5 +1,5 @@
 import type { DesktopAccessibilityAdapter } from './desktop-adapter.js';
-import type { UiElementInfo, WindowInfo } from '@studdy/shared';
+import type { UiElementInfo } from '@studdy/shared';
 
 export interface ChatDraft {
   ok: boolean;
