@@ -4,6 +4,7 @@ import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
 import { SLASH_COMMANDS, slashMatches, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
 import { liveLines } from './live-ui.js';
+import { configureLoginAutostart } from './login-autostart.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -112,6 +113,13 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(box(dots(color, metrics.level, s.observing) + '  BUDDY LIVE · mätt aktivitet', liveLines(s, metrics, {
           providerConnected: Boolean(active?.hasApiKey), issues: issues.count,
         }), color));
+      } else if (text === '/autostart' || text.startsWith('/autostart ')) {
+        const arg = text.slice('/autostart'.length).trim().toLowerCase();
+        const mode = arg === 'on' ? true : arg === 'off' ? false : null;
+        const result = configureLoginAutostart(mode);
+        log(result.ok ? (result.enabled ? p.mint('● Autostart på · ') : p.dim('○ Autostart av · ')) + result.detail
+          : p.amber(result.detail));
+        if (!arg) log(p.dim('Välj /autostart on eller /autostart off. En vanlig CLI körs inte när datorn är avstängd.'));
       } else if (text === '/debug') {
         const info = runtime.journal.summary(6);
         log(box('Lokal debugger · ' + info.count + ' händelser',
