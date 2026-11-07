@@ -25,3 +25,5 @@ export * from './live-proof.js';
 export * from './desktop-agent.js';
 
 export * from './chatgpt-ui.js';
+
+export * from './activity-timeline.js';
