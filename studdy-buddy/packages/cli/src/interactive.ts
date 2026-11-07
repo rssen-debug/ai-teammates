@@ -169,6 +169,6 @@ function secret(rl: readline.Interface, nextLine: () => Promise<string | null>, 
  */
 export function modelRequest(text: string): string | null {
   const value = text.trim();
-  const match = /^(?:byt(?:\\s+nu)?\\s+modell(?:en)?\\s+till|växla\\s+modell(?:en)?\\s+till|använd\\s+modellen)\\s+([a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,179})[.!]?$/i.exec(value);
+  const match = /^(?:byt(?:\s+nu)?\s+modell(?:en)?\s+till|växla\s+modell(?:en)?\s+till|använd\s+modellen)\s+([a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,179})[.!]?$/i.exec(value);
   return match?.[1] ?? null;
 }
