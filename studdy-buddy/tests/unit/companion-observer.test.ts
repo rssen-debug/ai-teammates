@@ -37,6 +37,18 @@ describe('proactive companion guardrails', () => {
     expect(detectContextHint(snapshot('Problems: TypeScript compilation'), 'VS Code')?.kind).toBe('code');
     expect(detectContextHint(snapshot('CapCut video editing timeline'), 'Editor')?.kind).toBe('creative');
   });
+  it('offers a generic, non-pretend suggestion for other readable programs', () => {
+    const other = snapshot('A document heading');
+    other.elements.push(
+      { ...other.elements[0]!, ref: '@s1:e2', name: 'Document body' },
+      { ...other.elements[0]!, ref: '@s1:e3', name: 'Toolbar' },
+    );
+    const hint = detectContextHint(other, 'Desktop document app');
+    expect(hint?.kind).toBe('general');
+    expect(hint?.question).toContain('vet ännu inte ditt mål');
+    expect(hint?.question).not.toContain('Document body');
+  });
+
   it('does not infer intent from only an app name, private window or credential content', () => {
     expect(detectContextHint(snapshot('Welcome'), 'Cisco Packet Tracer')).toBeNull();
     expect(detectContextHint(snapshot('OSI and subnetting'), 'Gmail Inbox')).toBeNull();
