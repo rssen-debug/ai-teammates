@@ -2,7 +2,7 @@ import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
 import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
-import { SLASH_COMMANDS, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
+import { SLASH_COMMANDS, slashMatches, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -14,12 +14,30 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   const color = supportsColor(process.env, { isTTY: terminal });
   const p = palette(color);
   const rl = readline.createInterface({ input, output: output as NodeJS.WritableStream, terminal, completer: slashCompletions });
+  // Lightweight ANSI suggestion overlay: appears as soon as / is typed in a TTY.
+  // Render below the readline input and restore the cursor, so typing stays natural.
+  // Piped/CI mode never emits terminal control sequences.
+  let previewVisible = false;
+  const preview = () => {
+    if (!terminal || rl.closed) return;
+    const inputLine = rl.line.trim();
+    const matches = /^\/[a-z]*$/i.test(inputLine) ? slashMatches(inputLine).slice(0, 6) : [];
+    if (!matches.length && !previewVisible) return;
+    output.write('\x1b7\x1b[0J');
+    if (matches.length) {
+      output.write('\n' + matches.map(item => p.mint(item.command.padEnd(12)) + p.dim(item.description)).join('\n'));
+    }
+    output.write('\x1b8');
+    previewVisible = matches.length > 0;
+  };
+  const onKey = () => { if (terminal) setImmediate(preview); };
+  if (terminal) input.on('keypress', onKey);
   // Install line handlers before the first await: a pipe can deliver its whole
   // script and EOF while nativeStatus() is still running.
   const lines: string[] = [];
   let waiting: ((line: string | null) => void) | null = null;
   let closed = false;
-  rl.on('line', line => { if (waiting) { const resolve = waiting; waiting = null; resolve(line); } else lines.push(line); });
+  rl.on('line', line => { if (previewVisible && terminal) { output.write('\x1b[0J'); previewVisible = false; } if (waiting) { const resolve = waiting; waiting = null; resolve(line); } else lines.push(line); });
   rl.on('close', () => { closed = true; if (waiting) { const resolve = waiting; waiting = null; resolve(null); } });
   const nextLine = (): Promise<string | null> => lines.length ? Promise.resolve(lines.shift()!) : closed ? Promise.resolve(null) : new Promise(resolve => { waiting = resolve; });
   const changed = runtime.configureFullAccess();
@@ -193,6 +211,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
     rl.prompt();
   }
   clearInterval(timer);
+  if (terminal) input.removeListener('keypress', onKey);
   await runtime.close();
   rl.close();
 }
