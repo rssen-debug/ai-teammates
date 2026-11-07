@@ -127,7 +127,7 @@ export class LiveObserver {
       // including a background app while the terminal has focus.
       const windows = result.windows.filter(w => w.title.trim());
       const isTerminal = (w: WindowInfo) =>
-        /(?:^|[\\/])(?:cmd|powershell|pwsh|windowsterminal|wt|node)(?:\\.exe)?$/i.test(w.processName.trim()) ||
+        /(?:^|[\\/])(?:cmd|powershell|pwsh|windowsterminal|wt|node)(?:\.exe)?$/i.test(w.processName.trim()) ||
         (!w.processName.trim() && /(?:cmd\.exe|powershell|studdy buddy)/i.test(w.title));
       const foreground = windows.find(w => w.focused && !w.minimized);
       this.foregroundWindow = foreground ? safeWindowLabel(foreground.title, foreground.processName) : null;
