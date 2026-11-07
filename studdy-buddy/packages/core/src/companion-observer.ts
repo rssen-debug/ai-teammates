@@ -12,7 +12,7 @@ export interface CompanionHint {
   signature: string;
   label: string;
   question: string;
-  kind?: 'error' | 'study' | 'code' | 'creative';
+  kind?: 'error' | 'study' | 'code' | 'creative' | 'general';
 }
 
 /** Only fixed, local text classification. The raw UI tree is never logged. */
@@ -71,11 +71,13 @@ export function detectContextHint(snapshot: UiSnapshot, title: string): Companio
     },
   ];
   const matched = patterns.find(p => p.re.test(combined));
-  if (!matched) return null;
+  if (!matched && safeElements.length < 3) return null;
+  const kind = matched?.kind ?? 'general';
   return {
-    signature: createHash('sha256').update(matched.kind + '\0' + title).digest('hex').slice(0, 20),
-    kind: matched.kind,
-    label: matched.label,
-    question: matched.question,
+    signature: createHash('sha256').update(kind + '\0' + title).digest('hex').slice(0, 20),
+    kind,
+    label: matched?.label ?? 'Jag ser att du arbetar i ett program',
+    question: matched?.question ??
+      'Jag ser aktivitet i ett tillåtet program, men vet ännu inte ditt mål. Vill du att jag hjälper till med det du gör?',
   };
 }
