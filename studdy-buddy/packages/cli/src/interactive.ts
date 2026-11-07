@@ -19,8 +19,9 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   // Piped/CI mode never emits terminal control sequences.
   let closed = false;
   let previewVisible = false;
+  let secretInputActive = false;
   const preview = () => {
-    if (!terminal || closed) return;
+    if (!terminal || closed || secretInputActive) return;
     const inputLine = rl.line.trim();
     const matches = /^\/[a-z]*$/i.test(inputLine) ? slashMatches(inputLine).slice(0, 6) : [];
     if (!matches.length && !previewVisible) return;
@@ -162,7 +163,15 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         if (preset === 'avbryt' || !preset) { log('Avbrutet.'); }
         else if (!['kilo', 'deepseek', 'openrouter', 'opencode'].includes(preset)) log(p.amber('Okänd tjänst. Skriv /api och välj från listan.'));
         else {
-          const key = await secret(rl, nextLine, 'API-nyckel (dold): ', output, terminal);
+          // Never mix rl.question() with the line queue. It steals keystrokes from
+          // the same readline interface and can freeze the Windows terminal.
+          secretInputActive = true;
+          let key = '';
+          try {
+            key = await secret(rl, nextLine, 'API-nyckel (dold): ', output, terminal);
+          } finally {
+            secretInputActive = false;
+          }
           if (!key.trim()) log('Ingen nyckel sparades.');
           else {
             const { runCli } = await import('./cli.js');
@@ -216,23 +225,31 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   rl.close();
 }
 
-function secret(rl: readline.Interface, nextLine: () => Promise<string | null>, prompt: string, output: { write(text: string): unknown }, terminal: boolean): Promise<string> {
-  return new Promise(resolve => {
-    output.write(prompt);
-    const stdin = process.stdin as NodeJS.ReadStream & { setRawMode?: (mode: boolean) => void };
-    const rawBefore = Boolean((stdin as NodeJS.ReadStream & { isRaw?: boolean }).isRaw);
-    if (terminal && stdin.setRawMode) stdin.setRawMode(true);
-    if (!terminal) { void nextLine().then(answer => resolve((answer ?? '').trim())); return; }
-    const mutable = rl as unknown as { _writeToOutput?: (s: string) => void };
-    const old = mutable._writeToOutput;
-    mutable._writeToOutput = () => {};
-    rl.question('', answer => {
-      if (terminal && stdin.setRawMode) stdin.setRawMode(rawBefore);
-      if (old) mutable._writeToOutput = old;
+/** Consume the SAME queued readline line as ordinary commands.
+ * Disable terminal echo while the API key is entered; never ask readline a
+ * second question or independently toggle raw mode (both can deadlock on Windows).
+ */
+async function secret(
+  rl: readline.Interface,
+  nextLine: () => Promise<string | null>,
+  prompt: string,
+  output: { write(text: string): unknown },
+  terminal: boolean,
+): Promise<string> {
+  const mutable = rl as unknown as { _writeToOutput?: (text: string) => void };
+  const old = mutable._writeToOutput;
+  output.write(prompt);
+  // readline still receives each key and fires our single 'line' handler.
+  // Only echo is hidden. Restore it on Enter, EOF and errors.
+  if (terminal) mutable._writeToOutput = () => {};
+  try {
+    return ((await nextLine()) ?? '').trim();
+  } finally {
+    if (terminal) {
+      mutable._writeToOutput = old;
       output.write('\n');
-      resolve(answer);
-    });
-  });
+    }
+  }
 }
 
 /** Recognise explicit natural-language model requests without hijacking ordinary chat.
