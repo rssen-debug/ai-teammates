@@ -1,0 +1,33 @@
+name: MAJIN browser secret redaction and real consent POST QA
+on:
+  push:
+    branches: [fix/browser-form-values-secret-redaction-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-privacy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - name: Exact browser redaction contract
+        run: node --test test/browser-form-privacy.test.js
+      - name: Real Chrome/Edge localhost checkbox and POST, Windows runner
+        if: runner.os == 'Windows'
+        env:
+          MAJIN_BROWSER_LIVE: '1'
+        run: node --test test/browser-form-privacy.live.test.js
+      - name: Full repository regression tests
+        run: npm test
+      - name: Repository checks
+        run: npm run check

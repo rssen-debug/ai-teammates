@@ -1,0 +1,25 @@
+name: MAJIN Qwen3B CommonJS to ESM repair feedback
+on:
+  push:
+    branches: [fix/qwen3b-commonjs-mjs-repair-feedback-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  esm-repair:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --test test/agent-commonjs-mjs-guided-repair.test.js test/instant-js-write-feedback.test.js test/agent-js-syntax-evidence.test.js
+      - run: npm test
+      - run: npm run check

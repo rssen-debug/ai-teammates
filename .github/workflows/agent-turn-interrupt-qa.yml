@@ -1,0 +1,27 @@
+name: MAJIN interrupt stalled agent model step
+on:
+  push:
+    branches: [fix/agent-turn-deadline-interrupt-model-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  agent-deadline:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: node --check src/core/watchdog.js
+      - run: node --check src/core/loop.js
+      - run: node --test test/agent-turn-deadline.test.js
+      - run: npm test
+      - run: npm run check

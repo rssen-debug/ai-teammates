@@ -1,0 +1,644 @@
+{
+  "at": "2026-10-24T07:55:00.236Z",
+  "kind": "regression",
+  "passed": false,
+  "checks": {
+    "realModelCompleted": false,
+    "sameGenuineProvider": true,
+    "exactlyOneAccepted": false,
+    "allRequestedValues": false,
+    "exactFileBytes": false,
+    "savedVerifiedReceipt": false,
+    "noDeniedAction": true,
+    "validationRecovery": false
+  },
+  "failure": "model round budget exhausted (12); task is incomplete",
+  "status": "failed",
+  "elapsedMs": 17388,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "sourceHead": "704de6320341993adb50303b8e11e646cca64710",
+  "dirtyCheckout": true,
+  "sourceHashes": {
+    "src/core/browser-form.js": "9b43550f3d338a385363890bc998929c78daa5ae72c7d763b98638e53a8ed654",
+    "src/core/tools/web.js": "b0a9cff9d18e4db8f9bb30b2d5d86070682813cc8005d88c7ed871dd277ef247",
+    "src/v4/agent.js": "c064e88172ac5ba60af36209675523892bd357a95f34e88aaf5d7fc1e02abc9a",
+    "src/v4/tools/host.js": "033d84625a240b1e42e174d2e96716a9073fe2d107dfdce0ce1d4cff6c435e97",
+    "scripts/v4/evals/form-autonomy.mjs": "a5b82cd2a91d36ef9e90600a80582a2466205c6176abdddb51393ee184cda170",
+    "scripts/v4/evals/form-autonomy-fixtures.mjs": "402e5f4c24dd54e62e4c46711e45bdb135f0ebbde44ce320345e5a4e7675a8af"
+  },
+  "modelRounds": 12,
+  "toolCalls": 12,
+  "uniqueToolRequests": 12,
+  "approved": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_click",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill"
+  ],
+  "denied": [],
+  "stagnationStop": false,
+  "toolFailures": [
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9f16fbf05e2d3937",
+        "name": "browser_fill",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "Ref is not grounded in this session; rerun browser.elements"
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a0ecafdb5ca2dc46",
+        "name": "browser_fill",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool browser_fill input failed schema at value: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-90e190d046188e4d",
+        "name": "browser_fill",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool browser_fill input failed schema at value: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    }
+  ],
+  "trace": [
+    {
+      "event": "state",
+      "seq": 4,
+      "data": {
+        "state": "thinking",
+        "round": 1
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 5,
+      "data": {
+        "id": "chatcmpl-tool-8e3d856e2eda10ab",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:55672/"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8e3d856e2eda10ab",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:55672/"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8e3d856e2eda10ab",
+        "name": "browser_open",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_a96e8a11ec53e87d"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 2
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b0ff36f89c17e81c",
+        "name": "browser_elements",
+        "input": {
+          "refresh": "true"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b0ff36f89c17e81c",
+        "name": "browser_elements",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_2ae421925fd13712"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 3
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b8e39046e6758df0",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e1",
+          "value": "Team"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b8e39046e6758df0",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e1",
+          "value": "Team"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b8e39046e6758df0",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_3fa4e4d53662129b"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 4
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8c7059638506b1a1",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e1",
+          "value": "Team"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8c7059638506b1a1",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e1",
+          "value": "Team"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8c7059638506b1a1",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_b01a6c9676c4ea4a"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 5
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-aa6cc6f05e72d23d",
+        "name": "browser_click",
+        "input": {
+          "expectChecked": "true",
+          "selector": "#consent-0fe8ceded3"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-aa6cc6f05e72d23d",
+        "name": "browser_click",
+        "input": {
+          "expectChecked": "true",
+          "selector": "#consent-0fe8ceded3"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-aa6cc6f05e72d23d",
+        "name": "browser_click",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_ced551a8e7be3da6"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 6
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9f16fbf05e2d3937",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e6",
+          "value": "Orion-0fe8ceded3"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9f16fbf05e2d3937",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e6",
+          "value": "Orion-0fe8ceded3"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9f16fbf05e2d3937",
+        "name": "browser_fill",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "Ref is not grounded in this session; rerun browser.elements"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 7
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9be95b96efeeebfc",
+        "name": "browser_elements",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9be95b96efeeebfc",
+        "name": "browser_elements",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_365c41180bdd3a8a"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 8
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b09b485b13124840",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e6",
+          "value": "Orion-0fe8ceded3"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b09b485b13124840",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e6",
+          "value": "Orion-0fe8ceded3"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b09b485b13124840",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_8b5061eae72929b0"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 9
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a0ecafdb5ca2dc46",
+        "name": "browser_fill",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a0ecafdb5ca2dc46",
+        "name": "browser_fill",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool browser_fill input failed schema at value: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 10
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-97233a272e79248b",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e7",
+          "value": "eval-0fe8ceded3@example.invalid"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-97233a272e79248b",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e7",
+          "value": "eval-0fe8ceded3@example.invalid"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-97233a272e79248b",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_706a65e842fca8b4"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 11
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-90e190d046188e4d",
+        "name": "browser_fill",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-90e190d046188e4d",
+        "name": "browser_fill",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool browser_fill input failed schema at value: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 12
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-816033a111bbcdf5",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e8",
+          "value": "3"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-816033a111bbcdf5",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e8",
+          "value": "3"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-816033a111bbcdf5",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_f0f6c1339d62dce0"
+      }
+    },
+    {
+      "event": "error",
+      "seq": 0,
+      "data": {
+        "message": "model round budget exhausted (12); task is incomplete",
+        "messageId": "msg_mvm3ss7l_4936c555a922",
+        "goalId": "goal_mvm3seux_4"
+      }
+    }
+  ],
+  "proof": {
+    "submissions": [],
+    "needsSlot": false,
+    "accepted": null
+  },
+  "artifacts": {
+    "fileName": "form-regression-06d2eadbf399.txt",
+    "receiptName": "receipt-regression-06d2eadbf399.txt"
+  },
+  "ordinaryGhostActivationProven": false,
+  "isolatedTestHost": true,
+  "physicalAcceptance": false,
+  "cost": {
+    "currencyAmount": null,
+    "reason": "Provider billing not independently supplied; token telemetry must not be converted to an invented price"
+  }
+}

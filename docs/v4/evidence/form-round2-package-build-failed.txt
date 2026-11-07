@@ -1,0 +1,46 @@
+
+> majin-v4-desktop@4.0.0-alpha.3 build
+> npm run stage && electron-builder --win nsis --x64
+
+
+> majin-v4-desktop@4.0.0-alpha.3 stage
+> node stage-host.mjs
+
+
+added 41 packages in 4s
+(node:13548) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+  • electron-builder  version=26.15.3 os=10.0.26200
+  • loaded configuration  file=package.json ("build" field)
+  • executing @electron/rebuild  electronVersion=45.0.0 arch=x64 buildFromSource=false workspaceRoot=C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop projectDir=./ appDir=./
+  • installing native dependencies  arch=x64
+  • completed installing native dependencies
+  • packaging       platform=win32 arch=x64 electron=45.0.0 appOutDir=dist\win-unpacked
+  • downloaded      label=electron progress=100%
+  • downloaded electron zip extracted successfully  output=C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\dist\win-unpacked
+  • searching for node modules  pm=npm searchDir=C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop
+  • searching for node modules  pm=traversal searchDir=C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop
+  • using manual traversal of node_modules to build dependency tree
+  • no node modules returned while searching directories  searchDirectories=[""]
+  • updating asar integrity executable resource  executablePath=dist\win-unpacked\MAJIN V4.exe
+  • signing with signtool.exe  path=dist\win-unpacked\resources\host\runtime\node.exe
+  • signing with signtool.exe  path=dist\win-unpacked\MAJIN V4.exe
+  • building        target=nsis file=dist\MAJIN-V4-4.0.0-alpha.3-Setup.exe archs=x64 oneClick=false perMachine=false
+  • signing with signtool.exe  path=dist\win-unpacked\resources\elevate.exe
+  ⨯ spawn UNKNOWN   failedTask=build stackTrace=Error: spawn UNKNOWN
+    at ChildProcess.spawn (node:internal/child_process:458:11)
+    at spawn (node:child_process:813:9)
+    at execFile (node:child_process:349:17)
+    at C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\node_modules\builder-util\src\util.ts:152:13
+    at new Promise (<anonymous>)
+    at exec (C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\node_modules\builder-util\src\util.ts:151:10)
+    at WineVmManager.execWine (C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\node_modules\app-builder-lib\src\vm\WineVm.ts:40:18)
+    at WineVmManager.exec (C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\node_modules\app-builder-lib\src\vm\WineVm.ts:22:17)
+    at NsisTarget.computeScriptAndSignUninstaller (C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\node_modules\app-builder-lib\src\targets\nsis\NsisTarget.ts:445:20)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\node_modules\app-builder-lib\src\targets\nsis\NsisTarget.ts:349:24
+    at async Promise.all (index 0)
+    at AsyncTaskManager.awaitTasks (C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\node_modules\builder-util\src\asyncTaskManager.ts:65:25)
+    at NsisTarget.finishBuild (C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\node_modules\app-builder-lib\src\core.ts:93:5)
+    at NsisTarget.finishBuild (C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\node_modules\app-builder-lib\src\targets\nsis\NsisTarget.ts:163:7)
+    at Packager.doBuild (C:\Users\Ghost\Documents\Codex\2026-10-23\forts-tt-majin-v4-max-5-2\work\MAJINCLI\desktop\node_modules\app-builder-lib\src\packager.ts:562:7)

@@ -1,0 +1,25 @@
+name: MAJIN actual create action evidence QA
+on:
+  push:
+    branches: [fix/agent-actually-create-action-intent-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --test test/agent-actually-create.test.js test/goal-artifact-js-cli.test.js
+      - run: npm test
+      - run: npm run check

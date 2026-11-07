@@ -1,0 +1,13 @@
+{
+  "id": "rename-file-dialog-win",
+  "version": "majin-desktop-eval/1",
+  "environment": "windows-real",
+  "category": "windows-desktop-file-management",
+  "difficulty": "medium",
+  "goal": "On a REAL Windows desktop: rename the file %TEMP%\\majin-eval-doc.txt to majin-eval-renamed.txt using the desktop (Explorer context menu, F2, or equivalent). Proof = the OS file system afterwards (never a spoken claim).",
+  "verify": { "cmd": "node", "script": "verify.mjs", "timeoutMs": 10000 },
+  "liveLane": {
+    "status": "pending-hardware — runs on the user's Windows machine via the wincontrol bridge; declared, never fabricated",
+    "setup": "powershell -File scripts/windows/desktop-eval-setup.ps1"
+  }
+}

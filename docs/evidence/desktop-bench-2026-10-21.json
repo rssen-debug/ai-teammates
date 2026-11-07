@@ -1,0 +1,53 @@
+{
+  "platformLane": "deferred-hardware-required",
+  "report": {
+    "version": "majin-desktop-eval/1",
+    "tasks": 3,
+    "verifiersVerified": 2,
+    "verifiersFlagged": 0,
+    "verifiersDeferred": 1,
+    "verifiersUnverified": 0,
+    "deferredTasks": [
+      {
+        "task": "rename-file-dialog-win",
+        "reason": "hardware-required — live Windows desktop; declared, never fabricated"
+      }
+    ],
+    "flaggedTasks": [],
+    "lanes": {
+      "declared": [
+        "simulated",
+        "windows-real"
+      ],
+      "run": [],
+      "agentLanesLive": "pending-hardware — declared, never fabricated"
+    },
+    "healthy": true
+  },
+  "rows": [
+    {
+      "task": "notepad-write-save",
+      "environment": "simulated",
+      "status": "verified",
+      "goodPasses": true,
+      "badPasses": false,
+      "why": "good end-state passes, bad end-state fails — the verifier measures the desktop state, not a story",
+      "wallMs": 65
+    },
+    {
+      "task": "rename-file-dialog-win",
+      "environment": "windows-real",
+      "status": "deferred",
+      "reason": "hardware-required — live Windows desktop; declared, never fabricated"
+    },
+    {
+      "task": "window-title-observe",
+      "environment": "simulated",
+      "status": "verified",
+      "goodPasses": true,
+      "badPasses": false,
+      "why": "good end-state passes, bad end-state fails — the verifier measures the desktop state, not a story",
+      "wallMs": 70
+    }
+  ]
+}

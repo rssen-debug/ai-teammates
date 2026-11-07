@@ -1,0 +1,19 @@
+name: MAJIN real job-form browser acceptance
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  real-job-form:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Real Edge/Chrome CDP, dynamic form, fields and file upload (no submit)
+        run: node scripts/v4/job-form-accept.mjs

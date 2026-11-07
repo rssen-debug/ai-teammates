@@ -1,0 +1,51 @@
+{
+  "at": "2026-10-24T00:33:38.051Z",
+  "kind": "real-Go-canonical-memory-sync",
+  "passed": true,
+  "checks": {
+    "realGoUnchanged": true,
+    "modelCompleted": true,
+    "previewExecuted": true,
+    "previewUnchanged": true,
+    "actualSyncExecuted": true,
+    "peerPreferenceImported": true,
+    "projectMetadataAndFullTextPreserved": true,
+    "localPreferenceExported": true,
+    "searchRetrievedPeer": true,
+    "noFactRecreationOrOtherTool": true
+  },
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "status": "completed",
+  "failure": null,
+  "conversationId": "conv_mvlo0wxi_f555f2ccd5f1",
+  "successfulTools": [
+    "memory_sync",
+    "memory_sync",
+    "memory_search"
+  ],
+  "approvals": 2,
+  "elapsedMs": 12417,
+  "evaluationCheckoutHead": "a0d59eaf97a71166be8e21f61d27cc63791d3a05",
+  "evaluationCheckoutDirty": true,
+  "sourceHashes": {
+    "src/core/memory-sync.js": "fd013069789dbdcb2c0596f5ce316914e59abf7c4c06c111b312db4bf0c2eb3d",
+    "src/v2/memory/store.js": "b8cb586abf5ada79f84b18978550d5440003bf2fdaad74165c8ace51633959fb",
+    "src/v4/tools/memory-sync.js": "1c76149016c5118a5e649bab8c72858fbca2d2bcbce0d610d83dab5728c7945c",
+    "src/v4/tools.js": "ebf9db457838bb4bc98bae514d88ca2dcbeceaef1a359c1a5deca4efa12c0957",
+    "scripts/v4/evals/memory-sync.mjs": "584e56e7642e6cf02401d59b622c6412bc6c25d25b07029cf58748c0f520795a"
+  },
+  "scope": "Real Go and actual Ghost filesystem; isolated test host/data, not ordinary Ghost activation or physical device acceptance.",
+  "ordinaryGhostActivationProven": false,
+  "physicalDevicePass": false
+}

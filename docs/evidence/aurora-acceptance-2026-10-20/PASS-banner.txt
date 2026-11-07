@@ -1,0 +1,2 @@
+Long conversation render (300 messages): 126ms
+PASS: startup, token injection, 1200 models, pagination, free filter, search, exact route save, Escape/focus, 6 provider errors, no false success, streamed answer, clean transcript, new chat, small viewport, contextual settings, task snapshot controls, file download, sandbox preview, capability intersection and reduced motion; no paid calls.

@@ -1,0 +1,14 @@
+{
+  "ordinaryGhostActivationProven": false,
+  "isolatedHost": true,
+  "roundCap": 12,
+  "toolCallCap": 24,
+  "approvalCap": 16,
+  "adaptiveRecovery": "Per-field one alternative native input strategy; batch reobservation and semantic regrounding; stop after three identical failed tool calls; no round-limit increase",
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  }
+}

@@ -1,0 +1,885 @@
+{
+  "at": "2026-10-24T07:50:48.279Z",
+  "kind": "regression",
+  "passed": false,
+  "checks": {
+    "realModelCompleted": false,
+    "sameGenuineProvider": true,
+    "exactlyOneAccepted": false,
+    "allRequestedValues": false,
+    "exactFileBytes": false,
+    "savedVerifiedReceipt": false,
+    "noDeniedAction": true,
+    "validationRecovery": false
+  },
+  "failure": null,
+  "status": "failed",
+  "elapsedMs": 35414,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "sourceHead": "704de6320341993adb50303b8e11e646cca64710",
+  "dirtyCheckout": true,
+  "sourceHashes": {
+    "src/core/browser-form.js": "683275b856ef0970832e53696f17048ba53bf758a31a73b88c1be3848c512dd2",
+    "src/core/tools/web.js": "586f8b5d00e44cd9a890ba3c668fabce070e19438c0fc3a981ba52f19706172a",
+    "src/v4/agent.js": "f19c7873963c0781d57a734bacfae623e9e35d745aa8c35d975b791defbf2d65",
+    "src/v4/tools/host.js": "3bdbcff507d297852ec17111595c4a3b804a0d6f1e25be4f56de70e45777e262",
+    "scripts/v4/evals/form-autonomy.mjs": "337614d782542ff36c70e7b1a72e72829ffc3441115a20dc4d4cb14b2225914c",
+    "scripts/v4/evals/form-autonomy-fixtures.mjs": "402e5f4c24dd54e62e4c46711e45bdb135f0ebbde44ce320345e5a4e7675a8af"
+  },
+  "modelRounds": 12,
+  "toolCalls": 16,
+  "uniqueToolRequests": 16,
+  "approved": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_click",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_click",
+    "browser_click"
+  ],
+  "denied": [],
+  "stagnationStop": false,
+  "toolFailures": [
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a8817924fee26a47",
+        "name": "browser_form",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_OUTPUT",
+        "error": "tool browser_form produced schema-mismatching output: Invalid input: expected string, received null"
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-92b21f6752d33b61",
+        "name": "browser_fill",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "browser.fill cannot set a checkbox — Use browser.click with this exact selector and confirm the checked result. The control was not modified."
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-ad39028904f889b0",
+        "name": "browser_click",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "Specify a selector, URL fragment, exact URL path/origin, or title fragment to verify"
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-96241431a27080ea",
+        "name": "browser_click",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "The click happened but its requested effect was NOT verified. Re-observe the page before trying a different approach."
+      }
+    }
+  ],
+  "trace": [
+    {
+      "event": "state",
+      "seq": 4,
+      "data": {
+        "state": "thinking",
+        "round": 1
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 5,
+      "data": {
+        "id": "chatcmpl-tool-8b2e13a8ee1161d3",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:63467/"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8b2e13a8ee1161d3",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:63467/"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8b2e13a8ee1161d3",
+        "name": "browser_open",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_a014dfbf8cadba3f"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 2
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a8817924fee26a47",
+        "name": "browser_form",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a8817924fee26a47",
+        "name": "browser_form",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_OUTPUT",
+        "error": "tool browser_form produced schema-mismatching output: Invalid input: expected string, received null"
+      }
+    },
+    {
+      "event": "recovery",
+      "seq": 0,
+      "data": {
+        "tool": "browser_form",
+        "failureClass": "INVALID_TOOL_OUTPUT",
+        "action": "none",
+        "advice": [
+          "revalidate_input",
+          "alternate_tool"
+        ],
+        "budget": 2
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 3
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-817c83996e376a3c",
+        "name": "browser_elements",
+        "input": {
+          "outline": "true"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-817c83996e376a3c",
+        "name": "browser_elements",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_a8c3d7a1f3882d74"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 4
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8653533fe2d88b7e",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e1",
+          "value": "Team"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8653533fe2d88b7e",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e1",
+          "value": "Team"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8653533fe2d88b7e",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_dd64d4f5bd184562"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 5
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-97c0068c727be6ca",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e1",
+          "value": "Team"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-97c0068c727be6ca",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e1",
+          "value": "Team"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-97c0068c727be6ca",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_347c3dcbb63f621e"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b53f210ac9b4a2ae",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e2",
+          "value": "Sweden"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b53f210ac9b4a2ae",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e2",
+          "value": "Sweden"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b53f210ac9b4a2ae",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_82bfb5c265cd3e34"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 6
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b4c7f98514bbd2a7",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#country-d5368d0610",
+          "value": "Sweden"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b4c7f98514bbd2a7",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#country-d5368d0610",
+          "value": "Sweden"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b4c7f98514bbd2a7",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_4bbadd0f6141def6"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-92b21f6752d33b61",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#consent-d5368d0610",
+          "value": "true"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-92b21f6752d33b61",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#consent-d5368d0610",
+          "value": "true"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-92b21f6752d33b61",
+        "name": "browser_fill",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "browser.fill cannot set a checkbox — Use browser.click with this exact selector and confirm the checked result. The control was not modified."
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 7
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-894b24421a328ddf",
+        "name": "browser_click",
+        "input": {
+          "expectChecked": "true",
+          "selector": "#consent-d5368d0610"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-894b24421a328ddf",
+        "name": "browser_click",
+        "input": {
+          "expectChecked": "true",
+          "selector": "#consent-d5368d0610"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-894b24421a328ddf",
+        "name": "browser_click",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_8114035c0bb9ae11"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 8
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bbb4b02fc9765802",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#group-d5368d0610-1",
+          "value": "Orion-d5368d0610"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bbb4b02fc9765802",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#group-d5368d0610-1",
+          "value": "Orion-d5368d0610"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-bbb4b02fc9765802",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_75d7d3b87d97caef"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8b776bcb6b57f16a",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#email-d5368d0610-1",
+          "value": "eval-d5368d0610@example.invalid"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8b776bcb6b57f16a",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#email-d5368d0610-1",
+          "value": "eval-d5368d0610@example.invalid"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8b776bcb6b57f16a",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_59feb51c19ea2329"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b5fdb04df110a4a2",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#seats-d5368d0610-1",
+          "value": "3"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b5fdb04df110a4a2",
+        "name": "browser_fill",
+        "input": {
+          "selector": "#seats-d5368d0610-1",
+          "value": "3"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b5fdb04df110a4a2",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_000c3864141a8f3d"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 9
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8b5defde36ef5e70",
+        "name": "browser_upload",
+        "input": {
+          "path": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt1\\home\\workspace\\form-regression-350de0ad6f93.txt",
+          "ref": "e3"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8b5defde36ef5e70",
+        "name": "browser_upload",
+        "input": {
+          "path": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt1\\home\\workspace\\form-regression-350de0ad6f93.txt",
+          "ref": "e3"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8b5defde36ef5e70",
+        "name": "browser_upload",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_960a0f7fb60182f4"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 10
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-ad39028904f889b0",
+        "name": "browser_click",
+        "input": {
+          "expectText": "Registration",
+          "selector": "button[type=submit]"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-ad39028904f889b0",
+        "name": "browser_click",
+        "input": {
+          "expectText": "Registration",
+          "selector": "button[type=submit]"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-ad39028904f889b0",
+        "name": "browser_click",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "Specify a selector, URL fragment, exact URL path/origin, or title fragment to verify"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 11
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-96241431a27080ea",
+        "name": "browser_click",
+        "input": {
+          "expectSelector": "#seats-d5368d0610-1",
+          "selector": "button[type=submit]"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-96241431a27080ea",
+        "name": "browser_click",
+        "input": {
+          "expectSelector": "#seats-d5368d0610-1",
+          "selector": "button[type=submit]"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-96241431a27080ea",
+        "name": "browser_click",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "The click happened but its requested effect was NOT verified. Re-observe the page before trying a different approach."
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 12
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-967213352a92fe36",
+        "name": "browser_read",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-967213352a92fe36",
+        "name": "browser_read",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_a5144e36df13de02"
+      }
+    },
+    {
+      "event": "error",
+      "seq": 0,
+      "data": {
+        "message": "model round budget exhausted (12); task is incomplete",
+        "messageId": "msg_mvm3ndt3_be63d898244d",
+        "goalId": "goal_mvm3mmja_4"
+      }
+    }
+  ],
+  "proof": {
+    "submissions": [
+      {
+        "values": {
+          "participation": "Team",
+          "group": "Orion-d5368d0610",
+          "email": "eval-d5368d0610@example.invalid",
+          "seats": "3",
+          "country": "SE",
+          "slot": null,
+          "consent": "on"
+        },
+        "uploadBytes": 61,
+        "uploadSha256": "4b53bab2192aff003bb732c906b2999d15f75063fb33acf6acd1734c16e57a2e",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+        "accepted": false
+      }
+    ],
+    "needsSlot": true,
+    "accepted": null
+  },
+  "artifacts": {
+    "fileName": "form-regression-350de0ad6f93.txt",
+    "receiptName": "receipt-regression-350de0ad6f93.txt"
+  },
+  "ordinaryGhostActivationProven": false,
+  "isolatedTestHost": true,
+  "physicalAcceptance": false,
+  "cost": {
+    "currencyAmount": null,
+    "reason": "Provider billing not independently supplied; token telemetry must not be converted to an invented price"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "at": "2026-10-23T21:03:28.710Z",
+  "engine": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  "node": "24.20.0",
+  "results": [
+    {
+      "viewport": "iphone-13",
+      "w": 390,
+      "h": 844,
+      "verifiedTool": true,
+      "historicalReceipts": true
+    },
+    {
+      "viewport": "pixel-7",
+      "w": 412,
+      "h": 915,
+      "verifiedTool": true,
+      "historicalReceipts": true
+    },
+    {
+      "viewport": "iphone-se",
+      "w": 375,
+      "h": 667,
+      "verifiedTool": true,
+      "historicalReceipts": true
+    },
+    {
+      "viewport": "ipad",
+      "w": 820,
+      "h": 1180,
+      "verifiedTool": true,
+      "historicalReceipts": true
+    },
+    {
+      "viewport": "desktop",
+      "w": 1280,
+      "h": 800,
+      "verifiedTool": true,
+      "historicalReceipts": true
+    }
+  ]
+}

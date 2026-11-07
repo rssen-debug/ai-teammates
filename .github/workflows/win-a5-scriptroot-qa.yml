@@ -1,0 +1,42 @@
+name: MAJIN Windows A5 scriptroot QA
+on:
+  push:
+    branches: [fix/windows-acceptance-a5-scriptroot-path-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-a5:
+    runs-on: windows-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: PS5.1 script must find probe even with broken Repo argument
+        shell: powershell
+        run: |
+          & .\qa\win-acceptance\run-all.ps1 -Repo 'D:\does-not-exist' -Out "$env:RUNNER_TEMP\acceptance.json"
+          if (!(Test-Path "$env:RUNNER_TEMP\acceptance.json")) { throw 'QA JSON absent' }
+          $doc = Get-Content -Raw "$env:RUNNER_TEMP\acceptance.json" | ConvertFrom-Json
+          $a5 = @($doc.steps | Where-Object { $_.step -eq 'A5' })
+          if ($a5.Count -ne 1 -or $a5[0].status -ne 'PASS') { throw "A5 failed: $($a5 | ConvertTo-Json -Compress)" }
+          $a1 = @($doc.steps | Where-Object { $_.step -eq 'A1' })
+          if ($a1.Count -ne 1 -or $a1[0].status -ne 'NOT TESTED') { throw 'Hosted desktop must stay NOT TESTED' }
+      - name: Verify honest result schema
+        shell: powershell
+        run: node scripts/verify-win-acceptance.mjs "$env:RUNNER_TEMP\acceptance.json"
+      - name: Full suite
+        run: npm test
+      - name: Repository checks
+        run: npm run check
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-a5-scriptroot-proof
+          path: ${{ runner.temp }}/acceptance.json
+          retention-days: 30
+          if-no-files-found: warn

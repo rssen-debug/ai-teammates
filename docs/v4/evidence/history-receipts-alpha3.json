@@ -1,0 +1,48 @@
+{
+  "schema": "majin.v4.history-receipts-acceptance/v1",
+  "at": "2026-10-23T18:02:54.888Z",
+  "version": "4.0.0-alpha.3",
+  "runtimeSourceCommit": "4239555474336786a2ef4be69744250963439d86",
+  "productionReady": false,
+  "suites": [
+    {
+      "log": "v4-alpha3.log",
+      "tests": 493,
+      "passed": 492,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        "turn journal: cancelling an unknown turn is a no-op, not an error"
+      ]
+    },
+    {
+      "log": "alpha3-history-final.log",
+      "tests": 30,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    {
+      "log": "alpha3-turns.log",
+      "tests": 12,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    }
+  ],
+  "fullRunNote": "One unexpected 401 occurred in unknown-turn cancellation. The isolated 12-test turns suite passed after adding pairing prerequisite assertions. Root cause is not claimed resolved.",
+  "acceptance": {
+    "durableReceipts": "PASS: two authenticated sessions, persisted write receipt and host restart",
+    "historicalVerification": "PASS: deleted original file, receipt retained with recorded-time and stale-world notice",
+    "failedAndUnverified": "PASS: no fabricated verification; failure class and literal HTML-shaped target preserved",
+    "crossDeviceRefresh": "PASS: receipts survive incremental refresh without duplicates or raw evidence payloads",
+    "browserReload": "PASS: five actual Chromium viewport reloads, saved-byte checks, visible historical cards",
+    "installedNative": "PASS: final alpha.3 installer, native/host version equality, pairing/chat/file, historical reload and host lifetime",
+    "upgradeDataPreservation": "PASS: disposable sentinel hash unchanged",
+    "physicalDevices": "NOT_VERIFIED",
+    "ghost": "NOT_CONNECTED",
+    "productionSigning": "UNAVAILABLE"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-24T00:09:43Z",
+  "kind": "independent-primary-source-factual-review",
+  "receipt": "genesis-research-attempt-1.json",
+  "artifactSha256": "a179a209284aac3e8972906af5fbf12b3921c6944bee053f237c1a4df484ecb6",
+  "automatedChecksPassed": true,
+  "semanticReviewPassed": false,
+  "scenarioStatus": "PARTIAL",
+  "sources": [
+    "https://www.rfc-editor.org/rfc/rfc8030.txt",
+    "https://www.rfc-editor.org/rfc/rfc8291.txt"
+  ],
+  "verified": [
+    "The actual Go model fetched both primary documents, cited them and wrote/read its workspace report.",
+    "TTL omission/expiry, encryption vs retention and the distinction between accepted push and physical receipt are supported."
+  ],
+  "issues": [
+    "The 'Guarantees' heading overstates short-term storage: RFC 8030 sections 5.2 and 7.2 allow shorter retention and early expiry. The report mentions these exceptions but its guarantee wording is misleading.",
+    "RFC 8291 section 4 gives a minimum supported 4096-octet payload size and resulting 3993-octet plaintext capacity, not a universal protocol maximum. The report's 'max' wording needs correction."
+  ],
+  "physicalDevicePass": false,
+  "note": "Original artifact and automated receipt retained unchanged. Research scenario is not accepted as a complete factual PASS."
+}

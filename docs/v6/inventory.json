@@ -1,0 +1,4184 @@
+{
+  "schema": "majin.v6.inventory/v1",
+  "generatedAt": "2026-10-27T15:15:46.255Z",
+  "platform": "linux",
+  "counts": {
+    "currentV1Universe": 157,
+    "currentV1Entries": 157,
+    "currentV2Builtins": 3,
+    "openCodeDriverAdapters": 97,
+    "openCodeAvailableNow": 93,
+    "openCodeUnavailable": 64,
+    "openCodeMcpTools": 11,
+    "lanesAvailable": 17,
+    "lanesTotal": 20,
+    "historicalUniqueDeclarations": 176
+  },
+  "browserRuntime": {
+    "available": false,
+    "reason": "no browser binary found (npx playwright install chromium)"
+  },
+  "deep": {
+    "registered": 97,
+    "available": 93,
+    "unavailable": 64,
+    "categories": {
+      "available": 93,
+      "superseded": 11,
+      "platform": 14,
+      "missing-dependency": 16,
+      "host-service": 23,
+      "lane-not-granted": 0,
+      "legacy-unported": 0,
+      "unregistered": 0
+    },
+    "coveragePercent": 59.2,
+    "capabilityPercent": 66.2,
+    "unavailableTools": [
+      {
+        "sourceName": "agent.approve",
+        "name": "agent_approve",
+        "lane": "agent-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "legacy agent orchestration requires a model runtime; the V5 provider supplies agent_plan, agent_checkpoint, and agent_delegate on the host side"
+      },
+      {
+        "sourceName": "agent.delegate",
+        "name": "agent_delegate",
+        "lane": "agent-service",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "agent_delegate"
+        ],
+        "surface": "provider-host",
+        "reason": "capability provided by agent_delegate (provider host); the legacy name itself is not registered: legacy agent orchestration requires a model runtime; the V5 provider supplies agent_plan, agent_checkpoint, and agent_delegate on the host side"
+      },
+      {
+        "sourceName": "agent.moa",
+        "name": "agent_moa",
+        "lane": "agent-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "legacy agent orchestration requires a model runtime; the V5 provider supplies agent_plan, agent_checkpoint, and agent_delegate on the host side"
+      },
+      {
+        "sourceName": "agent.plan",
+        "name": "agent_plan",
+        "lane": "agent-service",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "agent_plan"
+        ],
+        "surface": "provider-host",
+        "reason": "capability provided by agent_plan (provider host); the legacy name itself is not registered: legacy agent orchestration requires a model runtime; the V5 provider supplies agent_plan, agent_checkpoint, and agent_delegate on the host side"
+      },
+      {
+        "sourceName": "browser.check",
+        "name": "browser_check",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.clear_marks",
+        "name": "browser_clear_marks",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.click",
+        "name": "browser_click",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.close",
+        "name": "browser_close",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.download",
+        "name": "browser_download",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.elements",
+        "name": "browser_elements",
+        "lane": "browser",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "browser_inspect"
+        ],
+        "surface": "driver",
+        "reason": "capability provided by browser_inspect (isolated driver); the legacy name itself is not registered: legacy CDP browser surface is superseded by the V5 Playwright browser tools; legacy-only form helpers still require a port to that session"
+      },
+      {
+        "sourceName": "browser.fill",
+        "name": "browser_fill",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.form",
+        "name": "browser_form",
+        "lane": "browser",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "browser_inspect"
+        ],
+        "surface": "driver",
+        "reason": "capability provided by browser_inspect (isolated driver); the legacy name itself is not registered: legacy CDP browser surface is superseded by the V5 Playwright browser tools; legacy-only form helpers still require a port to that session"
+      },
+      {
+        "sourceName": "browser.form_fill",
+        "name": "browser_form_fill",
+        "lane": "browser",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "browser_fill",
+          "browser_check",
+          "browser_select"
+        ],
+        "surface": "driver",
+        "reason": "capability provided by browser_fill, browser_check, browser_select (isolated driver); the legacy name itself is not registered: legacy CDP browser surface is superseded by the V5 Playwright browser tools; legacy-only form helpers still require a port to that session"
+      },
+      {
+        "sourceName": "browser.form_submit",
+        "name": "browser_form_submit",
+        "lane": "browser",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "browser_click"
+        ],
+        "surface": "driver",
+        "reason": "capability provided by browser_click (isolated driver); the legacy name itself is not registered: legacy CDP browser surface is superseded by the V5 Playwright browser tools; legacy-only form helpers still require a port to that session"
+      },
+      {
+        "sourceName": "browser.inspect",
+        "name": "browser_inspect",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.open",
+        "name": "browser_open",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.press",
+        "name": "browser_press",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.read",
+        "name": "browser_read",
+        "lane": "browser",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "browser_inspect"
+        ],
+        "surface": "driver",
+        "reason": "capability provided by browser_inspect (isolated driver); the legacy name itself is not registered: legacy CDP browser surface is superseded by the V5 Playwright browser tools; legacy-only form helpers still require a port to that session"
+      },
+      {
+        "sourceName": "browser.select",
+        "name": "browser_select",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.shot",
+        "name": "browser_shot",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.tabs",
+        "name": "browser_tabs",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.upload",
+        "name": "browser_upload",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "browser.verify",
+        "name": "browser_verify",
+        "lane": "browser",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+      },
+      {
+        "sourceName": "computer.use",
+        "name": "computer_use",
+        "lane": "computer",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "control.click_button",
+        "name": "control_click_button",
+        "lane": "desktop",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "control.focus",
+        "name": "control_focus",
+        "lane": "desktop",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "control.inspect",
+        "name": "control_inspect",
+        "lane": "desktop",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "control.list_windows",
+        "name": "control_list_windows",
+        "lane": "desktop",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "control.read",
+        "name": "control_read",
+        "lane": "desktop",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "control.type",
+        "name": "control_type",
+        "lane": "desktop",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "cursor.overlay",
+        "name": "cursor_overlay",
+        "lane": "computer",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "desktop.capture_window",
+        "name": "desktop_capture_window",
+        "lane": "desktop",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "desktop.open_notepad",
+        "name": "desktop_open_notepad",
+        "lane": "desktop",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "majin.adapter",
+        "name": "majin_adapter",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "requires the V1/V5 host service context (config, memory, skills, scheduler, channels, dataset, or adapters); use the corresponding V5 surface until that service is supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.backup",
+        "name": "majin_backup",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "owner backup surface: `majin-v5 memory export` / `import --yes` covers long-term memory with validated sync records; no full-host backup service is supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.channel",
+        "name": "majin_channel",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "external messaging channels require host adapters and credentials configured by the owner; none are supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.configure",
+        "name": "majin_configure",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "owner-only configuration/guard surface (`majin-v5 grants`, `majin-v5 doctor`, the UI); settings and permissions are never writable from model text"
+      },
+      {
+        "sourceName": "majin.control",
+        "name": "majin_control",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "owner-only configuration/guard surface (`majin-v5 grants`, `majin-v5 doctor`, the UI); settings and permissions are never writable from model text"
+      },
+      {
+        "sourceName": "majin.dataset",
+        "name": "majin_dataset",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "requires the V1/V5 host service context (config, memory, skills, scheduler, channels, dataset, or adapters); use the corresponding V5 surface until that service is supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.doctor",
+        "name": "majin_doctor",
+        "lane": "majin-service",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "majin_doctor"
+        ],
+        "surface": "provider-host",
+        "reason": "capability provided by majin_doctor (provider host); the legacy name itself is not registered: requires the V1/V5 host service context (config, memory, skills, scheduler, channels, dataset, or adapters); use the corresponding V5 surface until that service is supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.guard",
+        "name": "majin_guard",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "owner-only configuration/guard surface (`majin-v5 grants`, `majin-v5 doctor`, the UI); settings and permissions are never writable from model text"
+      },
+      {
+        "sourceName": "majin.heartbeat",
+        "name": "majin_heartbeat",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "the V5 provider-host majin_heartbeat tool observes real goal outcomes and persists a local CLI inbox; the isolated driver has no heartbeat daemon"
+      },
+      {
+        "sourceName": "majin.memory",
+        "name": "majin_memory",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "long-term memory is split by design: model surface majin_memory (status/read/remember), full lifecycle owner-only via `majin-v5 memory` (list/search/get/forget/clear/export/import); the legacy all-in-one tool is not supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.moa",
+        "name": "majin_moa",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "requires the V1/V5 host service context (config, memory, skills, scheduler, channels, dataset, or adapters); use the corresponding V5 surface until that service is supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.plugin",
+        "name": "majin_plugin",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "requires the V1/V5 host service context (config, memory, skills, scheduler, channels, dataset, or adapters); use the corresponding V5 surface until that service is supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.provider",
+        "name": "majin_provider",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "provider reads are model-reachable via majin_provider (list/models); configuring providers or handling API keys is owner-only via `majin-v5 model` or the UI and never supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.routes",
+        "name": "majin_routes",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "model routing is owner configuration (`majin-v5 model`); the active selection is visible to the model via majin_provider and majin_status"
+      },
+      {
+        "sourceName": "majin.schedule",
+        "name": "majin_schedule",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "scheduled work is supplied by the provider-host majin_schedule tool while chat/serve is running; it uses saved model/grants, host local time and a bounded run count; the isolated driver has no scheduler"
+      },
+      {
+        "sourceName": "majin.selftest",
+        "name": "majin_selftest",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "requires the V1/V5 host service context (config, memory, skills, scheduler, channels, dataset, or adapters); use the corresponding V5 surface until that service is supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.skill",
+        "name": "majin_skill",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "verified procedures are model-reachable via procedures_search and procedures_read; procedures are learned host-side from independently verified goals, and legacy skill file management is not supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.status",
+        "name": "majin_status",
+        "lane": "majin-service",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "majin_status"
+        ],
+        "surface": "provider-host",
+        "reason": "capability provided by majin_status (provider host); the legacy name itself is not registered: requires the V1/V5 host service context (config, memory, skills, scheduler, channels, dataset, or adapters); use the corresponding V5 surface until that service is supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.tools",
+        "name": "majin_tools",
+        "lane": "majin-service",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "tools_search",
+          "driver_status"
+        ],
+        "surface": "driver",
+        "reason": "capability provided by tools_search, driver_status (isolated driver); the legacy name itself is not registered: requires the V1/V5 host service context (config, memory, skills, scheduler, channels, dataset, or adapters); use the corresponding V5 surface until that service is supplied to the isolated driver"
+      },
+      {
+        "sourceName": "majin.ui",
+        "name": "majin_ui",
+        "lane": "majin-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "requires the V1/V5 host service context (config, memory, skills, scheduler, channels, dataset, or adapters); use the corresponding V5 surface until that service is supplied to the isolated driver"
+      },
+      {
+        "sourceName": "media.generate_image",
+        "name": "media_generate_image",
+        "lane": "media-service",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "requires a configured media provider service; the deterministic driver does not supply media credentials or provider inference"
+      },
+      {
+        "sourceName": "media.speak",
+        "name": "media_speak",
+        "lane": "media-service",
+        "available": false,
+        "category": "missing-dependency",
+        "reason": "requires a configured media provider service; the deterministic driver does not supply media credentials or provider inference"
+      },
+      {
+        "sourceName": "memory.sync",
+        "name": "memory_sync",
+        "lane": "memory-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "requires the legacy memory service; V5 procedural memory is supplied host-side through procedures_search and procedures_read, and owner memory sync/backup runs through `majin-v5 memory export` / `import --yes`"
+      },
+      {
+        "sourceName": "mouse.move",
+        "name": "mouse_move",
+        "lane": "desktop",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "reset.apply",
+        "name": "reset_apply",
+        "lane": "host-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "requires the host runtime service that owns reset/plugin state; it is not supplied to the isolated deterministic driver"
+      },
+      {
+        "sourceName": "reset.plan",
+        "name": "reset_plan",
+        "lane": "host-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "requires the host runtime service that owns reset/plugin state; it is not supplied to the isolated deterministic driver"
+      },
+      {
+        "sourceName": "screen.capture",
+        "name": "screen_capture",
+        "lane": "screen",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "screen.claim",
+        "name": "screen_claim",
+        "lane": "screen",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "sys.notify",
+        "name": "sys_notify",
+        "lane": "screen",
+        "available": false,
+        "category": "platform",
+        "reason": "Windows-only (this host is linux)"
+      },
+      {
+        "sourceName": "team.manage",
+        "name": "team_manage",
+        "lane": "agent-service",
+        "available": false,
+        "category": "host-service",
+        "reason": "legacy agent orchestration requires a model runtime; the V5 provider supplies agent_plan, agent_checkpoint, and agent_delegate on the host side"
+      },
+      {
+        "sourceName": "team.run",
+        "name": "team_run",
+        "lane": "agent-service",
+        "available": false,
+        "category": "superseded",
+        "coveredBy": [
+          "agent_plan",
+          "agent_delegate",
+          "agent_checkpoint"
+        ],
+        "surface": "provider-host",
+        "reason": "capability provided by agent_plan, agent_delegate, agent_checkpoint (provider host); the legacy name itself is not registered: legacy agent orchestration requires a model runtime; the V5 provider supplies agent_plan, agent_checkpoint, and agent_delegate on the host side"
+      }
+    ],
+    "skipReasons": {
+      "registered": [
+        {
+          "name": "fs_list",
+          "sourceName": "fs.list",
+          "tier": "read",
+          "lane": "files"
+        },
+        {
+          "name": "fs_read",
+          "sourceName": "fs.read",
+          "tier": "read",
+          "lane": "files"
+        },
+        {
+          "name": "fs_write",
+          "sourceName": "fs.write",
+          "tier": "write",
+          "lane": "files"
+        },
+        {
+          "name": "fs_patch",
+          "sourceName": "fs.patch",
+          "tier": "write",
+          "lane": "files"
+        },
+        {
+          "name": "fs_search",
+          "sourceName": "fs.search",
+          "tier": "read",
+          "lane": "files"
+        },
+        {
+          "name": "fs_grep",
+          "sourceName": "fs.grep",
+          "tier": "read",
+          "lane": "files"
+        },
+        {
+          "name": "fs_move",
+          "sourceName": "fs.move",
+          "tier": "write",
+          "lane": "files"
+        },
+        {
+          "name": "fs_copy",
+          "sourceName": "fs.copy",
+          "tier": "write",
+          "lane": "files"
+        },
+        {
+          "name": "fs_delete",
+          "sourceName": "fs.delete",
+          "tier": "process",
+          "lane": "files"
+        },
+        {
+          "name": "fs_find",
+          "sourceName": "fs.find",
+          "tier": "read",
+          "lane": "files"
+        },
+        {
+          "name": "fs_stat",
+          "sourceName": "fs.stat",
+          "tier": "read",
+          "lane": "files"
+        },
+        {
+          "name": "fs_mkdir",
+          "sourceName": "fs.mkdir",
+          "tier": "write",
+          "lane": "files"
+        },
+        {
+          "name": "fs_tar",
+          "sourceName": "fs.tar",
+          "tier": "write",
+          "lane": "files"
+        },
+        {
+          "name": "exec_backends",
+          "sourceName": "exec.backends",
+          "tier": "read",
+          "lane": "shell"
+        },
+        {
+          "name": "exec_start",
+          "sourceName": "exec.start",
+          "tier": "process",
+          "lane": "shell"
+        },
+        {
+          "name": "exec_wait",
+          "sourceName": "exec.wait",
+          "tier": "process",
+          "lane": "shell"
+        },
+        {
+          "name": "exec_cancel",
+          "sourceName": "exec.cancel",
+          "tier": "process",
+          "lane": "shell"
+        },
+        {
+          "name": "exec_logs",
+          "sourceName": "exec.logs",
+          "tier": "read",
+          "lane": "shell"
+        },
+        {
+          "name": "shell_run",
+          "sourceName": "shell.run",
+          "tier": "process",
+          "lane": "shelltools"
+        },
+        {
+          "name": "shell_bg",
+          "sourceName": "shell.bg",
+          "tier": "process",
+          "lane": "shelltools"
+        },
+        {
+          "name": "shell_jobs",
+          "sourceName": "shell.jobs",
+          "tier": "read",
+          "lane": "shelltools"
+        },
+        {
+          "name": "shell_stop",
+          "sourceName": "shell.stop",
+          "tier": "process",
+          "lane": "shelltools"
+        },
+        {
+          "name": "shell_env",
+          "sourceName": "shell.env",
+          "tier": "read",
+          "lane": "shelltools"
+        },
+        {
+          "name": "sys_info",
+          "sourceName": "sys.info",
+          "tier": "read",
+          "lane": "sys"
+        },
+        {
+          "name": "sys_ps",
+          "sourceName": "sys.ps",
+          "tier": "read",
+          "lane": "sys"
+        },
+        {
+          "name": "sys_ports",
+          "sourceName": "sys.ports",
+          "tier": "read",
+          "lane": "sys"
+        },
+        {
+          "name": "sys_fs_usage",
+          "sourceName": "sys.fs_usage",
+          "tier": "read",
+          "lane": "sys"
+        },
+        {
+          "name": "sys_procs_top",
+          "sourceName": "sys.procs_top",
+          "tier": "read",
+          "lane": "sys"
+        },
+        {
+          "name": "sys_services",
+          "sourceName": "sys.services",
+          "tier": "read",
+          "lane": "sys"
+        },
+        {
+          "name": "power_propose",
+          "sourceName": "power.propose",
+          "tier": "write",
+          "lane": "power"
+        },
+        {
+          "name": "power_approve",
+          "sourceName": "power.approve",
+          "tier": "write",
+          "lane": "power"
+        },
+        {
+          "name": "power_apply",
+          "sourceName": "power.apply",
+          "tier": "process",
+          "lane": "power"
+        },
+        {
+          "name": "web_search",
+          "sourceName": "web.search",
+          "tier": "read",
+          "lane": "web"
+        },
+        {
+          "name": "web_fetch",
+          "sourceName": "web.fetch",
+          "tier": "read",
+          "lane": "web"
+        },
+        {
+          "name": "web_download",
+          "sourceName": "web.download",
+          "tier": "write",
+          "lane": "web"
+        },
+        {
+          "name": "research_run",
+          "sourceName": "research.run",
+          "tier": "read",
+          "lane": "research"
+        },
+        {
+          "name": "jobs_list",
+          "sourceName": "jobs.list",
+          "tier": "read",
+          "lane": "jobs"
+        },
+        {
+          "name": "jobs_start",
+          "sourceName": "jobs.start",
+          "tier": "write",
+          "lane": "jobs"
+        },
+        {
+          "name": "jobs_skip",
+          "sourceName": "jobs.skip",
+          "tier": "write",
+          "lane": "jobs"
+        },
+        {
+          "name": "jobs_cv_set",
+          "sourceName": "jobs.cv.set",
+          "tier": "write",
+          "lane": "jobs"
+        },
+        {
+          "name": "jobs_cv_show",
+          "sourceName": "jobs.cv.show",
+          "tier": "read",
+          "lane": "jobs"
+        },
+        {
+          "name": "jobs_prepare",
+          "sourceName": "jobs.prepare",
+          "tier": "process",
+          "lane": "jobs"
+        },
+        {
+          "name": "jobs_send",
+          "sourceName": "jobs.send",
+          "tier": "process",
+          "lane": "jobs"
+        },
+        {
+          "name": "flows_add",
+          "sourceName": "flows.add",
+          "tier": "process",
+          "lane": "flows"
+        },
+        {
+          "name": "flows_list",
+          "sourceName": "flows.list",
+          "tier": "read",
+          "lane": "flows"
+        },
+        {
+          "name": "flows_enable",
+          "sourceName": "flows.enable",
+          "tier": "write",
+          "lane": "flows"
+        },
+        {
+          "name": "flows_remove",
+          "sourceName": "flows.remove",
+          "tier": "write",
+          "lane": "flows"
+        },
+        {
+          "name": "flows_trigger",
+          "sourceName": "flows.trigger",
+          "tier": "process",
+          "lane": "flows"
+        },
+        {
+          "name": "flows_webhook_recorded",
+          "sourceName": "flows.webhook.recorded",
+          "tier": "write",
+          "lane": "flows"
+        },
+        {
+          "name": "github_verify",
+          "sourceName": "github.verify",
+          "tier": "process",
+          "lane": "github"
+        },
+        {
+          "name": "github_research",
+          "sourceName": "github.research",
+          "tier": "read",
+          "lane": "github"
+        },
+        {
+          "name": "channel_send",
+          "sourceName": "channel.send",
+          "tier": "process",
+          "lane": "channels"
+        },
+        {
+          "name": "majin_self_audit",
+          "sourceName": "majin.self_audit",
+          "tier": "read",
+          "lane": "audit"
+        },
+        {
+          "name": "ma_learn",
+          "sourceName": "ma.learn",
+          "tier": "write",
+          "lane": "learn"
+        },
+        {
+          "name": "ma_verify_lesson",
+          "sourceName": "ma.verify_lesson",
+          "tier": "write",
+          "lane": "learn"
+        },
+        {
+          "name": "ma_lessons",
+          "sourceName": "ma.lessons",
+          "tier": "read",
+          "lane": "learn"
+        },
+        {
+          "name": "marketing_channel_report",
+          "sourceName": "marketing.channel_report",
+          "tier": "read",
+          "lane": "marketing"
+        },
+        {
+          "name": "marketing_plan",
+          "sourceName": "marketing.plan",
+          "tier": "read",
+          "lane": "marketing"
+        },
+        {
+          "name": "marketing_status",
+          "sourceName": "marketing.status",
+          "tier": "read",
+          "lane": "marketing"
+        },
+        {
+          "name": "marketing_analyze",
+          "sourceName": "marketing.analyze",
+          "tier": "read",
+          "lane": "marketing"
+        },
+        {
+          "name": "re_analyze",
+          "sourceName": "re.analyze",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_strings",
+          "sourceName": "re.strings",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_hexdump",
+          "sourceName": "re.hexdump",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_search",
+          "sourceName": "re.search",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_entropy",
+          "sourceName": "re.entropy",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_sections",
+          "sourceName": "re.sections",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_imports",
+          "sourceName": "re.imports",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_exports",
+          "sourceName": "re.exports",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_yara",
+          "sourceName": "re.yara",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_iocs",
+          "sourceName": "re.iocs",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_overlay",
+          "sourceName": "re.overlay",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_extract",
+          "sourceName": "re.extract",
+          "tier": "write",
+          "lane": "re"
+        },
+        {
+          "name": "re_apk",
+          "sourceName": "re.apk",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_pcap",
+          "sourceName": "re.pcap",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_diff",
+          "sourceName": "re.diff",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_modules",
+          "sourceName": "re.modules",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_tool",
+          "sourceName": "re.tool",
+          "tier": "process",
+          "lane": "re"
+        },
+        {
+          "name": "re_tools",
+          "sourceName": "re.tools",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_disasm",
+          "sourceName": "re.disasm",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_unpack",
+          "sourceName": "re.unpack",
+          "tier": "write",
+          "lane": "re"
+        },
+        {
+          "name": "re_hash",
+          "sourceName": "re.hash",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "re_spec",
+          "sourceName": "re.spec",
+          "tier": "write",
+          "lane": "re"
+        },
+        {
+          "name": "re_rules",
+          "sourceName": "re.rules",
+          "tier": "read",
+          "lane": "re"
+        },
+        {
+          "name": "trading_plan",
+          "sourceName": "trading.plan",
+          "tier": "read",
+          "lane": "trading"
+        },
+        {
+          "name": "trading_research",
+          "sourceName": "trading.research",
+          "tier": "read",
+          "lane": "trading"
+        },
+        {
+          "name": "net_dns",
+          "sourceName": "net.dns",
+          "tier": "read",
+          "lane": "net"
+        },
+        {
+          "name": "net_tcp",
+          "sourceName": "net.tcp",
+          "tier": "read",
+          "lane": "net"
+        },
+        {
+          "name": "net_http",
+          "sourceName": "net.http",
+          "tier": "process",
+          "lane": "net"
+        },
+        {
+          "name": "net_serve",
+          "sourceName": "net.serve",
+          "tier": "process",
+          "lane": "net"
+        },
+        {
+          "name": "net_serve_stop",
+          "sourceName": "net.serve_stop",
+          "tier": "process",
+          "lane": "net"
+        }
+      ],
+      "skipped": [
+        {
+          "lane": "web",
+          "tool": "browser.open",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.read",
+          "reason": "legacy CDP browser surface is superseded by the V5 Playwright browser tools; legacy-only form helpers still require a port to that session"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.click",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.form",
+          "reason": "legacy CDP browser surface is superseded by the V5 Playwright browser tools; legacy-only form helpers still require a port to that session"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.form_fill",
+          "reason": "legacy CDP browser surface is superseded by the V5 Playwright browser tools; legacy-only form helpers still require a port to that session"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.form_submit",
+          "reason": "legacy CDP browser surface is superseded by the V5 Playwright browser tools; legacy-only form helpers still require a port to that session"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.fill",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.shot",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.upload",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.verify",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.elements",
+          "reason": "legacy CDP browser surface is superseded by the V5 Playwright browser tools; legacy-only form helpers still require a port to that session"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.clear_marks",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "web",
+          "tool": "browser.close",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "jobs",
+          "tool": "jobs.search",
+          "reason": "provided by the deterministic V5 jobs adapter with local deduplication and matching"
+        },
+        {
+          "lane": "jobs",
+          "tool": "jobs.match",
+          "reason": "provided by the deterministic V5 jobs adapter with local deduplication and matching"
+        },
+        {
+          "lane": "desktop",
+          "reason": "Windows-only (this host is linux)"
+        },
+        {
+          "lane": "screen",
+          "reason": "Windows-only (this host is linux)"
+        },
+        {
+          "lane": "computer",
+          "reason": "Windows-only (this host is linux)"
+        },
+        {
+          "lane": "files",
+          "tool": "fs.list",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "files",
+          "tool": "fs.read",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "files",
+          "tool": "fs.write",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "files",
+          "tool": "fs.patch",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "files",
+          "tool": "fs.search",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "files",
+          "tool": "fs.grep",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "files",
+          "tool": "fs.find",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "files",
+          "tool": "fs.stat",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "files",
+          "tool": "fs.mkdir",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "shelltools",
+          "tool": "shell.run",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "web",
+          "tool": "web.search",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "web",
+          "tool": "web.fetch",
+          "reason": "provided by the existing deterministic V5 driver implementation"
+        },
+        {
+          "lane": "browser",
+          "tool": "browser.inspect",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "browser",
+          "tool": "browser.check",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "browser",
+          "tool": "browser.select",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "browser",
+          "tool": "browser.press",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "browser",
+          "tool": "browser.download",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        },
+        {
+          "lane": "browser",
+          "tool": "browser.tabs",
+          "reason": "Playwright browser lane is enabled, but no supported browser binary was found on this host"
+        }
+      ]
+    }
+  },
+  "history": {
+    "ok": true,
+    "names": [
+      "agent.approve",
+      "agent.delegate",
+      "agent.moa",
+      "agent.plan",
+      "browser.check",
+      "browser.clear_marks",
+      "browser.click",
+      "browser.close",
+      "browser.download",
+      "browser.elements",
+      "browser.fill",
+      "browser.form",
+      "browser.form_fill",
+      "browser.form_submit",
+      "browser.inspect",
+      "browser.open",
+      "browser.press",
+      "browser.read",
+      "browser.select",
+      "browser.shot",
+      "browser.tabs",
+      "browser.upload",
+      "browser.verify",
+      "channel.send",
+      "computer.use",
+      "control.click_button",
+      "control.focus",
+      "control.inspect",
+      "control.list_windows",
+      "control.read",
+      "control.type",
+      "cursor.overlay",
+      "desktop.capture_window",
+      "desktop.open_notepad",
+      "exec.backends",
+      "exec.cancel",
+      "exec.logs",
+      "exec.start",
+      "exec.wait",
+      "flows.add",
+      "flows.enable",
+      "flows.list",
+      "flows.remove",
+      "flows.trigger",
+      "flows.webhook.recorded",
+      "fs.copy",
+      "fs.delete",
+      "fs.find",
+      "fs.grep",
+      "fs.list",
+      "fs.mkdir",
+      "fs.move",
+      "fs.patch",
+      "fs.read",
+      "fs.search",
+      "fs.stat",
+      "fs.tar",
+      "fs.write",
+      "github.research",
+      "github.verify",
+      "jobs.cv.set",
+      "jobs.cv.show",
+      "jobs.list",
+      "jobs.match",
+      "jobs.prepare",
+      "jobs.search",
+      "jobs.send",
+      "jobs.skip",
+      "jobs.start",
+      "lent.backup",
+      "lent.channel",
+      "lent.configure",
+      "lent.control",
+      "lent.guard",
+      "lent.memory",
+      "lent.moa",
+      "lent.provider",
+      "lent.routes",
+      "lent.schedule",
+      "lent.selftest",
+      "lent.skill",
+      "lent.status",
+      "lent.tools",
+      "lent.ui",
+      "ma.learn",
+      "ma.lessons",
+      "ma.verify_lesson",
+      "majin.adapter",
+      "majin.backup",
+      "majin.channel",
+      "majin.configure",
+      "majin.control",
+      "majin.dataset",
+      "majin.doctor",
+      "majin.guard",
+      "majin.heartbeat",
+      "majin.memory",
+      "majin.moa",
+      "majin.plugin",
+      "majin.provider",
+      "majin.routes",
+      "majin.schedule",
+      "majin.self_audit",
+      "majin.selftest",
+      "majin.skill",
+      "majin.status",
+      "majin.tools",
+      "majin.ui",
+      "marketing.analyze",
+      "marketing.channel_report",
+      "marketing.plan",
+      "marketing.status",
+      "media.generate_image",
+      "media.speak",
+      "memory.sync",
+      "memory_sync",
+      "mouse.move",
+      "net.dns",
+      "net.http",
+      "net.serve",
+      "net.serve_stop",
+      "net.tcp",
+      "power.apply",
+      "power.approve",
+      "power.propose",
+      "re.analyze",
+      "re.apk",
+      "re.diff",
+      "re.disasm",
+      "re.entropy",
+      "re.exports",
+      "re.extract",
+      "re.hash",
+      "re.hexdump",
+      "re.imports",
+      "re.iocs",
+      "re.modules",
+      "re.overlay",
+      "re.pcap",
+      "re.rules",
+      "re.search",
+      "re.sections",
+      "re.spec",
+      "re.strings",
+      "re.tool",
+      "re.tools",
+      "re.unpack",
+      "re.yara",
+      "read_file",
+      "research.run",
+      "reset.apply",
+      "reset.plan",
+      "screen.capture",
+      "screen.claim",
+      "shell.bg",
+      "shell.env",
+      "shell.jobs",
+      "shell.run",
+      "shell.stop",
+      "sys.fs_usage",
+      "sys.info",
+      "sys.notify",
+      "sys.ports",
+      "sys.procs_top",
+      "sys.ps",
+      "sys.services",
+      "team.manage",
+      "team.run",
+      "tools.search",
+      "trading.plan",
+      "trading.research",
+      "verify_now",
+      "web.download",
+      "web.fetch",
+      "web.search",
+      "write_file"
+    ],
+    "method": "unique `name:` declarations added in git history for tool source paths (lower bound)"
+  },
+  "tools": [
+    {
+      "name": "fs.list",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "read",
+      "description": "List a directory: names, sizes, dates. Use `kind` to get only executables or only folders.",
+      "parameters": [
+        "path"
+      ],
+      "openCodeAdapter": "fs_list",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.read",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "read",
+      "description": "Read a file. Returns numbered lines (or a hex dump for binary files) plus entropy and a file hash when it is binary.",
+      "parameters": [
+        "path",
+        "maxBytes",
+        "mode"
+      ],
+      "openCodeAdapter": "fs_read",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.write",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "write",
+      "description": "Write a file (missing folders are created). Overwrites — for small edits use fs.patch.",
+      "parameters": [
+        "path",
+        "content",
+        "append"
+      ],
+      "openCodeAdapter": "fs_write",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.patch",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "write",
+      "description": "Exact search/replace in a file. Simple, traceable, no fuzzy matching. Returns a diff.",
+      "parameters": [
+        "path",
+        "edits",
+        "dry"
+      ],
+      "openCodeAdapter": "fs_patch",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.search",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "read",
+      "description": "Regex search across files under a folder. Returns file:line:match. Use this before reading whole files.",
+      "parameters": [
+        "path",
+        "pattern",
+        "glob",
+        "ignoreCase",
+        "maxFiles",
+        "regex"
+      ],
+      "openCodeAdapter": "fs_search",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.grep",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "read",
+      "description": "Fast content search in ONE file (or every file under a folder) with context. Good for following flow in logs or source.",
+      "parameters": [
+        "path",
+        "pattern",
+        "context",
+        "limit"
+      ],
+      "openCodeAdapter": "fs_grep",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.move",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "write",
+      "description": "Move or rename a file/folder. Creates the target folders.",
+      "parameters": [
+        "from",
+        "to"
+      ],
+      "openCodeAdapter": "fs_move",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.copy",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "write",
+      "description": "Copy a file or folder (recursive).",
+      "parameters": [
+        "from",
+        "to",
+        "overwrite"
+      ],
+      "openCodeAdapter": "fs_copy",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.delete",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "destructive",
+      "description": "Delete a file or folder. Moves to the recycle bin where possible (Win/mac), otherwise permanent. Always goes through the guard.",
+      "parameters": [
+        "path",
+        "permanent"
+      ],
+      "openCodeAdapter": "fs_delete",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.find",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "read",
+      "description": "Find files by name under a folder, recursively. Use this to locate a document you only know the name or extension of (e.g. a CV or an invoice) before reading it. Matches the file name, not the content",
+      "parameters": [
+        "path",
+        "name",
+        "glob",
+        "maxResults",
+        "maxDepth",
+        "maxEntries"
+      ],
+      "openCodeAdapter": "fs_find",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.stat",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "read",
+      "description": "Metadata: size, dates, permissions, hash, entropy, file-type magic.",
+      "parameters": [
+        "path"
+      ],
+      "openCodeAdapter": "fs_stat",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.mkdir",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "write",
+      "description": "Create a folder (recursive).",
+      "parameters": [
+        "path"
+      ],
+      "openCodeAdapter": "fs_mkdir",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "fs.tar",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "files",
+      "risk": "write",
+      "description": "Pack or unpack with the system tar (built into Windows 10+). Use it to move a folder around or extract an archive.",
+      "parameters": [
+        "op",
+        "archive",
+        "path",
+        "cwd"
+      ],
+      "openCodeAdapter": "fs_tar",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "shell.run",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "shelltools",
+      "risk": "exec",
+      "description": "Run a command and wait. Everything is allowed — the guard only stops what is irreversible or destructive. cwd defaults to the workspace.",
+      "parameters": [
+        "command",
+        "cwd",
+        "timeoutSec",
+        "env"
+      ],
+      "openCodeAdapter": "shell_run",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "shell.bg",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "shelltools",
+      "risk": "exec",
+      "description": "Start a long-running job in the background and get an id. Use for servers, watchers, ghidra-headless, captures.",
+      "parameters": [
+        "command",
+        "name",
+        "cwd"
+      ],
+      "openCodeAdapter": "shell_bg",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "shell.jobs",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "shelltools",
+      "risk": "read",
+      "description": "List background jobs and their latest output. Use to follow servers and captures.",
+      "parameters": [
+        "id",
+        "tail"
+      ],
+      "openCodeAdapter": "shell_jobs",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "shell.stop",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "shelltools",
+      "risk": "exec",
+      "description": "Stop a background job (SIGTERM, then SIGKILL).",
+      "parameters": [
+        "id"
+      ],
+      "openCodeAdapter": "shell_stop",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "shell.env",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "shelltools",
+      "risk": "read",
+      "description": "Read environment variables and shell settings. Useful before building commands.",
+      "parameters": [
+        "name"
+      ],
+      "openCodeAdapter": "shell_env",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "sys.info",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "sys",
+      "risk": "read",
+      "description": "Machine status: OS, architecture, CPU, memory, home dir, workspace, node version.",
+      "parameters": [],
+      "openCodeAdapter": "sys_info",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "sys.ps",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "sys",
+      "risk": "read",
+      "description": "Process list (name, pid, memory, cpu). Filterable with a regex.",
+      "parameters": [
+        "filter",
+        "sortBy",
+        "limit"
+      ],
+      "openCodeAdapter": "sys_ps",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "sys.ports",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "sys",
+      "risk": "read",
+      "description": "Listening ports + pid. Use it to see what already runs (e.g. the MAJIN ui, frida, ollama).",
+      "parameters": [
+        "port"
+      ],
+      "openCodeAdapter": "sys_ports",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "sys.fs_usage",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "sys",
+      "risk": "read",
+      "description": "Disks and free space. Handy before unpacking something big.",
+      "parameters": [],
+      "openCodeAdapter": "sys_fs_usage",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "sys.procs_top",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "sys",
+      "risk": "read",
+      "description": "Quick top-N by CPU/memory with the command line — used to spot suspicious processes.",
+      "parameters": [
+        "n"
+      ],
+      "openCodeAdapter": "sys_procs_top",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "sys.services",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "sys",
+      "risk": "read",
+      "description": "Services/processes that start automatically — persistence check (RE and plain debugging).",
+      "parameters": [
+        "filter"
+      ],
+      "openCodeAdapter": "sys_services",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "net.dns",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "net",
+      "risk": "read",
+      "description": "Look up a domain (A/AAAA/TXT/CNAME/NS/MX). Used to follow IOCs found in a binary.",
+      "parameters": [
+        "host",
+        "type"
+      ],
+      "openCodeAdapter": "net_dns",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "net.tcp",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "net",
+      "risk": "read",
+      "description": "Probe a TCP port (open/closed) with a timeout. Only use it against things you own.",
+      "parameters": [
+        "host",
+        "port",
+        "timeoutMs"
+      ],
+      "openCodeAdapter": "net_tcp",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "net.http",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "net",
+      "risk": "exec",
+      "description": "Raw HTTP request (method, headers, body). Use for your own APIs and for testing a local web service.",
+      "parameters": [
+        "url",
+        "method",
+        "headers",
+        "body",
+        "maxChars"
+      ],
+      "openCodeAdapter": "net_http",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "net.serve",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "net",
+      "risk": "exec",
+      "description": "Start a temporary HTTP server that shares a folder (to pull samples into the sandbox). Returns the URL + job id.",
+      "parameters": [
+        "dir",
+        "port"
+      ],
+      "openCodeAdapter": "net_serve",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "net.serve_stop",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "net",
+      "risk": "exec",
+      "description": "Stop a temporary sharing server.",
+      "parameters": [
+        "port"
+      ],
+      "openCodeAdapter": "net_serve_stop",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "screen.capture",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "screen",
+      "risk": "read",
+      "description": "Take a screenshot (PNG). On Windows via .NET; needs no extra software.",
+      "parameters": [
+        "path",
+        "region",
+        "then"
+      ],
+      "openCodeAdapter": "screen_capture",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "screen.claim",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "screen",
+      "risk": "read",
+      "description": "Read what is in the clipboard (text/file). Handy after the user selected something in a binary.",
+      "parameters": [],
+      "openCodeAdapter": "screen_claim",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "sys.notify",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "screen",
+      "risk": "read",
+      "description": "Push a Windows toast notification or let MAJIN speak out loud. Use it when a long job finishes.",
+      "parameters": [
+        "title",
+        "body",
+        "speak"
+      ],
+      "openCodeAdapter": "sys_notify",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "web.search",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "web",
+      "risk": "read",
+      "description": "Search the web. No API key needed (duckduckgo/bing fallback). Returns title, url and snippet.",
+      "parameters": [
+        "query",
+        "count",
+        "engine"
+      ],
+      "openCodeAdapter": "web_search",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "web.fetch",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "web",
+      "risk": "read",
+      "description": "Read a URL with GET/HEAD as clean text (or json/raw). For POST/PUT/DELETE or other external actions use approval-gated net.http. Follows redirects, size-capped.",
+      "parameters": [
+        "url",
+        "extract",
+        "maxChars",
+        "method",
+        "headers"
+      ],
+      "openCodeAdapter": "web_fetch",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "web.download",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "web",
+      "risk": "write",
+      "description": "Download a file into the workspace (samples, archives, documents). Executables require an approval — an agent should not run something by accident.",
+      "parameters": [
+        "url",
+        "path",
+        "sha256"
+      ],
+      "openCodeAdapter": "web_download",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.open",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "read",
+      "description": "Open or navigate a real browser page using Playwright Core. Uses an isolated persistent MAJIN profile. By default tools never submit forms. The owner host can authorize writes to exact origins; a mode",
+      "parameters": [
+        "url",
+        "headless",
+        "executablePath"
+      ],
+      "openCodeAdapter": "browser_open",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.read",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "read",
+      "description": "Read visible text from the page (or one selector) — the actual words on the page, capped.",
+      "parameters": [
+        "selector",
+        "mode"
+      ],
+      "openCodeAdapter": "browser_read",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.click",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "write",
+      "description": "Click one page element selected by a Playwright CSS/text selector or by a Set-of-Marks ref from browser.inspect marks=true. Pass frame (iframe selector from browser.inspect) when the element lives ins",
+      "parameters": [
+        "selector",
+        "ref",
+        "index",
+        "frame"
+      ],
+      "openCodeAdapter": "browser_click",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.form",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "read",
+      "description": "Observe current form fields by live accessible labels/types, dropdown options, required/native validation, alert errors and submit/next buttons. Values stay hidden. Use before browser.form_fill and af",
+      "parameters": [],
+      "openCodeAdapter": "browser_form",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.form_fill",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "exec",
+      "description": "Set 1–12 previously observed form fields in order using exact labels or f-refs as keys in values. Text/select values are strings; checkboxes use true/false; file fields use workspace file paths. Reobs",
+      "parameters": [
+        "values"
+      ],
+      "openCodeAdapter": "browser_form_fill",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.form_submit",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "exec",
+      "description": "Click ONE previously observed next/review/submit button by its exact label or f-ref. Regrounds changed DOM, never automatically repeats submission. Returns current form, native/server errors and visib",
+      "parameters": [
+        "button"
+      ],
+      "openCodeAdapter": "browser_form_submit",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.fill",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "write",
+      "description": "Fill a text, email, number, date or textarea control by selector. Pass frame (iframe selector from browser.inspect) when the control lives inside an iframe. Values are not written to the action log. D",
+      "parameters": [
+        "selector",
+        "value",
+        "frame"
+      ],
+      "openCodeAdapter": "browser_fill",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.shot",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "read",
+      "description": "Capture a PNG screenshot of the current page into the workspace (default shots/shot-<time>.png). ifChanged=true reuses the previous file when the pixels are identical. The saved PNG is real visual evi",
+      "parameters": [
+        "path",
+        "ifChanged",
+        "fullPage"
+      ],
+      "openCodeAdapter": "browser_shot",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.upload",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "write",
+      "description": "Attach a local file to a file input. This only selects the file in the browser; it is not uploaded until the user submits, and submission is blocked.",
+      "parameters": [
+        "selector",
+        "filePath"
+      ],
+      "openCodeAdapter": "browser_upload",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.verify",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "read",
+      "description": "Verify a REAL post-action browser outcome on the current page: live URL (fragment, exact path, exact origin), title, unique visible element, element text, checkbox state, enabled state, or exact match",
+      "parameters": [
+        "selector",
+        "present",
+        "text",
+        "url",
+        "urlPath",
+        "urlOrigin",
+        "title",
+        "checked",
+        "enabled",
+        "count",
+        "waitMs",
+        "stableMs",
+        "frame"
+      ],
+      "openCodeAdapter": "browser_verify",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.elements",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "read",
+      "description": "W6 Set-of-Marks grounding: number every interactive element on the open page, draw the matching pink marks on screen, and return the references so browser.click({ref:\"eN\"}) hits deterministically inst",
+      "parameters": [
+        "refresh",
+        "query",
+        "delta",
+        "outline"
+      ],
+      "openCodeAdapter": "browser_elements",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.clear_marks",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "write",
+      "description": "Remove MAJIN Set-of-Marks overlays and data-majin-ref attributes from the current page (or from one iframe via frame) and forget the cached refs. This changes only MAJIN annotations; it does not alter",
+      "parameters": [
+        "frame"
+      ],
+      "openCodeAdapter": "browser_clear_marks",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.close",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "read",
+      "description": "Close the current Playwright browser session. The isolated persistent profile is kept for next time.",
+      "parameters": [],
+      "openCodeAdapter": "browser_close",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "media.generate_image",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "media-service",
+      "risk": "exec",
+      "description": "Generate one image using an OpenAI-compatible provider and save it in the workspace. Requires a configured provider/model that supports /images/generations; remote generation may cost money.",
+      "parameters": [
+        "model",
+        "prompt",
+        "path",
+        "size",
+        "quality"
+      ],
+      "openCodeAdapter": "media_generate_image",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "media.speak",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "media-service",
+      "risk": "exec",
+      "description": "Synthesize spoken audio from text with an OpenAI-compatible /audio/speech provider and save it locally. Requires a configured speech model; remote generation may cost money.",
+      "parameters": [
+        "model",
+        "text",
+        "path",
+        "voice",
+        "format",
+        "instructions"
+      ],
+      "openCodeAdapter": "media_speak",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.analyze",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Full triage of a binary: format, headers, sections+entropy, imports/exports, packers, YARA, IOC strings, opcode patterns, a risk score and suggested next steps. Start here.",
+      "parameters": [
+        "path",
+        "maxStrings",
+        "rules"
+      ],
+      "openCodeAdapter": "re_analyze",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.strings",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Extract strings (ascii + utf16) with offsets. Filter with a regex. Used to find URLs, paths, mutexes and important API names.",
+      "parameters": [
+        "path",
+        "min",
+        "filter",
+        "encoding",
+        "limit",
+        "classify"
+      ],
+      "openCodeAdapter": "re_strings",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.hexdump",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Hex dump at an offset. Used for headers, the overlay, packer signatures and raw comparison.",
+      "parameters": [
+        "path",
+        "offset",
+        "length"
+      ],
+      "openCodeAdapter": "re_hexdump",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.search",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Pattern hunt in bytes: \"4d 5a ?? (e8|eb)\" or a text string. Returns offset + context.",
+      "parameters": [
+        "path",
+        "pattern",
+        "max",
+        "context"
+      ],
+      "openCodeAdapter": "re_search",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.entropy",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Entropy profile per section + block. High entropy = packed or encrypted. Used to decide what to unpack.",
+      "parameters": [
+        "path",
+        "block",
+        "threshold"
+      ],
+      "openCodeAdapter": "re_entropy",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.sections",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Section table with flags, entropy and deviation (name/size/perm). The deviations are what to look at.",
+      "parameters": [
+        "path"
+      ],
+      "openCodeAdapter": "re_sections",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.imports",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Import tables (DLL → functions) with risk flags. Delay imports included.",
+      "parameters": [
+        "path",
+        "dll",
+        "flagged"
+      ],
+      "openCodeAdapter": "re_imports",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.exports",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Export table (for DLLs) + forwarded exports. Used to list hook and backend functions.",
+      "parameters": [
+        "path",
+        "limit"
+      ],
+      "openCodeAdapter": "re_exports",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.yara",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Run YARA rules with the built-in mini engine — no yara binary needed. Add your own rules in rules/majin.yar.",
+      "parameters": [
+        "path",
+        "ruleText",
+        "only"
+      ],
+      "openCodeAdapter": "re_yara",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.iocs",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Pull out and group IOCs (URLs, IPs, file paths, registry keys, mutexes, e-mail, GUIDs) and resolve domains when asked.",
+      "parameters": [
+        "path",
+        "resolve",
+        "save"
+      ],
+      "openCodeAdapter": "re_iocs",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.overlay",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Read (and optionally extract) the data after the last section — where packers and self-extractors hide.",
+      "parameters": [
+        "path",
+        "extract",
+        "maxPeek"
+      ],
+      "openCodeAdapter": "re_overlay",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.extract",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "write",
+      "description": "Extract ZIP/APK/asar entries or a PE resource into the workspace. Used to reach embedded content.",
+      "parameters": [
+        "path",
+        "entry",
+        "all",
+        "resourceType",
+        "out"
+      ],
+      "openCodeAdapter": "re_extract",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.apk",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Android package: permissions, components, DEX sizes, signer — no apktool needed.",
+      "parameters": [
+        "path"
+      ],
+      "openCodeAdapter": "re_apk",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.pcap",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Summarize a pcap/pcapng: hosts, ports, HTTP requests and DNS names. Used for C2 traffic from a sandbox run.",
+      "parameters": [
+        "path"
+      ],
+      "openCodeAdapter": "re_pcap",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.diff",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Compare two binaries (versions, variants, clean vs injected). Gives hash/import/string deltas plus a section diff.",
+      "parameters": [
+        "a",
+        "b",
+        "strings"
+      ],
+      "openCodeAdapter": "re_diff",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.modules",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Modules/DLLs loaded in a running process + unusual paths. Used to see injection or hooking live.",
+      "parameters": [
+        "process",
+        "filter"
+      ],
+      "openCodeAdapter": "re_modules",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.tool",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "exec",
+      "description": "Hook up external RE tools when you need real power: ghidra (decompile), rizin, objdump, binwalk, upx, yara, jadx, apktool, ilspycmd. Auto-detects what is installed.",
+      "parameters": [
+        "tool",
+        "path",
+        "commands",
+        "args",
+        "extract",
+        "out",
+        "timeoutSec"
+      ],
+      "openCodeAdapter": "re_tool",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.tools",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Which external RE tools exist and what is missing. The built-in parser needs nothing — this is for deeper work.",
+      "parameters": [
+        "refresh"
+      ],
+      "openCodeAdapter": "re_tools",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.disasm",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "Disassemble at an address/offset. Uses rizin/objdump when present — otherwise bytes + pattern analysis, never guesses.",
+      "parameters": [
+        "path",
+        "address",
+        "count",
+        "mode"
+      ],
+      "openCodeAdapter": "re_disasm",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.unpack",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "write",
+      "description": "Try to unpack known packers. UPX works directly; otherwise: entropy/section assessment + carving the overlay.",
+      "parameters": [
+        "path",
+        "out"
+      ],
+      "openCodeAdapter": "re_unpack",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.hash",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "MD5/SHA1/SHA256 + imphash for one or more files. Used to look up known samples.",
+      "parameters": [
+        "path",
+        "glob"
+      ],
+      "openCodeAdapter": "re_hash",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.spec",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "write",
+      "description": "Turn a finished investigation into SPEC.md: observable behaviour, inputs/outputs, formats, error handling and open questions — every claim carrying the file offset it came from, and everything not pro",
+      "parameters": [
+        "path",
+        "feature",
+        "report",
+        "max"
+      ],
+      "openCodeAdapter": "re_spec",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "re.rules",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "re",
+      "risk": "read",
+      "description": "List and save YARA rules in <home>/rules/majin.yar (MAJIN's own rule database).",
+      "parameters": [
+        "action",
+        "name",
+        "text"
+      ],
+      "openCodeAdapter": "re_rules",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.configure",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Change MAJIN own configuration (routes, moa, providers, channels, guard, agent, tools, ui, budget, persona). A validated JSON patch; an invalid patch is rejected with a reason. Use intent for natural ",
+      "parameters": [
+        "patch",
+        "intent",
+        "dry",
+        "note"
+      ],
+      "openCodeAdapter": "majin_configure",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.routes",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Model routing: show, set or test the jobs (chat, tasks, tools, code, re, research, plan, analysis, final, summarize, aggregator, router, vision).",
+      "parameters": [
+        "action",
+        "job",
+        "model",
+        "all",
+        "note"
+      ],
+      "openCodeAdapter": "majin_routes",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.provider",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Manage providers: list | add | remove | test | models (list available models from /models).",
+      "parameters": [
+        "action",
+        "name",
+        "preset",
+        "baseUrl",
+        "apiKey",
+        "env",
+        "models",
+        "kind"
+      ],
+      "openCodeAdapter": "majin_provider",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.moa",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Mixture-of-Agents: show | on | off | hard (only hard jobs) | set (references/aggregator/width). On by default.",
+      "parameters": [
+        "action",
+        "references",
+        "aggregator",
+        "width"
+      ],
+      "openCodeAdapter": "majin_moa",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.guard",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "The safety glass: status | mode(confirm|strict|off) | allow(tool) | disallow. The agent can NOT approve its own dangerous actions — a human always does that.",
+      "parameters": [
+        "action",
+        "mode",
+        "tool"
+      ],
+      "openCodeAdapter": "majin_guard",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.memory",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Long-term memory: remember(text) | recall(query) | forget(query) | list | clear. The agent stores preferences, projects and solutions here.",
+      "parameters": [
+        "action",
+        "text",
+        "query",
+        "tags"
+      ],
+      "openCodeAdapter": "majin_memory",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.skill",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Learned skills (markdown in data/skills): list | save | read | delete | match. A skill is how a kind of task is done, step by step.",
+      "parameters": [
+        "action",
+        "name",
+        "when",
+        "steps",
+        "tools",
+        "query",
+        "ok",
+        "why"
+      ],
+      "openCodeAdapter": "majin_skill",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.schedule",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Scheduled work: add | list | remove | run | pause | resume. Requests like \"every morning 07:30: do X and send it to telegram\" belong here.",
+      "parameters": [
+        "action",
+        "id",
+        "when",
+        "task",
+        "readOnly",
+        "deliver",
+        "model"
+      ],
+      "openCodeAdapter": "majin_schedule",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.channel",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Channels: status | telegram | whatsapp | send | pair. Sets bot keys, links devices and sends messages.",
+      "parameters": [
+        "action",
+        "token",
+        "transport",
+        "phoneNumberId",
+        "accessToken",
+        "verifyToken",
+        "to",
+        "text",
+        "channel",
+        "enable"
+      ],
+      "openCodeAdapter": "majin_channel",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.status",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "read",
+      "description": "Full status: config, routes, MOA, channels, external RE tools, budget, memory, skills, jobs, log path. Use it when the user asks \"how are you doing?\".",
+      "parameters": [
+        "verbose"
+      ],
+      "openCodeAdapter": "majin_status",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.doctor",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "read",
+      "description": "Health check, human style: every capability gets OK / why-not / how-to-fix. Use it when something feels off, before the user asks you to guess. No network calls — it reads config and reports, then poi",
+      "parameters": [],
+      "openCodeAdapter": "majin_doctor",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.selftest",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "read",
+      "description": "Diagnostics: provider keys, one real minimal call per provider, the tool registry, an RE check on its own binary, channel status, port, writability. Run this when something behaves oddly.",
+      "parameters": [
+        "level"
+      ],
+      "openCodeAdapter": "majin_selftest",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.tools",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "read",
+      "description": "List every tool with its description and risk level. All of them are always on — there is no off switch.",
+      "parameters": [
+        "group",
+        "describe"
+      ],
+      "openCodeAdapter": "majin_tools",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.backup",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Export/import everything MAJIN knows (config, memory, skills, schedules) as a tar.gz in workspace/backups.",
+      "parameters": [
+        "action",
+        "file"
+      ],
+      "openCodeAdapter": "majin_backup",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.ui",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "read",
+      "description": "Open the UI: on Windows a dedicated Edge/Chrome app window. action=open | theme | voice.",
+      "parameters": [
+        "action",
+        "theme",
+        "voice",
+        "wake"
+      ],
+      "openCodeAdapter": "majin_ui",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.control",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Control the agent itself: restart | stop | pause | resume | clear (session) | sessions | history.",
+      "parameters": [
+        "action",
+        "session",
+        "limit"
+      ],
+      "openCodeAdapter": "majin_control",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.dataset",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Local trajectory recording used to make MAJIN better. OFF by default, redacted on write, stored next to the config, and never uploaded — exporting is a deliberate command you run.",
+      "parameters": [
+        "action",
+        "query",
+        "score",
+        "id",
+        "before",
+        "clean",
+        "limit"
+      ],
+      "openCodeAdapter": "majin_dataset",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.adapter",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "Safe external adapters (Del 7B): validate | create | list | remove. An adapter is a DECLARATIVE http-json descriptor (no code, https only, permission class read | external-write | external-post); an i",
+      "parameters": [
+        "action",
+        "spec",
+        "name",
+        "params",
+        "approved"
+      ],
+      "openCodeAdapter": "majin_adapter",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.plugin",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "exec",
+      "description": "Create, list, reload or remove custom MAJIN tools. A created JavaScript plugin runs with MAJIN process privileges, is hash-checked at startup and every invocation requires exec approval in normal guar",
+      "parameters": [
+        "action",
+        "name",
+        "description",
+        "params",
+        "code"
+      ],
+      "openCodeAdapter": "majin_plugin",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "agent.plan",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "agent-service",
+      "risk": "read",
+      "description": "Write and update the visible work list for the session. Use it for more than 3 steps; the UI shows it live.",
+      "parameters": [
+        "items",
+        "mode",
+        "note"
+      ],
+      "openCodeAdapter": "agent_plan",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "agent.delegate",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "agent-service",
+      "risk": "read",
+      "description": "Send a sub-problem to a subagent with its own step budget (it sees your tools but not your history). Use it for parallel digging — e.g. \"analyse these 3 files\".",
+      "parameters": [
+        "tasks",
+        "parallel"
+      ],
+      "openCodeAdapter": "agent_delegate",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "agent.moa",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "agent-service",
+      "risk": "read",
+      "description": "Run an extra Mixture-of-Agents round on a sub-problem (several models in parallel + an aggregator). Use for hard decisions, not for everything.",
+      "parameters": [
+        "question",
+        "context",
+        "width"
+      ],
+      "openCodeAdapter": "agent_moa",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "agent.approve",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "agent-service",
+      "risk": "read",
+      "description": "Answer a pending confirmation in the UI (approve/deny). Only when the user explicitly told you to.",
+      "parameters": [
+        "id",
+        "approved",
+        "note"
+      ],
+      "openCodeAdapter": "agent_approve",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "jobs.search",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "jobs",
+      "risk": "read",
+      "description": "Search job sites (Platsbanken/SE for now) for candidates. NEW jobs enter the pipeline as \"found\" — already-seen jobs are counted, not re-shown. Returns titles/companies/deadlines/URLs + the fp you nee",
+      "parameters": [
+        "query",
+        "limit",
+        "includeSeen"
+      ],
+      "openCodeAdapter": "jobs_search",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "jobs.match",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "jobs",
+      "risk": "read",
+      "description": "Score every pipeline application with status \"found\" against the saved CV; those at/above minScore move to \"matched\" with the match report attached as evidence. Needs a CV (jobs.cv.set first).",
+      "parameters": [
+        "minScore"
+      ],
+      "openCodeAdapter": "jobs_match",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "jobs.list",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "jobs",
+      "risk": "read",
+      "description": "Show the application pipeline grouped by status (found/matched/started/waiting/submitted/failed/skipped) with counts — your proof that each submission happened lives in each entry's history.",
+      "parameters": [
+        "status"
+      ],
+      "openCodeAdapter": "jobs_list",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "jobs.start",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "jobs",
+      "risk": "write",
+      "description": "Mark an application as started (you — or a follow-up task — are working on it). fp comes from jobs.search / jobs.list.",
+      "parameters": [
+        "fp",
+        "note"
+      ],
+      "openCodeAdapter": "jobs_start",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "jobs.skip",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "jobs",
+      "risk": "write",
+      "description": "Mark an application as skipped (you decided not to pursue it). Skipped jobs never reappear in searches.",
+      "parameters": [
+        "fp",
+        "why"
+      ],
+      "openCodeAdapter": "jobs_skip",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "jobs.cv.set",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "jobs",
+      "risk": "write",
+      "description": "Save your CV (plain text) so jobs.match can score jobs against it. Give the text directly or a workspace file ({file: \"cv.txt\"}). Stored inside MAJIN_HOME — never uploaded anywhere.",
+      "parameters": [
+        "text",
+        "file"
+      ],
+      "openCodeAdapter": "jobs_cv_set",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "jobs.cv.show",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "jobs",
+      "risk": "read",
+      "description": "Show the saved CV summary: length, recognized skills, when it was saved. (The full text is yours — ask and it answers with the whole thing.)",
+      "parameters": [
+        "full"
+      ],
+      "openCodeAdapter": "jobs_cv_show",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "jobs.prepare",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "jobs",
+      "risk": "exec",
+      "description": "Open a job application form in your task’s own browser, fill every field we can honestly map (contact details from the CV + any answers you pass, the CV file itself), and move the application to \"wait",
+      "parameters": [
+        "fp",
+        "name",
+        "email",
+        "phone",
+        "city",
+        "linkedin",
+        "github",
+        "website",
+        "coverLetter",
+        "headless"
+      ],
+      "openCodeAdapter": "jobs_prepare",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "jobs.send",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "jobs",
+      "risk": "destructive",
+      "description": "SUBMIT a prepared application (status \"waiting\"). This is the real thing: it clicks the form’s submit control and then DEMANDS proof — confirmation words on the result page, saved screenshot, url. No ",
+      "parameters": [
+        "fp"
+      ],
+      "openCodeAdapter": "jobs_send",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "marketing.channel_report",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "marketing",
+      "risk": "read",
+      "description": "Fetch live campaign-level spend/click/impression reports from TikTok Ads or Google Ads using authorized locally configured platform-specific credentials. READ ONLY, NEVER changes ads. Distinguishes Go",
+      "parameters": [
+        "platform"
+      ],
+      "openCodeAdapter": "marketing_channel_report",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": "owner-configured external service and credentials"
+    },
+    {
+      "name": "marketing.plan",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "marketing",
+      "risk": "read",
+      "description": "Plan affordable store marketing from the TOTAL cash budget (even 50 SEK), without ads API keys or extra LLM calls. Computes order break-even math and a concrete organic-first 7-day launch plan with re",
+      "parameters": [
+        "site",
+        "totalBudget",
+        "currency",
+        "product",
+        "trackingReady",
+        "reportedPastOrders",
+        "historicalCpa"
+      ],
+      "openCodeAdapter": "marketing_plan",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": "owner-configured external service and credentials"
+    },
+    {
+      "name": "marketing.status",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "marketing",
+      "risk": "read",
+      "description": "Show whether Meta Ads marketing is connected and whether product economics are configured, without exposing any access tokens. No network calls.",
+      "parameters": [],
+      "openCodeAdapter": "marketing_status",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": "owner-configured external service and credentials"
+    },
+    {
+      "name": "marketing.analyze",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "marketing",
+      "risk": "read",
+      "description": "Fetch live last-7-day Meta Ads Insights and compute conservative, margin-aware recommendations. Reports CPA, estimated contribution, sample uncertainty and spend versus the advisory daily cap. Does no",
+      "parameters": [],
+      "openCodeAdapter": "marketing_analyze",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": "owner-configured external service and credentials"
+    },
+    {
+      "name": "github.verify",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "github",
+      "risk": "exec",
+      "description": "Self-extension quality gate: on a dedicated MAJIN Git feature branch, verify source checkout and optionally RUN REAL parse, localization and Node test suites with timeouts. Never automatically install",
+      "parameters": [
+        "dir",
+        "runTests"
+      ],
+      "openCodeAdapter": "github_verify",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": "owner-configured external service and credentials"
+    },
+    {
+      "name": "github.research",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "github",
+      "risk": "read",
+      "description": "Search public GitHub repositories (action search), inspect repository metadata/README (inspect) or prepare a deterministic integration safety/architecture plan (integration). Before self-extending a M",
+      "parameters": [
+        "action",
+        "query",
+        "repo",
+        "limit"
+      ],
+      "openCodeAdapter": "github_research",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": "owner-configured external service and credentials"
+    },
+    {
+      "name": "trading.plan",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "trading",
+      "risk": "read",
+      "description": "For \"I have $50/$100 to trade\" compute a conservative hypothetical cash allocation in the stated currency. No assumed live quote, broker, or fees. Ask for the asset and missing evidence; always abstai",
+      "parameters": [
+        "budget",
+        "currency",
+        "symbol",
+        "price",
+        "feePerOrder",
+        "allowFractional"
+      ],
+      "openCodeAdapter": "trading_plan",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": "owner-configured external service and credentials"
+    },
+    {
+      "name": "trading.research",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "trading",
+      "risk": "read",
+      "description": "ONLY when user requests deep analysis on a specific stock/crypto ticker: use genuine optional installed TauricResearch/TradingAgents (Apache-2.0) with existing MAJIN tools model and market data. Bound",
+      "parameters": [
+        "symbol",
+        "budget",
+        "currency",
+        "date"
+      ],
+      "openCodeAdapter": "trading_research",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": "owner-configured external service and credentials"
+    },
+    {
+      "name": "tools.search",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "meta",
+      "risk": "read",
+      "description": "find the right capability before guessing a tool name — deterministic zero-LLM search over every registered tool: give it a plain-words goal, get back the matching tools with their side-effect class a",
+      "parameters": [
+        "q",
+        "limit"
+      ],
+      "openCodeAdapter": "tools_search",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "control.focus",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "desktop",
+      "risk": "exec",
+      "description": "Focus a specific observed hwnd:<number> or unique window title; verify foreground handle.",
+      "parameters": [
+        "window"
+      ],
+      "openCodeAdapter": "control_focus",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "control.inspect",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "desktop",
+      "risk": "read",
+      "description": "Inspect actual Win32 child classes and text in an observed window.",
+      "parameters": [
+        "window"
+      ],
+      "openCodeAdapter": "control_inspect",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "mouse.move",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "desktop",
+      "risk": "exec",
+      "description": "Move the ACTUAL Windows system mouse pointer to specified screen coordinates and verify its position. Requires a real interactive desktop. Does not click, and is separate from cursor.overlay.",
+      "parameters": [
+        "x",
+        "y"
+      ],
+      "openCodeAdapter": "mouse_move",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "control.list_windows",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "desktop",
+      "risk": "read",
+      "description": "List the REAL top-level windows on this machine (title + class). Negative-control-verified lane; Windows-only.",
+      "parameters": [],
+      "openCodeAdapter": "control_list_windows",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "control.type",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "desktop",
+      "risk": "exec",
+      "description": "Write text into the Edit field of a REAL window (title substring) and VERIFY by reading it back. Claim = measured round-trip, never optimism. Windows-only.",
+      "parameters": [
+        "window",
+        "text"
+      ],
+      "openCodeAdapter": "control_type",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "control.read",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "desktop",
+      "risk": "read",
+      "description": "Read the current text of a REAL window's Edit field (title substring). Windows-only.",
+      "parameters": [
+        "window"
+      ],
+      "openCodeAdapter": "control_read",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "control.click_button",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "desktop",
+      "risk": "exec",
+      "description": "Click a button by caption in a REAL window via BM_CLICK (e.g. \"OK\" in the Run dialog). Windows-only.",
+      "parameters": [
+        "window",
+        "caption"
+      ],
+      "openCodeAdapter": "control_click_button",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "research.run",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "research",
+      "risk": "read",
+      "description": "Run a full research pipeline (PLAN → SEARCH → FETCH → EXTRACT → CROSS-CHECK → SYNTHESIZE → VERIFY) with a source ledger and contradiction flags. Returns the report markdown plus artifact paths. Never ",
+      "parameters": [
+        "question",
+        "maxSources",
+        "offline"
+      ],
+      "openCodeAdapter": "research_run",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "exec.backends",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "shell",
+      "risk": "read",
+      "description": "List which execution backends (local/docker/ssh) are actually available on this machine — measured, not promised.",
+      "parameters": [],
+      "openCodeAdapter": "exec_backends",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "exec.start",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "shell",
+      "risk": "exec",
+      "description": "Start a job on an explicitly chosen backend (local | docker | ssh). Never falls back to a different backend silently: if docker/ssh is unavailable the job refuses with an error code. Supports timeout ",
+      "parameters": [
+        "backend",
+        "command",
+        "cwd",
+        "timeoutSec",
+        "image",
+        "sshHost",
+        "sshUser",
+        "sshPort"
+      ],
+      "openCodeAdapter": "exec_start",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "exec.wait",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "shell",
+      "risk": "exec",
+      "description": "Wait for a running job (by exec.start id) to finish; returns exit code, duration and truncated output (full streams live in the artifacts dir).",
+      "parameters": [
+        "id"
+      ],
+      "openCodeAdapter": "exec_wait",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "exec.cancel",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "shell",
+      "risk": "exec",
+      "description": "Cancel a running job (SIGTERM then SIGKILL after grace). Cancellation is an act, not a guess: returns who cancelled and when.",
+      "parameters": [
+        "id",
+        "reason"
+      ],
+      "openCodeAdapter": "exec_cancel",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "exec.logs",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "shell",
+      "risk": "read",
+      "description": "Read persisted logs for a job id from the exec artifact dir (works also for finished jobs while on disk).",
+      "parameters": [
+        "id",
+        "stream"
+      ],
+      "openCodeAdapter": "exec_logs",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "flows.add",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "flows",
+      "risk": "exec",
+      "description": "Register a durable event flow: when (trigger spec) + then (action tool with args template). The action runs through the SAME approval guard as interactive turns. Supported triggers: schedule (reuse sc",
+      "parameters": [
+        "name",
+        "when",
+        "then",
+        "maxFiresPerHour",
+        "requireApproval"
+      ],
+      "openCodeAdapter": "flows_add",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "flows.list",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "flows",
+      "risk": "read",
+      "description": "List registered flows with enabled state, last status and fire count — measured from state.json on disk.",
+      "parameters": [],
+      "openCodeAdapter": "flows_list",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "flows.enable",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "flows",
+      "risk": "write",
+      "description": "Enable or disable an existing flow by id — state change persisted.",
+      "parameters": [
+        "id",
+        "enabled"
+      ],
+      "openCodeAdapter": "flows_enable",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "flows.remove",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "flows",
+      "risk": "write",
+      "description": "Remove a flow; state dir stays on disk (audit trail) but the runtime stops reacting.",
+      "parameters": [
+        "id"
+      ],
+      "openCodeAdapter": "flows_remove",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "flows.trigger",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "flows",
+      "risk": "exec",
+      "description": "Fire a flow manually (when.type=manual flows, or used by the webhook route /api/flows/hook/<id>). Event context becomes {{.*}} bindings.",
+      "parameters": [
+        "id",
+        "payload"
+      ],
+      "openCodeAdapter": "flows_trigger",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "flows.webhook.recorded",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "flows",
+      "risk": "write",
+      "description": "Server-route helper: record a webhook event for a flow (same dedupe/rate-limit semantics as manual fire).",
+      "parameters": [
+        "id",
+        "payload"
+      ],
+      "openCodeAdapter": "flows_webhook_recorded",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "channel.send",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "channels",
+      "risk": "exec",
+      "description": "Send a message to a configured outbound channel (discord/slack/matrix/email/webhook). Missing credentials NEVER pretend: you get a not_configured diagnosis instead. Configure under channels.<name>.* i",
+      "parameters": [
+        "channel",
+        "to",
+        "url",
+        "subject",
+        "text",
+        "embeds",
+        "blocks",
+        "dryRun"
+      ],
+      "openCodeAdapter": "channel_send",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": "owner-configured external service and credentials"
+    },
+    {
+      "name": "majin.heartbeat",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "majin-service",
+      "risk": "write",
+      "description": "W9 heartbeat: status/enable/disable/tick (force a digest of accumulated real events)/test (dry-run the alert text exactly as it would be sent). Only real bus events alert; missing channels never prete",
+      "parameters": [
+        "action",
+        "event"
+      ],
+      "openCodeAdapter": "majin_heartbeat",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "computer.use",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "computer",
+      "risk": "exec",
+      "description": "Drive the REAL desktop toward a goal: OBSERVE → PLAN → ACT → VERIFY → RECOVER. Acting lane = existing control.* Win32 tools (+screen.capture). Success requires verification, never click-ok. Evidence: ",
+      "parameters": [
+        "goal",
+        "maxSteps",
+        "modelCallsOff"
+      ],
+      "openCodeAdapter": "computer_use",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "cursor.overlay",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "computer",
+      "risk": "exec",
+      "description": "Pink cursor overlay: move/label/show/hide/quit the REAL desktop overlay (Windows interactive session only, honest FORBIDDEN elsewhere).",
+      "parameters": [
+        "op",
+        "x",
+        "y",
+        "label"
+      ],
+      "openCodeAdapter": "cursor_overlay",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "reset.plan",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "host-service",
+      "risk": "read",
+      "description": "W11 safe recovery, step 1 (dry-run): measure recoverable artifacts (dead exec runs, temp spill, stale flow/heartbeat logs) WITHOUT touching anything. Returns per-kind counts, KB, and a confirm token t",
+      "parameters": [
+        "types"
+      ],
+      "openCodeAdapter": "reset_plan",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "reset.apply",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "host-service",
+      "risk": "exec",
+      "description": "W11 safe recovery, step 2: apply EXACTLY the files measured by your last reset.plan, identified by its token. fs drift between plan and apply aborts with an honest error instead of blindly deleting. L",
+      "parameters": [
+        "confirmToken"
+      ],
+      "openCodeAdapter": "reset_apply",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "majin.self_audit",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "sys",
+      "risk": "read",
+      "description": "W14 self-audit: MAJIN interrogates its own honesty — rules: unsupported claims in shipped source, mock-mode rows in REAL sessions, unfinished TODO/FIXME/HACK markers, status-doc drift, recovery readin",
+      "parameters": [
+        "scope",
+        "includeRecovery"
+      ],
+      "openCodeAdapter": "majin_self_audit",
+      "executableOnHost": false,
+      "unavailableReason": "Tool is missing from the loaded lane export on this build",
+      "credentialBoundary": null
+    },
+    {
+      "name": "memory.sync",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "memory-service",
+      "risk": "write",
+      "description": "W9 bidirectional memory sync between this MAJIN and another store dir (server MAJIN_HOME, shared drive, backup). Two-way delta exchange with tombstone-respect; dryRun measures without writing a byte.",
+      "parameters": [
+        "target",
+        "dryRun"
+      ],
+      "openCodeAdapter": "memory_sync",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "ma.learn",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "learn",
+      "risk": "write",
+      "description": "W10 learning-loop: record a MEASURED failure as a durable lesson. Same trigger re-recorded AFTER it was verified = the proof did not hold → lesson auto-DEMOTED (honest, loud). Verify later with ma.ver",
+      "parameters": [
+        "trigger",
+        "lesson",
+        "fix",
+        "source"
+      ],
+      "openCodeAdapter": "ma_learn",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "ma.verify_lesson",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "learn",
+      "risk": "write",
+      "description": "Mark a lesson VERIFIED — only against a concrete proof string (command + result, test name + outcome, observed behaviour). Minimum 20 chars; a bald \"fixed\" is refused by design.",
+      "parameters": [
+        "id",
+        "proof"
+      ],
+      "openCodeAdapter": "ma_verify_lesson",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "ma.lessons",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "learn",
+      "risk": "read",
+      "description": "List durable lessons + loop stats. Open items (unverified/regressed) reported FIRST — the loop exists to close them, not to celebrate the done pile.",
+      "parameters": [
+        "status"
+      ],
+      "openCodeAdapter": "ma_lessons",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "team.manage",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "agent-service",
+      "risk": "write",
+      "description": "W4 standing teams: handle roster (persistent identity per member), shared blackboard memory, and team/run status. Identity = stable member.id with role/instructions/tools-allowlist (pattern: openai/sw",
+      "parameters": [
+        "action",
+        "team",
+        "id",
+        "role",
+        "instructions",
+        "tools",
+        "maxSteps",
+        "key",
+        "value",
+        "limit"
+      ],
+      "openCodeAdapter": "team_manage",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "team.run",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "agent-service",
+      "risk": "exec",
+      "description": "W4: run a goal-graph against a standing team. goals = JSON array [{id, member, input, deps?, estMs?}]; each goal is owned by ONE member id from the roster. Enforces a global step budget LOUDLY (never ",
+      "parameters": [
+        "team",
+        "goals",
+        "cap",
+        "teamStepCap",
+        "runId",
+        "resumeRunId"
+      ],
+      "openCodeAdapter": "team_run",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "power.propose",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "power",
+      "risk": "write",
+      "description": "W6 DISCOVER+PROPOSE: read upstream agent definitions (openai/swarm python Agent-literals or crewAI agents.yaml) from a source file, and produce a dry transfer plan (validated candidates → team roster ",
+      "parameters": [
+        "pattern",
+        "file",
+        "sourceRepo",
+        "sourceRef",
+        "license",
+        "team"
+      ],
+      "openCodeAdapter": "power_propose",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "power.approve",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "power",
+      "risk": "write",
+      "description": "W6 APPROVE: record the human approval gesture for a plan in the ledger. Copyleft/unknown-license plans REQUIRE acceptCopyleftRisk:\"true\" — legal risk is a gate, never an afterthought.",
+      "parameters": [
+        "planHash",
+        "acceptCopyleftRisk",
+        "sourceLicense"
+      ],
+      "openCodeAdapter": "power_approve",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "power.apply",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "power",
+      "risk": "exec",
+      "description": "W6 INSTALL+VERIFY: apply an APPROVED plan into the target team (idempotent roster upserts with provenance in instructions + ledger action log), then READ BACK the roster and proof every id. Without ap",
+      "parameters": [
+        "planHash",
+        "team",
+        "membersJson",
+        "sourceRepo",
+        "sourceRef",
+        "sourceLicense"
+      ],
+      "openCodeAdapter": "power_apply",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.inspect",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "read",
+      "description": "Inspect the current page: title, URL, visible text, form controls (labels, selectors, selected/checked state) and the page iframes (selector + src) so frame-scoped tools can target them. Password and ",
+      "parameters": [
+        "maxChars",
+        "marks",
+        "frame"
+      ],
+      "openCodeAdapter": "browser_inspect",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.check",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "write",
+      "description": "Check or uncheck one checkbox/radio input by selector. For radio groups use the exact option selector; no form submission occurs. Pass frame when the input lives inside an iframe.",
+      "parameters": [
+        "selector",
+        "checked",
+        "frame"
+      ],
+      "openCodeAdapter": "browser_check",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.select",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "write",
+      "description": "Choose an option in a <select> element by its value. Does not submit the form. Pass frame when the select lives inside an iframe.",
+      "parameters": [
+        "selector",
+        "value",
+        "frame"
+      ],
+      "openCodeAdapter": "browser_select",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.press",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "write",
+      "description": "Press a keyboard key on the selected element. Enter that would submit a form is intercepted; non-GET requests remain blocked.",
+      "parameters": [
+        "selector",
+        "key"
+      ],
+      "openCodeAdapter": "browser_press",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.download",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "write",
+      "description": "Click one element (selector or Set-of-Marks ref) that starts a file download and save the downloaded bytes into the workspace. Returns the saved path, byte count and sha256 so the result can be proven",
+      "parameters": [
+        "selector",
+        "ref",
+        "path",
+        "timeoutMs",
+        "frame"
+      ],
+      "openCodeAdapter": "browser_download",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "browser.tabs",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "browser",
+      "risk": "write",
+      "description": "List, switch or close tabs in the current browser session. Links that open a new tab do not move the active page by themselves: list tabs, then switch to the index whose URL/title matches the page you",
+      "parameters": [
+        "action",
+        "index"
+      ],
+      "openCodeAdapter": "browser_tabs",
+      "executableOnHost": true,
+      "unavailableReason": null,
+      "credentialBoundary": null
+    },
+    {
+      "name": "desktop.open_notepad",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "desktop",
+      "risk": "exec",
+      "description": "Open a new Windows Notepad window. Does not type or verify document contents.",
+      "parameters": [],
+      "openCodeAdapter": "desktop_open_notepad",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    },
+    {
+      "name": "desktop.capture_window",
+      "source": "V1 registry (src/core/tools)",
+      "lane": "desktop",
+      "risk": "read",
+      "description": "Capture an observed HWND using Windows PrintWindow. Returns PNG; caller must inspect pixels, including for blank capture.",
+      "parameters": [
+        "hwnd",
+        "path"
+      ],
+      "openCodeAdapter": "desktop_capture_window",
+      "executableOnHost": false,
+      "unavailableReason": "Windows-only (this host is linux)",
+      "credentialBoundary": null
+    }
+  ],
+  "v2Tools": [
+    {
+      "name": "read_file",
+      "tier": "read",
+      "description": "read a small file inside the workspace root"
+    },
+    {
+      "name": "write_file",
+      "tier": "write",
+      "description": "write a small text file inside the workspace root"
+    },
+    {
+      "name": "verify_now",
+      "tier": "read",
+      "description": "run a V2 verifier kind (file/json/http/pixel/dom/memory) on a spec"
+    }
+  ],
+  "mcpTools": [
+    {
+      "name": "majin_status",
+      "source": "V6 MCP",
+      "description": "Read the actual MAJIN bridge status, owner grants and available tool count. Performs no action."
+    },
+    {
+      "name": "majin_tools_search",
+      "source": "V6 MCP",
+      "description": "Search the real owner-authorized MAJIN tool catalog. This is not a capability wish-list. Follow with majin_tool_schema, then majin_tool_call."
+    },
+    {
+      "name": "majin_tool_schema",
+      "source": "V6 MCP",
+      "description": "Read the exact inputSchema for one authorized MAJIN tool. Does not execute it."
+    },
+    {
+      "name": "majin_tool_call",
+      "source": "V6 MCP",
+      "description": "Execute one owner-authorized MAJIN tool through the existing persistent driver. Read its schema first. Supply a stable operationId; reuse it only for identical arguments. Never invent a new ID to retr"
+    },
+    {
+      "name": "v6_status",
+      "source": "V6 MCP",
+      "description": "Read the real persisted V6 work state: queue counts, worker health, recent task events and checks. No action is performed."
+    },
+    {
+      "name": "v6_queue_add",
+      "source": "V6 MCP",
+      "description": "Queue a bounded background task. Use kind \"tool\" with payload {tool, arguments} for a MAJIN tool, or \"job.discover\"/\"job.evaluate\"/\"gmail.verify\". Deduplicate with a stable dedupeKey."
+    },
+    {
+      "name": "v6_queue_list",
+      "source": "V6 MCP",
+      "description": "List durable tasks, optionally filtered by state or kind."
+    },
+    {
+      "name": "v6_task_get",
+      "source": "V6 MCP",
+      "description": "Read one task including attempts, progress, lease and last error. Use this instead of guessing why work stopped."
+    },
+    {
+      "name": "v6_task_cancel",
+      "source": "V6 MCP",
+      "description": "Cancel queued or retryable work. A running task is cancelled at the next safe point; an uncertain external effect is never replayed by cancelling."
+    },
+    {
+      "name": "v6_work_start",
+      "source": "V6 MCP",
+      "description": "Start a detached, bounded V6 worker process that continues queued work without another chat turn. Requires explicit task and runtime budgets."
+    },
+    {
+      "name": "v6_work_stop",
+      "source": "V6 MCP",
+      "description": "Ask running V6 workers to stop after their current task by writing the STOP marker. Does not fabricate a completion."
+    }
+  ],
+  "lanes": {
+    "desktop": {
+      "available": false,
+      "tools": 0,
+      "reason": "Windows-only (this host is linux)"
+    },
+    "computer": {
+      "available": false,
+      "tools": 0,
+      "reason": "Windows-only (this host is linux)"
+    },
+    "screen": {
+      "available": false,
+      "tools": 0,
+      "reason": "Windows-only (this host is linux)"
+    },
+    "net": {
+      "available": true,
+      "tools": 5,
+      "reason": null
+    },
+    "files": {
+      "available": true,
+      "tools": 13,
+      "reason": null
+    },
+    "shell": {
+      "available": true,
+      "tools": 5,
+      "reason": null
+    },
+    "shelltools": {
+      "available": true,
+      "tools": 5,
+      "reason": null
+    },
+    "sys": {
+      "available": true,
+      "tools": 6,
+      "reason": null
+    },
+    "power": {
+      "available": true,
+      "tools": 3,
+      "reason": null
+    },
+    "web": {
+      "available": true,
+      "tools": 16,
+      "reason": null
+    },
+    "research": {
+      "available": true,
+      "tools": 1,
+      "reason": null
+    },
+    "jobs": {
+      "available": true,
+      "tools": 9,
+      "reason": null
+    },
+    "flows": {
+      "available": true,
+      "tools": 6,
+      "reason": null
+    },
+    "github": {
+      "available": true,
+      "tools": 2,
+      "reason": null
+    },
+    "channels": {
+      "available": true,
+      "tools": 1,
+      "reason": null
+    },
+    "audit": {
+      "available": true,
+      "tools": 1,
+      "reason": null
+    },
+    "learn": {
+      "available": true,
+      "tools": 3,
+      "reason": null
+    },
+    "marketing": {
+      "available": true,
+      "tools": 4,
+      "reason": null
+    },
+    "re": {
+      "available": true,
+      "tools": 23,
+      "reason": null
+    },
+    "trading": {
+      "available": true,
+      "tools": 2,
+      "reason": null
+    }
+  },
+  "notes": [
+    "A registered tool is not proof of a working integration.",
+    "deep mode reflects this host at this moment; Windows-only tools are unavailable on non-Windows hosts.",
+    "Credential boundaries are marked by lane; no credentials are inspected.",
+    "Historical counts are unique declarations found in git history, not runtime registrations.",
+    "No Windows acceptance has been performed from this environment."
+  ]
+}

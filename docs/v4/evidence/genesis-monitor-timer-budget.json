@@ -1,0 +1,52 @@
+{
+  "at": "2026-10-23T23:27:59.114Z",
+  "sourceCommit": "e45640a5a5e0de2688e4321c713908a62d231d0d",
+  "kind": "real-monitor-timer-budget-followup",
+  "taskId": "j-fee6f474-777a-42f1-a7c2-9f30bd1757bd",
+  "checks": {
+    "threeScheduledRuns": true,
+    "distinctRuns": true,
+    "allCompleted": true,
+    "exhaustedPaused": true,
+    "singleAlert": true
+  },
+  "task": {
+    "runCount": 3,
+    "maxRuns": 3,
+    "paused": true,
+    "history": [
+      {
+        "runId": "2cfc5f53-69bd-4610-89e1-afd0d47ebf58",
+        "at": "2026-10-23T23:25:27.022Z",
+        "status": "completed",
+        "summary": "Source checked; condition matched."
+      },
+      {
+        "runId": "85c74dbb-8e98-4dc9-946a-826bce7e7a88",
+        "at": "2026-10-23T23:26:27.355Z",
+        "status": "completed",
+        "summary": "Source checked; condition matched."
+      },
+      {
+        "runId": "06abe864-13f2-4721-bfec-71cd22279f5c",
+        "at": "2026-10-23T23:27:27.801Z",
+        "status": "completed",
+        "summary": "Source checked; condition matched."
+      }
+    ],
+    "observation": {
+      "actual": 1263,
+      "matched": true,
+      "sequence": 1,
+      "at": "2026-10-23T23:27:27.672Z"
+    }
+  },
+  "alertStatus": [
+    "no_subscribed_devices"
+  ],
+  "subscribedDevices": 0,
+  "physicalReceipt": false,
+  "hostRestartVerified": false,
+  "blockedAction": "Automatic review rejected the planned source-child restart: blocked by policy. No restart attempted by another route.",
+  "passed": true
+}

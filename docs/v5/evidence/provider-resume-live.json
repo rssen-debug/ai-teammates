@@ -1,0 +1,17 @@
+{
+  "kind": "live-selected-provider-checkpoint-test",
+  "date": "2026-10-25",
+  "platform": "win32",
+  "node": "24.22.1",
+  "provider": "opencode-go",
+  "model": "deepseek-v4-pro",
+  "status": "COMPLETED",
+  "sameGoalId": true,
+  "preservedCriteria": true,
+  "appendExactlyOnce": true,
+  "resumedAfterAgentReconstruction": true,
+  "modelCalls": 4,
+  "toolCount": 4,
+  "independentFileVerifications": 1,
+  "scope": "Two-phase file task through actual provider inference and deterministic file tools; not a desktop, voice or external form test."
+}

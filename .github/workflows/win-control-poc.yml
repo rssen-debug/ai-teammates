@@ -1,0 +1,43 @@
+name: win-control-poc
+
+# Handover #4 — PoC-before-bind for native Windows control.
+# Dispatch-gated on purpose: this experiment proves what raw UI Automation can
+# do on a clean runner BEFORE any dependency (FlaUI / Microsoft UFO / OmniParser)
+# is even considered. No installs, no secrets, no model calls. The recorded
+# verdict JSON is the decision input; an ADOPT/DEFER note lands in
+# docs/DEV_CONTINUATION.json once evidence exists — never before.
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 'Run note (why this probe now)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  uia-probe:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run raw UI Automation probe (zero installs)
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/win-uia-probe.ps1 -OutFile probe-result.json
+
+      - name: Print probe verdict
+        if: always()
+        shell: pwsh
+        run: Get-Content probe-result.json -Raw
+
+      - name: Upload probe verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uia-probe-result
+          path: probe-result.json
+          retention-days: 30

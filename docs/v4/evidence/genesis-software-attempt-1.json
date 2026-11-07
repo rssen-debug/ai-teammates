@@ -1,0 +1,126 @@
+{
+  "at": "2026-10-23T23:05:03.890Z",
+  "kind": "real-Go-software-creation",
+  "sourceCommit": "daf04bf905ed1ecda8944a5f54ca4cf7ff5c1d56",
+  "passed": false,
+  "checks": {
+    "modelCompleted": false,
+    "realGoUnchanged": true,
+    "sourceExists": true,
+    "modelExecutedTests": false,
+    "modelReadBack": true,
+    "independentCliCases": true,
+    "independentModelTests": false
+  },
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "elapsedMs": 65368,
+  "status": "denied",
+  "failure": null,
+  "conversationId": "conv_mvlktvnu_be650e20e733",
+  "actions": [
+    "workspace_write",
+    "workspace_write",
+    "workspace_read",
+    "workspace_read",
+    "fs_patch",
+    "fs_read",
+    "fs_read"
+  ],
+  "failures": [
+    {
+      "name": "fs_patch",
+      "error": "found no \"var isMain = false;\ntry {\n  isMain = pro\" i genesis-expenses-f155dc4c26.mjs. ",
+      "summary": "UNKNOWN"
+    }
+  ],
+  "approvals": [
+    "fs_patch",
+    "fs_patch"
+  ],
+  "denied": [
+    "exec_start"
+  ],
+  "artifacts": {
+    "app": "genesis-expenses-f155dc4c26.mjs",
+    "tests": "genesis-expenses-f155dc4c26.test.mjs"
+  },
+  "observations": [
+    {
+      "exitCode": 0,
+      "actual": {
+        "totalCents": -95,
+        "byCategory": {
+          "food": 30,
+          "travel": -125
+        }
+      },
+      "expected": {
+        "totalCents": -95,
+        "byCategory": {
+          "food": 30,
+          "travel": -125
+        }
+      },
+      "pass": true
+    },
+    {
+      "exitCode": 0,
+      "actual": {
+        "totalCents": 0,
+        "byCategory": {}
+      },
+      "expected": {
+        "totalCents": 0,
+        "byCategory": {}
+      },
+      "pass": true
+    },
+    {
+      "exitCode": 0,
+      "actual": {
+        "totalCents": 400,
+        "byCategory": {
+          "__proto__": 101,
+          "constructor": 299
+        }
+      },
+      "expected": {
+        "totalCents": 400,
+        "byCategory": {
+          "__proto__": 101,
+          "constructor": 299
+        }
+      },
+      "pass": true
+    },
+    {
+      "invalidInput": true,
+      "exitCode": 1,
+      "pass": true
+    },
+    {
+      "invalidInput": true,
+      "exitCode": 1,
+      "pass": true
+    },
+    {
+      "invalidInput": true,
+      "exitCode": 1,
+      "pass": true
+    }
+  ],
+  "modelTestExitCode": 1,
+  "modelTestOutput": "✖ empty rows -> zero total and empty object (6.8959ms)\n✖ basic totals per category (0.8411ms)\n✔ avoids binary floating-point summation errors (0.362ms)\n✖ signed amounts, integers, one decimal (0.5062ms)\n✔ rejects missing/empty category (0.651ms)\n✔ rejects invalid amounts (0.3236ms)\n✔ rejects non-array and malformed rows (0.2792ms)\n✔ parseAmountCents unit checks (0.1968ms)\nℹ tests 8\nℹ suites 0\nℹ pass 5\nℹ fail 3\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 170.3596\n\n✖ failing tests:\n\ntest at genesis-expenses-f155dc4c26.test.mjs:5:1\n✖ empty rows -> zero total and empty object (6.8959ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    {\n  +   byCategory: [Object: null prototype] {},\n  -   byCategory: {},\n      totalCents: 0\n    }\n  \n      at TestContext.<anonymous> (file:///C:/Users/Ghost/AppData/Local/MAJIN/workspace/genesis-expenses-f155dc4c26.test.mjs:6:10)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.start (node:internal/test_runner/test:1257:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { totalCents: 0, byCategory: {} },\n    expected: { totalCents: 0, byCategory: {} },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at genesis-expenses-f155dc4c26.test.mjs:9:1\n✖ basic totals per category (0.8411ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    {\n  +   byCategory: [Object: null prototype] {\n  -   byCategory: {\n        food: 1275,\n        travel: 325\n      },\n      totalCents: 1600\n    }\n  \n      at TestContext.<anonymous> (file:///C:/Users/Ghost/AppData/Local/MAJIN/workspace/genesis-expenses-f155dc4c26.test.mjs:15:10)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)\n      at Test.postRun (node:internal/test_runner/test:1537:19)\n      at Test.run (node:internal/test_runner/test:1462:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { totalCents: 1600, byCategory: { food: 1275, travel: 325 } },\n    expected: { totalCents: 1600, byCategory: { food: 1275, travel: 325 } },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at genesis-expenses-f155dc4c26.test.mjs:32:1\n✖ signed amounts, integers, one decimal (0.5062ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    {\n  +   byCategory: [Object: null prototype] {\n  -   byCategory: {\n        x: -500,\n        y: 700,\n        z: 150\n      },\n      totalCents: 350\n  \n      at TestContext.<anonymous> (file:///C:/Users/Ghost/AppData/Local/MAJIN/workspace/genesis-expenses-f155dc4c26.test.mjs:33:10)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)\n      at Test.postRun (node:internal/test_runner/test:1537:19)\n      at Test.run (node:internal/test_runner/test:1462:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { totalCents: 350, byCategory: { x: -500, y: 700, z: 150 } },\n    expected: { totalCents: 350, byCategory: { x: -500, y: 700, z: 150 } },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+  "physicalDevicePass": false
+}

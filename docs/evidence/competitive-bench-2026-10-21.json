@@ -1,0 +1,45 @@
+{
+  "report": {
+    "version": "majin-competitive-bench/1",
+    "tasks": 3,
+    "verifiersVerified": 3,
+    "verifiersFlagged": 0,
+    "verifiersUnverified": 0,
+    "flaggedTasks": [],
+    "lanes": {
+      "declared": [
+        "majin",
+        "raw-baseline"
+      ],
+      "run": [],
+      "agentLanesLive": "pending-credentials — declared, never fabricated"
+    },
+    "healthy": true
+  },
+  "rows": [
+    {
+      "task": "json-key-extract",
+      "status": "verified",
+      "goodPasses": true,
+      "badPasses": false,
+      "why": "good passes, bad fails — the verifier measures something real",
+      "wallMs": 101
+    },
+    {
+      "task": "report-largest",
+      "status": "verified",
+      "goodPasses": true,
+      "badPasses": false,
+      "why": "good passes, bad fails — the verifier measures something real",
+      "wallMs": 91
+    },
+    {
+      "task": "two-step-chain",
+      "status": "verified",
+      "goodPasses": true,
+      "badPasses": false,
+      "why": "good passes, bad fails — the verifier measures something real",
+      "wallMs": 97
+    }
+  ]
+}

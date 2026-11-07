@@ -1,0 +1,27 @@
+name: MAJIN instant JS syntax repair feedback
+on:
+  push:
+    branches: [fix/instant-syntax-feedback-on-fs-write-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  instant-repair:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --check src/core/goal-artifact.js
+      - run: node --check src/core/loop.js
+      - run: node --test test/instant-js-write-feedback.test.js test/agent-js-syntax-evidence.test.js
+      - run: npm test
+      - run: npm run check

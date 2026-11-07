@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-23T17:31:06.968Z",
+  "executablePath": "C:\\Users\\krist\\Documents\\Codex\\2026-10-23\\har-d\\work\\installed-majin-v4\\MAJIN V4.exe",
+  "nativeWindow": true,
+  "pairing": true,
+  "verifiedFile": true,
+  "inference": "demo (not a live provider)",
+  "preferences": {
+    "nodeIntegration": false,
+    "sandbox": true,
+    "contextIsolation": true
+  }
+}

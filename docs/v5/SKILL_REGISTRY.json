@@ -1,0 +1,964 @@
+{
+  "schema": "majin.v5.skill-registry/v1",
+  "xpCurveSchema": "majin.v5.xp-curve/v1",
+  "version": "5.0.0",
+  "domains": {
+    "documents": {
+      "id": "documents",
+      "title": "Documents & Files",
+      "summary": "Reading, extracting, validating and uploading documents (PDF, DOCX, text)."
+    },
+    "research": {
+      "id": "research",
+      "title": "Search & Research",
+      "summary": "Searching, fetching, deduplicating and cross-checking external sources."
+    },
+    "browser": {
+      "id": "browser",
+      "title": "Browser & Forms",
+      "summary": "Navigating pages, filling semantic forms and verifying DOM states."
+    },
+    "career": {
+      "id": "career",
+      "title": "Career & Job Applications",
+      "summary": "CV fact extraction, job matching, application preparation and workflows."
+    },
+    "code": {
+      "id": "code",
+      "title": "Code & Synthesis",
+      "summary": "Building pages, scripts, self-synthesized skills and automated repairs."
+    },
+    "desktop": {
+      "id": "desktop",
+      "title": "Desktop & System",
+      "summary": "Operating local programs, files, terminal and Windows UI automation."
+    }
+  },
+  "skills": [
+    {
+      "canonical_id": "documents.read",
+      "display_name": "Läs dokument",
+      "title_en": "Read Document",
+      "domain": "documents",
+      "kind": "skill",
+      "aliases": [
+        "documents.read",
+        "read-document",
+        "parse-cv",
+        "read-cv",
+        "extract-pdf",
+        "extract-docx",
+        "läs-cv",
+        "läsa-dokument",
+        "läs-pdf",
+        "tolka-cv",
+        "dokumentläsning",
+        "läs dokument",
+        "read document"
+      ],
+      "purpose": "Read and extract verifiable text and structured facts from PDF, DOCX and text documents.",
+      "masteryScope": {
+        "mastered": "Extracts text and structured sections from readable PDF, DOCX, Markdown and plain text files within granted folders or workspace.",
+        "limitations": "Does not invent missing facts or bypass encrypted/password-protected files without owner credentials."
+      },
+      "contract": {
+        "input": [
+          "filePath",
+          "format?"
+        ],
+        "output": [
+          "text",
+          "sha256",
+          "confidence",
+          "facts"
+        ]
+      },
+      "dependencies": [],
+      "required_tools": [
+        "document_read"
+      ],
+      "preferred_tools": [
+        "fs.find",
+        "fs.read"
+      ],
+      "relevance_criteria": [
+        "cv",
+        "pdf",
+        "docx",
+        "resume",
+        "document",
+        "read",
+        "extract",
+        "läs",
+        "dokument",
+        "fil"
+      ],
+      "version": "1.0.0",
+      "origin": "builtin",
+      "verification_method": "file_sha256",
+      "failure_strategies": {
+        "UNREADABLE_PDF": "Switch to secondary extractor or OCR/vision fallback and verify output length.",
+        "FILE_NOT_FOUND": "Use fs.find inside granted folders rather than repeating the missing path."
+      },
+      "compatibility": {
+        "platform": "any",
+        "nodeFloor": 22,
+        "validatedEnvFingerprint": null,
+        "externalOrigins": {}
+      },
+      "maturity_status": "UNTRAINED",
+      "xp": 0,
+      "level": 1,
+      "rawLevel": 1,
+      "gatedAt98": false,
+      "missingLevel99Gates": [],
+      "reliability": 1,
+      "freshness": "FRESH",
+      "staleReason": null,
+      "lastVerifiedAt": null,
+      "lastReceiptId": null,
+      "lastXpGain": 0,
+      "distinctScenarios": [],
+      "distinctScenariosCount": 0,
+      "verifiedRecoveryCount": 0,
+      "qualityGates": {
+        "versionedTestSuitePassed": false,
+        "testSuiteVersion": null
+      },
+      "verification_history": [],
+      "learnedProcedures": [],
+      "avoidStrategies": [],
+      "synthesizedScript": null,
+      "mergedFrom": [],
+      "level99Evaluation": {
+        "passed": false,
+        "gates": {
+          "versionedTestSuite": false,
+          "variedTasks": false,
+          "errorRecovery": false,
+          "freshEvidence": false,
+          "definedScope": true
+        },
+        "missing": [
+          "versionedTestSuite",
+          "variedTasks",
+          "errorRecovery",
+          "freshEvidence"
+        ],
+        "versionDisclaimer": "100% indicates fulfilled requirements for this skill version only, never a guarantee for all future tasks."
+      }
+    },
+    {
+      "canonical_id": "documents.upload",
+      "display_name": "Filuppladdning",
+      "title_en": "Document Upload",
+      "domain": "documents",
+      "kind": "skill",
+      "aliases": [
+        "documents.upload",
+        "upload-document",
+        "upload-cv",
+        "file-upload",
+        "attach-cv",
+        "ladda-upp-cv",
+        "ladda-upp-fil",
+        "filuppladdning",
+        "bifoga-cv",
+        "document upload"
+      ],
+      "purpose": "Upload a verified local document (such as a CV) to an external portal or workspace.",
+      "masteryScope": {
+        "mastered": "Uploads verified PDF/DOCX/image files to file inputs and confirms byte/filename receipt.",
+        "limitations": "Cannot upload files outside workspace/granted folders or exceed portal size caps."
+      },
+      "contract": {
+        "input": [
+          "filePath",
+          "targetSelectorOrUrl"
+        ],
+        "output": [
+          "uploadedName",
+          "bytes",
+          "sha256",
+          "receiptId"
+        ]
+      },
+      "dependencies": [
+        "documents.read"
+      ],
+      "required_tools": [
+        "browser.upload"
+      ],
+      "preferred_tools": [
+        "browser.verify"
+      ],
+      "relevance_criteria": [
+        "upload",
+        "attach",
+        "cv",
+        "portal",
+        "ladda",
+        "upp",
+        "bifoga"
+      ],
+      "version": "1.0.0",
+      "origin": "builtin",
+      "verification_method": "http_or_dom_receipt",
+      "failure_strategies": {
+        "INPUT_HIDDEN": "Locate underlying input[type=file] element and verify attached file name and SHA-256.",
+        "TOO_LARGE": "Report exact size limit blocker rather than truncating binary document."
+      },
+      "compatibility": {
+        "platform": "any",
+        "nodeFloor": 22,
+        "validatedEnvFingerprint": null,
+        "externalOrigins": {}
+      },
+      "maturity_status": "UNTRAINED",
+      "xp": 0,
+      "level": 1,
+      "rawLevel": 1,
+      "gatedAt98": false,
+      "missingLevel99Gates": [],
+      "reliability": 1,
+      "freshness": "FRESH",
+      "staleReason": null,
+      "lastVerifiedAt": null,
+      "lastReceiptId": null,
+      "lastXpGain": 0,
+      "distinctScenarios": [],
+      "distinctScenariosCount": 0,
+      "verifiedRecoveryCount": 0,
+      "qualityGates": {
+        "versionedTestSuitePassed": false,
+        "testSuiteVersion": null
+      },
+      "verification_history": [],
+      "learnedProcedures": [],
+      "avoidStrategies": [],
+      "synthesizedScript": null,
+      "mergedFrom": [],
+      "level99Evaluation": {
+        "passed": false,
+        "gates": {
+          "versionedTestSuite": false,
+          "variedTasks": false,
+          "errorRecovery": false,
+          "freshEvidence": false,
+          "definedScope": true
+        },
+        "missing": [
+          "versionedTestSuite",
+          "variedTasks",
+          "errorRecovery",
+          "freshEvidence"
+        ],
+        "versionDisclaimer": "100% indicates fulfilled requirements for this skill version only, never a guarantee for all future tasks."
+      }
+    },
+    {
+      "canonical_id": "research.search",
+      "display_name": "Sök & Research",
+      "title_en": "Search & Research",
+      "domain": "research",
+      "kind": "skill",
+      "aliases": [
+        "research.search",
+        "web-search",
+        "job-search-ads",
+        "find-listings",
+        "search-sources",
+        "sök-jobb",
+        "hitta-annonser",
+        "webbsökning",
+        "undersök",
+        "sök & research",
+        "search & research"
+      ],
+      "purpose": "Search external job feeds and web sources, deduplicate links and verify source availability.",
+      "masteryScope": {
+        "mastered": "Queries structured APIs and web pages, deduplicates URLs and extracts grounded listings.",
+        "limitations": "Cannot access paywalled or authenticated private feeds without owner session."
+      },
+      "contract": {
+        "input": [
+          "query",
+          "criteria",
+          "limit"
+        ],
+        "output": [
+          "items",
+          "uniqueCount",
+          "sources"
+        ]
+      },
+      "dependencies": [],
+      "required_tools": [
+        "jobs.search"
+      ],
+      "preferred_tools": [
+        "web.search",
+        "web.fetch"
+      ],
+      "relevance_criteria": [
+        "search",
+        "find",
+        "jobs",
+        "listings",
+        "research",
+        "sök",
+        "hitta",
+        "jobb",
+        "annonser"
+      ],
+      "version": "1.0.0",
+      "origin": "builtin",
+      "verification_method": "http_receipt",
+      "failure_strategies": {
+        "TIMEOUT": "Retry with bounded backoff or switch to secondary feed.",
+        "EMPTY_RESULTS": "Broaden query synonyms while preserving mandatory geography/role filters."
+      },
+      "compatibility": {
+        "platform": "any",
+        "nodeFloor": 22,
+        "validatedEnvFingerprint": null,
+        "externalOrigins": {}
+      },
+      "maturity_status": "UNTRAINED",
+      "xp": 0,
+      "level": 1,
+      "rawLevel": 1,
+      "gatedAt98": false,
+      "missingLevel99Gates": [],
+      "reliability": 1,
+      "freshness": "FRESH",
+      "staleReason": null,
+      "lastVerifiedAt": null,
+      "lastReceiptId": null,
+      "lastXpGain": 0,
+      "distinctScenarios": [],
+      "distinctScenariosCount": 0,
+      "verifiedRecoveryCount": 0,
+      "qualityGates": {
+        "versionedTestSuitePassed": false,
+        "testSuiteVersion": null
+      },
+      "verification_history": [],
+      "learnedProcedures": [],
+      "avoidStrategies": [],
+      "synthesizedScript": null,
+      "mergedFrom": [],
+      "level99Evaluation": {
+        "passed": false,
+        "gates": {
+          "versionedTestSuite": false,
+          "variedTasks": false,
+          "errorRecovery": false,
+          "freshEvidence": false,
+          "definedScope": true
+        },
+        "missing": [
+          "versionedTestSuite",
+          "variedTasks",
+          "errorRecovery",
+          "freshEvidence"
+        ],
+        "versionDisclaimer": "100% indicates fulfilled requirements for this skill version only, never a guarantee for all future tasks."
+      }
+    },
+    {
+      "canonical_id": "browser.forms",
+      "display_name": "Formulär",
+      "title_en": "Browser Forms",
+      "domain": "browser",
+      "kind": "skill",
+      "aliases": [
+        "browser.forms",
+        "form-fill",
+        "fill-form",
+        "web-form",
+        "application-form",
+        "job-form",
+        "formulär",
+        "fyll-i-formulär",
+        "ansökningsformulär",
+        "webbformulär",
+        "ifyllning",
+        "browser forms"
+      ],
+      "purpose": "Inspect, fill and verify web forms using grounded field labels and truthful user data.",
+      "masteryScope": {
+        "mastered": "Fills text inputs, textareas, selects, radio groups and checkboxes with retained-value verification.",
+        "limitations": "Never bypasses CAPTCHA or MFA; pauses and requests owner handoff when encountered."
+      },
+      "contract": {
+        "input": [
+          "url",
+          "fields",
+          "submitMandate"
+        ],
+        "output": [
+          "filledFields",
+          "retainedVerified",
+          "submitted",
+          "confirmationReceipt"
+        ]
+      },
+      "dependencies": [],
+      "required_tools": [
+        "browser.open",
+        "browser.form_fill"
+      ],
+      "preferred_tools": [
+        "browser.form",
+        "browser.verify",
+        "browser.form_submit"
+      ],
+      "relevance_criteria": [
+        "form",
+        "fill",
+        "application",
+        "submit",
+        "input",
+        "formulär",
+        "fyll",
+        "ansökan",
+        "skicka"
+      ],
+      "version": "1.0.0",
+      "origin": "builtin",
+      "verification_method": "dom_state",
+      "failure_strategies": {
+        "VALUE_REVERTED": "Use native input descriptor setter + input/change event dispatch and re-verify DOM value.",
+        "CAPTCHA_REQUIRED": "Mark item BLOCKED with concrete CAPTCHA handoff and preserve form checkpoint."
+      },
+      "compatibility": {
+        "platform": "any",
+        "nodeFloor": 22,
+        "validatedEnvFingerprint": null,
+        "externalOrigins": {}
+      },
+      "maturity_status": "UNTRAINED",
+      "xp": 0,
+      "level": 1,
+      "rawLevel": 1,
+      "gatedAt98": false,
+      "missingLevel99Gates": [],
+      "reliability": 1,
+      "freshness": "FRESH",
+      "staleReason": null,
+      "lastVerifiedAt": null,
+      "lastReceiptId": null,
+      "lastXpGain": 0,
+      "distinctScenarios": [],
+      "distinctScenariosCount": 0,
+      "verifiedRecoveryCount": 0,
+      "qualityGates": {
+        "versionedTestSuitePassed": false,
+        "testSuiteVersion": null
+      },
+      "verification_history": [],
+      "learnedProcedures": [],
+      "avoidStrategies": [],
+      "synthesizedScript": null,
+      "mergedFrom": [],
+      "level99Evaluation": {
+        "passed": false,
+        "gates": {
+          "versionedTestSuite": false,
+          "variedTasks": false,
+          "errorRecovery": false,
+          "freshEvidence": false,
+          "definedScope": true
+        },
+        "missing": [
+          "versionedTestSuite",
+          "variedTasks",
+          "errorRecovery",
+          "freshEvidence"
+        ],
+        "versionDisclaimer": "100% indicates fulfilled requirements for this skill version only, never a guarantee for all future tasks."
+      }
+    },
+    {
+      "canonical_id": "career.job-match",
+      "display_name": "Jobbmatchning",
+      "title_en": "Job Matching",
+      "domain": "career",
+      "kind": "skill",
+      "aliases": [
+        "career.job-match",
+        "match-jobs",
+        "evaluate-job",
+        "cv-match",
+        "jobbmatchning",
+        "matcha-jobb",
+        "bedöm-matchning",
+        "job matching"
+      ],
+      "purpose": "Match extracted CV facts against job ads, separating required vs preferred qualifications.",
+      "masteryScope": {
+        "mastered": "Evaluates role, geography, language, required skills and preferred skills with transparent motivation.",
+        "limitations": "Never fabricates missing qualifications, certificates or work permits."
+      },
+      "contract": {
+        "input": [
+          "cvFacts",
+          "jobAds",
+          "criteria"
+        ],
+        "output": [
+          "matches",
+          "requiredMet",
+          "preferredMet",
+          "motivation"
+        ]
+      },
+      "dependencies": [
+        "documents.read",
+        "research.search"
+      ],
+      "required_tools": [
+        "jobs.match"
+      ],
+      "preferred_tools": [
+        "jobs.prepare"
+      ],
+      "relevance_criteria": [
+        "match",
+        "fit",
+        "criteria",
+        "qualify",
+        "passar",
+        "matcha",
+        "kriterier",
+        "krav",
+        "meriterande"
+      ],
+      "version": "1.0.0",
+      "origin": "builtin",
+      "verification_method": "schema_assert",
+      "failure_strategies": {
+        "MISSING_CRITERIA": "Apply explicit owner criteria override and re-score candidate list."
+      },
+      "compatibility": {
+        "platform": "any",
+        "nodeFloor": 22,
+        "validatedEnvFingerprint": null,
+        "externalOrigins": {}
+      },
+      "maturity_status": "UNTRAINED",
+      "xp": 0,
+      "level": 1,
+      "rawLevel": 1,
+      "gatedAt98": false,
+      "missingLevel99Gates": [],
+      "reliability": 1,
+      "freshness": "FRESH",
+      "staleReason": null,
+      "lastVerifiedAt": null,
+      "lastReceiptId": null,
+      "lastXpGain": 0,
+      "distinctScenarios": [],
+      "distinctScenariosCount": 0,
+      "verifiedRecoveryCount": 0,
+      "qualityGates": {
+        "versionedTestSuitePassed": false,
+        "testSuiteVersion": null
+      },
+      "verification_history": [],
+      "learnedProcedures": [],
+      "avoidStrategies": [],
+      "synthesizedScript": null,
+      "mergedFrom": [],
+      "level99Evaluation": {
+        "passed": false,
+        "gates": {
+          "versionedTestSuite": false,
+          "variedTasks": false,
+          "errorRecovery": false,
+          "freshEvidence": false,
+          "definedScope": true
+        },
+        "missing": [
+          "versionedTestSuite",
+          "variedTasks",
+          "errorRecovery",
+          "freshEvidence"
+        ],
+        "versionDisclaimer": "100% indicates fulfilled requirements for this skill version only, never a guarantee for all future tasks."
+      }
+    },
+    {
+      "canonical_id": "code.build-page",
+      "display_name": "Sidbyggare & Kod",
+      "title_en": "Page & Code Builder",
+      "domain": "code",
+      "kind": "skill",
+      "aliases": [
+        "code.build-page",
+        "build-page",
+        "write-code",
+        "fix-code",
+        "create-site",
+        "bygg-sidan",
+        "bygg-hemsida",
+        "fixa-koden",
+        "skapa-sida",
+        "sidbyggare & kod",
+        "page & code builder"
+      ],
+      "purpose": "Create, modify and verify web pages, scripts and code artifacts in the workspace.",
+      "masteryScope": {
+        "mastered": "Generates valid HTML/CSS/JS/Python/Node files and verifies syntax and file SHA-256 on disk.",
+        "limitations": "Does not deploy to external production servers without explicit owner approval."
+      },
+      "contract": {
+        "input": [
+          "specification",
+          "targetFile"
+        ],
+        "output": [
+          "filePath",
+          "sha256",
+          "bytes",
+          "syntaxValid"
+        ]
+      },
+      "dependencies": [],
+      "required_tools": [
+        "workspace_write"
+      ],
+      "preferred_tools": [
+        "workspace_read",
+        "fs.write"
+      ],
+      "relevance_criteria": [
+        "build",
+        "page",
+        "html",
+        "website",
+        "code",
+        "script",
+        "bygg",
+        "sida",
+        "hemsida",
+        "kod"
+      ],
+      "version": "1.0.0",
+      "origin": "builtin",
+      "verification_method": "file_sha256",
+      "failure_strategies": {
+        "SYNTAX_ERROR": "Parse and repair syntax before marking artifact complete."
+      },
+      "compatibility": {
+        "platform": "any",
+        "nodeFloor": 22,
+        "validatedEnvFingerprint": null,
+        "externalOrigins": {}
+      },
+      "maturity_status": "UNTRAINED",
+      "xp": 0,
+      "level": 1,
+      "rawLevel": 1,
+      "gatedAt98": false,
+      "missingLevel99Gates": [],
+      "reliability": 1,
+      "freshness": "FRESH",
+      "staleReason": null,
+      "lastVerifiedAt": null,
+      "lastReceiptId": null,
+      "lastXpGain": 0,
+      "distinctScenarios": [],
+      "distinctScenariosCount": 0,
+      "verifiedRecoveryCount": 0,
+      "qualityGates": {
+        "versionedTestSuitePassed": false,
+        "testSuiteVersion": null
+      },
+      "verification_history": [],
+      "learnedProcedures": [],
+      "avoidStrategies": [],
+      "synthesizedScript": null,
+      "mergedFrom": [],
+      "level99Evaluation": {
+        "passed": false,
+        "gates": {
+          "versionedTestSuite": false,
+          "variedTasks": false,
+          "errorRecovery": false,
+          "freshEvidence": false,
+          "definedScope": true
+        },
+        "missing": [
+          "versionedTestSuite",
+          "variedTasks",
+          "errorRecovery",
+          "freshEvidence"
+        ],
+        "versionDisclaimer": "100% indicates fulfilled requirements for this skill version only, never a guarantee for all future tasks."
+      }
+    },
+    {
+      "canonical_id": "desktop.file-fix",
+      "display_name": "Dator & Filhantering",
+      "title_en": "Desktop & File Repair",
+      "domain": "desktop",
+      "kind": "skill",
+      "aliases": [
+        "desktop.file-fix",
+        "open-program-fix-file",
+        "fix-file",
+        "desktop-control",
+        "öppna-programmet",
+        "fixa-filen",
+        "datorstyrning",
+        "dator & filhantering",
+        "desktop & file repair"
+      ],
+      "purpose": "Locate, inspect and repair files or operate local desktop applications within owner permissions.",
+      "masteryScope": {
+        "mastered": "Reads, patches and verifies local files in granted folders and controls Windows windows when in an interactive session.",
+        "limitations": "Requires granted folder access or interactive Windows session for GUI control."
+      },
+      "contract": {
+        "input": [
+          "targetPathOrApp",
+          "instruction"
+        ],
+        "output": [
+          "modifiedPath",
+          "sha256",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "required_tools": [
+        "fs.read",
+        "fs.write"
+      ],
+      "preferred_tools": [
+        "wincontrol.open",
+        "computer.use"
+      ],
+      "relevance_criteria": [
+        "open",
+        "program",
+        "fix",
+        "file",
+        "desktop",
+        "öppna",
+        "programmet",
+        "fixa",
+        "filen"
+      ],
+      "version": "1.0.0",
+      "origin": "builtin",
+      "verification_method": "file_sha256",
+      "failure_strategies": {
+        "PERMISSION_DENIED": "Request owner folder grant for the target directory."
+      },
+      "compatibility": {
+        "platform": "any",
+        "nodeFloor": 22,
+        "validatedEnvFingerprint": null,
+        "externalOrigins": {}
+      },
+      "maturity_status": "UNTRAINED",
+      "xp": 0,
+      "level": 1,
+      "rawLevel": 1,
+      "gatedAt98": false,
+      "missingLevel99Gates": [],
+      "reliability": 1,
+      "freshness": "FRESH",
+      "staleReason": null,
+      "lastVerifiedAt": null,
+      "lastReceiptId": null,
+      "lastXpGain": 0,
+      "distinctScenarios": [],
+      "distinctScenariosCount": 0,
+      "verifiedRecoveryCount": 0,
+      "qualityGates": {
+        "versionedTestSuitePassed": false,
+        "testSuiteVersion": null
+      },
+      "verification_history": [],
+      "learnedProcedures": [],
+      "avoidStrategies": [],
+      "synthesizedScript": null,
+      "mergedFrom": [],
+      "level99Evaluation": {
+        "passed": false,
+        "gates": {
+          "versionedTestSuite": false,
+          "variedTasks": false,
+          "errorRecovery": false,
+          "freshEvidence": false,
+          "definedScope": true
+        },
+        "missing": [
+          "versionedTestSuite",
+          "variedTasks",
+          "errorRecovery",
+          "freshEvidence"
+        ],
+        "versionDisclaimer": "100% indicates fulfilled requirements for this skill version only, never a guarantee for all future tasks."
+      }
+    },
+    {
+      "canonical_id": "career.job-application",
+      "display_name": "Jobbansökan (Workflow)",
+      "title_en": "Job Application Workflow",
+      "domain": "career",
+      "kind": "workflow",
+      "aliases": [
+        "career.job-application",
+        "job-application-workflow",
+        "apply-500-jobs",
+        "jobbansökan",
+        "sök-500-jobb",
+        "ansökningsflöde",
+        "jobbansökan (workflow)",
+        "job application workflow"
+      ],
+      "purpose": "End-to-end workflow composing CV reading, job search, deduplication, matching, form filling and CV upload.",
+      "masteryScope": {
+        "mastered": "Orchestrates up to 500 job evaluations with deduplication, truthful form filling, CV upload and confirmation verification.",
+        "limitations": "Respects 500 ceiling as a cap, never fabricates CV experience, and hands off CAPTCHA/MFA to the owner."
+      },
+      "contract": {
+        "input": [
+          "cvFile",
+          "criteria",
+          "maxJobs",
+          "autoSubmitMandate"
+        ],
+        "output": [
+          "counters",
+          "applications",
+          "receipts"
+        ]
+      },
+      "dependencies": [
+        "documents.read",
+        "research.search",
+        "career.job-match",
+        "browser.forms",
+        "documents.upload"
+      ],
+      "required_tools": [
+        "document_read",
+        "jobs.search",
+        "jobs.match",
+        "browser.form_fill",
+        "browser.upload"
+      ],
+      "preferred_tools": [
+        "browser.form_submit",
+        "browser.verify"
+      ],
+      "relevance_criteria": [
+        "500",
+        "ansökningar",
+        "apply",
+        "workflow",
+        "cv",
+        "köpenhamn"
+      ],
+      "version": "1.0.0",
+      "origin": "builtin",
+      "verification_method": "http_or_dom_receipt",
+      "failure_strategies": {
+        "PORTAL_BLOCKED": "Record blocker per job item and continue remaining queue items."
+      },
+      "compatibility": {
+        "platform": "any",
+        "nodeFloor": 22,
+        "validatedEnvFingerprint": null,
+        "externalOrigins": {}
+      },
+      "maturity_status": "UNTRAINED",
+      "xp": 0,
+      "level": 1,
+      "rawLevel": 1,
+      "gatedAt98": false,
+      "missingLevel99Gates": [],
+      "reliability": 1,
+      "freshness": "FRESH",
+      "staleReason": null,
+      "lastVerifiedAt": null,
+      "lastReceiptId": null,
+      "lastXpGain": 0,
+      "distinctScenarios": [],
+      "distinctScenariosCount": 0,
+      "verifiedRecoveryCount": 0,
+      "qualityGates": {
+        "versionedTestSuitePassed": false,
+        "testSuiteVersion": null
+      },
+      "verification_history": [],
+      "learnedProcedures": [],
+      "avoidStrategies": [],
+      "synthesizedScript": null,
+      "mergedFrom": [],
+      "level99Evaluation": {
+        "passed": false,
+        "gates": {
+          "versionedTestSuite": false,
+          "variedTasks": false,
+          "errorRecovery": false,
+          "freshEvidence": false,
+          "definedScope": true
+        },
+        "missing": [
+          "versionedTestSuite",
+          "variedTasks",
+          "errorRecovery",
+          "freshEvidence"
+        ],
+        "versionDisclaimer": "100% indicates fulfilled requirements for this skill version only, never a guarantee for all future tasks."
+      }
+    }
+  ],
+  "aggregate": {
+    "label": "Active Skills Summary",
+    "totalSkills": 8,
+    "trainedSkills": 0,
+    "aggregateLevel": 1,
+    "maxLevel": 99,
+    "totalXp": 0,
+    "domains": [
+      {
+        "id": "documents",
+        "title": "Documents & Files",
+        "summary": "Reading, extracting, validating and uploading documents (PDF, DOCX, text)."
+      },
+      {
+        "id": "research",
+        "title": "Search & Research",
+        "summary": "Searching, fetching, deduplicating and cross-checking external sources."
+      },
+      {
+        "id": "browser",
+        "title": "Browser & Forms",
+        "summary": "Navigating pages, filling semantic forms and verifying DOM states."
+      },
+      {
+        "id": "career",
+        "title": "Career & Job Applications",
+        "summary": "CV fact extraction, job matching, application preparation and workflows."
+      },
+      {
+        "id": "code",
+        "title": "Code & Synthesis",
+        "summary": "Building pages, scripts, self-synthesized skills and automated repairs."
+      },
+      {
+        "id": "desktop",
+        "title": "Desktop & System",
+        "summary": "Operating local programs, files, terminal and Windows UI automation."
+      }
+    ]
+  }
+}

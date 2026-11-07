@@ -1,0 +1,256 @@
+{
+  "version": "majin-recovery-matrix/1",
+  "at": "2026-10-21T02:15:00.186Z",
+  "wallMs": 964,
+  "invariants": {
+    "I1_no_stuck_in_deterministic_suite": true,
+    "I2_zero_unhandled_rejections": true,
+    "I3_every_row_within_bound": true,
+    "I4_rate_counts_only_real_verdicts": true
+  },
+  "totals": {
+    "rows": 15,
+    "executed": 15,
+    "recovered": 7,
+    "controlled": 8,
+    "stuck": 0,
+    "not_tested": 0
+  },
+  "recoveryRate": 1,
+  "unhandledRejections": 0,
+  "results": [
+    {
+      "id": "swarm.transient-retry-recovers",
+      "hypothesis": "short transient provider flake recovers via bounded retry; work completes",
+      "verdict": "recovered",
+      "wallMs": 2,
+      "reason": "",
+      "facts": {
+        "verdict": "recovered",
+        "facts": {
+          "tries": 2,
+          "okCount": 1,
+          "sawRetry": true
+        }
+      }
+    },
+    {
+      "id": "swarm.permanent-fail-blocks-dependents",
+      "hypothesis": "permanent failure stops the chain honestly: dependents blocked, independents complete, the run terminates",
+      "verdict": "controlled",
+      "wallMs": 1,
+      "reason": "",
+      "facts": {
+        "verdict": "controlled",
+        "facts": {
+          "failCount": 1,
+          "okCount": 1,
+          "bBlocked": true,
+          "bReason": "dependency a failed"
+        }
+      }
+    },
+    {
+      "id": "swarm.bad-input-rejected-plainly",
+      "hypothesis": "defective input (unknown dep, cycle) is rejected loudly up front — never partial work",
+      "verdict": "controlled",
+      "wallMs": 0,
+      "reason": "",
+      "facts": {
+        "verdict": "controlled",
+        "facts": {
+          "depErr": "node x: unknown dep \"ghost\"",
+          "cycErr": "nodes: cyclic graph"
+        }
+      }
+    },
+    {
+      "id": "swarm.deadline-marks-remaining",
+      "hypothesis": "timeoutMs terminates: the hanging node is blocked with reason=deadline; the run returns inside timeout + small margin",
+      "verdict": "controlled",
+      "wallMs": 201,
+      "reason": "",
+      "facts": {
+        "verdict": "controlled",
+        "facts": {
+          "wallMs": 201,
+          "blocked": 2
+        }
+      }
+    },
+    {
+      "id": "swarm.abort-signal-cancels-honestly",
+      "hypothesis": "external abort stops the chain with an explicit cancelled marker — never half-stuck waiting forever",
+      "verdict": "controlled",
+      "wallMs": 251,
+      "reason": "",
+      "facts": {
+        "verdict": "controlled",
+        "facts": {
+          "wallMs": 251,
+          "cancelled": true
+        }
+      }
+    },
+    {
+      "id": "swarm.adaptive-overrun-contracts-and-completes",
+      "hypothesis": "measured actuals 4x over estMs prove plan fragility: cap contracts, adaptations journal why, work still completes",
+      "verdict": "recovered",
+      "wallMs": 243,
+      "reason": "",
+      "facts": {
+        "verdict": "recovered",
+        "facts": {
+          "okCount": 6,
+          "adaptations": 2,
+          "sawOverrun": true
+        }
+      }
+    },
+    {
+      "id": "swarm.critical-tail-first-launch-order",
+      "hypothesis": "longest critical tail launches first when capacity is scarce (ranked, deterministic)",
+      "verdict": "recovered",
+      "wallMs": 1,
+      "reason": "",
+      "facts": {
+        "verdict": "recovered",
+        "facts": {
+          "order": [
+            "tail-large",
+            "tail-mid",
+            "tail-small"
+          ]
+        }
+      }
+    },
+    {
+      "id": "watchdog.tool-timeout-fires",
+      "hypothesis": "hanging tool times out with explicit code (no forever-wait in the loop)",
+      "verdict": "controlled",
+      "wallMs": 250,
+      "reason": "",
+      "facts": {
+        "verdict": "controlled",
+        "facts": {
+          "code": "tool_timeout"
+        }
+      }
+    },
+    {
+      "id": "watchdog.abort-deadline-parent-abort",
+      "hypothesis": "parent abort cancels the job with an explicit signal error",
+      "verdict": "controlled",
+      "wallMs": 0,
+      "reason": "",
+      "facts": {
+        "verdict": "controlled",
+        "facts": {
+          "err": "TypeError"
+        }
+      }
+    },
+    {
+      "id": "watchdog.repeat-detector-flags-no-progress",
+      "hypothesis": "identical consecutive tool calls are flagged as no-progress (repeat >= limit); an intervening different call resets",
+      "verdict": "recovered",
+      "wallMs": 0,
+      "reason": "",
+      "facts": {
+        "verdict": "recovered",
+        "facts": {
+          "thirdCount": 3,
+          "afterReset": 1
+        }
+      }
+    },
+    {
+      "id": "watchdog.stall-and-approval-transitions",
+      "hypothesis": "stall + approval state explicit: inactivity reported honestly; approvals transition active->stalled->timed_out, never silently",
+      "verdict": "controlled",
+      "wallMs": 0,
+      "reason": "",
+      "facts": {
+        "verdict": "controlled",
+        "facts": {
+          "before": false,
+          "after": true,
+          "transitions": [
+            "stall:ap1",
+            "timeout:ap1"
+          ]
+        }
+      }
+    },
+    {
+      "id": "teams.budget-loud-then-resume-wins",
+      "hypothesis": "budget exhaustion = LOUD TeamBudgetError + partial checkpoint; resuming with a raised cap finishes the REST without touching completed nodes",
+      "verdict": "recovered",
+      "wallMs": 6,
+      "reason": "",
+      "facts": {
+        "verdict": "recovered",
+        "facts": {
+          "firstStatus": "partial",
+          "skipped": [
+            "g1"
+          ],
+          "calls2": [
+            "g2"
+          ],
+          "spentAfterResume": 2
+        }
+      }
+    },
+    {
+      "id": "teams.crash-resume-exactly-once",
+      "hypothesis": "crash mid-graph: resume NEVER re-runs a completed node (counter-proof), the rest completes",
+      "verdict": "recovered",
+      "wallMs": 3,
+      "reason": "",
+      "facts": {
+        "verdict": "recovered",
+        "facts": {
+          "firstCalls": [
+            "g1",
+            "g2"
+          ],
+          "resumedCalls": [
+            "g2"
+          ],
+          "okAfter": 2
+        }
+      }
+    },
+    {
+      "id": "mission.checkpoint-carry-verified-only",
+      "hypothesis": "mission-checkpoint: WRITE->CRASH->READ yields carry of ONLY verified nodes — half-written/unverified never count as done",
+      "verdict": "controlled",
+      "wallMs": 2,
+      "reason": "",
+      "facts": {
+        "verdict": "controlled",
+        "facts": {
+          "carriedKeys": [
+            "n1"
+          ],
+          "journalLineWritten": true
+        }
+      }
+    },
+    {
+      "id": "classifier.transient-vs-permanent-accuracy",
+      "hypothesis": "retry can never help against permanent failure: the classifier splits the canonical strings correctly",
+      "verdict": "recovered",
+      "wallMs": 0,
+      "reason": "",
+      "facts": {
+        "verdict": "recovered",
+        "facts": {
+          "checked": 6,
+          "misses": []
+        }
+      }
+    }
+  ]
+}

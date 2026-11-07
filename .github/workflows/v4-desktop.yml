@@ -1,0 +1,104 @@
+name: MAJIN V4 Windows desktop
+
+on:
+  pull_request:
+    branches: [v4/main]
+  push:
+    branches: [v4/main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
+concurrency:
+  group: v4-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx playwright install chromium
+      - name: Windows V4 contracts and browser acceptance
+        shell: pwsh
+        run: |
+          # Windows failures used to be invisible outside the runner: the job log
+          # lives in blob storage. Capture the suite output and, on failure, emit
+          # the failing lines as annotations so they can be read from the API.
+          node --test --test-concurrency=1 --test-timeout=180000 test/v4/*.test.js *> test-output.log
+          $code = $LASTEXITCODE
+          Get-Content test-output.log -Tail 400 | Out-File -FilePath truncated.log -Encoding utf8
+          if ($code -ne 0) {
+            $fails = Select-String -Path truncated.log -Pattern '^not ok|^# fail|error:|failureType' -Context 0,6
+            $lines = ($fails | Select-Object -First 40 | ForEach-Object { $_.ToString() }) -join "`n"
+            Write-Host "::error title=V4 Windows test failure::$($lines -replace "`n", '%0A')"
+            throw "V4 test suite failed with exit $code"
+          }
+      - name: Install desktop build dependencies
+        working-directory: desktop
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Download pinned Electron runtime
+        working-directory: desktop
+        run: node node_modules/electron/install.js
+      - name: Build per-user Windows installer
+        working-directory: desktop
+        run: npm run build
+      - name: Exercise packaged native window against isolated test host
+        run: node scripts/v4/desktop-smoke.mjs
+        env:
+          MAJIN_V4_DESKTOP_EXE: ${{ github.workspace }}\desktop\dist\win-unpacked\MAJIN V4.exe
+      - name: Cold-start packaged host without a system Node installation
+        run: node scripts/v4/desktop-cold-smoke.mjs
+      - name: Publish the Windows result where it can always be read
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Job logs and artifacts live in storage that is not reachable from
+            // every client; a check run's output is plain API data.
+            const fs = require('fs');
+            let text = '';
+            try { text = fs.readFileSync('test-output.log', 'utf8'); } catch (e) { text = 'no test-output.log: ' + e.message; }
+            // TAP nests failing subtests with indentation, so the filter must not
+            // anchor at line start - that is why an earlier run reported only
+            // "# fail 1" and not which test it was.
+            const fails = text.split('\n')
+              .filter((l) => /(^|\s)not ok\s+\d+|^# fail\s+[1-9]|failureType:|AssertionError|Error:/.test(l))
+              .slice(0, 200)
+              .join('\n');
+            // Also record which file failed, since a TAP subtest names its parent.
+            const files = [...new Set((text.match(/test[\\/]v4[\\/][\w.-]+\.test\.js/g) || []))].slice(0, 20).join(', ');
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'Windows V4 suite result',
+              head_sha: context.sha,
+              status: 'completed',
+              conclusion: '${{ job.status }}' === 'success' ? 'success' : 'failure',
+              output: {
+                title: 'Windows V4 suite',
+                summary: fails ? `Files: ${files}\n\nFailing lines:\n\n${fails}` : text.slice(-4000),
+              },
+            });
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: majin-v4-windows-test-package
+          path: |
+            desktop/dist/*Setup.exe
+            desktop/dist/*.blockmap
+            docs/v4/evidence/
+          if-no-files-found: error
+          retention-days: 14

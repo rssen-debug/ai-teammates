@@ -1,0 +1,41 @@
+✔ semantic form batches reground replaced nodes, use a different native input strategy, verify exact uploads and refuse ambiguous/auth targets (6006.1828ms)
+✔ browser form controls retain values and uploads while rejecting ambiguous or stale targets (7648.6858ms)
+✔ host: rejected input names the missing argument without echoing private values (277.3773ms)
+✔ host: concurrent goals get isolated V1 sessions and approvals retain the same goal session (737.8328ms)
+✔ host: browser uploads enforce live folder grants before reaching the browser (20.9331ms)
+✔ host: adapted V1 calls receive the real per-call abort signal without mutating shared context (0.9615ms)
+✔ host: capability detection is self-consistent on whatever host runs it (414.1325ms)
+✔ host: the capability report is serialisable and carries no module handles (528.8694ms)
+✔ host: a lane reported unavailable registers no tools at all (1.0399ms)
+✔ host: available lanes register with tiers that drive approval (457.3151ms)
+✔ host: a held shell tool cannot run without consent (511.1129ms)
+✔ host: a file read through the bus returns structured data (622.9377ms)
+✔ host: an owner allowlist narrows what is exposed (515.4309ms)
+✔ host: an adapted tool that reports "unsupported" fails with a class (1.2575ms)
+✔ host: an adapted tool that throws is classified, never a success (0.8616ms)
+✔ host: risk maps to the tiers the runner enforces (0.1319ms)
+✔ host: V1 param strings become a permissive zod schema, not a guessing one (1.1333ms)
+✔ host: browser binary detection never reports a binary it did not find (0.6823ms)
+✔ host: lane export names come from one table, so a V1 rename is one line (0.2ms)
+✔ host: every discovered lane is a real module with a real export (615.3411ms)
+✔ host: capabilities endpoint is authenticated and reports the owner-mode state (1235.6496ms)
+✔ host: a grant registers the files lane and keeps destructive tools held (1121.9826ms)
+✔ host: the install-time allowlist limits what a grant can expose (974.0608ms)
+✔ host: browser tools are withheld when no browser runtime exists, and named as skipped (0.9145ms)
+✔ host: the whole working tool set is substantial and every entry has a tier (370.7217ms)
+✔ host: a structured V1 failure becomes a classified failure, not a schema break (1.0618ms)
+✔ host: a protected-path refusal is classified as a permission error (0.7831ms)
+✔ host: classifyV1Error maps the V1 vocabulary onto the kernel classes (0.3775ms)
+✔ cli: v4:tools reports lanes and refuses to claim a tool it cannot probe (986.5705ms)
+✔ team: failed nodes are retried on resume; only successful work is skipped (50.0024ms)
+✔ team: dependencies receive verified artifacts and text; budgets reach the worker (27.1369ms)
+✔ team: cancellation prevents dependent work and never checkpoints cancelled work as done (13.2272ms)
+✔ graph: explanatory text cannot turn a failed tool action into success (8.429ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10469.809

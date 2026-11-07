@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-23T21:12:52.951693+00:00",
+  "parentCommit": "909d758e5c10ce8d58d62cca67cd78a5a8da4bdd",
+  "fullV4": {
+    "tests": 525,
+    "passed": 524,
+    "failed": 1,
+    "skipped": 0,
+    "durationMs": 472161.5126,
+    "failure": "Old per-conversation model integration sent no version or cost authorization; new API returned 409.",
+    "completeGreenRun": false
+  },
+  "subsequentChanges": "Updated integration contract for canonical selection and actual restart; approval UI busy/cancel handling, with focused regressions.",
+  "currentSourceFocused": {
+    "tests": 45,
+    "passed": 45,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 40443.4616
+  },
+  "i18n": {
+    "files": 322,
+    "strayLiterals": 0
+  },
+  "physicalDevicePass": false,
+  "releaseReady": false
+}

@@ -1,0 +1,29 @@
+name: MAJIN V3 fast CI
+
+on:
+  push:
+    branches: [v3/main]
+  pull_request:
+    branches: [v3/main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-fast-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run check
+      - run: npm run i18n

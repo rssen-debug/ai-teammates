@@ -1,0 +1,723 @@
+{
+  "at": "2026-10-24T07:50:12.688Z",
+  "kind": "C",
+  "passed": false,
+  "checks": {
+    "realModelCompleted": false,
+    "sameGenuineProvider": true,
+    "exactlyOneAccepted": false,
+    "allRequestedValues": false,
+    "exactFileBytes": false,
+    "savedVerifiedReceipt": false,
+    "noDeniedAction": true,
+    "validationRecovery": false
+  },
+  "failure": null,
+  "status": "failed",
+  "elapsedMs": 22825,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "sourceHead": "704de6320341993adb50303b8e11e646cca64710",
+  "dirtyCheckout": true,
+  "sourceHashes": {
+    "src/core/browser-form.js": "683275b856ef0970832e53696f17048ba53bf758a31a73b88c1be3848c512dd2",
+    "src/core/tools/web.js": "586f8b5d00e44cd9a890ba3c668fabce070e19438c0fc3a981ba52f19706172a",
+    "src/v4/agent.js": "f19c7873963c0781d57a734bacfae623e9e35d745aa8c35d975b791defbf2d65",
+    "src/v4/tools/host.js": "3bdbcff507d297852ec17111595c4a3b804a0d6f1e25be4f56de70e45777e262",
+    "scripts/v4/evals/form-autonomy.mjs": "337614d782542ff36c70e7b1a72e72829ffc3441115a20dc4d4cb14b2225914c",
+    "scripts/v4/evals/form-autonomy-fixtures.mjs": "402e5f4c24dd54e62e4c46711e45bdb135f0ebbde44ce320345e5a4e7675a8af"
+  },
+  "modelRounds": 12,
+  "toolCalls": 14,
+  "uniqueToolRequests": 14,
+  "approved": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_upload",
+    "browser_click",
+    "browser_click",
+    "browser_click"
+  ],
+  "denied": [],
+  "stagnationStop": false,
+  "toolFailures": [
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b87da2bc6a34a260",
+        "name": "browser_form",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_OUTPUT",
+        "error": "tool browser_form produced schema-mismatching output: Invalid input: expected string, received null"
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b38fc7a0af42d8a3",
+        "name": "browser_click",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "Use role+accessibleName together, uniquely, without selector/ref"
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-858253bf50679bb0",
+        "name": "browser_click",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "Specify a selector, URL fragment, exact URL path/origin, or title fragment to verify"
+      }
+    }
+  ],
+  "trace": [
+    {
+      "event": "state",
+      "seq": 4,
+      "data": {
+        "state": "thinking",
+        "round": 1
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 5,
+      "data": {
+        "id": "chatcmpl-tool-b5068beb5daa47bc",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:54358/"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b5068beb5daa47bc",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:54358/"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b5068beb5daa47bc",
+        "name": "browser_open",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_4d59701992e3ecd0"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 2
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b87da2bc6a34a260",
+        "name": "browser_form",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b87da2bc6a34a260",
+        "name": "browser_form",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_OUTPUT",
+        "error": "tool browser_form produced schema-mismatching output: Invalid input: expected string, received null"
+      }
+    },
+    {
+      "event": "recovery",
+      "seq": 0,
+      "data": {
+        "tool": "browser_form",
+        "failureClass": "INVALID_TOOL_OUTPUT",
+        "action": "none",
+        "advice": [
+          "revalidate_input",
+          "alternate_tool"
+        ],
+        "budget": 2
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 3
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-80f489d70909225f",
+        "name": "browser_elements",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-80f489d70909225f",
+        "name": "browser_elements",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_8afef199522ccfe7"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 4
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9d6a2a88ec2113ed",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e1",
+          "value": "Atlas 200e91e83d"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9d6a2a88ec2113ed",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e1",
+          "value": "Atlas 200e91e83d"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9d6a2a88ec2113ed",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_b5c4c35572b94a3b"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9ffb2eda3bc1e1aa",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e2",
+          "value": "person-200e91e83d@example.invalid"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9ffb2eda3bc1e1aa",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e2",
+          "value": "person-200e91e83d@example.invalid"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9ffb2eda3bc1e1aa",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_3df9a7254c98802d"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9d95356c9001a5fb",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e3",
+          "value": "4"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9d95356c9001a5fb",
+        "name": "browser_fill",
+        "input": {
+          "ref": "e3",
+          "value": "4"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9d95356c9001a5fb",
+        "name": "browser_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_763412c3a20f4acc"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 5
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9557da618e1a1f96",
+        "name": "browser_upload",
+        "input": {
+          "path": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt1\\home\\workspace\\form-C-75946e3c3ac6.txt",
+          "ref": "e4"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9557da618e1a1f96",
+        "name": "browser_upload",
+        "input": {
+          "path": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt1\\home\\workspace\\form-C-75946e3c3ac6.txt",
+          "ref": "e4"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9557da618e1a1f96",
+        "name": "browser_upload",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_6f23166923353d76"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 6
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-98c8b1da6208ec77",
+        "name": "browser_elements",
+        "input": {
+          "query": "consent submit"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-98c8b1da6208ec77",
+        "name": "browser_elements",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_8066b620761dfe6b"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 7
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8db2444c661f7ea1",
+        "name": "browser_elements",
+        "input": {
+          "refresh": "true"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8db2444c661f7ea1",
+        "name": "browser_elements",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_5c10c030b01d7343"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 8
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-922bf2c06de226e1",
+        "name": "browser_read",
+        "input": {
+          "mode": "compact"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-922bf2c06de226e1",
+        "name": "browser_read",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_1b832e8f6e0fe758"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 9
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b4aab72ab4b55345",
+        "name": "browser_click",
+        "input": {
+          "accessibleName": "Allow this isolated application",
+          "role": "checkbox"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b4aab72ab4b55345",
+        "name": "browser_click",
+        "input": {
+          "accessibleName": "Allow this isolated application",
+          "role": "checkbox"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b4aab72ab4b55345",
+        "name": "browser_click",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_9514b7f5c6196b01"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 10
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b38fc7a0af42d8a3",
+        "name": "browser_click",
+        "input": {
+          "accessibleName": "Send application",
+          "expectText": "receipt",
+          "role": "button",
+          "selector": "button[type=submit]"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b38fc7a0af42d8a3",
+        "name": "browser_click",
+        "input": {
+          "accessibleName": "Send application",
+          "expectText": "receipt",
+          "role": "button",
+          "selector": "button[type=submit]"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b38fc7a0af42d8a3",
+        "name": "browser_click",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "Use role+accessibleName together, uniquely, without selector/ref"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 11
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-ac35e5a17fa252d0",
+        "name": "browser_elements",
+        "input": {
+          "query": "Send application"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-ac35e5a17fa252d0",
+        "name": "browser_elements",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_c453db329d1addfc"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 12
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-858253bf50679bb0",
+        "name": "browser_click",
+        "input": {
+          "expectText": "receipt",
+          "ref": "e6"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-858253bf50679bb0",
+        "name": "browser_click",
+        "input": {
+          "expectText": "receipt",
+          "ref": "e6"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-858253bf50679bb0",
+        "name": "browser_click",
+        "ok": false,
+        "verified": false,
+        "summary": "UNKNOWN",
+        "error": "Specify a selector, URL fragment, exact URL path/origin, or title fragment to verify"
+      }
+    },
+    {
+      "event": "error",
+      "seq": 0,
+      "data": {
+        "message": "model round budget exhausted (12); task is incomplete",
+        "messageId": "msg_mvm3mmbs_d51d4d1fc7cb",
+        "goalId": "goal_mvm3m4sh_3"
+      }
+    }
+  ],
+  "proof": {
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/",
+        "origin": null
+      },
+      {
+        "method": "GET",
+        "path": "/favicon.ico",
+        "origin": null
+      }
+    ],
+    "submissions": [],
+    "steps": [],
+    "accepted": null,
+    "challenge": false
+  },
+  "artifacts": {
+    "fileName": "form-C-75946e3c3ac6.txt",
+    "receiptName": "receipt-C-75946e3c3ac6.txt"
+  },
+  "ordinaryGhostActivationProven": false,
+  "isolatedTestHost": true,
+  "physicalAcceptance": false,
+  "cost": {
+    "currencyAmount": null,
+    "reason": "Provider billing not independently supplied; token telemetry must not be converted to an invented price"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "at": "2026-10-23T22:28:12.056Z",
+  "sourceParent": "7ec1008a019aa0a159823c480b8d35df7d89968b",
+  "verdict": "NOT READY",
+  "changes": [
+    "CDP request identity and disconnect settlement",
+    "per-call abort propagation",
+    "owned browser startup/navigation cancellation",
+    "pre-mutation cancellation checks",
+    "authorized tool-exposure fixture"
+  ],
+  "focused": {
+    "combined": {
+      "passed": 57,
+      "failed": 0,
+      "skipped": 0
+    },
+    "agentApprovalCancelBrowser": {
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    },
+    "note": "Overlapping focused suites; not a full-suite total."
+  },
+  "actualLocalBrowser": {
+    "stalledNavigationCancelled": true,
+    "ownedDebugEndpointClosed": true,
+    "fleetSlotReturned": true,
+    "noLateSession": true,
+    "preAbortedOpenClaimsNoSlot": true
+  },
+  "newLiveModelAcceptance": false,
+  "priorLiveFormAttempts": 5,
+  "priorLiveFormPasses": 0,
+  "physicalPhonePass": false,
+  "productionReleasePass": false,
+  "storageHeadroomPass": false,
+  "priorCi": {
+    "commit": "7ec1008a019aa0a159823c480b8d35df7d89968b",
+    "linux": {
+      "passed": 531,
+      "failed": 1,
+      "skipped": 7,
+      "job": 120685222797
+    },
+    "windows": {
+      "passed": 537,
+      "failed": 1,
+      "skipped": 1,
+      "job": 120685222596
+    },
+    "failure": "Synthetic fs.stat fixture lacked an authorized root; now supplies temporary workspace and asserts outside-path denial."
+  }
+}

@@ -1,0 +1,24 @@
+name: MAJIN real browser model selection survives restart
+on:
+  push:
+    branches: [fix/real-browser-model-picker-restart-qa-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  model-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: npx playwright install --with-deps chromium
+      - name: Actual MAJIN server plus real Chromium OpenCode Go selection and restart
+        run: node scripts/qa/model-picker-live-browser.mjs
+      - run: node --test test/model-picker-persist-readback.test.js test/onboarding.test.js
+      - run: npm test
+      - run: npm run check

@@ -1,0 +1,17 @@
+{
+  "scenario": "F_procedural_memory",
+  "model": "deepseek-v4-pro",
+  "liveInference": true,
+  "learnedVerifiedProcedure": true,
+  "persistedProcedures": 1,
+  "reconstructedArchitect": true,
+  "modelSearched": true,
+  "modelRead": true,
+  "independentNewFileVerification": true,
+  "originalFileUnchanged": true,
+  "parameterValuesAbsentFromProcedure": true,
+  "elapsedMs": 16134,
+  "modelCalls": 8,
+  "toolCalls": 6,
+  "status": "passed"
+}

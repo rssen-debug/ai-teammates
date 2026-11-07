@@ -1,0 +1,41 @@
+{
+  "at": "2026-10-23T19:54:05.804Z",
+  "machine": "DESKTOP-C1RSBUA",
+  "ttsEngine": "existing Kokoro ONNX am_adam",
+  "sttModel": "faster-whisper tiny, local CPU int8, auto language",
+  "checks": [
+    {
+      "case": "english",
+      "status": 200,
+      "transcript": "Hello, Major. Please answer in English. How are you today?",
+      "language": "en",
+      "elapsedMs": 1954,
+      "totalMs": 2097,
+      "source": "Windows synthetic speech, not physical microphone"
+    },
+    {
+      "case": "swedish",
+      "status": 200,
+      "transcript": "Hej Magin. Kan du öppna historiken och visa mina senaste meddelande?",
+      "language": "sv",
+      "elapsedMs": 1938,
+      "totalMs": 1973,
+      "source": "Windows synthetic speech, not physical microphone"
+    }
+  ],
+  "security": {
+    "crossOrigin": 403,
+    "invalidAudio": 422,
+    "over35Seconds": 413
+  },
+  "tts": {
+    "httpStatus": 200,
+    "wavHeader": "RIFF",
+    "bytes": 117132,
+    "sha256": "1a1b535c3a2f920875a6870a92fef30d1cd199b2befed4063c69571d83944dff",
+    "elapsedMs": 3460
+  },
+  "physicalVoiceAccepted": false,
+  "voiceQualityAccepted": false,
+  "phoneRoundtripMeasured": false
+}

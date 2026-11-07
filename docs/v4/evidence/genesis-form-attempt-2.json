@@ -1,0 +1,113 @@
+{
+  "at": "2026-10-23T21:52:09.413Z",
+  "sourceCommit": "43003d350704abff768bf381c6e36a0c59b2465e",
+  "kind": "real-Go-unfamiliar-local-form",
+  "passed": false,
+  "checks": {
+    "realModelCompleted": false,
+    "providerUnchanged": true,
+    "browserUpload": false,
+    "browserInteraction": false,
+    "validationRecovered": false,
+    "oneAcceptedRegistration": false,
+    "exactUploadedBytes": false,
+    "savedObservedReceipt": false
+  },
+  "failure": "model round budget exhausted (12); task is incomplete",
+  "status": "failed",
+  "elapsedMs": 20203,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "conversationId": "conv_mvli933d_fe39cbce6931",
+  "successfulActions": [
+    "browser_open",
+    "browser_elements",
+    "browser_fill",
+    "browser_read",
+    "browser_elements",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill"
+  ],
+  "toolFailures": [
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "the page reverted the value immediately — the field may have javascript validation — type slower substrings or confirm the field with browser.shot"
+    },
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "the page reverted the value immediately — the field may have javascript validation — type slower substrings or confirm the field with browser.shot"
+    },
+    {
+      "name": "browser_fill",
+      "summary": "INVALID_TOOL_INPUT:MAJIN",
+      "error": "tool browser_fill input failed schema: Invalid input: expected string, received undefined"
+    },
+    {
+      "name": "browser_fill",
+      "summary": "INVALID_TOOL_INPUT:MAJIN",
+      "error": "tool browser_fill input failed schema: Invalid input: expected string, received undefined"
+    },
+    {
+      "name": "browser_fill",
+      "summary": "INVALID_TOOL_INPUT:MAJIN",
+      "error": "tool browser_fill input failed schema: Invalid input: expected string, received undefined"
+    },
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "the page reverted the value immediately — the field may have javascript validation — type slower substrings or confirm the field with browser.shot"
+    },
+    {
+      "name": "browser_fill",
+      "summary": "INVALID_TOOL_INPUT:MAJIN",
+      "error": "tool browser_fill input failed schema: Invalid input: expected string, received undefined"
+    },
+    {
+      "name": "browser_fill",
+      "summary": "UNKNOWN",
+      "error": "the page reverted the value immediately — the field may have javascript validation — type slower substrings or confirm the field with browser.shot"
+    },
+    {
+      "name": "browser_fill",
+      "summary": "INVALID_TOOL_INPUT:MAJIN",
+      "error": "tool browser_fill input failed schema: Invalid input: expected string, received undefined"
+    }
+  ],
+  "oneUseApprovals": [
+    "browser_open",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill",
+    "browser_fill"
+  ],
+  "deniedActions": [],
+  "proof": {
+    "submissions": [],
+    "needsSlot": false,
+    "accepted": null
+  },
+  "artifacts": {
+    "uploadName": "genesis-form-upload-54e5cb1acf47.txt",
+    "receiptName": "genesis-form-receipt-54e5cb1acf47.txt"
+  },
+  "physicalPhonePass": false,
+  "fullScenarioAComplete": false,
+  "note": "Controlled dynamic-form/upload/validation acceptance only; external authentication handoff, cancellation and other real-world gates remain separate."
+}

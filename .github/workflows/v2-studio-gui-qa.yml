@@ -1,0 +1,86 @@
+name: V2 Studio live GUI QA (operator runner)
+
+on:
+  push:
+    branches: [v2/main]
+  workflow_dispatch:
+    inputs:
+      headless:
+        description: 'Run headless (false = headed proof on the real desktop)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+permissions:
+  contents: read
+
+# The operator machine runs a RESTRICTED PowerShell ExecutionPolicy — runner
+# steps were blocked (PSSecurityException) before the first npm command. The
+# default shell below launches each step with an explicit bypass: policy of
+# THE JOB, not the machine (documented for the operator; the machine policy
+# itself is never touched by this lane).
+defaults:
+  run:
+    shell: powershell -NoProfile -ExecutionPolicy Bypass -File "{0}"
+
+
+concurrency:
+  group: v2-studio-gui-qa
+  cancel-in-progress: false
+
+jobs:
+  gui-qa:
+    name: Drive real Chromium through the full Studio surface family (evidence artifacts)
+    runs-on: [self-hosted, windows, majin-interactive]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install pinned dependencies (manifest ≡ journal)
+        run: |
+          $t=[Diagnostics.Stopwatch]::StartNew()
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
+          Write-Host ("npm ci: {0:N1}s" -f $t.Elapsed.TotalSeconds)
+      # REUSE: the operator machine already ships Microsoft Edge — Playwright drives it via
+      # channel 'msedge' (harness falls back to chromium honestly if Edge is absent).
+      # No 120MB browser download in this lane, by design.
+      - name: Run the GUI-QA evidence harness against a real Studio instance
+        env:
+          GUI_HEADLESS: ${{ github.event_name == 'push' && '1' || (inputs.headless == 'true' && '1' || '0') }}
+          GUI_QA_OUT: gui-qa-out
+        timeout-minutes: 15
+        run: |
+          $t=[Diagnostics.Stopwatch]::StartNew()
+          node scripts/v2-gui-qa.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'GUI-QA RED — see gui-qa-out/gui-qa-results.json artifact' }
+          Write-Host ("gui-qa script: {0:N1}s" -f $t.Elapsed.TotalSeconds)
+      - name: Human summary (GITHUB_STEP_SUMMARY reuse)
+        if: always()
+        run: |
+          $path = "gui-qa-out/gui-qa-results.json"
+          if (Test-Path $path) {
+            $r = Get-Content $path -Raw | ConvertFrom-Json
+            $ok = ($r.steps | Where-Object {$_.ok}).Count
+            $tot = ($r.steps).Count
+            Add-Content $env:GITHUB_STEP_SUMMARY ("## GUI-QA: " + $r.verdict + " (" + $ok + "/" + $tot + ")")
+            Add-Content $env:GITHUB_STEP_SUMMARY ""
+            Add-Content $env:GITHUB_STEP_SUMMARY "| Steg | Status | Notis |"
+            Add-Content $env:GITHUB_STEP_SUMMARY "|---|---|---|"
+            foreach ($s in $r.steps) { $mark = if ($s.ok) { ":white_check_mark:" } else { ":x:" }; $note = if ($s.note) { $s.note } else { "" }; Add-Content $env:GITHUB_STEP_SUMMARY ("| " + $s.label + " | " + $mark + " | " + $note + " |") }
+            Add-Content $env:GITHUB_STEP_SUMMARY ""
+            Add-Content $env:GITHUB_STEP_SUMMARY ("**Kanal:** " + $r.channel + " | **Headless:** " + $r.headless + " | **Run:** " + $env:GITHUB_RUN_ID)
+          } else {
+            Add-Content $env:GITHUB_STEP_SUMMARY "## GUI-QA: harness dog tidigt - se artifact-upload + logg"
+          }
+
+      - name: Upload evidence (results JSON + full-page screenshot)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-studio-gui-qa-evidence
+          path: gui-qa-out/
+          if-no-files-found: warn

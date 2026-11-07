@@ -1,0 +1,104 @@
+{
+  "schema": "majin.win-uia-probe.v2.1",
+  "timestamp": "2026-10-20T00:23:23.1000304Z",
+  "env": {
+    "osVersion": "Microsoft Windows NT 10.0.26100.0",
+    "psVersion": "5.1.26100.33438",
+    "clrVersion": "4.0.30319.42000",
+    "machineName": "runnervm0xl3a",
+    "is64Bit": true,
+    "userName": "runneradmin",
+    "userDomain": "runnervm0xl3a",
+    "userInteractive": true,
+    "sessionId": 2
+  },
+  "p1_assemblyAndRoot": {
+    "loaded": true,
+    "topWindowCount": 3,
+    "topWindows": [
+      {
+        "name": "",
+        "className": "Shell_TrayWnd",
+        "controlType": "ControlType.Pane",
+        "bounds": "0,720,1024,48"
+      },
+      {
+        "name": "C:\\ProgramData\\GitHub\\HostedComputeAgent\\hosted-compute-agent",
+        "className": "CASCADIA_HOSTING_WINDOW_CLASS",
+        "controlType": "ControlType.Window",
+        "bounds": "18,26,1044,635"
+      },
+      {
+        "name": "Program Manager",
+        "className": "Progman",
+        "controlType": "ControlType.Pane",
+        "bounds": "0,0,1024,768"
+      }
+    ]
+  },
+  "p2_negativeControl": {
+    "windowName": "MAJIN-Nonexistent-Window-7f3b9d2e",
+    "found": false,
+    "nullAsExpected": true
+  },
+  "p3_notepad": {
+    "launched": true,
+    "windowFound": true,
+    "windowName": "Untitled - Notepad",
+    "className": "Notepad",
+    "controlType": null,
+    "valuePatternOk": false,
+    "textPatternOk": false,
+    "setValueOk": false,
+    "readBackOk": false,
+    "readBackMatches": false,
+    "clearedOk": false,
+    "closedOk": true,
+    "gapReason": "no Edit/Document control under the Notepad window"
+  },
+  "p5_subtreeAndFallback": {
+    "ran": true,
+    "nodeCount": 2,
+    "nodes": [
+      {
+        "idx": 0,
+        "name": "",
+        "className": "Edit",
+        "controlType": "ControlType.Pane",
+        "patterns": []
+      },
+      {
+        "idx": 1,
+        "name": "",
+        "className": "msctls_statusbar32",
+        "controlType": "ControlType.Pane",
+        "patterns": []
+      }
+    ],
+    "valuePatternCandidates": 0,
+    "textPatternCandidates": 0,
+    "fallbackValueWriteOk": false,
+    "fallbackReadBackMatches": false,
+    "fallbackClearedOk": false,
+    "sendKeysAttempted": true,
+    "sendKeysOk": false,
+    "winnerLane": null,
+    "note": null
+  },
+  "capabilities": {
+    "identifyWindows": true,
+    "locateControls": true,
+    "textInput": false,
+    "readBack": false
+  },
+  "notes": [],
+  "evidenceSource": {
+    "runId": 39347315232,
+    "artifactId": 12231398736,
+    "artifactName": "uia-probe-result",
+    "workflow": "win-control-poc.yml",
+    "ref": "main (971da8b)",
+    "event": "workflow_dispatch",
+    "collectedBy": "MAJIN Agent 2026-10-20"
+  }
+}

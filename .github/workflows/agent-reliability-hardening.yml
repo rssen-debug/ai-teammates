@@ -1,0 +1,39 @@
+name: MAJIN agent reliability hardening QA
+
+on:
+  push:
+    branches: [fix/agent-reliability-dynamic-tools-20261020]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Syntax-check all modified agent components
+        run: |
+          node --check src/core/loop.js
+          node --check src/core/agent.js
+          node --check src/core/context.js
+          node --check src/core/watchdog.js
+          node --check test/agent-reliability.test.js
+      - name: Run agent reliability regressions
+        run: node --test test/agent-reliability.test.js
+      - name: Full existing suite
+        run: npm test
+      - name: Source parse checks
+        run: npm run check

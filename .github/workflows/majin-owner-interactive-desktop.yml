@@ -1,0 +1,106 @@
+name: MAJIN interactive desktop bridge preflight
+on:
+  push:
+    branches: [qa/interactive-desktop-bridge-20261021, release/majin-v1.0.2-reliability-20261021, release/majin-v1.0.2-interactive-20261021, fix/icon-and-universal-win-qa-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write # only bounded QA verdict on PR #218, no files or secrets
+concurrency:
+  group: interactive-desktop-bridge
+  cancel-in-progress: true
+jobs:
+  preflight:
+    name: Verify actual owner-PC desktop bridge without changing user files
+    runs-on: [self-hosted, windows, interactive-desktop, majin-qa]
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check interactive desktop in current process session (no screenshots)
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          Add-Type -AssemblyName System.Windows.Forms
+          $sessionId = (Get-Process -Id $PID).SessionId
+          $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+          $bounds = $screen.Bounds
+          $interactive = [Environment]::UserInteractive
+          $isRealSession = $interactive -and ($sessionId -gt 0) -and ($bounds.Width -ge 600) -and ($bounds.Height -ge 400)
+          $proof = [ordered]@{
+            schema='majin.owner-desktop-preflight.v1'
+            interactive=$interactive
+            sessionAboveZero=($sessionId -gt 0)
+            usableScreen=($bounds.Width -ge 600 -and $bounds.Height -ge 400)
+            runnerIsSelfHosted=($env:RUNNER_ENVIRONMENT -eq 'self-hosted')
+            detected=($isRealSession -and ($env:RUNNER_ENVIRONMENT -eq 'self-hosted'))
+            note='No app started, no screenshot, no mouse or keyboard action; read-only desktop preflight.'
+          }
+          $proof | ConvertTo-Json -Compress | Set-Content -Encoding utf8 (Join-Path $env:RUNNER_TEMP 'majin-interactive-preflight.json')
+          $proof | ConvertTo-Json -Compress | Write-Host
+          if (-not $proof.detected) { throw 'No proven interactive desktop on the connected runner; GUI live testing blocked.' }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install MAJIN dependencies only into isolated checkout
+        shell: powershell
+        run: |
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'npm ci failed in QA checkout' }
+      - name: Check JS syntax and cloud desktop planner safeguards
+        shell: powershell
+        run: |
+          node --check src/core/tools/computer.js
+          if ($LASTEXITCODE -ne 0) { throw 'computer tool syntax failed' }
+          node --test test/computer-use-live-contract.test.js test/computer-use.test.js test/wincontrol.test.js
+          if ($LASTEXITCODE -ne 0) { throw 'computer-use contract regression failed' }
+      - name: Verify actual GUI tool operations and W12 pink pixels
+        shell: powershell
+        timeout-minutes: 8
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          MAJIN_LLM_TIMEOUT: '45000'
+        run: |
+          node scripts/qa/owner-desktop-live.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Real Windows desktop QA failed; inspect owner-desktop evidence' }
+      - name: Validate real OpenCode Go, synthetic jobs and Blender (if installed) in isolated QA folder
+        shell: powershell
+        timeout-minutes: 15
+        env:
+          MAJIN_OWNER_QA: '1'
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          MAJIN_LLM_TIMEOUT: '45000'
+        run: |
+          node --check scripts/qa/universal-owner-windows.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'QA script syntax failed' }
+          node scripts/qa/universal-owner-windows.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Owner Windows universal QA has a genuine failing or untested required step' }
+      - name: Upload non-sensitive preflight verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-desktop-preflight
+          path: |
+            ${{ runner.temp }}/majin-interactive-preflight.json
+            qa-evidence/owner-desktop.json
+            qa-evidence/universal-owner.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Post sanitized owner Windows QA status to PR #218
+        if: ${{ always() && github.ref == 'refs/heads/fix/icon-and-universal-win-qa-20261021' }}
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $file = Join-Path $env:GITHUB_WORKSPACE 'qa-evidence/universal-owner.json'
+          if (Test-Path $file) {
+            $r = Get-Content $file -Raw | ConvertFrom-Json
+            $summary = "MAJIN owner Windows QA, commit `$env:GITHUB_SHA`: Go=$($r.model), Blender=$($r.blender), synthetic jobs=$($r.jobs). Tests only; no real applications sent. Blender NOT_TESTED means not installed or not available. Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          } else {
+            $summary = "MAJIN owner Windows QA did NOT produce a verdict; preflight or earlier step blocked. Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          }
+          $json = @{body=$summary} | ConvertTo-Json -Compress
+          $headers = @{ Authorization="Bearer $env:GH_TOKEN"; Accept='application/vnd.github+json'; 'User-Agent'='MAJIN-QA' }
+          try {
+            Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/issues/218/comments" -Method Post -ContentType 'application/json' -Headers $headers -Body ([Text.Encoding]::UTF8.GetBytes($json)) | Out-Null
+            Write-Host 'PR QA status posted (only PASS/FAIL/NOT_TESTED labels, no local paths)'
+          } catch { Write-Warning 'Could not post owner QA status; report remains in workflow artifact' }

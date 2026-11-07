@@ -1,0 +1,630 @@
+{
+  "at": "2026-10-24T08:13:21.555Z",
+  "kind": "B",
+  "passed": true,
+  "checks": {
+    "realModelCompleted": true,
+    "sameGenuineProvider": true,
+    "exactlyOneAccepted": true,
+    "allRequestedValues": true,
+    "exactFileBytes": true,
+    "savedVerifiedReceipt": true,
+    "noDeniedAction": true,
+    "validationRecovery": true
+  },
+  "failure": null,
+  "status": "completed",
+  "elapsedMs": 26709,
+  "model": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "modelAfter": {
+    "demo": false,
+    "provider": "opencode-go",
+    "model": "glm-5.3-flash",
+    "label": "OpenCode Go · glm-5.3-flash"
+  },
+  "sourceHead": "1b2fc8533e859e7cf2159cd1bc560eb89abaa4ce",
+  "dirtyCheckout": true,
+  "sourceHashes": {
+    "src/core/browser-form.js": "109a121be015b639f1eb65b65f703bf9e9cccadaa31f9c87937f1c90f7f81c47",
+    "src/core/tools/web.js": "dafeee5a51603272f23535442896fcf56cf421e6d5f5d6a0fcfa727601351eb1",
+    "src/v4/agent.js": "e8d23a64bedabd9b7e08a40fedd741a4dcb1e569b3b200dfa5e5ad50855189dd",
+    "src/v4/tools/host.js": "033d84625a240b1e42e174d2e96716a9073fe2d107dfdce0ce1d4cff6c435e97",
+    "scripts/v4/evals/form-autonomy.mjs": "a57cf7aad4df8976cc08822f96545b428cc4c8dffdb082547268529615d4b2ae",
+    "scripts/v4/evals/form-autonomy-fixtures.mjs": "402e5f4c24dd54e62e4c46711e45bdb135f0ebbde44ce320345e5a4e7675a8af"
+  },
+  "modelRounds": 11,
+  "toolCalls": 10,
+  "uniqueToolRequests": 10,
+  "approved": [
+    "browser_open",
+    "browser_form_fill",
+    "browser_form_submit",
+    "browser_form_fill",
+    "browser_form_submit",
+    "browser_form_submit"
+  ],
+  "denied": [],
+  "stagnationStop": false,
+  "toolFailures": [
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8595f97d7b8f5362",
+        "name": "browser_form_submit",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool browser_form_submit input failed schema at button: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    }
+  ],
+  "trace": [
+    {
+      "event": "state",
+      "seq": 4,
+      "data": {
+        "state": "thinking",
+        "round": 1
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 5,
+      "data": {
+        "id": "chatcmpl-tool-9a0fa277df8176b1",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:65398/"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9a0fa277df8176b1",
+        "name": "browser_open",
+        "input": {
+          "url": "http://127.0.0.1:65398/"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9a0fa277df8176b1",
+        "name": "browser_open",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_9e51869a982be39e"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 2
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9ef54d295d4ae4b6",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Applicant name": "Atlas bd78bad58a",
+            "Email address": "person-bd78bad58a@example.invalid"
+          }
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9ef54d295d4ae4b6",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Applicant name": "Atlas bd78bad58a",
+            "Email address": "person-bd78bad58a@example.invalid"
+          }
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9ef54d295d4ae4b6",
+        "name": "browser_form_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_8c6152a95a8a0f06",
+        "formProgress": {
+          "verifiedFields": 2,
+          "recoveries": 0,
+          "strategies": [
+            "live_field"
+          ]
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 3
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-afeaef9a97a5091b",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Continue to documents"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-afeaef9a97a5091b",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Continue to documents"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-afeaef9a97a5091b",
+        "name": "browser_form_submit",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_57c1e87463d4533f"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 4
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a9e5c0a72d811024",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Allow this isolated application": true,
+            "Application attachment": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt4\\home\\workspace\\form-B-ed30ae1469f2.txt"
+          }
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a9e5c0a72d811024",
+        "name": "browser_form_fill",
+        "input": {
+          "values": {
+            "Allow this isolated application": true,
+            "Application attachment": "C:\\Users\\Ghost\\Documents\\Codex\\2026-10-23\\forts-tt-majin-v4-max-5-2\\work\\form-autonomy-round2-attempt4\\home\\workspace\\form-B-ed30ae1469f2.txt"
+          }
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-a9e5c0a72d811024",
+        "name": "browser_form_fill",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_13de69ce0d03c108",
+        "formProgress": {
+          "verifiedFields": 2,
+          "recoveries": 0,
+          "strategies": [
+            "live_field"
+          ]
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 5
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8595f97d7b8f5362",
+        "name": "browser_form_submit",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8595f97d7b8f5362",
+        "name": "browser_form_submit",
+        "ok": false,
+        "verified": false,
+        "summary": "INVALID_TOOL_INPUT:MAJIN",
+        "error": "tool browser_form_submit input failed schema at button: Invalid input: expected string, received undefined. Correct the named argument using the tool schema."
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 6
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-883f065a5e55ddb6",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Review application"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-883f065a5e55ddb6",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Review application"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-883f065a5e55ddb6",
+        "name": "browser_form_submit",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_77574275d9949284"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 7
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-83b7da1dbea19f9f",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Confirm application"
+        }
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "working"
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-83b7da1dbea19f9f",
+        "name": "browser_form_submit",
+        "input": {
+          "button": "Confirm application"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-83b7da1dbea19f9f",
+        "name": "browser_form_submit",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_ca7df0272623afa0"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 8
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b5ddada197e6762b",
+        "name": "browser_read",
+        "input": {}
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-b5ddada197e6762b",
+        "name": "browser_read",
+        "ok": true,
+        "verified": false,
+        "summary": "klart",
+        "receiptId": "rcpt_89f1587099407aa3"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 9
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8c92857f7ff60617",
+        "name": "workspace_write",
+        "input": {
+          "fileName": "receipt-B-ed30ae1469f2.txt",
+          "chars": 130
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-8c92857f7ff60617",
+        "name": "workspace_write",
+        "ok": true,
+        "verified": true,
+        "summary": "receipt-B-ed30ae1469f2.txt · 130 byte",
+        "receiptId": "rcpt_b18b49272f6fb30b"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 10
+      }
+    },
+    {
+      "event": "tool_start",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9c1ae90eaab6aea4",
+        "name": "workspace_read",
+        "input": {
+          "fileName": "receipt-B-ed30ae1469f2.txt"
+        }
+      }
+    },
+    {
+      "event": "tool_result",
+      "seq": 0,
+      "data": {
+        "id": "chatcmpl-tool-9c1ae90eaab6aea4",
+        "name": "workspace_read",
+        "ok": true,
+        "verified": true,
+        "summary": "receipt-B-ed30ae1469f2.txt · 130 byte",
+        "receiptId": "rcpt_4224eee94cc66b86"
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "thinking",
+        "round": 11
+      }
+    },
+    {
+      "event": "state",
+      "seq": 0,
+      "data": {
+        "state": "verifying"
+      }
+    }
+  ],
+  "proof": {
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/",
+        "origin": null
+      },
+      {
+        "method": "GET",
+        "path": "/favicon.ico",
+        "origin": null
+      },
+      {
+        "method": "POST",
+        "path": "/next",
+        "origin": "http://127.0.0.1:65398"
+      },
+      {
+        "method": "POST",
+        "path": "/next",
+        "origin": "http://127.0.0.1:65398"
+      },
+      {
+        "method": "POST",
+        "path": "/next",
+        "origin": "http://127.0.0.1:65398"
+      }
+    ],
+    "submissions": [
+      {
+        "values": {
+          "name": "Atlas bd78bad58a",
+          "email": "person-bd78bad58a@example.invalid",
+          "step": "1"
+        },
+        "uploadBytes": 0,
+        "uploadSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "accepted": false,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+      },
+      {
+        "values": {
+          "consent": "on",
+          "step": "2"
+        },
+        "uploadBytes": 61,
+        "uploadSha256": "c609412036063e10d6137fbd27e6cc824b9e190ea4a4f9f054c41fa44d676e08",
+        "accepted": false,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+      },
+      {
+        "values": {
+          "name": "Atlas bd78bad58a",
+          "email": "person-bd78bad58a@example.invalid",
+          "step": "3",
+          "consent": "on"
+        },
+        "uploadBytes": 0,
+        "uploadSha256": "c609412036063e10d6137fbd27e6cc824b9e190ea4a4f9f054c41fa44d676e08",
+        "accepted": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+      }
+    ],
+    "steps": [
+      {
+        "step": 1,
+        "values": {
+          "name": "Atlas bd78bad58a",
+          "email": "person-bd78bad58a@example.invalid",
+          "step": "1"
+        }
+      },
+      {
+        "step": 2,
+        "values": {
+          "consent": "on",
+          "step": "2"
+        },
+        "uploadSha256": "c609412036063e10d6137fbd27e6cc824b9e190ea4a4f9f054c41fa44d676e08"
+      }
+    ],
+    "accepted": {
+      "receipt": "ACCEPT-73275ce31c319521c71542a3",
+      "values": {
+        "name": "Atlas bd78bad58a",
+        "email": "person-bd78bad58a@example.invalid",
+        "step": "3",
+        "consent": "on"
+      },
+      "uploadSha256": "c609412036063e10d6137fbd27e6cc824b9e190ea4a4f9f054c41fa44d676e08"
+    },
+    "challenge": false
+  },
+  "artifacts": {
+    "fileName": "form-B-ed30ae1469f2.txt",
+    "receiptName": "receipt-B-ed30ae1469f2.txt"
+  },
+  "recoveryActions": [],
+  "ordinaryGhostActivationProven": false,
+  "isolatedTestHost": true,
+  "physicalAcceptance": false,
+  "cost": {
+    "currencyAmount": null,
+    "reason": "Provider billing not independently supplied; token telemetry must not be converted to an invented price"
+  }
+}

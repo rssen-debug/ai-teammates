@@ -1,0 +1,128 @@
+{
+  "version": "majin-live-provider-chaos/1",
+  "date": "2026-10-21",
+  "at": "2026-10-21T06:38:11.509Z",
+  "provider": "opencode zen/go (live — model choice per-row, see facts)",
+  "wallMs": 3782,
+  "invariants": {
+    "I1_no_stuck_in_live_suite": true,
+    "I2_zero_unhandled_rejections": true,
+    "I3_every_row_within_bound": true,
+    "I4_rate_counts_only_real_verdicts": true,
+    "I5_no_api_key_in_artifacts": true
+  },
+  "totals": {
+    "rows": 7,
+    "recovered": 2,
+    "controlled": 5,
+    "stuck": 0
+  },
+  "recoveryRate": 1,
+  "unhandledRejections": 0,
+  "results": [
+    {
+      "id": "baseline.real-answer-arrives",
+      "hypothesis": "provider answers for real: 1 request, >=1 chars of model text, usage tokens accounted, within bound",
+      "verdict": "recovered",
+      "wallMs": 1634,
+      "boundMs": 20000,
+      "reason": "",
+      "facts": {
+        "ms": 1629,
+        "httpStatus": 200,
+        "textChars": 13,
+        "reasoningChars": 539,
+        "finishReason": "stop",
+        "usage": {
+          "prompt": 28,
+          "completion": 125,
+          "total": 153
+        },
+        "model": "glm-5.3-flash"
+      }
+    },
+    {
+      "id": "latency.tight-deadline-aborts-honestly",
+      "hypothesis": "400ms deadline must yield deadline_abort (no hang, no silent retry loop) and wall under bound",
+      "verdict": "controlled",
+      "wallMs": 405,
+      "boundMs": 3000,
+      "reason": "",
+      "facts": {
+        "ms": 405,
+        "aborted": true,
+        "error": {
+          "code": "deadline_abort",
+          "message": "AbortError"
+        }
+      }
+    },
+    {
+      "id": "abort.mid-flight-zero-leaks",
+      "hypothesis": "external abort (AbortController-equiv: timeoutMs=50) stops the task cleanly — no ghost answer, no unhandled",
+      "verdict": "controlled",
+      "wallMs": 51,
+      "boundMs": 3000,
+      "reason": "",
+      "facts": {
+        "ms": 51,
+        "error": {
+          "code": "deadline_abort",
+          "message": "AbortError"
+        }
+      }
+    },
+    {
+      "id": "auth.bad-key-plain-refusal",
+      "hypothesis": "deliberately broken key must yield auth-4xx loudly on the FIRST call — never a silent retry loop, never 200",
+      "verdict": "controlled",
+      "wallMs": 115,
+      "boundMs": 15000,
+      "reason": "",
+      "facts": {
+        "httpStatus": 401,
+        "code": "auth_refused",
+        "ms": 114
+      }
+    },
+    {
+      "id": "model.bogus-name-refused-plainly",
+      "hypothesis": "invalid model name must yield 4xx/plain refusal, never 200-with-garbage, and wall inside bound",
+      "verdict": "controlled",
+      "wallMs": 113,
+      "boundMs": 15000,
+      "reason": "",
+      "facts": {
+        "httpStatus": 400,
+        "code": "request_refused"
+      }
+    },
+    {
+      "id": "concurrency.burst-of-5-settles-bounded",
+      "hypothesis": "5 parallel identical small calls: ALL settle (ok OR loud 4xx/429) with no unhandled — none hangs",
+      "verdict": "recovered",
+      "wallMs": 1187,
+      "boundMs": 30000,
+      "reason": "",
+      "facts": {
+        "ms": 1187,
+        "oks": 5,
+        "refusedPlain": 0,
+        "leakedRejections": 0
+      }
+    },
+    {
+      "id": "empty-messages.client-or-server-refuses-plainly",
+      "hypothesis": "a guard must exist — client-side refusal OR loud server-4xx, never a silently fabricated completion",
+      "verdict": "controlled",
+      "wallMs": 277,
+      "boundMs": 15000,
+      "reason": "",
+      "facts": {
+        "httpStatus": 400,
+        "code": "request_refused",
+        "refusedBy": "server"
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+name: MAJIN read-then-modify exact content regression
+on:
+  push:
+    branches: [fix/read-then-edit-exact-file-proof-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-content:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --test test/read-then-edit-exact-content.test.js test/verified-single-delete.test.js
+      - run: npm test
+      - run: npm run check

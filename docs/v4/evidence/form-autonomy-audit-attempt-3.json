@@ -1,0 +1,131 @@
+{
+  "at": "2026-10-24T08:00:01.528Z",
+  "attempt": "3",
+  "kind": "post-run-independent-artifact-and-telemetry-audit",
+  "newFormsPassed": 3,
+  "originalRegressionPassed": true,
+  "currentSourceMatches": true,
+  "verdict": "FORM AUTONOMY PASS (three controlled fixtures plus original regression only)",
+  "results": [
+    {
+      "kind": "A",
+      "evidence": "docs/v4/evidence/form-autonomy-A-attempt-3.json",
+      "evidenceSha256": "3203a8dfac3ab4f674ce2922a864c9b426845c976b69428d28fb9cf813d774d3",
+      "passed": true,
+      "independent": {
+        "oneServerAcceptance": true,
+        "exactReceivedBytes": true,
+        "actualSavedReceipt": true,
+        "modelRoundAccounting": true,
+        "genuineGo": true,
+        "receiptChecks": true
+      },
+      "sourceMatchesCurrent": true,
+      "rounds": 10,
+      "toolCalls": 9,
+      "recoveryActions": [
+        {
+          "verifiedFields": 3,
+          "recoveries": 1,
+          "strategies": [
+            "native_type_retry",
+            "live_field"
+          ]
+        }
+      ],
+      "failures": 2,
+      "tokenUsage": {
+        "input": 61009,
+        "output": 467,
+        "source": "Actual provider response telemetry; not a billing receipt"
+      },
+      "currencyCost": null,
+      "receiptSha256": "e35b8ffdd7c6c821d2787a4716798f3785726bd2f04c670b5862540a1e9e28fe",
+      "uploadSha256": "3ddb5cf856827b96fb14d01ccc3faf59c608b9be0d03ff47576c34be04dbfe25"
+    },
+    {
+      "kind": "B",
+      "evidence": "docs/v4/evidence/form-autonomy-B-attempt-3.json",
+      "evidenceSha256": "86e34f803814c007df0ade059a053d83293b97bfe0ae664a0ffe30a0221dfafc",
+      "passed": true,
+      "independent": {
+        "oneServerAcceptance": true,
+        "exactReceivedBytes": true,
+        "actualSavedReceipt": true,
+        "modelRoundAccounting": true,
+        "genuineGo": true,
+        "receiptChecks": true
+      },
+      "sourceMatchesCurrent": true,
+      "rounds": 11,
+      "toolCalls": 10,
+      "recoveryActions": [],
+      "failures": 1,
+      "tokenUsage": {
+        "input": 66668,
+        "output": 396,
+        "source": "Actual provider response telemetry; not a billing receipt"
+      },
+      "currencyCost": null,
+      "receiptSha256": "44b3b9b3ed6f07186945654525311d50b4a1b7187a0ece7faf12dc46c43d3957",
+      "uploadSha256": "6a313d656d5201f081f8920fe3e527819352754613be301d5cc815493e0d4a56"
+    },
+    {
+      "kind": "C",
+      "evidence": "docs/v4/evidence/form-autonomy-C-attempt-3.json",
+      "evidenceSha256": "bf3717d2748f7b673453961c02611cf1b68c843090b2d37b1fc4ff8b2d69ec61",
+      "passed": true,
+      "independent": {
+        "oneServerAcceptance": true,
+        "exactReceivedBytes": true,
+        "actualSavedReceipt": true,
+        "modelRoundAccounting": true,
+        "genuineGo": true,
+        "receiptChecks": true
+      },
+      "sourceMatchesCurrent": true,
+      "rounds": 10,
+      "toolCalls": 9,
+      "recoveryActions": [],
+      "failures": 2,
+      "tokenUsage": {
+        "input": 64511,
+        "output": 469,
+        "source": "Actual provider response telemetry; not a billing receipt"
+      },
+      "currencyCost": null,
+      "receiptSha256": "a0cd92da1781380992cb739e830d2120226d07cbd37967b2c84cb99db258e28d",
+      "uploadSha256": "993bd99fb26f617eadc0e6191bfc7de987f60a4969e4d677557f5e0173f4f845"
+    },
+    {
+      "kind": "regression",
+      "evidence": "docs/v4/evidence/form-autonomy-regression-attempt-3.json",
+      "evidenceSha256": "ddf5a43d213cf7fb3a084b96327b3f8cd0d6c4de7fd9e6378b36ade1a29a82ef",
+      "passed": true,
+      "independent": {
+        "oneServerAcceptance": true,
+        "exactReceivedBytes": true,
+        "actualSavedReceipt": true,
+        "modelRoundAccounting": true,
+        "genuineGo": true,
+        "receiptChecks": true
+      },
+      "sourceMatchesCurrent": true,
+      "rounds": 11,
+      "toolCalls": 11,
+      "recoveryActions": [],
+      "failures": 2,
+      "tokenUsage": {
+        "input": 80116,
+        "output": 595,
+        "source": "Actual provider response telemetry; not a billing receipt"
+      },
+      "currencyCost": null,
+      "receiptSha256": "ee8f65437d314e3626cde4ce1d3c8324ca80b21fa6217bda234a9956055dcd18",
+      "uploadSha256": "67be54c045927fdb3cc479513c50073b9f70ad9ef9605edb2d231cbec2c0b901"
+    }
+  ],
+  "universalAutonomyProven": false,
+  "productionReleaseReady": false,
+  "ordinaryGhostActivationProven": false
+}

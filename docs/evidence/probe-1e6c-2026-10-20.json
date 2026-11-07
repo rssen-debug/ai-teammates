@@ -1,0 +1,55 @@
+{
+  "schema": "majin.probe-1e6c.v1",
+  "ts": "2026-10-20T06:26:33.781Z",
+  "ollama": {
+    "reachable": true,
+    "modelsListed": [
+      "qwen3:0.6b",
+      "smollm2:135m"
+    ],
+    "models": {}
+  },
+  "completeThroughRouter": {
+    "ok": true,
+    "provider": "ollama",
+    "model": "smollm2:135m",
+    "elapsedMs": 7870,
+    "answer": "The capital of Sweden is Stockholm.",
+    "usage": {
+      "input": 43,
+      "output": 8,
+      "cached": 0,
+      "reported": true,
+      "total": 51,
+      "costUsd": 0
+    },
+    "costUsd": 0
+  },
+  "secondProviderAutoHandoffPriorRun": {
+    "from": "opencode/longcat-2.5-preview-free",
+    "to": "ollama/qwen3:0.6b",
+    "goal": "Name the capital of Sweden. One word.",
+    "ts": 1792476975153,
+    "consumed": true
+  },
+  "costSummary": {
+    "ollama/smollm2:135m": {
+      "costUsd": 0,
+      "elapsedMs": 7870,
+      "answerOk": true
+    },
+    "opencode/longcat-2.5-preview-free": {
+      "costUsd": 0,
+      "liveCall": false,
+      "note": "no credential in sandbox; pricing listed as $0 in config"
+    }
+  },
+  "verdict": {
+    "secondProviderSupported": true,
+    "autoHandoffObserved": true,
+    "localInferenceCostUsd": 0,
+    "limitations": [
+      "cloud second lane (opencode) cannot live-complete in sandbox: no credential issued; handoff observed from a prior live run journal only"
+    ]
+  }
+}
