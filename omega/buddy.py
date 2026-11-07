@@ -6410,6 +6410,71 @@ def _render_majin(payload: dict, limit: int = 4000) -> str:
     return clip(jdump(payload.get("result", payload)), limit)
 
 
+#: The interpreter policy the installer and the acceptance suite both rely on.
+#: The previous installer hard-required 3.12 and failed on machines that had a
+#: perfectly good 3.11 or 3.13, so the range is declared once, here, and read by
+#: everything else. The floor is the one buddy.py itself enforces at import.
+PYTHON_MIN = (3, 10)
+PYTHON_RECOMMENDED = (3, 12)
+PYTHON_MAX_TESTED = (3, 13)
+
+
+def cmd_autostart(rest: list[str]) -> int:
+    """Start Buddy at log-in. Delegates to the product's own registry code."""
+    arg = (rest[0].lower() if rest else "status")
+    if arg in ("status", ""):
+        on = autostart_state()
+        print(("● autostart is ON — Buddy starts minimised when you log in" if on
+               else "○ autostart is OFF"))
+        return 0
+    if arg in ("on", "enable", "yes", "true"):
+        ok, msg = set_autostart(True)
+    elif arg in ("off", "disable", "no", "false"):
+        ok, msg = set_autostart(False)
+    else:
+        print(f"unknown argument {rest[0]!r} — use on, off or status")
+        return 2
+    print(("✔ " if ok else "✖ ") + msg)
+    return 0 if ok else 1
+
+
+def cmd_deps(rest: list[str]) -> int:
+    """The authoritative dependency and interpreter policy, straight from DEPS.
+
+    The installer reads this rather than keeping its own list, so the two cannot
+    drift apart. `--json` is the machine-readable form the installer parses.
+    """
+    rows = [{"module": m, "pip": d["pip"], "required": bool(d["required"]),
+             "win_only": bool(d.get("win_only")), "why": d["why"],
+             "installed": dep_available(m)} for m, d in DEPS.items()]
+    if "--json" in rest:
+        print(jdump({"app_version": APP_VERSION,
+                     "python_min": list(PYTHON_MIN), "python_recommended": list(PYTHON_RECOMMENDED),
+                     "python_max_tested": list(PYTHON_MAX_TESTED),
+                     "running_python": list(sys.version_info[:3]), "deps": rows}))
+        return 0
+    v = sys.version_info
+    print(f"Python policy: minimum {PYTHON_MIN[0]}.{PYTHON_MIN[1]}, recommended "
+          f"{PYTHON_RECOMMENDED[0]}.{PYTHON_RECOMMENDED[1]}+, tested up to "
+          f"{PYTHON_MAX_TESTED[0]}.{PYTHON_MAX_TESTED[1]}")
+    print(f"Running: {v.major}.{v.minor}.{v.micro} at {sys.executable}")
+    if (v.major, v.minor) > PYTHON_MAX_TESTED:
+        print(C.c(C.Y, f"  ⚠ newer than the tested ceiling — it may work, but it is not proven"))
+    miss_req = [r for r in rows if r["required"] and not r["installed"]]
+    miss_opt = [r for r in rows if not r["required"] and not r["installed"]]
+    for r in rows:
+        mark = C.c(C.G, "●") if r["installed"] else (C.c(C.R, "○") if r["required"] else C.c(C.DIM, "○"))
+        tag = "required" if r["required"] else "optional"
+        print(f"  {mark} {r['pip']:<18} {tag:<9} {r['why']}")
+    if miss_req:
+        print(C.c(C.R, f"\n  {len(miss_req)} required package(s) missing: "
+                       + ", ".join(r["pip"] for r in miss_req)))
+        print("  fix: python -m pip install " + " ".join(r["pip"] for r in miss_req))
+    if miss_opt:
+        print(C.c(C.Y, f"  {len(miss_opt)} optional package(s) absent — the features they enable are off"))
+    return 1 if miss_req else 0
+
+
 def cmd_test(rest: list[str]) -> int:
     """Run every automated suite and report each one separately."""
     runner = SOURCE_FILE.parent / "tests" / "run_all.py"
@@ -6543,6 +6608,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             "self-test": lambda r: launch_isolated("selftest"),
             "selftest": lambda r: launch_isolated("selftest"),
             "voice-test": lambda r: _voice_test_cmd(),
+            "autostart": cmd_autostart,
+            "deps": cmd_deps,
             "help": lambda r: (print(USAGE), 0)[1],
             "--help": lambda r: (print(USAGE), 0)[1],
             "version": lambda r: (print(f"Studdy Buddy Omega {APP_VERSION}"), 0)[1],
