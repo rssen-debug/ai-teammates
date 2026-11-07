@@ -6,6 +6,7 @@ import { SLASH_COMMANDS, slashMatches, slashCompletions, addGoal, completeGoal, 
 import { liveLines, compactLivePrompt } from './live-ui.js';
 import { configureLoginAutostart } from './login-autostart.js';
 import { runVoiceMode } from './voice-mode.js';
+import { runContinuousVoice } from './continuous-voice.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -111,9 +112,10 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(box(dots(color, metrics.level, s.observing) + '  BUDDY LIVE · mätt aktivitet', liveLines(s, metrics, {
           providerConnected: Boolean(active?.hasApiKey), issues: issues.count,
         }), color));
-      } else if (text === '/voice') {
-        log(p.mint('Voice använder Windows taligenkänning + din redan sparade Kilo-modell och lokal uppläsning.'));
-        log(p.dim('QwenAudio kräver en separat kompatibel realtidsröstfrontend. /voice ger inte Qwens full-duplex-läge.'));
+      } else if (text === '/voice' || text === '/voice live') {
+        log(p.mint('Startar kontinuerlig röst · Kilo-molnmodell + Windows CPU-tal (inga extra API-nycklar).'));
+        await runContinuousVoice(runtime, log);
+      } else if (text === '/voice basic') {
         await runVoiceMode(runtime, log);
       } else if (text === '/do' || text.startsWith('/do ')) {
         const goal = text.slice(3).trim();
