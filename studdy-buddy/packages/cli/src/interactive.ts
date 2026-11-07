@@ -7,6 +7,7 @@ import { liveLines, compactLivePrompt } from './live-ui.js';
 import { configureLoginAutostart } from './login-autostart.js';
 import { runVoiceMode } from './voice-mode.js';
 import { runContinuousVoice, listInstalledWindowsVoices } from './continuous-voice.js';
+import { naturalDesktopGoal } from './natural-action.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -46,6 +47,13 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   rl.on('close', () => { closed = true; if (waiting) { const resolve = waiting; waiting = null; resolve(null); } });
   const nextLine = (): Promise<string | null> => lines.length ? Promise.resolve(lines.shift()!) : closed ? Promise.resolve(null) : new Promise(resolve => { waiting = resolve; });
   const changed = runtime.configureFullAccess();
+  // The user explicitly requested hands-off Windows login startup. Install a
+  // per-user entry only for an actual interactive Windows session. Never do
+  // this in CI/piped scripts, and persist an explicit /autostart off choice.
+  if (terminal && process.platform === 'win32' &&
+      runtime.services.db.checkpoints.get<boolean>('buddy.autostart.opted-out.v1') !== true) {
+    configureLoginAutostart(true);
+  }
   const provider = runtime.services.activeProvider();
   const native = await runtime.nativeStatus();
   log(box(`${dots(color, runtime.ledger().level(), runtime.liveStatus().observing)}  Studdy Buddy`, [
@@ -112,6 +120,15 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(box(dots(color, metrics.level, s.observing) + '  BUDDY LIVE · mätt aktivitet', liveLines(s, metrics, {
           providerConnected: Boolean(active?.hasApiKey), issues: issues.count,
         }), color));
+      } else if (text === '/context' || text === '/what') {
+        await runtime.observer.tick();
+        const context = runtime.voiceScreenContext();
+        log(box('Vad Buddy kan använda i ditt samtal', [
+          'Fönster: ' + context.label,
+          'Bevis: ' + context.proof,
+          context.text ? 'Observerad text: ' + context.text : 'Ingen skärmtext delas med Kilo i det här läget.',
+          'Endast pågående samtal får den här kontexten; den läggs inte automatiskt i Obsidian.',
+        ], color));
       } else if (text === '/voice' || text === '/voice live') {
         log(p.mint('Startar kontinuerlig röst · Kilo-molnmodell + Windows CPU-tal (inga extra API-nycklar).'));
         await runContinuousVoice(runtime, log);
@@ -148,6 +165,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text === '/autostart' || text.startsWith('/autostart ')) {
         const arg = text.slice('/autostart'.length).trim().toLowerCase();
         const mode = arg === 'on' ? true : arg === 'off' ? false : null;
+        if (mode !== null) runtime.services.db.checkpoints.set('buddy.autostart.opted-out.v1', mode === false);
         const result = configureLoginAutostart(mode);
         log(result.ok ? (result.enabled ? p.mint('● Autostart på · ') : p.dim('○ Autostart av · ')) + result.detail
           : p.amber(result.detail));
@@ -163,6 +181,8 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(box('Obsidian-minne', [
           'Valv: ' + (info.vaultPath ?? 'otillgängligt'),
           'Personliga minnen: ' + info.memoryFacts,
+          'Observerade arbetsmönster: ' + (runtime.services.memory?.observedPatterns().map(row =>
+            row.kind + ' ' + row.periods + ' observationsperioder') .join(' · ') || 'inga ännu'),
           'Dagliga samtalsanteckningar sparas efter lyckade AI-svar.',
           'Debugger: ' + info.debuggerPath,
           'Minnet är lokalt och kan granskas av dig.',
@@ -179,6 +199,9 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text === '/profile') {
         const facts = runtime.services.memory?.profileFacts() ?? [];
         log(facts.length ? 'Dina sparade minnen:\n' + facts.map(fact => '• ' + fact).join('\n') : 'Inga personliga minnen ännu. Skriv /remember <fakta> eller ”kom ihåg att …”.');
+        const patterns = runtime.services.memory?.observedPatterns() ?? [];
+        if (patterns.length) log('Observerade mönster (inte arbetade timmar):\n' + patterns.map(p =>
+          '• ' + p.kind + ': ' + p.periods + ' tidsperioder').join('\n'));
       } else if (text.startsWith('/remember ') || /^kom ihåg att /i.test(text)) {
         const fact = text.startsWith('/remember ') ? text.slice(10).trim() : text.replace(/^kom ihåg att /i, '').trim();
         log(runtime.services.memory?.rememberProfile(fact)
@@ -298,11 +321,20 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(h.status.running ? `ws://${h.status.host}:${h.status.port}\nToken: ${h.token}` : h.status.detail);
       } else if (text.startsWith('/')) log('Okänt kommando. /help');
       else {
-        log(p.dim('○ Buddy arbetar · tolkar förfrågan och inväntar verifierat svar...'));
-        const result = await runtime.chat(text);
-        if (result.ok) log(p.violet('studdy › ') + result.data.message.text);
-        else log(p.red(result.error.message));
-        if (!result.ok || result.data.degraded) runtime.journal.record('cli.chat', result.ok ? result.data.error ?? 'provider failed' : result.error.message, 'warn');
+        const goal = naturalDesktopGoal(text);
+        if (goal) {
+          log(p.dim('● Buddy · Kilo planerar ett verkligt datorsteg'));
+          const report = await runtime.runDesktopGoal(goal, event =>
+            log((event.ok ? p.mint('● ') : p.amber('○ ')) +
+              event.step + ' · ' + event.action + ' · ' + event.detail));
+          log((report.complete ? p.mint('Verifierat: ') : p.amber('Inte slutfört: ')) + report.summary);
+        } else {
+          log(p.dim('○ Buddy arbetar · tolkar förfrågan och inväntar verifierat svar...'));
+          const result = await runtime.chatWithScreen(text);
+          if (result.ok) log(p.violet('studdy › ') + result.data.message.text);
+          else log(p.red(result.error.message));
+          if (!result.ok || result.data.degraded) runtime.journal.record('cli.chat', result.ok ? result.data.error ?? 'provider failed' : result.error.message, 'warn');
+        }
       }
     } catch (error) {
       runtime.journal.record('cli.interactive', error);

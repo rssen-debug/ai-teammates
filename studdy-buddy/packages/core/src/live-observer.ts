@@ -164,9 +164,15 @@ export class LiveObserver {
         const count = services.db.checkpoints.get<number>('buddy.live.verified-observations.v1') ?? 0;
         services.db.checkpoints.set('buddy.live.verified-observations.v1', Math.min(999999999, count + 1));
         new VerifiedSkillLedger(services.db.checkpoints).record('observe:' + proof, true);
+        // Save coarse, verified workflow categories at most once per hour;
+        // never store the UI text or private-page titles in long-term memory.
+        const contextHint = detectContextHint(snapshot, active.title);
+        if (contextHint?.kind === 'study' || contextHint?.kind === 'code' || contextHint?.kind === 'creative') {
+          try { services.memory?.recordObservedPattern(contextHint.kind, new Date(this.clock())); }
+          catch { /* Local memory failure must not stop screen observation. */ }
+        }
         // Failures are prioritized over optional context suggestions.
-        const hint = detectCompanionHint(snapshot, active.title)
-          ?? detectContextHint(snapshot, active.title);
+        const hint = detectCompanionHint(snapshot, active.title) ?? contextHint;
         if (hint && !this.signatures.has(hint.signature)) {
           this.signatures.add(hint.signature);
           if (this.signatures.size > 100) {

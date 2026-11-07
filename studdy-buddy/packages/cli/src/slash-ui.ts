@@ -17,6 +17,7 @@ export const SLASH_COMMANDS = [
   { command: '/goal', description: 'Dina mål och nästa steg' },
   { command: '/do', description: 'Kilo planerar och utför en verifierad datoruppgift' },
   { command: '/voice', description: 'Kontinuerlig CPU-röst med Kilo och avbrytbara svar' },
+  { command: '/context', description: 'Visa vad Buddy verkligen kan använda från skärmen' },
   { command: '/status', description: 'Vad Buddy faktiskt gör' },
   { command: '/live', description: 'Livepanel med verkliga observationer' },
   { command: '/debug', description: 'Visa lokala fel från debuggern' },

@@ -127,7 +127,7 @@ export function likelySpeakerEcho(input:string, lastOutput:string):boolean {
 }
 
 export async function runContinuousVoice(
-  runtime: Pick<StuddyRuntime,'chat'|'runDesktopGoal'> & { services: StuddyRuntime['services'] },
+  runtime: Pick<StuddyRuntime,'chat'|'runDesktopGoal'> & { services: StuddyRuntime['services']; chatWithScreen?: StuddyRuntime['chatWithScreen']; voiceScreenContext?: StuddyRuntime['voiceScreenContext'] },
   status: VoiceStatus,
   options: { input?: VoiceInput; playback?: VoicePlayback; maxTurns?:number }={},
 ):Promise<void>{
@@ -155,7 +155,7 @@ export async function runContinuousVoice(
   let lastOutput='', pending:Promise<void>|null=null, turns=0, lastWasSpeaking=false;
   const bound=Math.max(1,Math.min(options.maxTurns??60,150));
   status('● LIVE VOICE · mikrofon aktiv · Windows CPU-tal ↔ Kilo ↔ Windows-röst');
-  status('Prata normalt. Du kan avbryta när Buddy pratar. Säg "stop voice" för att avsluta.');
+  status('Prata normalt. Buddy använder verifierad skärmkontext när den kan läsas. Säg "stop voice" för att avsluta.');
   try {
     for await (const heard of input.listen()) {
       if(isVoiceStop(heard)){status('○ Röstläge stoppat med röstkommando.');break;}
@@ -169,6 +169,18 @@ export async function runContinuousVoice(
       lastWasSpeaking=false;
       status('du 🎤 › '+heard);
       if(++turns>bound){status('Sessionens turgräns nådd.');break;}
+      // Explicit remembered facts only, never automatic long-term recording
+      // of what happens to be on the user's screen.
+      const remember=/^(?:buddy[,]?\s*)?(?:remember that|remember|kom ihåg att)\s+(.{3,160})$/i.exec(heard);
+      if(remember){
+        const saved=runtime.services.memory?.rememberProfile(remember[1]!);
+        const reply=saved?'I saved that preference to your Obsidian profile.':
+          'I could not save that memory; check it contains no secrets.';
+        status('studdy › '+reply);
+        lastOutput=reply;lastWasSpeaking=true;
+        pending=speaking.speak(reply).catch(error=>status('Röstfel: '+String(error).slice(0,160))).finally(()=>{pending=null;});
+        continue;
+      }
       const command=/^(?:buddy[,]?\s*)?(?:do|gör)\s+(.{3,600})$/i.exec(heard);
       let response='';
       if(command){
@@ -176,7 +188,7 @@ export async function runContinuousVoice(
           status((e.ok?'● ':'○ ')+e.action+' · '+e.detail));
         response=report.summary;
       }else{
-        const result=await runtime.chat(heard);
+        const result=await (runtime.chatWithScreen ? runtime.chatWithScreen(heard) : runtime.chat(heard));
         response=result.ok?result.data.message.text:result.error.message;
       }
       if(!response.trim())continue;
