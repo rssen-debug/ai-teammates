@@ -49,7 +49,7 @@ export function detectContextHint(snapshot: UiSnapshot, title: string): Companio
   // A generic app name alone is not evidence of what the user is doing.
   const sample = safeElements.map(e => (e.name || e.value || '').slice(0, 130)).join(' ').slice(0, 2200);
   if (!sample) return null;
-  const combined = title + ' ' + sample;
+  const combined = sample; // title identifies the app, but is not evidence of active work
   const patterns: Array<{kind: 'study'|'code'|'creative'; re: RegExp; label: string; question: string}> = [
     {
       kind: 'study',
