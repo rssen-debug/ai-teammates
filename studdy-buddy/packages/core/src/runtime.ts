@@ -24,6 +24,8 @@ import { findStartMenuApp } from './windows-app-catalog.js';
 import { openExternal } from './open-external.js';
 import { VerifiedSkillLedger } from './verified-skills.js';
 import { AGENT_SYSTEM, runAgent, type Activity, type AgentReport } from './desktop-agent.js';
+import { openKernel, Supervisor, buildHandlers, type OpenKernel } from '@studdy/agent-core';
+import { createKernelInvoker, type KernelInvoker } from './kernel-runtime.js';
 import { parseLaunchIntent, isInboxRequest, isStartLiveRequest, isLiveQuestion, isAccessQuestion, isScreenQuestion } from './chat-intents.js';
 
 export interface RuntimeOptions {
@@ -47,6 +49,8 @@ export class StuddyRuntime {
   readonly journal: DebugJournal;
   readonly logger: BoundedLogger;
   private bridge: BrowserBridgeServer | null = null;
+  private kernelStore: OpenKernel | null = null;
+  private kernelInvokerStore: KernelInvoker | null = null;
   private lastSelection: SelectionContext | null = null;
   private proactiveHints: CompanionHint[] = [];
   private lastProactiveAt = 0;
@@ -88,6 +92,43 @@ export class StuddyRuntime {
   }
 
   databasePath(): string { return databasePath(this.dataDir); }
+
+  /**
+   * Opens (once) the durable kernel that owns queued autonomous work.
+   *
+   * The kernel is created lazily so `studdy ask` and other plain commands never
+   * pay for it, and so a read-only command cannot create state as a side effect
+   * of merely starting up.
+   */
+  kernel(): OpenKernel {
+    if (!this.kernelStore) this.kernelStore = openKernel({ dataDir: this.dataDir });
+    return this.kernelStore;
+  }
+
+  /** The real tools a kernel worker may execute (permission-checked). */
+  kernelInvoker(allow: readonly string[] | null = null): KernelInvoker {
+    if (!this.kernelInvokerStore) {
+      this.kernelInvokerStore = createKernelInvoker({ services: this.services, adapter: this.adapter, allow });
+    }
+    return this.kernelInvokerStore;
+  }
+
+  /** Builds a supervisor wired to the real tool invoker for this runtime. */
+  kernelSupervisor(workerId?: string, limits: ConstructorParameters<typeof Supervisor>[0]['limits'] = {}): { kernel: OpenKernel; supervisor: Supervisor; invoker: KernelInvoker } {
+    const kernel = this.kernel();
+    const invoker = this.kernelInvoker();
+    const supervisor = new Supervisor({
+      queue: kernel.queue,
+      log: kernel.log,
+      handlers: buildHandlers(),
+      workerId: workerId ?? `studdy-${process.pid}`,
+      heartbeatFile: join(kernel.paths.workersDir, `${workerId ?? `studdy-${process.pid}`}.json`),
+      stopFile: kernel.paths.stopFile,
+      toolInvoker: invoker.invoke,
+      limits,
+    });
+    return { kernel, supervisor, invoker };
+  }
   configureFullAccess(): boolean {
     return configureCliFullAccess({ checkpoints: this.services.db.checkpoints, permissions: this.services.permissions });
   }

@@ -8,6 +8,7 @@ import { maskKey } from '@studdy/ai-router';
 import { voiceSettingsSchema, type ProviderConfig } from '@studdy/shared';
 import { neuralVoiceFor, synthesizeNeural } from '@studdy/voice-engine';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
+import { runKernelCommand, runToolsCommand } from './kernel-commands.js';
 
 export interface CliIO {
   out: (text: string) => void;
@@ -27,6 +28,16 @@ const CLI_FLAGS = {
   once: { type: 'boolean' as const }, stdin: { type: 'boolean' as const },
   app: { type: 'string' as const }, 'no-write': { type: 'boolean' as const },
   headed: { type: 'boolean' as const },
+  kind: { type: 'string' as const }, tool: { type: 'string' as const },
+  args: { type: 'string' as const }, priority: { type: 'string' as const },
+  'dedupe-key': { type: 'string' as const }, 'effect-key': { type: 'string' as const },
+  irreversible: { type: 'boolean' as const }, 'max-tasks': { type: 'string' as const },
+  'max-runtime-ms': { type: 'string' as const }, 'worker-id': { type: 'string' as const },
+  state: { type: 'string' as const }, limit: { type: 'string' as const },
+  outcome: { type: 'string' as const }, evidence: { type: 'string' as const },
+  statement: { type: 'string' as const }, readback: { type: 'string' as const },
+  path: { type: 'string' as const }, 'operation-id': { type: 'string' as const },
+  detail: { type: 'string' as const },
   version: { type: 'boolean' as const, short: 'v' }, help: { type: 'boolean' as const, short: 'h' },
 };
 
@@ -48,6 +59,9 @@ Användning:
   studdy provider test | probe   Live-test / uppmätta modellförmågor
   studdy status                  Kompakt dashboard
   studdy doctor                  Lokal hälsokontroll
+  studdy kernel status|enqueue|run|list|get|events  Autonom, spårbar arbetskö
+  studdy kernel cancel|retry|reconcile|verify  Ägarbeslut och beviskontroll
+  studdy tools                   Verktyg workern faktiskt kan köra
   studdy selftest                Kör riktiga Windows-tester och skriv anonym rapport
   studdy prove [--app "App"]     Bevisa live: starta, läs, skriv, skärmbild
   studdy open "Google Chrome"    Starta valfri app, verifierat
@@ -163,6 +177,21 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
           '', `${p.violet('Nivå ' + ledger.level)}  ${p.dim(ledger.verified + ' verifierade skills')}  ${p.dim(snapshot.concepts.length + ' begrepp')}`,
         ], color));
         return 0;
+      }
+      case 'kernel': {
+        return await runKernelCommand({
+          args: positional.slice(1),
+          flags: flags as Record<string, unknown>,
+          runtime,
+          io: { out: (value) => out(value), err: (text) => io.err(text), json },
+        });
+      }
+      case 'tools': {
+        return await runToolsCommand({
+          flags: flags as Record<string, unknown>,
+          runtime,
+          io: { out: (value) => out(value), err: (text) => io.err(text), json },
+        });
       }
       case 'doctor': {
         const native = await runtime.nativeStatus();
