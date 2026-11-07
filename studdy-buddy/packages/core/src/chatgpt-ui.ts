@@ -51,7 +51,7 @@ export async function prepareChatGPTDraft(
     !w.minimized && /(?:chrome|msedge|brave|firefox|edge)/i.test(w.processName+' '+w.title))
     .sort((a,b)=>Number(b.focused)-Number(a.focused)).slice(0,8);
   if(!browsers.length)return {ok:false,detail:'Ingen öppen webbläsare hittades.'};
-  let sawChatGPT=false, sawEditor=false, observationError='';
+  let sawChatGPT=false, observationError='';
   for(const w of browsers){
     const snap=await adapter.snapshot(w.id);
     if(!snap.accessible){ observationError=snap.note ?? 'Tillgänglighetsträdet kunde inte läsas.'; continue; }
@@ -59,7 +59,6 @@ export async function prepareChatGPTDraft(
     sawChatGPT=true;
     const input=snap.elements.find(editable);
     if(!input)continue;
-    sawEditor=true;
     if(input.value?.trim())return {ok:false,detail:'ChatGPT har redan ett utkast. Jag skriver inte över det.'};
     const focused=await adapter.focusWindow(w.id);
     if(!focused.ok)return {ok:false,detail:'Kunde inte fokusera ChatGPT: '+focused.detail.slice(0,100)};
