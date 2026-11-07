@@ -72,7 +72,9 @@ export class StuddyRuntime {
         // Keep raw UI data out of logs; the user must approve any corrective action.
         this.proactiveHints.push(hint);
         if (this.proactiveHints.length > 8) this.proactiveHints.shift();
-        this.journal.record('observer.hint', 'UI_ERROR_DETECTED', 'warn');
+        if ((hint.kind ?? 'error') === 'error') {
+          this.journal.record('observer.hint', 'UI_ERROR_DETECTED', 'warn');
+        }
       },
     });
   }
