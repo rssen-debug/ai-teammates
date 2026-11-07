@@ -107,7 +107,52 @@ Proaktivitet: OFF · tyst nu — Proaktiva tips är avstängda.
    fanns, men `SpeechPlayer` anropade **hårdkodat** `WindowsNativeProvider`. Ingen
    inställning kunde nå dem. Neural-vägen är nu inkopplad och valbar.
 
-## 5. Vad som INTE är bevisat, och varför
+## 5. Behörigheter — "full åtkomst" betyder nu det den säger
+
+`/access` visar och ändrar varje behörighet:
+
+```bash
+/access                       # lista allt med ● beviljad / ○ nekad
+/access all                   # slå på allt
+/access none                  # stäng av allt
+/access computer.actions on   # en sak
+/access microphone off
+```
+
+Ändringen slår igenom direkt: `application.observe` startar eller stoppar
+observationen utan omstart.
+
+**En riktig bugg som detta avslöjade:** `FULL_DESKTOP_SCOPES` innehöll inte
+`microphone`, så "Full åtkomst · beviljad" lämnade mikrofonen **nekad** — medan
+`/voice` använde den ändå. Antingen betyder behörigheten något eller så ska den
+inte finnas. Nu betyder den något: mikrofonen ingår i full åtkomst, och röstlägena
+**vägrar starta** utan den, med en tydlig instruktion i stället för tyst lyssnande.
+
+Bevisat genom byggd CLI:
+
+```
+╭─ Behörigheter — APPROVED_ACTION ─╮
+│ ● screen.capture       beviljad │
+│ ● application.observe  beviljad │
+│ ● browser.read         beviljad │
+│ ● microphone           beviljad │   <- var nekad före denna ändring
+│ ● computer.actions     beviljad │
+│ ● provider.dataShare   beviljad │
+```
+
+### Vad appen aldrig kan ge sig själv
+
+Windows-tillgänglighet (UI Automation) är en **OS-behörighet**. Den sätts i
+Windows, inte av appen, och `doctor` rapporterar den separat:
+
+```
+○ Native helper · agent-desktop 1.2.0 finns, men desktop-åtkomst nekas.
+```
+
+Det är rätt beteende. En app som kunde bevilja sig själv åtkomst till skärmen
+skulle vara ett säkerhetshål, inte en funktion.
+
+## 6. Vad som INTE är bevisat, och varför
 
 | Sak | Status |
 | --- | --- |
@@ -117,7 +162,7 @@ Proaktivitet: OFF · tyst nu — Proaktiva tips är avstängda.
 | 24/7 medveten | Nej. Autostart startar ett `cmd`-fönster vid inloggning; stängs det eller datorn sover är den borta. |
 | "Se allt" | Nej, och ska inte påstås. Toppnivåfönster + tillgänglighetsträd. Skyddade fält, banker, incognito och rå pixlar läses medvetet inte. |
 
-## 6. Kör detta på din dator och klistra in svaret
+## 7. Kör detta på din dator och klistra in svaret
 
 ```powershell
 studdy --version                      # måste vara versionen med denna PR

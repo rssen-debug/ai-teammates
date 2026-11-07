@@ -48,6 +48,12 @@ export async function runVoiceMode(
   say: (line: string)=>void,
   options: { capture?:()=>Promise<SpeechCapture>; speak?: (text:string)=>Promise<void>; maxTurns?:number }={},
 ):Promise<void> {
+  // Only the *real* microphone needs the grant. An injected capture (tests, or a
+  // different audio source) is not the microphone and must not be blocked.
+  if(!options.capture && !runtime.services.permissions.isGranted('microphone')){
+    say('○ Mikrofonen är inte tillåten. Kör /access microphone on och försök igen.');
+    return;
+  }
   const player=new SpeechPlayer();
   const settings=voiceSettingsSchema.parse({ enabled:true,provider:'windows-native',
     language:runtime.services.db.checkpoints.get<string>('buddy.chat.language.v1')==='en-US'?'en-US':'sv-SE' });

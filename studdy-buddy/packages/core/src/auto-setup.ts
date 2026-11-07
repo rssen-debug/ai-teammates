@@ -7,6 +7,10 @@ export interface AutoSetupStore {
 
 export const FULL_DESKTOP_SCOPES: PermissionKey[] = [
   'application.observe', 'screen.capture', 'browser.read', 'computer.actions', 'provider.dataShare',
+  // The microphone was missing here, so "Full åtkomst" left it denied while the
+  // voice modes used it anyway. Either the permission means something or it
+  // should not exist; this makes it mean something.
+  'microphone',
 ];
 const SETUP_KEY = 'desktop.full-access.v1';
 const CLI_SETUP_KEY = 'cli.full-access.v1';

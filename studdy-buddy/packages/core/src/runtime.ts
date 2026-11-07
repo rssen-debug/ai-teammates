@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { defaultDataDir, databasePath } from '@studdy/database';
-import type { SelectionContext, SourcePage, UiSnapshot } from '@studdy/shared';
+import type { PermissionKey, PermissionMode, SelectionContext, SourcePage, UiSnapshot } from '@studdy/shared';
 import { ok, fail, type Result } from '@studdy/shared';
 import { StuddyServices, type AskResult } from './services.js';
 import { DesktopAccessibilityAdapter, type AdapterStatus } from './desktop-adapter.js';
@@ -260,6 +260,24 @@ export class StuddyRuntime {
   selection(): SelectionContext | null { return this.lastSelection; }
   async stopBridge(): Promise<void> { await this.bridge?.stop(); this.bridge = null; }
   liveStatus(): LiveStatus { return this.observer.status(); }
+  /** Every permission the app knows about, with its real state. */
+  permissions(): { key: PermissionKey; granted: boolean; mode: PermissionMode }[] {
+    const mode = this.services.permissions.currentMode();
+    return this.services.permissions.getAll().map(p => ({ key: p.key, granted: p.granted, mode }));
+  }
+
+  /**
+   * Change one permission and apply the consequence immediately: observation
+   * starts or stops with the grant, instead of waiting for a restart.
+   */
+  setPermission(key: PermissionKey, granted: boolean): void {
+    if (granted) this.services.permissions.grant(key); else this.services.permissions.revoke(key);
+    if (key === 'application.observe') {
+      if (granted) this.observer.start(); else this.observer.stop();
+    }
+    this.journal.record('permission.' + key, granted ? 'granted' : 'revoked');
+  }
+
   /**
    * Hand out at most one proactive hint, and only when the existing
    * ProactiveGovernor allows it. Before this, the CLI printed every hint the

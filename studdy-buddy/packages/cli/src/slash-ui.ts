@@ -31,10 +31,14 @@ export const SLASH_COMMANDS = [
   { command: '/progress', description: 'Skills baserat på bevis' },
   { command: '/help', description: 'Visa alla kommandon' },
   { command: '/exit', description: 'Avsluta Buddy' },
+  // New commands go last: the numbered menu is a contract, and inserting at the
+  // top silently renumbers everything a user has learned.
+  { command: '/access', description: 'Se och ändra varje behörighet' },
+  { command: '/proactive', description: 'Proaktiva tips: off, quiet eller normal' },
 ] as const;
 
 export function slashMatches(query: string): typeof SLASH_COMMANDS[number][] {
-  if (!query.startsWith('/')) return [];
+  if (!query.startsWith('/')) return [...SLASH_COMMANDS];
   const needle = query.trim().toLowerCase();
   return SLASH_COMMANDS.filter(item => item.command.startsWith(needle));
 }

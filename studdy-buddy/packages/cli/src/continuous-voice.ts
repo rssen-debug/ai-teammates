@@ -131,6 +131,12 @@ export async function runContinuousVoice(
   status: VoiceStatus,
   options: { input?: VoiceInput; playback?: VoicePlayback; maxTurns?:number }={},
 ):Promise<void>{
+  // The microphone permission is now enforced, not decorative. Without it the
+  // mode stops with a clear instruction instead of silently listening.
+  if(!options.input && !runtime.services.permissions.isGranted('microphone')){
+    status('○ Mikrofonen är inte tillåten. Kör /access microphone on (eller /access all) och försök igen.');
+    return;
+  }
   const input=options.input??new WindowsContinuousInput();
   const player=options.playback??new SpeechPlayer();
   // This is an English-first voice product. The text model receives the same

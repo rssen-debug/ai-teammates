@@ -158,6 +158,38 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
             log(p.mint('Vald offline-röst (SAPI): ' + name));
           }
         }
+      } else if (text === '/access' || text.startsWith('/access ')) {
+        // One place to see and change every permission. Before this, the only
+        // way to grant or revoke anything was `studdy setup`, which is one-shot
+        // and silent about what it actually turned on.
+        const keys = runtime.permissions();
+        const wanted = text.slice('/access'.length).trim().toLowerCase();
+        if (!wanted) {
+          const rows = keys.map(k => (k.granted ? '● ' : '○ ') + k.key.padEnd(20) + ' ' + (k.granted ? 'beviljad' : 'nekad'));
+          log(box('Behörigheter — ' + keys[0]?.mode, [
+            ...rows,
+            '',
+            'Slå på allt:   /access all',
+            'Stäng av allt: /access none',
+            'En sak:        /access computer.actions on   (eller off)',
+            '',
+            'OS-behörigheter (Windows-tillgänglighet) kan appen inte ge sig själv — de sätts i Windows.',
+          ], color));
+        } else if (wanted === 'all' || wanted === 'none') {
+          const grant = wanted === 'all';
+          for (const k of keys) runtime.setPermission(k.key, grant);
+          log(p.mint(grant ? 'Alla app-behörigheter beviljade. Windows-behörigheter sätts fortfarande i Windows.' :
+            'Alla app-behörigheter avstängda.'));
+        } else {
+          const [key, state] = wanted.split(/\s+/);
+          const known = keys.find(k => k.key === key);
+          if (!known) log(p.amber('Okänd behörighet: ' + key + '. Kör /access för listan.'));
+          else if (state !== 'on' && state !== 'off') log(p.amber('Skriv /access ' + key + ' on|off'));
+          else {
+            runtime.setPermission(known.key, state === 'on');
+            log(p.mint(known.key + ': ' + (state === 'on' ? 'beviljad' : 'nekad')));
+          }
+        }
       } else if (text === '/proactive' || text.startsWith('/proactive ')) {
         const wanted = text.slice('/proactive'.length).trim().toUpperCase();
         if (wanted === 'OFF' || wanted === 'QUIET' || wanted === 'NORMAL') {
