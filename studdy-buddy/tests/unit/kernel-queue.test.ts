@@ -182,7 +182,7 @@ describe('durable kernel queue', () => {
     const events = log.read({ limit: 50 });
     expect(events.some((event) => event.type === 'task.queued')).toBe(true);
     // Every line is valid JSONL with a monotonic seq.
-    const raw = readFileSync(join(eventsDir, 'events.jsonl'), 'utf8').trim().split('\n');
+    const raw = readFileSync(join(eventsDir, 'events.jsonl'), 'utf8').trim().split(/\r?\n/);
     const seqs = raw.map((line) => (JSON.parse(line) as { seq: number }).seq);
     expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
   });

@@ -62,8 +62,27 @@ export function atomicWriteJson(file: string, value: unknown, { mode = 0o600 }: 
   ensureDir(path.dirname(file));
   const tmp = `${file}.${process.pid}.${randomUUID().slice(0, 6)}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, { mode });
-  fs.renameSync(tmp, file);
-  return file;
+  // A Windows reader holding the destination open (a scanner, an editor, another
+  // test process) makes rename fail with EPERM/EBUSY/EACCES. Retrying briefly is
+  // correct because the replacement itself is still atomic; the temp file is
+  // never partially visible.
+  const deadline = Date.now() + 2000;
+  for (;;) {
+    try {
+      fs.renameSync(tmp, file);
+      return file;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      const transient = code === 'EPERM' || code === 'EBUSY' || code === 'EACCES';
+      if (!transient || Date.now() > deadline) {
+        fs.rmSync(tmp, { force: true });
+        throw error;
+      }
+      // Synchronous sleep: the caller is in a synchronous critical section and
+      // the queue lock must not be released mid-write.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+    }
+  }
 }
 
 export function sleep(ms: number): Promise<void> {

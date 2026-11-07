@@ -119,7 +119,21 @@ export class EventLog {
     };
     if (data.taskId) head.taskId = String(data.taskId).slice(0, 160);
     if (data.workerId) head.workerId = String(data.workerId).slice(0, 80);
-    fs.appendFileSync(this.file, `${JSON.stringify(head)}\n`, { mode: 0o600 });
+    const line = `${JSON.stringify(head)}\n`;
+    const deadline = Date.now() + 2000;
+    for (;;) {
+      try {
+        fs.appendFileSync(this.file, line, { mode: 0o600 });
+        return head;
+      } catch (error) {
+        // Windows can refuse an append while another handle is open. Retry
+        // briefly rather than losing an audit record.
+        const code = (error as NodeJS.ErrnoException).code;
+        const transient = code === 'EPERM' || code === 'EBUSY' || code === 'EACCES';
+        if (!transient || Date.now() > deadline) break;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+      }
+    }
     return head;
   }
 
