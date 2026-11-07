@@ -20,31 +20,16 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   const color = supportsColor(process.env, { isTTY: terminal });
   const p = palette(color);
   const rl = readline.createInterface({ input, output: output as NodeJS.WritableStream, terminal, completer: slashCompletions });
-  // Lightweight ANSI suggestion overlay: appears as soon as / is typed in a TTY.
-  // Render below the readline input and restore the cursor, so typing stays natural.
-  // Piped/CI mode never emits terminal control sequences.
+  // Native readline already supports Tab completion. The old ANSI preview
+  // overlay escaped below the cursor, duplicated /voice six times and broke
+  // wide Windows terminal rendering. Use the stable numbered '/' menu instead.
   let closed = false;
-  let previewVisible = false;
   let secretInputActive = false;
-  const preview = () => {
-    if (!terminal || closed || secretInputActive) return;
-    const inputLine = rl.line.trim();
-    const matches = /^\/[a-z]*$/i.test(inputLine) ? slashMatches(inputLine).slice(0, 6) : [];
-    if (!matches.length && !previewVisible) return;
-    output.write('\x1b7\x1b[0J');
-    if (matches.length) {
-      output.write('\n' + matches.map(item => p.mint(item.command.padEnd(12)) + p.dim(item.description)).join('\n'));
-    }
-    output.write('\x1b8');
-    previewVisible = matches.length > 0;
-  };
-  const onKey = () => { if (terminal) setImmediate(preview); };
-  if (terminal) input.on('keypress', onKey);
   // Install line handlers before the first await: a pipe can deliver its whole
   // script and EOF while nativeStatus() is still running.
   const lines: string[] = [];
   let waiting: ((line: string | null) => void) | null = null;
-  rl.on('line', line => { if (previewVisible && terminal) { output.write('\x1b[0J'); previewVisible = false; } if (waiting) { const resolve = waiting; waiting = null; resolve(line); } else lines.push(line); });
+  rl.on('line', line => { if (waiting) { const resolve = waiting; waiting = null; resolve(line); } else lines.push(line); });
   rl.on('close', () => { closed = true; if (waiting) { const resolve = waiting; waiting = null; resolve(null); } });
   const nextLine = (): Promise<string | null> => lines.length ? Promise.resolve(lines.shift()!) : closed ? Promise.resolve(null) : new Promise(resolve => { waiting = resolve; });
   const changed = runtime.configureFullAccess();
@@ -58,9 +43,10 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   const provider = runtime.services.activeProvider();
   const native = await runtime.nativeStatus();
   log(box(`${dots(color, runtime.ledger().level(), runtime.liveStatus().observing)}  Studdy Buddy`, [
-    statusLine('Full åtkomst', true, color, changed ? 'beviljad' : 'tidigare konfigurerad'),
+    statusLine('App-behörigheter', runtime.permissions().every(key => key.granted), color,
+      changed ? 'grundinställningar aktiverade (OS separat)' : 'kontrollera med /access (OS separat)'),
     statusLine('AI', Boolean(provider?.hasApiKey), color, provider?.hasApiKey ? `${provider.name} · ${provider.modelId}` : 'Anslut med /api'),
-    statusLine('Native helper', native.available, color, native.detail),
+    statusLine('Native helper', native.available, color, native.available ? native.detail : 'Åtkomst nekad · kör studdy doctor för detaljer'),
     '', p.dim('Skriv naturligt · / öppnar kommandomenyn · Tab kompletterar'),
   ], color));
   if (runtime.services.permissions.isGranted('application.observe')) runtime.observer.start();
@@ -71,7 +57,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   let lastStatusLine = '';
   const currentPrompt = () => p.dim(compactLivePrompt(runtime.liveStatus(), runtime.ledger().level())) + '  ' + p.mint('du › ');
   const refreshPrompt = (force = false) => {
-    if (!terminal || closed || secretInputActive || inCommand) return;
+    if (!terminal || closed || secretInputActive || inCommand || rl.line.length > 0) return;
     const status = compactLivePrompt(runtime.liveStatus(), runtime.ledger().level());
     if (!force && status === lastStatusLine) return;
     lastStatusLine = status;
@@ -402,7 +388,6 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
     rl.prompt();
   }
   clearInterval(timer);
-  if (terminal) input.removeListener('keypress', onKey);
   await runtime.close();
   rl.close();
 }
