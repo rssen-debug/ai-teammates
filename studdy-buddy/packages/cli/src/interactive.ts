@@ -6,7 +6,7 @@ import { SLASH_COMMANDS, slashCompletions, addGoal, completeGoal, goalSummary, m
 import { liveLines, compactLivePrompt } from './live-ui.js';
 import { configureLoginAutostart } from './login-autostart.js';
 import { runVoiceMode } from './voice-mode.js';
-import { runContinuousVoice, listInstalledWindowsVoices } from './continuous-voice.js';
+import { runContinuousVoice, listInstalledWindowsVoices, probeWindowsVoice } from './continuous-voice.js';
 import { naturalDesktopGoal } from './natural-action.js';
 import { NEURAL_VOICES, neuralVoiceFor } from '@studdy/voice-engine';
 
@@ -119,6 +119,18 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text === '/voice' || text === '/voice live') {
         log(p.mint('Startar kontinuerlig röst · Kilo-molnmodell + Windows CPU-tal (inga extra API-nycklar).'));
         await runContinuousVoice(runtime, log);
+      } else if (text === '/voice doctor') {
+        const granted = runtime.services.permissions.isGranted('microphone');
+        const health = await probeWindowsVoice();
+        log(box('Mikrofontest', [
+          'Buddy-behörighet: ' + (granted ? 'beviljad' : 'nekad (/access microphone on)'),
+          'Windows mikrofon: ' + health.microphone,
+          'Installerad igenkännare: ' + (health.recognizer ?? 'ingen verifierad'),
+          health.detail,
+          granted && health.microphone === 'ready'
+            ? 'Mikrofonen kunde öppnas; faktisk ljudigenkänning kräver ett taltest med /voice.'
+            : 'Röstläget är inte verifierat. Följ felet ovan innan /voice.',
+        ], color));
       } else if (text === '/voice voices') {
         // Two different things, said plainly: the natural neural voices that
         // need no download, and the offline SAPI voices that need none either.
