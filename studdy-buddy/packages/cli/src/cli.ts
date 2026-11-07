@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseArgs } from 'node:util';
 import { spawn } from 'node:child_process';
 import { StuddyRuntime, summarizeSnapshot, SpeechPlayer, type RuntimeOptions } from '@studdy/core';
 import { maskKey } from '@studdy/ai-router';
@@ -12,7 +13,17 @@ export interface CliIO {
   color?: boolean;
   stdin?: NodeJS.ReadableStream;
 }
-export interface CliOptions extends RuntimeOptions { cwd?: string; version?: string; }
+export interface CliOptions extends RuntimeOptions { cwd?: string; version?: string; openUrl?: (url: string) => Promise<void>; }
+const CLI_FLAGS = {
+  json: { type: 'boolean' as const }, 'no-color': { type: 'boolean' as const },
+  'key-stdin': { type: 'boolean' as const }, 'token-stdin': { type: 'boolean' as const },
+  yes: { type: 'boolean' as const }, enable: { type: 'boolean' as const },
+  port: { type: 'string' as const }, 'base-url': { type: 'string' as const },
+  model: { type: 'string' as const }, 'vision-model': { type: 'string' as const },
+  name: { type: 'string' as const }, duration: { type: 'string' as const },
+  once: { type: 'boolean' as const }, stdin: { type: 'boolean' as const },
+  version: { type: 'boolean' as const, short: 'v' }, help: { type: 'boolean' as const, short: 'h' },
+};
 
 const PRESETS: Record<string, { id: string; name: string; baseUrl: string; modelId: string }> = {
   kilo: { id: 'kilo', name: 'Kilo Gateway', baseUrl: 'https://ai-gateway.kilo.ai/api/v1', modelId: 'kilo-auto/free' },
@@ -26,9 +37,10 @@ export const HELP = `${dots(false)}  Studdy Buddy CLI
 Användning:
   studdy                         Interaktiv chatt + live-status
   studdy ask "förklara varför…"  Engångsfråga till din AI
+  studdy repl                    Kör chattsekvens från stdin (scriptbart)
   studdy setup                   Full åtkomst + guide för AI-nyckel
-  studdy provider set <preset> --key-stdin
-  studdy provider test           Live-test mot vald provider
+  studdy provider set <preset|custom> --key-stdin [--base-url URL --model ID]
+  studdy provider test | probe   Live-test / uppmätta modellförmågor
   studdy status                  Kompakt dashboard
   studdy doctor                  Lokal hälsokontroll
   studdy open "Google Chrome"    Starta valfri app, verifierat
@@ -40,7 +52,7 @@ Användning:
   studdy type <ref> "text"       Skriv i observerat fält
   studdy press <combo> [id]      Tangenttryck, t.ex. ctrl+s
   studdy focus <window-id>       Fokusera fönster
-  studdy watch                   Live-dashboard, uppdateras på plats
+  studdy watch [--once --duration S]  Live-dashboard, uppdateras på plats
   studdy bridge [--port N]       Starta webbläsar-brygga + skriv token
   studdy sites [allow <host>]    Tillåtna/väntande webbsidor
   studdy gmail connect <id>      Anslut Gmail med OAuth/PKCE
@@ -50,7 +62,7 @@ Användning:
   studdy memory                  Skriv/synka Obsidian-minne
   studdy progress | readiness    Lärande och readiness
   studdy history | logs          Historik / bounded logg
-  studdy voice "text"            Lokal Windows-TTS
+  studdy voice "text"            Lokal uppläsning (Windows/macOS/Linux)
   studdy models                  Providerprofil
   studdy reset --yes             Rensa lokal chatthistorik
 
@@ -64,18 +76,28 @@ Nycklar tas aldrig som argument. Använd --key-stdin eller interactive prompt.
 `;
 
 export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}): Promise<number> {
-  const color = io.color ?? supportsColor();
+  let parsed;
+  try { parsed = parseArgs({ args: argv, options: CLI_FLAGS, allowPositionals: true, strict: true }); }
+  catch (error) { io.err(error instanceof Error ? error.message : String(error)); return 2; }
+  const flags = parsed.values;
+  const positional = parsed.positionals;
+  const option = (name: string): string | undefined => { const v = flags[name as keyof typeof flags]; return typeof v === 'string' ? v : undefined; };
+  const json = flags.json === true;
+  const color = flags['no-color'] ? false : (io.color ?? supportsColor());
+  const command = flags.version ? 'version' : flags.help ? 'help' : positional[0] ?? 'help';
+  const out = (value: unknown) => io.out(json ? JSON.stringify(value, null, 2) : typeof value === 'string' ? value : JSON.stringify(value, null, 2));
+  if (command === 'help') { io.out(HELP); return 0; }
+  if (command === 'version') { out({ version: options.version ?? '0.2.0' }); return 0; }
+  const runtime = new StuddyRuntime({ ...options, openUrl: options.openUrl ?? (async (url: string): Promise<void> => {
+    if (new URL(url).hostname === 'accounts.google.com') io.out('Öppna denna inloggningslänk i din webbläsare:\n' + url);
+    const { openExternal } = await import('@studdy/core');
+    try { await openExternal(url); } catch { io.err('Kunde inte öppna webbläsaren automatiskt. Använd länken eller filen ovan.'); }
+  }) });
   const p = palette(color);
-  const args = argv.filter(a => a !== '--no-color');
-  const json = args.includes('--json');
-  const positional = args.filter(a => !a.startsWith('--'));
-  const command = positional[0] ?? 'help';
-  const runtime = new StuddyRuntime(options);
-  const out = (value: unknown) => io.out(json ? JSON.stringify(value, null, 2) : String(value));
   try {
     switch (command) {
-      case 'help': case '--help': case '-h': io.out(HELP); return 0;
-      case 'version': case '--version': case '-v': out({ version: options.version ?? '0.2.0' }); return 0;
+      case 'help': io.out(HELP); return 0;
+      case 'version': out({ version: options.version ?? '0.2.0' }); return 0;
       case 'setup': {
         const changed = runtime.configureFullAccess();
         const provider = runtime.services.activeProvider();
@@ -93,11 +115,12 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
       case 'provider': {
         const sub = positional[1];
         if (sub === 'set') {
-          const preset = PRESETS[positional[2] ?? ''];
-          if (!preset) { io.err(`Okänd preset. Välj ${Object.keys(PRESETS).join(', ')}.`); return 2; }
-          const key = args.includes('--key-stdin') ? await readAll(io.stdin ?? process.stdin) : process.env.STUDDY_API_KEY;
+          const presetName = positional[2] ?? '';
+          const preset = presetName === 'custom' ? { id: 'custom', name: option('name') ?? 'Egen provider', baseUrl: option('base-url') ?? '', modelId: option('model') ?? '' } : PRESETS[presetName];
+          if (!preset) { io.err(`Okänd preset. Välj ${Object.keys(PRESETS).join(', ')}, custom.`); return 2; }
+          const key = flags['key-stdin'] ? await readAll(io.stdin ?? process.stdin) : process.env.STUDDY_API_KEY;
           if (!key?.trim()) { io.err('Ingen nyckel. Skicka via --key-stdin eller STUDDY_API_KEY.'); return 2; }
-          const saved = runtime.services.saveProvider({ ...preset, apiKey: key.trim() });
+          const saved = runtime.services.saveProvider({ ...preset, baseUrl: option('base-url') ?? preset.baseUrl, modelId: option('model') ?? preset.modelId, visionModelId: option('vision-model') ?? null, apiKey: key.trim() });
           if (!saved.ok) { io.err(saved.error.message); return 1; }
           out({ ok: true, provider: preset.id, key: maskKey(key.trim()) });
           return 0;
@@ -106,16 +129,20 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
           const result = await runtime.services.testProvider();
           out(result); return result.ok && result.data.ok ? 0 : 1;
         }
+        if (sub === 'probe') {
+          const result = await runtime.services.probeCapabilities();
+          out(result); return result.ok ? 0 : 1;
+        }
         if (sub === 'list') { out(runtime.services.activeProvider()); return 0; }
-        io.err('Använd provider set|test|list.'); return 2;
+        io.err('Använd provider set|test|probe|list.'); return 2;
       }
       case 'status': {
-        const live = runtime.liveStatus();
+        const live = await runtime.observer.tick();
         const provider = runtime.services.activeProvider();
         const native = await runtime.nativeStatus();
         const snapshot = runtime.services.learning.snapshot();
         const ledger = runtime.ledger().details();
-        const bridge = runtime.bridgeStatus();
+        const bridge = await runtime.probeBridge();
         const data = { live, provider, native, learning: snapshot, ledger, bridge, dataDir: runtime.dataDir };
         if (json) { out(data); return 0; }
         io.out(box(`${dots(color)}  Studdy Buddy`, [
@@ -136,7 +163,7 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
           { name: 'Databas', ok: true, detail: runtime.databasePath(), blocked: false },
           { name: 'Native helper', ok: native.available, detail: native.detail, blocked: !native.available },
           { name: 'AI-nyckel', ok: Boolean(provider?.hasApiKey), detail: provider?.hasApiKey ? 'sparad i lokalt valv' : 'saknas · studdy setup', blocked: false },
-          { name: 'Full åtkomst', ok: runtime.services.permissions.isGranted('computer.actions'), detail: 'kör studdy setup', blocked: false },
+          { name: 'Full åtkomst', ok: runtime.services.permissions.isGranted('computer.actions'), detail: runtime.services.permissions.isGranted('computer.actions') ? 'beviljad lokalt; OS-behörigheter rapporteras separat' : 'kör studdy setup', blocked: false },
         ];
         if (json) { out({ checks }); return checks.some(c => !c.ok && !c.blocked) ? 1 : 0; }
         io.out(box('Doctor', checks.map(c => statusLine(c.name, c.ok, color, c.detail)), color));
@@ -169,8 +196,13 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
         const r = await runtime.computerAction(command, positional.slice(1));
         out(r); return r.ok ? 0 : 1;
       }
+      case 'repl': {
+        const { runInteractive } = await import('./interactive.js');
+        await runInteractive({ ...options, input: io.stdin, output: { write: (text: string) => io.out(text) } });
+        return 0;
+      }
       case 'ask': case 'chat': {
-        const question = positional.slice(1).join(' ').trim();
+        const question = flags.stdin ? await readAll(io.stdin ?? process.stdin) : positional.slice(1).join(' ').trim();
         if (!question) { io.err('Skriv en fråga: studdy ask "varför…?"'); return 2; }
         const result = await runtime.chat(question);
         if (!result.ok) { io.err(result.error.message); return 1; }
@@ -178,26 +210,32 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
         return result.data.degraded ? 1 : 0;
       }
       case 'watch': {
+        const seconds = flags.once ? 0 : option('duration') === undefined ? Infinity : Number(option('duration'));
+        if (!Number.isFinite(seconds) || seconds < 0) { io.err('Ange --duration i sekunder (0 eller större).'); return 2; }
         runtime.observer.start();
         const render = () => {
           const s = runtime.liveStatus();
-          process.stdout.write('\x1b[2J\x1b[H' + box(`${dots(color)}  Live`, [
-            statusLine(s.observing ? 'Observerar' : 'Väntar', s.observing, color, s.windowTitle ?? s.activity),
-            p.dim(`${s.elementCount} element · nivå ${s.level} · Ctrl+C avslutar`),
-          ], color) + '\n');
+          if (json) out(s);
+          else io.out(box(`${dots(color)}  Live`, [statusLine(s.observing ? 'Observerar' : 'Väntar', s.observing, color, s.windowTitle ?? s.activity), p.dim(`${s.elementCount} element · nivå ${s.level} · Ctrl+C avslutar`)], color));
         };
+        await new Promise(resolve => setTimeout(resolve, 200));
         render();
-        const timer = setInterval(render, 1000);
-        await new Promise<void>(resolve => process.once('SIGINT', () => resolve()));
-        clearInterval(timer);
+        if (flags.once || seconds === 0) return runtime.liveStatus().observing ? 0 : 1;
+        await new Promise<void>(resolve => {
+          const stop = () => { clearInterval(timer); clearTimeout(limit); resolve(); };
+          const timer = setInterval(render, 2500);
+          const limit = setTimeout(stop, seconds * 1000);
+          process.once('SIGINT', stop);
+        });
         return 0;
       }
       case 'bridge': {
-        const portIndex = args.indexOf('--port');
-        const port = portIndex >= 0 ? Number(args[portIndex + 1]) : undefined;
+        const port = option('port') === undefined ? undefined : Number(option('port'));
+        if (port !== undefined && (!Number.isInteger(port) || port < 0 || port > 65535)) { io.err('Ogiltig port (0–65535).'); return 2; }
         const { status, token } = await runtime.startBridge(port);
         if (!status.running) { io.err(status.detail); return 1; }
-        io.out(box('Browser bridge', [
+        if (json) out({ ...status, token });
+        else io.out(box('Browser bridge', [
           statusLine('Loopback WebSocket', true, color, `ws://${status.host}:${status.port}`),
           '', 'Token (klistra in i Studdy-tillägget):', p.mint(token),
           '', p.dim('Endast tillåtna sidor läses. Ctrl+C avslutar.'),
@@ -207,7 +245,7 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
       }
       case 'sites': {
         if (positional[1] === 'allow' && positional[2]) { out({ allowed: runtime.allowSite(positional[2]) }); return 0; }
-        out({ allowed: runtime.services.siteAllowList(), pending: runtime.pendingSites(), bridge: runtime.bridgeStatus() }); return 0;
+        out({ allowed: runtime.services.siteAllowList(), pending: runtime.pendingSites(), bridge: await runtime.probeBridge() }); return 0;
       }
       case 'gmail': {
         const sub = positional[1];
@@ -216,15 +254,15 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
           if (!id) { io.err('Ange Google OAuth client-id.'); return 2; }
           const r = await runtime.gmail.connect(id); out(r); return r.connected ? 0 : 1;
         }
-        if (sub === 'list') { io.out(await runtime.inbox(positional.slice(2).join(' ') || undefined)); return 0; }
+        if (sub === 'list') { const r = await runtime.inboxResult(positional.slice(2).join(' ') || undefined); out(r); return r.ok ? 0 : 1; }
         if (sub === 'disconnect') { await runtime.gmail.disconnect(); out({ ok: true }); return 0; }
         out(runtime.gmail.status()); return 0;
       }
       case 'github': {
         const sub = positional[1];
         if (sub === 'configure') {
-          const token = args.includes('--token-stdin') ? (await readAll(io.stdin ?? process.stdin)).trim() : undefined;
-          out(runtime.github.configure({ repository: positional[2] ?? '', token, enabled: args.includes('--enable') })); return 0;
+          const token = flags['token-stdin'] ? (await readAll(io.stdin ?? process.stdin)).trim() : undefined;
+          out(runtime.github.configure({ repository: positional[2] ?? '', token, enabled: flags.enable === true })); return 0;
         }
         if (sub === 'sync') { const r = await runtime.github.publish(); out(r); return r.ok ? 0 : 1; }
         if (sub === 'report') { io.out(runtime.github.report()); return 0; }
@@ -246,7 +284,7 @@ export async function runCli(argv: string[], io: CliIO, options: CliOptions = {}
       }
       case 'models': out(runtime.services.activeProvider()); return 0;
       case 'reset': {
-        if (!args.includes('--yes')) { io.err('Detta rensar lokal chatthistorik. Kör studdy reset --yes.'); return 2; }
+        if (!flags.yes === true) { io.err('Detta rensar lokal chatthistorik. Kör studdy reset --yes.'); return 2; }
         runtime.services.resetChat(); out({ ok: true }); return 0;
       }
       case 'test': {

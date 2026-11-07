@@ -51,6 +51,18 @@ jobs:
             if (hard.length) { console.error(hard); process.exit(1); }
           "
 
+      - name: Linux native capability report (headless is BLOCKED, never fake green)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        env:
+          STUDDY_DATA_DIR: ${{ runner.temp }}/studdy-linux-proof
+        run: |
+          set -euo pipefail
+          node dist/cli/studdy.mjs setup --no-color
+          node dist/cli/studdy.mjs windows --json --no-color > linux-windows.json || true
+          cat linux-windows.json
+          node -e "const r=require('./linux-windows.json'); if (!r.error || !/AT-SPI|D-Bus|desktop/i.test(r.error)) process.exit(1); console.log('Headless desktop blocker observed honestly:', r.error);"
+
       - name: Package CLI tarball
         if: matrix.os == 'windows-latest'
         run: npm run package:cli

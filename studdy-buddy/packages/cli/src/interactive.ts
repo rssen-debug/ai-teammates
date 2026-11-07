@@ -3,15 +3,28 @@ import { Readable } from 'node:stream';
 import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
 
-export async function runInteractive(options: RuntimeOptions = {}): Promise<void> {
+export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
+export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
+  const input = options.input ?? process.stdin;
+  const output = options.output ?? process.stdout;
+  const log = (text: string) => output.write(text + '\n');
+  const terminal = Boolean((input as NodeJS.ReadStream).isTTY);
   const runtime = new StuddyRuntime(options);
-  const color = supportsColor();
+  const color = supportsColor(process.env, { isTTY: terminal });
   const p = palette(color);
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY) });
+  const rl = readline.createInterface({ input, output: output as NodeJS.WritableStream, terminal });
+  // Install line handlers before the first await: a pipe can deliver its whole
+  // script and EOF while nativeStatus() is still running.
+  const lines: string[] = [];
+  let waiting: ((line: string | null) => void) | null = null;
+  let closed = false;
+  rl.on('line', line => { if (waiting) { const resolve = waiting; waiting = null; resolve(line); } else lines.push(line); });
+  rl.on('close', () => { closed = true; if (waiting) { const resolve = waiting; waiting = null; resolve(null); } });
+  const nextLine = (): Promise<string | null> => lines.length ? Promise.resolve(lines.shift()!) : closed ? Promise.resolve(null) : new Promise(resolve => { waiting = resolve; });
   const changed = runtime.configureFullAccess();
   const provider = runtime.services.activeProvider();
   const native = await runtime.nativeStatus();
-  console.log(box(`${dots(color)}  Studdy Buddy`, [
+  log(box(`${dots(color)}  Studdy Buddy`, [
     statusLine('Full åtkomst', true, color, changed ? 'beviljad' : 'tidigare konfigurerad'),
     statusLine('AI', Boolean(provider?.hasApiKey), color, provider?.hasApiKey ? provider.name : '/setup för att lägga nyckel'),
     statusLine('Native helper', native.available, color, native.detail),
@@ -23,56 +36,62 @@ export async function runInteractive(options: RuntimeOptions = {}): Promise<void
     const s = runtime.liveStatus();
     if (s.state !== lastState) {
       lastState = s.state;
-      console.log(p.dim(`● live: ${s.observing ? s.windowTitle : s.activity}`));
+      log(p.dim(`● live: ${s.observing ? s.windowTitle : s.activity}`));
       rl.prompt(true);
     }
   }, 1000);
   rl.setPrompt(p.mint('du › '));
   rl.prompt();
-  for await (const line of rl) {
+  // readline's async iterator pauses after each yield. Mixing it with nested
+  // rl.question() and background prompts can leave a piped REPL permanently
+  // paused. An explicit queue keeps input flowing across awaits and EOF.
+  for (;;) {
+    const line = await nextLine();
+    if (line === null) break;
     const text = line.trim();
     if (!text) { rl.prompt(); continue; }
     if (text === '/exit' || text === '/quit') break;
     try {
       if (text === '/help') {
-        console.log('/status /setup /open <app> /windows /snapshot <id> /memory /progress /bridge /exit');
+        log('/status /setup /open <app> /windows /snapshot <id> /memory /progress /bridge /exit');
       } else if (text === '/status') {
         const s = runtime.liveStatus();
         const ledger = runtime.ledger().details();
-        console.log(box('Status', [
+        log(box('Status', [
           statusLine('Live', s.observing, color, s.windowTitle ?? s.activity),
           statusLine('AI', Boolean(runtime.services.activeProvider()?.hasApiKey), color),
           `Nivå ${ledger.level} · ${ledger.verified} verifierade skills`,
         ], color));
       } else if (text === '/setup') {
-        const preset = (await question(rl, 'Provider (kilo/deepseek/openrouter/opencode): ')).trim().toLowerCase();
-        const key = await secret(rl, 'API-nyckel (dold): ');
+        output.write('Provider (kilo/deepseek/openrouter/opencode): ');
+        const preset = ((await nextLine()) ?? '').trim().toLowerCase();
+        const key = await secret(rl, nextLine, 'API-nyckel (dold): ', output, terminal);
         const { runCli } = await import('./cli.js');
-        await runCli(['provider', 'set', preset, '--key-stdin', '--no-color'], { out: console.log, err: console.error, color: false, stdin: Readable.from([key]) }, options);
+        await runCli(['provider', 'set', preset, '--key-stdin', '--no-color'], { out: log, err: log, color: false, stdin: Readable.from([key]) }, options);
       } else if (text.startsWith('/open ')) {
         const r = await runtime.launchApp(text.slice(6));
-        console.log(r.ok ? p.mint('✓ ' + r.detail) : p.amber('○ ' + r.detail));
+        log(r.ok ? p.mint('✓ ' + r.detail) : p.amber('○ ' + r.detail));
       } else if (text === '/windows') {
         const r = await runtime.adapter.listWindows();
-        console.log(r.error ?? r.windows.map(w => `${w.id}  ${w.title}`).join('\n'));
+        log(r.error ?? r.windows.map(w => `${w.id}  ${w.title}`).join('\n'));
       } else if (text.startsWith('/snapshot ')) {
         const snap = await runtime.adapter.snapshot(text.slice(10).trim());
-        console.log(snap.accessible ? snap.elements.filter(e => e.name || e.value).slice(0, 30).map(e => `${e.ref} ${e.role}: ${e.name || e.value}`).join('\n') : snap.note);
-      } else if (text === '/memory') console.log(runtime.syncMemory());
-      else if (text === '/progress') console.log(JSON.stringify(runtime.services.progress(), null, 2));
+        log(snap.accessible ? snap.elements.filter(e => e.name || e.value).slice(0, 30).map(e => `${e.ref} ${e.role}: ${e.name || e.value}`).join('\n') : snap.note ?? 'Ingen tillgänglig snapshot.');
+      } else if (text === '/memory') log(runtime.syncMemory());
+      else if (text === '/progress') log(JSON.stringify(runtime.services.progress(), null, 2));
       else if (text === '/bridge') {
         const h = await runtime.startBridge();
-        console.log(h.status.running ? `ws://${h.status.host}:${h.status.port}\nToken: ${h.token}` : h.status.detail);
-      } else if (text.startsWith('/')) console.log('Okänt kommando. /help');
+        log(h.status.running ? `ws://${h.status.host}:${h.status.port}\nToken: ${h.token}` : h.status.detail);
+      } else if (text.startsWith('/')) log('Okänt kommando. /help');
       else {
         const result = await runtime.chat(text);
-        if (result.ok) console.log(p.violet('studdy › ') + result.data.message.text);
-        else console.log(p.red(result.error.message));
+        if (result.ok) log(p.violet('studdy › ') + result.data.message.text);
+        else log(p.red(result.error.message));
         if (!result.ok || result.data.degraded) runtime.journal.record('cli.chat', result.ok ? result.data.error ?? 'provider failed' : result.error.message, 'warn');
       }
     } catch (error) {
       runtime.journal.record('cli.interactive', error);
-      console.log(p.red('Fel: ') + (error instanceof Error ? error.message : String(error)));
+      log(p.red('Fel: ') + (error instanceof Error ? error.message : String(error)));
     }
     rl.prompt();
   }
@@ -81,18 +100,20 @@ export async function runInteractive(options: RuntimeOptions = {}): Promise<void
   rl.close();
 }
 
-function question(rl: readline.Interface, prompt: string): Promise<string> {
-  return new Promise(resolve => rl.question(prompt, resolve));
-}
-function secret(rl: readline.Interface, prompt: string): Promise<string> {
+function secret(rl: readline.Interface, nextLine: () => Promise<string | null>, prompt: string, output: { write(text: string): unknown }, terminal: boolean): Promise<string> {
   return new Promise(resolve => {
-    process.stdout.write(prompt);
+    output.write(prompt);
+    const stdin = process.stdin as NodeJS.ReadStream & { setRawMode?: (mode: boolean) => void };
+    const rawBefore = Boolean((stdin as NodeJS.ReadStream & { isRaw?: boolean }).isRaw);
+    if (terminal && stdin.setRawMode) stdin.setRawMode(true);
+    if (!terminal) { void nextLine().then(answer => resolve((answer ?? '').trim())); return; }
     const mutable = rl as unknown as { _writeToOutput?: (s: string) => void };
     const old = mutable._writeToOutput;
     mutable._writeToOutput = () => {};
     rl.question('', answer => {
+      if (terminal && stdin.setRawMode) stdin.setRawMode(rawBefore);
       if (old) mutable._writeToOutput = old;
-      process.stdout.write('\n');
+      output.write('\n');
       resolve(answer);
     });
   });

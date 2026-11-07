@@ -24,7 +24,7 @@ export type GmailSummary = { id: string; threadId: string; subject: string; from
 export class GmailConnector {
   private vault: FileVaultKeychain;
   private pending = false;
-  constructor(dataDir: string, private readonly openUrl: (url: string) => Promise<void> = openExternal) { this.vault = new FileVaultKeychain(dataDir); }
+  constructor(dataDir: string, private readonly openUrl: (url: string) => Promise<void> = openExternal, private readonly fetchImpl: typeof fetch = fetch) { this.vault = new FileVaultKeychain(dataDir); }
 
   status(): { connected: boolean; configured: boolean; connecting: boolean } {
     return { connected: !!this.tokens(), configured: !!this.vault.get(CONFIG_KEY), connecting: this.pending };
@@ -46,6 +46,7 @@ export class GmailConnector {
     }
     this.pending = true;
     let server: Server | null = null;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       const verifier = randomBytes(48).toString('base64url');
       const challenge = createHash('sha256').update(verifier).digest('base64url');
@@ -84,13 +85,13 @@ export class GmailConnector {
       await this.openUrl(url.toString());
       const code = await Promise.race([
         response,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Gmail-inloggningen tog för lång tid.')), 180_000)),
+        new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error('Gmail-inloggningen tog för lång tid.')), 180_000); }),
       ]);
       const form = new URLSearchParams({
         client_id: clientId, redirect_uri: redirect, code,
         code_verifier: verifier, grant_type: 'authorization_code',
       });
-      const result = await fetch(TOKEN, {
+      const result = await this.fetchImpl(TOKEN, {
         method: 'POST', body: form,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         signal: AbortSignal.timeout(20_000),
@@ -105,6 +106,7 @@ export class GmailConnector {
       this.vault.set(CONFIG_KEY, clientId);
       return { connected: true, detail: 'Gmail anslutet med läsbehörighet. Ingen mejlåtkomst utan en uttrycklig fråga.' };
     } finally {
+      if (timeout) clearTimeout(timeout);
       this.pending = false;
       if (server) (server as Server).close();
     }
@@ -116,7 +118,7 @@ export class GmailConnector {
     this.vault.delete(CONFIG_KEY);
     if (tokens?.access_token) {
       try {
-        await fetch('https://oauth2.googleapis.com/revoke', {
+        await this.fetchImpl('https://oauth2.googleapis.com/revoke', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({ token: tokens.access_token }),
@@ -131,7 +133,7 @@ export class GmailConnector {
     const clientId = this.vault.get(CONFIG_KEY);
     if (!tokens || !clientId) throw new Error('Gmail är inte anslutet.');
     if (tokens.expires_at > Date.now() + 90_000) return tokens.access_token;
-    const res = await fetch(TOKEN, {
+    const res = await this.fetchImpl(TOKEN, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -155,12 +157,12 @@ export class GmailConnector {
     const q = query.slice(0, 180);
     const params = new URLSearchParams({ q, maxResults: String(Math.min(15, Math.max(1, max))) });
     const headers = { Authorization: 'Bearer ' + access };
-    const res = await fetch(GMAIL + '/messages?' + params, { headers, signal: AbortSignal.timeout(20_000) });
+    const res = await this.fetchImpl(GMAIL + '/messages?' + params, { headers, signal: AbortSignal.timeout(20_000) });
     if (!res.ok) throw new Error('Gmail list HTTP ' + res.status);
     const payload = await res.json() as { messages?: { id: string; threadId: string }[] };
     const ids = (payload.messages ?? []).slice(0, 15);
     return Promise.all(ids.map(async item => {
-      const info = await fetch(GMAIL + '/messages/' + encodeURIComponent(item.id) + '?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date',
+      const info = await this.fetchImpl(GMAIL + '/messages/' + encodeURIComponent(item.id) + '?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date',
         { headers, signal: AbortSignal.timeout(20_000) });
       if (!info.ok) throw new Error('Gmail message HTTP ' + info.status);
       const data = await info.json() as { id: string; threadId: string; snippet?: string; payload?: { headers?: { name: string; value: string }[] } };

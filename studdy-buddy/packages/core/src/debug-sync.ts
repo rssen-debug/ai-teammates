@@ -24,7 +24,7 @@ export class GitHubDebugSync {
   private active = false;
   private lastPublished = '';
 
-  constructor(dataDir: string) {
+  constructor(dataDir: string, private readonly fetchImpl: typeof fetch = fetch) {
     mkdirSync(dataDir, { recursive: true });
     this.configPath = join(dataDir, 'github-debug-sync.json');
     this.localDebugPath = join(dataDir, 'Obsidian-Vault', 'debugger.md');
@@ -100,7 +100,7 @@ export class GitHubDebugSync {
       if (report === this.lastPublished) return { ok: true, detail: 'Inga nya rapporterade fel.' };
       const url = 'https://api.github.com/repos/' + config.repository + '/contents/' + REMOTE_PATH;
       const authorization = { ...HEADERS, Authorization: 'Bearer ' + token };
-      const lookup = await fetch(url, { headers: authorization, signal: AbortSignal.timeout(15000) });
+      const lookup = await this.fetchImpl(url, { headers: authorization, signal: AbortSignal.timeout(15000) });
       let sha: string | undefined;
       if (lookup.status === 200) {
         const file = await lookup.json() as GitHubFile;
@@ -108,7 +108,7 @@ export class GitHubDebugSync {
       } else if (lookup.status !== 404) {
         throw new Error('GitHub lookup HTTP ' + lookup.status);
       }
-      const res = await fetch(url, {
+      const res = await this.fetchImpl(url, {
         method: 'PUT',
         headers: { ...authorization, 'Content-Type': 'application/json' },
         body: JSON.stringify({

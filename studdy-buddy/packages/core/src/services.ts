@@ -289,8 +289,11 @@ export class StuddyServices {
       return fail('INVALID_URL', 'Base URL måste börja med https://');
     }
     if (!base.modelId) return fail('INVALID_MODEL', 'Ange ett modell-id.');
-    if (!base.baseUrl.startsWith('https://') && !/localhost|127\.0\.0\.1/.test(base.baseUrl)) {
-      return fail('INSECURE_URL', 'Endast https:// tillåts (förutom localhost).');
+    let providerUrl: URL;
+    try { providerUrl = new URL(base.baseUrl); } catch { return fail('INVALID_URL', 'Ogiltig provider-URL.'); }
+    if (providerUrl.username || providerUrl.password || providerUrl.search || providerUrl.hash) return fail('INVALID_URL', 'Provider-URL får inte innehålla inloggning, query eller fragment.');
+    if (providerUrl.protocol !== 'https:' && !(providerUrl.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(providerUrl.hostname))) {
+      return fail('INSECURE_URL', 'Endast https:// tillåts (förutom loopback-hosts).');
     }
 
     this.db.providers.save(base);

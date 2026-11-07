@@ -24,12 +24,12 @@ function runnerReturning(map: Record<string, { code: number; stdout: string; std
 }
 
 describe('DesktopAccessibilityAdapter', () => {
-  it('reports unavailable on non-Windows platforms instead of pretending', async () => {
-    const adapter = new DesktopAccessibilityAdapter({ platform: 'linux', runner: runnerReturning({}) });
+  it('reports unsupported OS honestly', async () => {
+    const adapter = new DesktopAccessibilityAdapter({ platform: 'freebsd', runner: runnerReturning({}) });
     const status = await adapter.status();
     expect(status.available).toBe(false);
     expect(status.mode).toBe('unavailable');
-    expect(status.detail).toMatch(/Windows/);
+    expect(status.detail).toMatch(/freebsd/);
   });
 
   it('reports unavailable when the CLI is missing', async () => {
@@ -258,6 +258,31 @@ describe('the real CLI envelope (observed, not assumed)', () => {
     expect(flat).not.toContain('--window');
     expect(flat).toContain('list-windows');
     expect(flat).toContain('--window-id');
+  });
+});
+
+describe('Linux/native transport regressions', () => {
+  it('passes typed text through stdin, not argv, and enforces the native byte limit', async () => {
+    const calls: { args: string[]; input?: string }[] = [];
+    const adapter = new DesktopAccessibilityAdapter({ platform: 'linux', runner: {
+      run: async (_cmd, args, _timeout, input) => { calls.push({ args, input }); return { code: 0, stdout: JSON.stringify({ ok: true }), stderr: '' }; },
+    } });
+    expect((await adapter.type('@s1:e2', 'hej $(inte ett shell-kommando)')).ok).toBe(true);
+    expect(calls[0]!.args).toEqual(['type', '@s1:e2', '--stdin']);
+    expect(calls[0]!.input).toContain('$(inte');
+    expect((await adapter.type('@s1:e2', 'å'.repeat(6000))).ok).toBe(false);
+    expect(calls).toHaveLength(1);
+  });
+  it('does not call a screenshot successful unless a nonempty file exists', async () => {
+    const adapter = new DesktopAccessibilityAdapter({ platform: 'linux', runner: {
+      run: async () => ({ code: 0, stdout: JSON.stringify({ ok: true }), stderr: '' }),
+    } });
+    expect((await adapter.screenshot('w1', '/definitely/missing/studdy-test.png')).ok).toBe(false);
+  });
+  it('reports a missing executable from stderr, not misleading JSON parsing', async () => {
+    const { defaultRunner } = await import('../../packages/core/src/desktop-adapter.js');
+    const result = await defaultRunner.run('/definitely-missing-agent-desktop', ['version'], 1000);
+    expect(result.code).not.toBe(0); expect(result.stderr).toMatch(/ENOENT/);
   });
 });
 
