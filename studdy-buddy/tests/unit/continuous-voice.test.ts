@@ -67,6 +67,6 @@ describe('continuous CPU voice through Kilo',()=>{
     const command=new WindowsNativeProvider('win32').buildCommand({text:'Hello',settings});
     expect(command.command).toBe('powershell.exe');
     expect(command.args.join(' ')).toContain("SelectVoice('Microsoft David Desktop')");
-    expect(command.args.join(' ')).toContain('$s.Rate = -1');
+    expect(command.args.join(' ')).toContain('$s.Rate = -2');
   });
 });
