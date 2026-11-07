@@ -2,6 +2,7 @@ import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
 import { StuddyRuntime, type RuntimeOptions } from '@studdy/core';
 import { box, dots, palette, statusLine, supportsColor } from './theme.js';
+import { SLASH_COMMANDS, slashMatches, slashCompletions, addGoal, completeGoal, goalSummary, modelChoices } from './slash-ui.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -12,13 +13,31 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   const runtime = new StuddyRuntime(options);
   const color = supportsColor(process.env, { isTTY: terminal });
   const p = palette(color);
-  const rl = readline.createInterface({ input, output: output as NodeJS.WritableStream, terminal });
+  const rl = readline.createInterface({ input, output: output as NodeJS.WritableStream, terminal, completer: slashCompletions });
+  // Lightweight ANSI suggestion overlay: appears as soon as / is typed in a TTY.
+  // Render below the readline input and restore the cursor, so typing stays natural.
+  // Piped/CI mode never emits terminal control sequences.
+  let closed = false;
+  let previewVisible = false;
+  const preview = () => {
+    if (!terminal || closed) return;
+    const inputLine = rl.line.trim();
+    const matches = /^\/[a-z]*$/i.test(inputLine) ? slashMatches(inputLine).slice(0, 6) : [];
+    if (!matches.length && !previewVisible) return;
+    output.write('\x1b7\x1b[0J');
+    if (matches.length) {
+      output.write('\n' + matches.map(item => p.mint(item.command.padEnd(12)) + p.dim(item.description)).join('\n'));
+    }
+    output.write('\x1b8');
+    previewVisible = matches.length > 0;
+  };
+  const onKey = () => { if (terminal) setImmediate(preview); };
+  if (terminal) input.on('keypress', onKey);
   // Install line handlers before the first await: a pipe can deliver its whole
   // script and EOF while nativeStatus() is still running.
   const lines: string[] = [];
   let waiting: ((line: string | null) => void) | null = null;
-  let closed = false;
-  rl.on('line', line => { if (waiting) { const resolve = waiting; waiting = null; resolve(line); } else lines.push(line); });
+  rl.on('line', line => { if (previewVisible && terminal) { output.write('\x1b[0J'); previewVisible = false; } if (waiting) { const resolve = waiting; waiting = null; resolve(line); } else lines.push(line); });
   rl.on('close', () => { closed = true; if (waiting) { const resolve = waiting; waiting = null; resolve(null); } });
   const nextLine = (): Promise<string | null> => lines.length ? Promise.resolve(lines.shift()!) : closed ? Promise.resolve(null) : new Promise(resolve => { waiting = resolve; });
   const changed = runtime.configureFullAccess();
@@ -28,7 +47,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
     statusLine('Full åtkomst', true, color, changed ? 'beviljad' : 'tidigare konfigurerad'),
     statusLine('AI', Boolean(provider?.hasApiKey), color, provider?.hasApiKey ? `${provider.name} · ${provider.modelId}` : 'Anslut med /api'),
     statusLine('Native helper', native.available, color, native.detail),
-    '', p.dim('Skriv ett meddelande eller /api · /models · /status · /help'),
+    '', p.dim('Skriv naturligt · / öppnar kommandomenyn · Tab kompletterar'),
   ], color));
   if (runtime.services.permissions.isGranted('application.observe')) runtime.observer.start();
   let lastState = runtime.liveStatus().state;
@@ -48,12 +67,22 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   for (;;) {
     const line = await nextLine();
     if (line === null) break;
-    const text = line.trim();
+    let text = line.trim();
     if (!text) { rl.prompt(); continue; }
+    if (text === '/') {
+      log(box('Kommandon  ·  välj nummer', SLASH_COMMANDS.map((item, i) => String(i + 1).padStart(2) + '   ' + item.command.padEnd(12) + item.description), color));
+      output.write('Välj › ');
+      const choice = ((await nextLine()) ?? '').trim();
+      const index = Number(choice);
+      text = Number.isInteger(index) && index > 0 && index <= SLASH_COMMANDS.length
+        ? SLASH_COMMANDS[index - 1]!.command
+        : SLASH_COMMANDS.find(item => item.command === choice)?.command ?? '';
+      if (!text) { log(p.dim('Stängt.')); rl.prompt(); continue; }
+    }
     if (text === '/exit' || text === '/quit') break;
     try {
       if (text === '/help') {
-        log('Chatt: skriv som vanligt.\n/api  Anslut AI-nyckel\n/models  Se provider och modell\n/model <modell-id>  Byt modell utan att skriva in nyckeln igen\n/status  Live-status\n/prove  Testa datorstyrning i Anteckningar\n/open <app>  Öppna program\n/windows  Lista fönster\n/snapshot <id>  Läs fönster\n/progress  Skills\n/memory  Minne\n/bridge  Webbläsarkoppling\n/exit  Avsluta');
+        log('Skriv / för en väljbar meny, Tab för komplettering, eller prata naturligt.\n' + SLASH_COMMANDS.map(item => item.command.padEnd(12) + item.description).join('\n'));
       } else if (text === '/status') {
         await runtime.observer.tick();
         const s = runtime.liveStatus();
@@ -71,9 +100,47 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
         log(runtime.services.memory?.rememberProfile(fact)
           ? p.mint('Sparat i ditt personliga minne. Det används som kontext i framtida samtal.')
           : p.amber('Kunde inte spara. Lägg inte API-nycklar eller lösenord i personliga minnen.'));
+      } else if (text === '/goal' || text === '/goals') {
+        log(box('Dina mål', [goalSummary(runtime.services.db.checkpoints), '', '1  Lägg till mål', '2  Markera mål som klart', '3  Stäng'], color));
+        output.write('Välj › ');
+        const choice = ((await nextLine()) ?? '').trim();
+        if (choice === '1') {
+          output.write('Vad vill du uppnå? › ');
+          const title = (await nextLine()) ?? '';
+          const goal = addGoal(runtime.services.db.checkpoints, title);
+          log(goal ? p.mint('Sparat mål #' + goal.id + ': ' + goal.title) : p.amber('Inget mål sparades.'));
+        } else if (choice === '2') {
+          output.write('Nummer på klart mål › ');
+          const id = ((await nextLine()) ?? '').replace(/^#/, '').trim();
+          log(completeGoal(runtime.services.db.checkpoints, id) ? p.mint('Målet markerat som klart.') : p.amber('Målet hittades inte eller är redan klart.'));
+        } else log(p.dim('Stängt.'));
+      } else if (text.startsWith('/goal add ') || /^mitt mål är att /i.test(text)) {
+        const title = text.startsWith('/goal add ') ? text.slice(10) : text.replace(/^mitt mål är att /i, '');
+        const goal = addGoal(runtime.services.db.checkpoints, title);
+        log(goal ? p.mint('Sparat mål #' + goal.id + ': ' + goal.title) : p.amber('Inget mål sparades.'));
+      } else if (text.startsWith('/goal done ')) {
+        const id = text.slice(11).replace(/^#/, '').trim();
+        log(completeGoal(runtime.services.db.checkpoints, id) ? p.mint('Målet markerat som klart.') : p.amber('Målet hittades inte eller är redan klart.'));
       } else if (text === '/models') {
         const active = runtime.services.activeProvider();
         log(active ? `Aktiv: ${active.name} · ${active.modelId} · ${active.hasApiKey ? 'API-nyckel sparad' : 'saknar nyckel'}\nByt: /model <modell-id> · Byt tjänst/nyckel: /api` : 'Ingen AI ansluten. Skriv /api och välj en tjänst.');
+      } else if (text === '/model') {
+        const active = runtime.services.activeProvider();
+        if (!active) log(p.amber('Anslut AI först med /api.'));
+        else {
+          const choices = modelChoices(active.id, active.modelId);
+          log(box('Välj modell', [...choices.map((id, i) => String(i + 1) + '  ' + id + (id === active.modelId ? '  (aktiv)' : '')), '', 'Eller skriv ett modell-ID · Enter avbryter'], color));
+          output.write('Modell › ');
+          const chosen = ((await nextLine()) ?? '').trim();
+          const index = Number(chosen);
+          const modelId = Number.isInteger(index) && index > 0 && index <= choices.length ? choices[index - 1]! : chosen;
+          if (!modelId) log(p.dim('Ingen ändring.'));
+          else if (!/^[a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,179}$/.test(modelId)) log(p.amber('Ogiltigt modell-ID.'));
+          else {
+            const result = runtime.services.saveProvider({ id: active.id, modelId });
+            log(result.ok ? p.mint('Aktiv modell: ' + modelId + '. Sparad till nästa start.') : p.red(result.error.message));
+          }
+        }
       } else if (text.startsWith('/model ')) {
         const modelId = text.slice(7).trim();
         if (!modelId || /[\\r\\n]/.test(modelId) || modelId.length > 180) { log(p.amber('Ange ett giltigt modell-id.')); }
@@ -86,9 +153,12 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
           }
         }
       } else if (text === '/api' || text === '/setup') {
-        log('Välj tjänst: kilo / deepseek / openrouter / opencode (eller skriv avbryt)');
-        output.write('Tjänst › ');
-        const preset = ((await nextLine()) ?? '').trim().toLowerCase();
+        const providers = ['kilo', 'deepseek', 'openrouter', 'opencode'];
+        log(box('Anslut AI', providers.map((name, i) => String(i + 1) + '  ' + name), color));
+        output.write('Välj tjänst (1–4) › ');
+        const value = ((await nextLine()) ?? '').trim().toLowerCase();
+        const index = Number(value);
+        const preset = Number.isInteger(index) && index > 0 && index <= providers.length ? providers[index - 1]! : value;
         if (preset === 'avbryt' || !preset) { log('Avbrutet.'); }
         else if (!['kilo', 'deepseek', 'openrouter', 'opencode'].includes(preset)) log(p.amber('Okänd tjänst. Skriv /api och välj från listan.'));
         else {
@@ -141,6 +211,7 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
     rl.prompt();
   }
   clearInterval(timer);
+  if (terminal) input.removeListener('keypress', onKey);
   await runtime.close();
   rl.close();
 }
