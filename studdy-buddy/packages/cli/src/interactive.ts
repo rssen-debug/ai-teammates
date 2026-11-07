@@ -6,7 +6,7 @@ import { SLASH_COMMANDS, slashMatches, slashCompletions, addGoal, completeGoal, 
 import { liveLines, compactLivePrompt } from './live-ui.js';
 import { configureLoginAutostart } from './login-autostart.js';
 import { runVoiceMode } from './voice-mode.js';
-import { runContinuousVoice } from './continuous-voice.js';
+import { runContinuousVoice, listInstalledWindowsVoices } from './continuous-voice.js';
 
 export interface InteractiveOptions extends RuntimeOptions { version?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown }; }
 export async function runInteractive(options: InteractiveOptions = {}): Promise<void> {
@@ -115,6 +115,23 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
       } else if (text === '/voice' || text === '/voice live') {
         log(p.mint('Startar kontinuerlig röst · Kilo-molnmodell + Windows CPU-tal (inga extra API-nycklar).'));
         await runContinuousVoice(runtime, log);
+      } else if (text === '/voice voices') {
+        const names = await listInstalledWindowsVoices();
+        log(names.length ? 'Installerade CPU-röster:\n' + names.map(name => '• ' + name).join('\n') :
+          'Inga installerade Windows SAPI-röster kunde verifieras.');
+      } else if (text.startsWith('/voice voice ')) {
+        const name = text.slice('/voice voice '.length).trim();
+        const names = await listInstalledWindowsVoices();
+        if (!names.includes(name)) log(p.amber('Rösten finns inte i installerade Windows-röster. Visa med /voice voices.'));
+        else {
+          runtime.services.db.checkpoints.set('buddy.voice.voiceId.v1', name);
+          log(p.mint('Vald CPU-röst: ' + name));
+        }
+      } else if (text === '/voice style documentary' || text === '/voice style normal') {
+        const documentary = text.endsWith('documentary');
+        runtime.services.db.checkpoints.set('buddy.voice.style.v1', documentary ? 'documentary' : 'normal');
+        log(p.mint(documentary ? 'Dokumentärtempo valt (0,92×). Rösten beror på dina installerade Windows-röster.' :
+          'Normalt taltempo valt.'));
       } else if (text === '/voice basic') {
         await runVoiceMode(runtime, log);
       } else if (text === '/do' || text.startsWith('/do ')) {
