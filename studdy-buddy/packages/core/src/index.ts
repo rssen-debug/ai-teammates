@@ -23,3 +23,5 @@ export * from './live-observer.js';
 export * from './live-proof.js';
 
 export * from './desktop-agent.js';
+
+export * from './chatgpt-ui.js';
