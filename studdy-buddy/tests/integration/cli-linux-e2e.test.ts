@@ -204,26 +204,30 @@ describe('built CLI in a real OS process, real HTTP and real native helper', () 
       await exited;
     }
   }, 20_000);
-  it.runIf(process.platform === 'linux')('masks the interactive secret in a real pseudoterminal', async () => {
-    const script = `import os,pty,select,time,subprocess,sys\n` +
+  it.runIf(process.platform === 'linux')('accepts /api secret and returns to chat in a real pseudoterminal', async () => {
+    const script = `import os,pty,select,time,subprocess,sys,tempfile,shutil\n` +
       `secret='pty-synthetic-key-123456'\n` +
+      `data_dir=tempfile.mkdtemp(prefix='studdy-pty-secret-')\n` +
       `master,slave=pty.openpty()\n` +
-      `p=subprocess.Popen([${JSON.stringify(process.execPath)},${JSON.stringify(bundle)}],stdin=slave,stdout=slave,stderr=slave,env=dict(os.environ),close_fds=True)\n` +
-      `os.close(slave); out=b''; sent=False; end=time.time()+12\n` +
+      `env=dict(os.environ, STUDDY_DATA_DIR=data_dir, NO_COLOR='1')\n` +
+      `p=subprocess.Popen([${JSON.stringify(process.execPath)},${JSON.stringify(bundle)}],stdin=slave,stdout=slave,stderr=slave,env=env,close_fds=True)\n` +
+      `os.close(slave); out=b''; state=0; end=time.time()+16\n` +
+      `checks=[('du › '.encode(),'/api'),('Välj tjänst'.encode(),'1'),('API-nyckel (dold): '.encode(),secret),('du › '.encode(),'/models'),('du › '.encode(),'/exit')]\n` +
       `while time.time()<end and p.poll() is None:\n` +
       ` r,_,_=select.select([master],[],[],0.1)\n` +
       ` if r:\n` +
       `  try: out+=os.read(master,65536)\n` +
       `  except OSError: break\n` +
-      ` if not sent and 'du › '.encode() in out:\n` +
-      `  for line in ['/setup','kilo',secret,'/status','/exit']:\n` +
-      `   os.write(master,(line+'\\r').encode()); time.sleep(.3)\n` +
-      `  sent=True\n` +
+      ` if state < len(checks) and checks[state][0] in out:\n` +
+      `  os.write(master,(checks[state][1]+'\\r').encode()); state+=1; out+=b' [STEP_SENT] ' ;time.sleep(.2)\n` +
       `try: p.wait(timeout=3)\n` +
       `except subprocess.TimeoutExpired: p.kill(); p.wait()\n` +
-      `print('SECRET_LEAK' if secret.encode() in out else 'SECRET_MASKED'); print('EXIT',p.returncode)\n`;
+      `print('SECRET_LEAK' if secret.encode() in out else 'SECRET_MASKED'); print('EXIT',p.returncode);print('STEPS',state);print('CONNECTED' if b'API-nyckel sparad' in out or b'AI-anslutning sparad' in out else 'NOT_CONNECTED')\n` +
+      `shutil.rmtree(data_dir,ignore_errors=True)\n`;
     const r = await runFile('python3', ['-c', script], { cwd: root, env: { ...process.env, STUDDY_DATA_DIR: dir, NO_COLOR: '1' }, timeout: 20_000 });
     expect(r.stdout).toContain('SECRET_MASKED');
     expect(r.stdout).toContain('EXIT 0');
+    expect(r.stdout).toContain('STEPS 5');
+    expect(r.stdout).toContain('CONNECTED');
   }, 25_000);
 });
