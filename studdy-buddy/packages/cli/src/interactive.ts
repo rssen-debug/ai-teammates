@@ -57,6 +57,8 @@ export async function runInteractive(options: InteractiveOptions = {}): Promise<
   let lastObservedAt: number | null = null;
   let lastStatusLine = '';
   const timer = setInterval(() => {
+    // Never redraw or interrupt the terminal while the user pastes a credential.
+    if (secretInputActive) return;
     const s = runtime.liveStatus();
     const changed = s.state !== lastState || (s.observing && s.lastObservedAt !== lastObservedAt);
     lastState = s.state;
