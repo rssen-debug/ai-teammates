@@ -65,6 +65,20 @@ jobs:
           }
           Write-Host 'Alla förväntade steg finns i skriptet.'
 
+      - name: Python bundle builds and runs (one file, 900+ files inside)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/make_python_bundle.py --out /tmp/bundle.py
+          python3 /tmp/bundle.py info | tee /tmp/info.txt
+          grep -qE 'Källfiler[[:space:]]*:[[:space:]]*[0-9]{3,}' /tmp/info.txt
+          python3 /tmp/bundle.py run --version
+          python3 /tmp/bundle.py extract /tmp/bundle-out
+          test -f /tmp/bundle-out/studdy-buddy/package.json
+          # Den committade filen måste vara samma format som generatorn gör.
+          head -1 bundles/studdy-buddy-all.py | grep -q '^#!'
+
       - name: Built CLI smoke test
         shell: bash
         env:

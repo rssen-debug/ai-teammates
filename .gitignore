@@ -38,3 +38,6 @@ next-env.d.ts
 .neon
 
 .trigger
+# python
+__pycache__/
+*.pyc

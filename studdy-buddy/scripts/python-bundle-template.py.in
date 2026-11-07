@@ -1,0 +1,321 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Studdy Buddy / AI Teammates — hela projektet i EN Python-fil.
+
+Version : @@VERSION@@
+Byggd   : @@BUILT@@
+Innehåll: @@FILE_COUNT@@ källfiler (@@RAW_BYTES@@ byte) + färdigbyggd CLI.
+
+VARFÖR DEN HÄR FILEN SER UT SOM DEN GÖR
+========================================
+Källkoden är TypeScript (Next.js-app + studdy-buddy-CLI). Att skriva om den till
+Python hade inte varit samma projekt — det hade varit en annan produkt. Därför
+bär den här filen projektet ordagrant: all källkod ligger i ett gzip-arkiv inuti
+filen, och den färdigbyggda CLI:n ligger i ett andra arkiv så att den går att
+KÖRA på en gång med bara Node installerat.
+
+Alltså: en fil att ladda ner, två saker den kan göra.
+
+    python3 studdy-buddy-all.py                  # meny
+    python3 studdy-buddy-all.py info             # vad filen innehåller
+    python3 studdy-buddy-all.py list             # alla filer i projektet
+    python3 studdy-buddy-all.py extract min-mapp # packa upp allt
+    python3 studdy-buddy-all.py run --version    # kör CLI:n direkt
+    python3 studdy-buddy-all.py run doctor       # hälsokontroll på din dator
+    python3 studdy-buddy-all.py install-cli      # installera `studdy` globalt
+
+Krav: Python 3.8+ för att packa upp. Node 22.13+ för att köra CLI:n.
+Inget nätverk behövs — allt ligger redan i filen.
+
+Kryptografisk kontroll (bevisar att filen inte ändrats):
+    Filens egna SHA-256 skrivs ut av `info`. Jämför med det du fick.
+"""
+
+from __future__ import annotations
+
+import base64
+import gzip
+import json
+import hashlib
+import io
+import os
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+
+META = {
+    "name": "studdy-buddy-all",
+    "project": "ai-teammates (AI Teammates + Studdy Buddy CLI)",
+    "version": "@@VERSION@@",
+    "built": "@@BUILT@@",
+    "commit": "@@GIT_SHA@@",
+    "files": @@FILE_COUNT@@,
+    "source_bytes": @@RAW_BYTES@@,
+    "skipped": @@SKIPPED@@,
+    "repo_gz_bytes": @@REPO_GZ_LEN@@,
+    "cli_gz_bytes": @@CLI_GZ_LEN@@,
+}
+
+# --------------------------------------------------------------------------
+# Innehållet. Två gzip-arkiv, base64-kodade så att filen förblir ren text.
+# --------------------------------------------------------------------------
+REPO_GZ = """\
+@@REPO_B64@@
+"""
+
+CLI_GZ = """\
+@@CLI_B64@@
+"""
+
+
+# ------------------------------------------------------------------ dekodning
+def _decode(blob: str) -> bytes:
+    return base64.b64decode("".join(blob.split()))
+
+
+def repo_bytes() -> bytes:
+    return _decode(REPO_GZ)
+
+
+def cli_bytes() -> bytes:
+    return gzip.decompress(_decode(CLI_GZ))
+
+
+def repo_tar() -> tarfile.TarFile:
+    return tarfile.open(fileobj=io.BytesIO(repo_bytes()), mode="r:gz")
+
+
+def members() -> list[tarfile.TarInfo]:
+    with repo_tar() as tar:
+        return [m for m in tar.getmembers() if m.isfile() or m.issym()]
+
+
+# ------------------------------------------------------------------ säkerhet
+def _safe_join(root: str, name: str) -> str:
+    """Stop path traversal cold. An archive must never write outside the target."""
+    root_abs = os.path.abspath(root)
+    target = os.path.abspath(os.path.join(root_abs, name))
+    if os.path.commonpath([root_abs, target]) != root_abs:
+        raise ValueError(f"Vägrar packa upp utanför målmappen: {name}")
+    return target
+
+
+# ------------------------------------------------------------------ kommandon
+def cmd_info(_args: list[str]) -> int:
+    print(f"Projekt      : {META['project']}")
+    print(f"Version      : {META['version']}")
+    print(f"Byggd        : {META['built']}")
+    print(f"Git-commit   : {META['commit']}")
+    print(f"Källfiler    : {META['files']} ({META['source_bytes'] / 1e6:.2f} MB rå)")
+    print(f"Överhoppade  : {META['skipped']}")
+    print(f"Repo-arkiv   : {META['repo_gz_bytes'] / 1e3:.0f} kB gzip")
+    print(f"CLI-arkiv    : {META['cli_gz_bytes'] / 1e3:.0f} kB gzip "
+          f"({len(cli_bytes())} byte uppackad)")
+    print(f"Denna fil    : {os.path.abspath(__file__)}")
+    print(f"Filstorlek   : {os.path.getsize(__file__) / 1e6:.2f} MB")
+    with open(__file__, "rb") as fh:
+        digest = hashlib.sha256(fh.read()).hexdigest()
+    print(f"SHA-256      : {digest}")
+    print()
+    print("Kör 'python3 %s list' för att se innehållet." % os.path.basename(__file__))
+    return 0
+
+
+def cmd_list(args: list[str]) -> int:
+    pattern = args[0].lower() if args else ""
+    rows = members()
+    shown = 0
+    for m in rows:
+        if pattern and pattern not in m.name.lower():
+            continue
+        if m.issym():
+            print(f"{'länk':>9}  {m.name} -> {m.linkname}")
+        else:
+            print(f"{m.size:>9,}  {m.name}")
+        shown += 1
+    print()
+    print(f"{shown} filer" + (f" matchar '{pattern}'" if pattern else f" av {len(rows)}"))
+    return 0
+
+
+def cmd_extract(args: list[str]) -> int:
+    target = args[0] if args else "studdy-buddy-source"
+    total = 0
+    links = 0
+    with repo_tar() as tar:
+        for m in tar.getmembers():
+            dest = _safe_join(target, m.name)
+            os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
+            if m.issym():
+                # Länken måste stanna inom målmappen, annars är det en attack.
+                resolved = os.path.normpath(os.path.join(os.path.dirname(dest), m.linkname))
+                root_abs = os.path.abspath(target)
+                if os.path.commonpath([root_abs, os.path.abspath(resolved)]) != root_abs:
+                    print(f"Vägrar skapa länk utanför målmappen: {m.name}", file=sys.stderr)
+                    continue
+                if os.path.lexists(dest):
+                    os.remove(dest)
+                os.symlink(m.linkname, dest)
+                links += 1
+                continue
+            if not m.isfile():
+                continue
+            src = tar.extractfile(m)
+            if src is None:
+                continue
+            with src, open(dest, "wb") as out:
+                shutil.copyfileobj(src, out)
+            total += 1
+    print(f"Packade upp {total} filer och {links} symlänkar till {os.path.abspath(target)}")
+    print()
+    print("Nästa steg (kräver Node 22.13+):")
+    print(f"  cd {target}/studdy-buddy && npm ci && npm run build")
+    print("  eller kör CLI:n direkt utan npm: se 'install-cli'")
+    return 0
+
+
+def _node_version_ok() -> tuple[bool, str]:
+    exe = shutil.which("node")
+    if not exe:
+        return False, "Node saknas i PATH"
+    try:
+        raw = subprocess.run([exe, "--version"], capture_output=True, text=True,
+                             timeout=20).stdout.strip()
+    except (OSError, subprocess.SubprocessError) as err:
+        return False, f"Kunde inte köra node: {err}"
+    ver = raw.lstrip("v")
+    try:
+        major, minor = int(ver.split(".")[0]), int(ver.split(".")[1])
+    except (ValueError, IndexError):
+        return False, f"Konstig version: {raw}"
+    ok = (major, minor) >= (22, 13)
+    return ok, raw
+
+
+def _write_cli(directory: str) -> str:
+    path = os.path.join(directory, "studdy.mjs")
+    with open(path, "wb") as fh:
+        fh.write(cli_bytes())
+    return path
+
+
+def cmd_run(args: list[str]) -> int:
+    ok, detail = _node_version_ok()
+    if not ok:
+        print(f"Kan inte köra: {detail}. Kräver Node >= 22.13.", file=sys.stderr)
+        print("Installera: https://nodejs.org eller 'winget install OpenJS.NodeJS.LTS'",
+              file=sys.stderr)
+        return 2
+    with tempfile.TemporaryDirectory(prefix="studdy-cli-") as tmp:
+        script = _write_cli(tmp)
+        env = dict(os.environ)
+        # Håll användarens riktiga data utanför temp-mappen så minnet bevaras.
+        env.setdefault("STUDDY_DATA_DIR", os.path.join(
+            os.path.expanduser("~"), ".studdy-buddy"))
+        argv = [shutil.which("node") or "node", script] + args
+        try:
+            return subprocess.run(argv, env=env).returncode
+        except KeyboardInterrupt:
+            return 130
+
+
+def _npm_tarball(path: str) -> None:
+    """Skriv ett npm-paket (.tgz) med package.json + studdy.mjs.
+
+    Varför tarball och inte en mapp: `npm install -g <mapp>` skapar en SYMLÄNK
+    till mappen. Vår mapp är temporär och försvinner direkt efteråt, så
+    installationen blir tom. Ett tarball kopieras på riktigt.
+    """
+    manifest = {
+        "name": "studdy-buddy",
+        "version": META["version"],
+        "description": "Studdy Buddy CLI - one file, no downloads",
+        "type": "module",
+        "bin": {"studdy": "./studdy.mjs"},
+        "engines": {"node": ">=22.13.0"},
+        "license": "MIT",
+    }
+    payload = json.dumps(manifest, indent=2) + "\n"
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as tar:
+        for name, data in (("package/package.json", payload.encode("utf-8")),
+                           ("package/studdy.mjs", cli_bytes())):
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            info.mtime = 0
+            info.mode = 0o755 if name.endswith(".mjs") else 0o644
+            info.uid = info.gid = 0
+            info.uname = info.gname = "root"
+            tar.addfile(info, io.BytesIO(data))
+    # npm förväntar sig gzip utan tidsstämpel; annars blir paketet olika varje gång.
+    with open(path, "wb") as fh:
+        fh.write(gzip.compress(raw.getvalue(), compresslevel=9, mtime=0))
+
+
+def cmd_install_cli(args: list[str]) -> int:
+    ok, detail = _node_version_ok()
+    if not ok:
+        print(f"Kan inte installera: {detail}. Kräver Node >= 22.13.", file=sys.stderr)
+        return 2
+    prefix = args[0] if args else ""
+    if prefix:
+        os.makedirs(prefix, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="studdy-install-") as tmp:
+        tgz = os.path.join(tmp, "studdy-buddy-%s.tgz" % META["version"])
+        _npm_tarball(tgz)
+        argv = ["npm", "install", "-g", tgz, "--no-audit", "--no-fund"]
+        if prefix:
+            argv += ["--prefix", prefix]
+        try:
+            code = subprocess.run(argv).returncode
+        except FileNotFoundError:
+            print("npm saknas i PATH.", file=sys.stderr)
+            return 2
+    if code == 0:
+        print()
+        print("Klart. Kör 'studdy --version' i ett NYTT terminalfönster (PATH uppdateras där).")
+    return code
+
+
+def cmd_menu(_args: list[str]) -> int:
+    print(__doc__.split("Krav:")[0].strip())
+    print()
+    name = os.path.basename(__file__)
+    print("Prova:")
+    print(f"  python3 {name} info")
+    print(f"  python3 {name} extract min-mapp")
+    print(f"  python3 {name} run --version")
+    return 0
+
+
+COMMANDS = {
+    "info": cmd_info,
+    "list": cmd_list,
+    "extract": cmd_extract,
+    "run": cmd_run,
+    "install-cli": cmd_install_cli,
+    "menu": cmd_menu,
+    "help": cmd_menu,
+}
+
+
+def main(argv: list[str]) -> int:
+    if not argv:
+        return cmd_menu([])
+    cmd, rest = argv[0], argv[1:]
+    handler = COMMANDS.get(cmd)
+    if handler is None:
+        print(f"Okänt kommando: {cmd}", file=sys.stderr)
+        print("Använd: " + ", ".join(sorted(COMMANDS)), file=sys.stderr)
+        return 2
+    return handler(rest)
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main(sys.argv[1:]))
+    except BrokenPipeError:
+        os._exit(0)
