@@ -174,8 +174,8 @@ export class WindowsNativeProvider implements TtsProvider {
       '$s = New-Object System.Speech.Synthesis.SpeechSynthesizer;',
       `$s.Rate = ${rate};`,
       `$s.Volume = ${volume};`,
-      settings.voiceId && /^[a-zA-Z0-9 ._-]{1,120}$/.test(settings.voiceId)
-        ? `try { $s.SelectVoice('${settings.voiceId.replace(/'/g, "''")}') } catch { $s.SelectVoiceByHints('NotSet','NotSet',0,[System.Globalization.CultureInfo]::GetCultureInfo('${culture}')) };`
+      request.settings.voiceId && /^[a-zA-Z0-9 ._-]{1,120}$/.test(request.settings.voiceId)
+        ? `try { $s.SelectVoice('${request.settings.voiceId.replace(/'/g, "''")}') } catch { $s.SelectVoiceByHints('NotSet','NotSet',0,[System.Globalization.CultureInfo]::GetCultureInfo('${culture}')) };`
         : `try { $s.SelectVoiceByHints('NotSet','NotSet',0,[System.Globalization.CultureInfo]::GetCultureInfo('${culture}')) } catch {};`,
       `$s.Speak('${escaped}');`,
     ].join(' ');
