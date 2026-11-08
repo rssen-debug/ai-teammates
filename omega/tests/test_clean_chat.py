@@ -47,6 +47,11 @@ class CleanChatTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('app.out(presence_report(app, minutes=20))', source)
         self.assertNotIn('app.out("\\n".join(ram_snapshot.splitlines()[:8]))', source)
 
+    def test_sidebar_discloses_free_only_policy(self):
+        panel = (Path(__file__).resolve().parents[1] / "live_panel.py").read_text(encoding="utf-8")
+        self.assertIn('MODELL: kilo-auto/free · FREE ONLY', panel)
+        self.assertIn('app.settings.get("free_only", True)', panel)
+
     def test_prompt_requires_link_evidence_and_no_generic_ask(self):
         self.assertIn("inspect it with browser/web tools", buddy.SYSTEM_PROMPT)
         self.assertIn("do not merely restate their input", buddy.SYSTEM_PROMPT)
