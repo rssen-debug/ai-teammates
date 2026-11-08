@@ -44,8 +44,8 @@ class PanelTest(unittest.TestCase):
     def test_sprite_is_static_art_not_fake_tool_activity(self):
         a = pixel_companion("sleeping")
         b = pixel_companion("working")
-        self.assertEqual(len(a), 4)
-        self.assertNotEqual(a[1], b[1])
+        self.assertEqual(len(a), 7)
+        self.assertNotEqual(a[2], b[2])
 
     def test_timers_never_guess(self):
         self.assertEqual(remaining_seconds(0, 30, 100), "--:--")
