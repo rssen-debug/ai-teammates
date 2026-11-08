@@ -69,6 +69,8 @@ class LivePanel:
         self._level_checked_at = 0.0
         self._level_task: asyncio.Task | None = None
         self._cached_companion: Any = None
+        self._cached_companion_options: dict = {}
+        self._cached_companion_enabled = False
         self._companion_checked_at = 0.0
         self.trace: deque[tuple[str, bool | None, float]] = deque(maxlen=9)
         self.phase = "Väntar på uppgift"
@@ -180,23 +182,28 @@ class LivePanel:
             self._companion_checked_at = time.monotonic()
             try:
                 self._cached_companion = app.companion.loop if app.companion.present()[0] else None
+                self._cached_companion_options = self._cached_companion.options() if self._cached_companion else {}
+                self._cached_companion_enabled = bool(self._cached_companion_options.get("enabled"))
             except Exception:
                 self._cached_companion = None
+                self._cached_companion_enabled = False
+                self._cached_companion_options = {}
         comp = self._cached_companion
-        observing = bool(comp and comp.enabled and comp.captures > 0
+        comp_enabled = self._cached_companion_enabled
+        observing = bool(comp_enabled and comp and comp.captures > 0
                          and (now - comp.last_capture_at) < 90)
         active = running or observing
         mode = ("● ARBETAR" if running else "◉ OBSERVERAR" if observing
-                else "◌ VAKEN · INVÄNTAR CYKEL" if comp and comp.enabled else "○ SOVER")
+                else "◌ VAKEN · INVÄNTAR CYKEL" if comp_enabled else "○ SOVER")
         add(mode, "bold #ff72b6" if active else "#bca8bc")
         add("AI  kilo-auto/free  ·  VOICE OFF", "#ffffff")
         add("──────────────────────────────────", "#744061")
         add("STEG: " + self.phase, "bold #ffe0f1")
         add("VERKTYG: " + self.tool, "#fbc4df")
         add("──────────────────────────────────", "#744061")
-        add("COMPANION: " + ("LIVE" if comp and comp.enabled else "OFF"), "#ff72b6")
-        if comp and comp.enabled:
-            opts = comp.options()
+        add("COMPANION: " + ("LIVE" if comp_enabled else "OFF"), "#ff72b6")
+        if comp_enabled and comp:
+            opts = self._cached_companion_options
             add("Nästa Companion-tick: " + remaining_seconds(
                 comp.last_tick_at, float(opts.get("tick_seconds", 30)), now))
             capture_after = float(opts.get("capture_seconds", 30))
