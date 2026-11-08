@@ -123,7 +123,7 @@ def pixel_companion(mode: str, frame: int = 0,
     strictly follows the measured level from omega/level.py.
     """
     stage, _ = companion_stage(level)
-    blink = frame % 9 == 0
+    blink = frame % 9 == 8
     eyes = ("─ ─" if blink or mode == "sleeping" else
             "◕ ◕" if mode == "working" else
             "● ●" if mode == "observing" else "• •")
