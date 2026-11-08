@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import sys
+import tempfile
+from types import SimpleNamespace
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from genesis_decision import decide, compare_strategies
+from genesis_decision import decide, compare_strategies, DecisionHistory
 
 
 class DecisionV5Test(unittest.TestCase):
@@ -61,11 +63,37 @@ class DecisionV5Test(unittest.TestCase):
         self.assertFalse(compare_strategies([])["promote"])
         self.assertFalse(compare_strategies([{}])["promote"])
 
+    def test_historical_outcomes_change_verification_advice_without_grants(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "decisions.sqlite3"
+            db = DecisionHistory(path)
+            for _ in range(6):
+                db.record("desktop", SimpleNamespace(status="failed", verified=False), 6)
+            saved = DecisionHistory(path).snapshot("desktop")
+            self.assertEqual(saved["count"], 6)
+            self.assertEqual(saved["verified"], 0)
+            result = decide("Klicka på knappen i Outlook",
+                            ["desktop_context"], tool_status={"desktop_context": True},
+                            historical=saved)
+            self.assertIn("smaller reversible steps", result.prompt())
+            self.assertEqual(result.available_tools, ("desktop_context",))
+            self.assertFalse("permission granted" in result.prompt())
+
+    def test_sparse_evidence_is_not_claimed_as_skill(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = DecisionHistory(Path(tmp) / "decisions.sqlite3")
+            db.record("code", SimpleNamespace(status="complete", verified=True), 3)
+            self.assertEqual(db.snapshot("code")["verified"], 1)
+            self.assertEqual(db.snapshot("code")["avg_steps"], 3)
+            result = decide("Fix Python code", historical=db.snapshot("code"))
+            self.assertEqual(result.reliability_hint, "")
+
     def test_runtime_wires_decision_into_agent_and_model(self):
         source = (Path(__file__).resolve().parents[1] / "buddy.py").read_text(encoding="utf-8")
         self.assertIn("self.decision = decide(goal,", source)
         self.assertIn("self.decision.role if self.decision.confidence", source)
         self.assertIn("parts.append(run.decision.prompt())", source)
+        self.assertIn("DecisionHistory().record(self.decision.domain, o, self.steps)", source)
         self.assertIn('self.decision.reason', source)
 
 
