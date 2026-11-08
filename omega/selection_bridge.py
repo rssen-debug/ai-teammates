@@ -22,15 +22,30 @@ def selected_text(auto, maximum: int = MAX_SELECTION) -> str:
     focused = auto.GetFocusedControl()
     if focused is None:
         return ""
-    pattern = focused.GetTextPattern()
-    if pattern is None:
+    # UIAutomation exposes different capabilities per application and control.
+    # In many browsers/toolkits the focused control has no TextPattern method.
+    # Missing support is normal, not a repeating background exception.
+    getter = getattr(focused, "GetTextPattern", None)
+    if not callable(getter):
         return ""
-    selected = pattern.GetSelection()
+    try:
+        pattern = getter()
+        if pattern is None:
+            return ""
+        selected = pattern.GetSelection()
+    except (AttributeError, LookupError, NotImplementedError):
+        return ""
     if not selected:
         return ""
     pieces = []
     for item in selected:
-        value = str(item.GetText(maximum) or "")
+        try:
+            getter = getattr(item, "GetText", None)
+            if not callable(getter):
+                continue
+            value = str(getter(maximum) or "")
+        except (AttributeError, LookupError, NotImplementedError):
+            continue
         if value.strip():
             pieces.append(value[:maximum])
         if sum(map(len, pieces)) >= maximum:
@@ -55,6 +70,8 @@ class SelectionBridge:
         self.stop_event = threading.Event()
         self.status = "OFF"
         self.auto_task = None
+        self._last_auto_error = None
+        self._auto_error_count = 0
 
     def start(self):
         if self.thread and self.thread.is_alive():
@@ -142,6 +159,8 @@ class SelectionBridge:
                     continue
                 selection = await asyncio.wait_for(
                     asyncio.to_thread(read_selection), timeout=5)
+                self._auto_error_count = 0
+                self._last_auto_error = None
                 if len(selection.strip()) < 12:
                     last_candidate, stable = None, 0
                     continue
@@ -166,8 +185,15 @@ class SelectionBridge:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                self.app.ui.event("Automarkering: " + type(exc).__name__)
-                await asyncio.sleep(5)
+                # An unsupported UIA control must not flood the activity pane.
+                # Keep an error count, report a distinct error once, and back
+                # off progressively; other agent tasks remain unaffected.
+                message = type(exc).__name__ + ": " + str(exc).split("\n")[0][:100]
+                self._auto_error_count += 1
+                if message != self._last_auto_error:
+                    self._last_auto_error = message
+                    self.app.ui.event("Automarkering misslyckades: " + message)
+                await asyncio.sleep(min(60, 5 * self._auto_error_count))
 
     async def _deliver(self, source, selection):
         if (self.app.privacy.private
