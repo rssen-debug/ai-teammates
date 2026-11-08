@@ -10,7 +10,7 @@ from types import SimpleNamespace
 OMEGA = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(OMEGA))
 
-from live_panel import LivePanel, remaining_seconds, clean_line, evidence_progress, pixel_companion
+from live_panel import LivePanel, remaining_seconds, clean_line, evidence_progress, pixel_companion, companion_stage, companion_personality
 
 
 class FakeCLI:
@@ -42,10 +42,25 @@ class PanelTest(unittest.TestCase):
         self.assertTrue(b["quality_limited"])
 
     def test_sprite_is_static_art_not_fake_tool_activity(self):
-        a = pixel_companion("sleeping")
-        b = pixel_companion("working")
+        a = pixel_companion("sleeping", level=12)
+        b = pixel_companion("working", level=12)
         self.assertEqual(len(a), 7)
         self.assertNotEqual(a[2], b[2])
+
+    def test_pet_evolves_only_from_measured_level(self):
+        levels = (1, 9, 10, 24, 25, 49, 50, 74, 75, 100)
+        stages = [companion_stage(level)[0] for level in levels]
+        self.assertEqual(stages, [0, 0, 1, 1, 2, 2, 3, 3, 4, 4])
+        self.assertEqual(companion_stage(None)[0], 0)
+        self.assertEqual(len(pixel_companion("awake", level=1)), 5)
+        self.assertEqual(len(pixel_companion("awake", level=100)), 11)
+
+    def test_visual_blink_does_not_level_up(self):
+        a = pixel_companion("observing", frame=0, level=12)
+        b = pixel_companion("observing", frame=1, level=12)
+        self.assertNotEqual(a, b)
+        self.assertEqual(companion_stage(12), companion_stage(12))
+        self.assertIn("kollar vad som gick fel", companion_personality("working", 12, False).lower())
 
     def test_timers_never_guess(self):
         self.assertEqual(remaining_seconds(0, 30, 100), "--:--")
