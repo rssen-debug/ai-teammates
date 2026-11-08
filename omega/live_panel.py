@@ -64,7 +64,11 @@ class LivePanel:
         ui = self._ui
         ui._panel_state = self
         self.app = app
-        self.messages: deque[str] = deque(maxlen=450)
+        self.messages: deque[str] = deque(maxlen=220)
+        self._cached_level: dict = {}
+        self._level_checked_at = 0.0
+        self._cached_companion: Any = None
+        self._companion_checked_at = 0.0
         self.trace: deque[tuple[str, bool | None, float]] = deque(maxlen=9)
         self.phase = "Väntar på uppgift"
         self.tool = "-"
@@ -79,7 +83,7 @@ class LivePanel:
                               scrollbar=True, wrap_lines=True, line_numbers=False)
         self._status_control = FormattedTextControl(self._side_text)
         right = Frame(Window(content=self._status_control, wrap_lines=True),
-                      title=" OMEGA · LIVE ", width=Dimension(preferred=43, min=36))
+                      title=" OMEGA · LIVE ", width=Dimension.exact(39))
         visibility = Condition(lambda: shutil.get_terminal_size((120, 35)).columns >= 94)
         self._layout = Layout(
             VSplit([
@@ -96,13 +100,13 @@ class LivePanel:
             full_screen=True,
             input=DummyInput() if not __import__('sys').stdin.isatty() else None,
             output=DummyOutput() if not __import__('sys').stdout.isatty() else None,
-            mouse_support=True,
+            mouse_support=False,
             refresh_interval=1.0,
             style=Style.from_dict({
-                "frame.border": "#145e36",
-                "frame.label": "bold #41e888",
-                "text-area": "#dedede",
-                "": "#c4e0cc bg:#07140f",
+                "frame.border": "#b02d78",
+                "frame.label": "bold #ff79bb",
+                "text-area": "#ffffff bg:#140d17",
+                "": "#ffffff bg:#140d17",
             }),
         )
 
@@ -127,9 +131,9 @@ class LivePanel:
         if entered:
             shown = re.sub(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}",
                            "[REDACTED-JWT]", entered)
-            self.messages.append("you › " + clean_line(shown, 900))
+            # Echo instantly into the visible conversation, not just the backing deque.
+            self._add("you › " + clean_line(shown, 900))
             self.queue.put_nowait(entered)
-            self._refresh()
         return True
 
     def _refresh(self) -> None:
@@ -139,11 +143,20 @@ class LivePanel:
                 self._loop.call_soon_threadsafe(self.application.invalidate)
 
     def _add(self, text: str) -> None:
-        with self._lock:
-            self.messages.append(str(text))
-            self._chat.text = "\n".join(self.messages)[-28000:]
-            self._chat.buffer.cursor_position = len(self._chat.text)
-        self._refresh()
+        # Prior CLI output contains ANSI codes. In prompt_toolkit those were
+        # printed as visible escape garbage; render clean white text instead.
+        sanitized = re.sub(r"\x1b\[[0-9;]*m", "", str(text))
+        def update() -> None:
+            with self._lock:
+                self.messages.append(sanitized)
+                view = "\n".join(self.messages)[-16000:]
+                self._chat.text = view
+                self._chat.buffer.cursor_position = len(view)
+            self._refresh()
+        if self._loop and self._loop.is_running() and threading.current_thread() is not threading.main_thread():
+            self._loop.call_soon_threadsafe(update)
+        else:
+            update()
 
     def _side_text(self) -> list[tuple[str, str]]:
         app = self.app
@@ -153,24 +166,27 @@ class LivePanel:
             lines.append((style, clean_line(text, 55) + "\n"))
 
         running = bool(app.current_run)
-        comp = None
-        try:
-            if app.companion.present()[0]:
-                comp = app.companion.loop
-        except Exception:
-            pass
+        # Avoid loading the profile/SQLite and lazy Companion subsystem on
+        # every 1-second redraw: doing so stalls the terminal input.
+        if time.monotonic() - self._companion_checked_at >= 8:
+            self._companion_checked_at = time.monotonic()
+            try:
+                self._cached_companion = app.companion.loop if app.companion.present()[0] else None
+            except Exception:
+                self._cached_companion = None
+        comp = self._cached_companion
         observing = bool(comp and comp.enabled and comp.captures > 0
                          and (now - comp.last_capture_at) < 90)
         active = running or observing
         mode = ("● ARBETAR" if running else "◉ OBSERVERAR" if observing
                 else "◌ VAKEN · INVÄNTAR CYKEL" if comp and comp.enabled else "○ SOVER")
-        add(mode, "bold #46f184" if active else "#899c91")
-        add("AI  kilo-auto/free  ·  VOICE OFF", "#b8f3c7")
-        add("──────────────────────────────────", "#1f5438")
-        add("STEG: " + self.phase, "bold #a1ffbe")
-        add("VERKTYG: " + self.tool, "#8edcaa")
-        add("──────────────────────────────────", "#1f5438")
-        add("COMPANION: " + ("LIVE" if comp and comp.enabled else "OFF"), "#41e888")
+        add(mode, "bold #ff72b6" if active else "#bca8bc")
+        add("AI  kilo-auto/free  ·  VOICE OFF", "#ffffff")
+        add("──────────────────────────────────", "#744061")
+        add("STEG: " + self.phase, "bold #ffe0f1")
+        add("VERKTYG: " + self.tool, "#fbc4df")
+        add("──────────────────────────────────", "#744061")
+        add("COMPANION: " + ("LIVE" if comp and comp.enabled else "OFF"), "#ff72b6")
         if comp and comp.enabled:
             opts = comp.options()
             add("Nästa Companion-tick: " + remaining_seconds(
@@ -189,27 +205,33 @@ class LivePanel:
         else:
             add("Nästa skärmkoll: --:--")
             add("Reflektion: pausad")
-        add("──────────────────────────────────", "#1f5438")
-        add("AKTIVITET · VERKLIGA VERKTYG", "bold #65ef9e")
+        add("──────────────────────────────────", "#744061")
+        add("AKTIVITET · VERKLIGA VERKTYG", "bold #ff90c8")
         if self.trace:
             for label, ok, _at in list(self.trace)[-7:]:
                 mark = "✓" if ok is True else ("✕" if ok is False else "›")
-                add(" " + mark + " " + clean_line(label, 37), "#99efb5" if ok is True else "#d7ad74")
+                add(" " + mark + " " + clean_line(label, 37), "#ffffff" if ok is True else "#ffb3bc")
         else:
-            add(" Inga verktyg körda ännu.", "#899c91")
-        add("──────────────────────────────────", "#1f5438")
-        level = app.level_snapshot()
-        lvl = level.get("level")
+            add(" Inga verktyg körda ännu.", "#bca8bc")
+        add("──────────────────────────────────", "#744061")
+        # Evidence level can query the whole task/tool/memory history. Cache it.
+        if time.monotonic() - self._level_checked_at >= 45:
+            self._level_checked_at = time.monotonic()
+            try:
+                self._cached_level = app.level_snapshot()
+            except Exception:
+                self._cached_level = {}
+        lvl = self._cached_level.get("level")
         if isinstance(lvl, (float, int)):
             green = min(20, max(0, round(lvl / 5)))
-            add("AI LEVEL: " + str(lvl) + "/100", "bold #a8fdbf")
-            add("●" * green + "○" * (20 - green), "#42e985")
+            add("AI LEVEL: " + str(lvl) + "/100", "bold #ffffff")
+            add("●" * green + "○" * (20 - green), "#ff76b7")
         else:
-            add("AI LEVEL: ej uppmätt", "#899c91")
-        add("Nivån bygger på verifierad evidens.", "#7d9a86")
-        add("──────────────────────────────────", "#1f5438")
-        add("Arbetsstatus, inte intern tankekedja.", "#8aab94")
-        add("Skriv /presence för 20-minutersrapport.", "#8aab94")
+            add("AI LEVEL: ej uppmätt", "#bca8bc")
+        add("Nivån bygger på verifierad evidens.", "#bdafba")
+        add("──────────────────────────────────", "#744061")
+        add("Arbetsstatus, inte intern tankekedja.", "#d4b7c9")
+        add("Skriv /presence för 20-minutersrapport.", "#d4b7c9")
         return lines
 
     # Below methods become overrides on an actual CLI subclass.
