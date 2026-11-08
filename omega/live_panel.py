@@ -454,8 +454,9 @@ class LivePanel:
                     if getattr(self.app, "tasks", None) is not None:
                         await asyncio.to_thread(self._poll_build_state)
                 if self._tetris.awaiting_move:
-                    busy = bool(self.app.current_run) or bool(getattr(
-                        getattr(self.app, "tasks", None), "current", {}))
+                    # Owner chat takes priority; autonomous coding tasks may
+                    # continue concurrently with the independent Tetris model.
+                    busy = bool(self.app.current_run) or bool(self._typing.text.strip())
                     has_key = bool(self.app.gateway.key())
                     if busy:
                         self._tetris_ai_state = "pausad för användaren/uppgift"
