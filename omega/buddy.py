@@ -6432,12 +6432,18 @@ async def integration_tests(s: Suite, app: Buddy, tmp: Path) -> None:
             sha_ok = backup_ok and mm.file_sha256(Path(rep.backup)) == rep.backup_sha256
             sink2 = mm.SqliteSink(app.store.path)
             mig2 = mm.Migrator(sink2, roots=roots)
-            # The agent's own connection has to be released BEFORE the swap, not only
-            # reopened after it. Windows refuses to replace a file any process holds
+            # EVERY connection to the target has to be released before the swap, not
+            # just the obvious one. Windows refuses to replace a file any process holds
             # open, so rollback failed outright there with WinError 5. POSIX lets the
-            # rename through and leaves this connection on the old inode, which is why
+            # rename through and leaves the connection on the old inode, which is why
             # the reopen was already here — closing first makes the restore real on
             # both instead of impossible on one and theatrical on the other.
+            #
+            # There were two, and only one of them was visible at the call site: the
+            # agent's own Store, and the sink the N1 migration opened on the same file
+            # and never released. sink2 needs no closing here — rollback closes the
+            # sink it is given.
+            sink.close()
             app.store.close()
             try:
                 rolled = mig2.rollback(rep.backup) if backup_ok else False
