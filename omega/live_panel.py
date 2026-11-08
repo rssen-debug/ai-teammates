@@ -67,6 +67,7 @@ class LivePanel:
         self.messages: deque[str] = deque(maxlen=220)
         self._cached_level: dict = {}
         self._level_checked_at = 0.0
+        self._level_task: asyncio.Task | None = None
         self._cached_companion: Any = None
         self._companion_checked_at = 0.0
         self.trace: deque[tuple[str, bool | None, float]] = deque(maxlen=9)
@@ -158,6 +159,13 @@ class LivePanel:
         else:
             update()
 
+    async def _refresh_level(self) -> None:
+        try:
+            self._cached_level = await asyncio.to_thread(self.app.level_snapshot)
+        except Exception:
+            self._cached_level = {}
+        self._refresh()
+
     def _side_text(self) -> list[tuple[str, str]]:
         app = self.app
         now = time.time()
@@ -218,9 +226,11 @@ class LivePanel:
         if time.monotonic() - self._level_checked_at >= 45:
             self._level_checked_at = time.monotonic()
             try:
-                self._cached_level = app.level_snapshot()
-            except Exception:
-                self._cached_level = {}
+                loop = asyncio.get_running_loop()
+                if self._level_task is None or self._level_task.done():
+                    self._level_task = loop.create_task(self._refresh_level())
+            except RuntimeError:
+                pass  # unit tests and headless status do not trigger expensive queries
         lvl = self._cached_level.get("level")
         if isinstance(lvl, (float, int)):
             green = min(20, max(0, round(lvl / 5)))
