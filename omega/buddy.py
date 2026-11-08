@@ -6432,11 +6432,17 @@ async def integration_tests(s: Suite, app: Buddy, tmp: Path) -> None:
             sha_ok = backup_ok and mm.file_sha256(Path(rep.backup)) == rep.backup_sha256
             sink2 = mm.SqliteSink(app.store.path)
             mig2 = mm.Migrator(sink2, roots=roots)
-            rolled = mig2.rollback(rep.backup) if backup_ok else False
-            # The rollback replaced the file under the live connection, so the
-            # agent must reconnect — otherwise it would keep reading the old
-            # inode and the restore would be theatre.
-            app.store.reopen()
+            # The agent's own connection has to be released BEFORE the swap, not only
+            # reopened after it. Windows refuses to replace a file any process holds
+            # open, so rollback failed outright there with WinError 5. POSIX lets the
+            # rename through and leaves this connection on the old inode, which is why
+            # the reopen was already here — closing first makes the restore real on
+            # both instead of impossible on one and theatrical on the other.
+            app.store.close()
+            try:
+                rolled = mig2.rollback(rep.backup) if backup_ok else False
+            finally:
+                app.store.reopen()
             after = app.store.one("SELECT COUNT(*) AS n FROM memories")["n"]
             legacy_left = app.store.one("SELECT COUNT(*) AS n FROM memories WHERE tags LIKE '%legacy%'")["n"]
             s.rec("N3", "migration backup + rollback restore the exact state",
