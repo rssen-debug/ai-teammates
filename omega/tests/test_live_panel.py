@@ -127,12 +127,7 @@ class PanelTest(unittest.TestCase):
         p = self.build()
         self.assertFalse(p.show_thinking)
         p._status_control.create_content(width=39, height=35)
-        result = p._status_control.mouse_handler(
-            MouseEvent(position=Point(x=1, y=10),
-                       event_type=MouseEventType.MOUSE_UP,
-                       button=MouseButton.LEFT, modifiers=frozenset()))
-        # Fragmen­t clickability is verified separately below because its
-        # line position changes when Companion status changes.
+        # The status text supplies an actual prompt_toolkit mouse handler.
         clickable = [frag for frag in p._side_text() if len(frag) == 3]
         self.assertEqual(len(clickable), 1)
         clickable[0][2](MouseEvent(position=Point(x=1, y=0),
