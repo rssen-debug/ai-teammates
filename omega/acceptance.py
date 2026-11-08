@@ -404,11 +404,45 @@ def s05_real_conversation(ctx: Ctx) -> Result:
 # 6–10 · WINDOWS DESKTOP AND BROWSER
 # ════════════════════════════════════════════════════════════════════════════
 def _windows_gate(ctx: Ctx, what: str) -> Optional[Result]:
-    if IS_WIN:
-        return None
-    return Result(BLOCKED, f"{what} needs a real Windows desktop session; this host is {sys.platform}",
-                  {"platform": sys.platform},
-                  fix="run `buddy accept` on the owner's Windows 11 machine")
+    """BLOCKED unless this host can actually drive a Windows desktop, else None.
+
+    Two preconditions, and both are probed rather than assumed:
+
+      * Windows — the Win32 / UI Automation chain exists nowhere else;
+      * an interactive desktop session — a CI runner IS Windows, but nobody is logged
+        in. `GetForegroundWindow()` returns 0, a launched process presents no window
+        anyone can see, and there is nothing to read, click or type into.
+
+    Running the scenario anyway and reporting FAIL would be the same
+    host-precondition-as-failure mistake as benchmark B13, the self-test's Notepad and
+    voice checks, and acceptance scenario 1 — four instances of it already fixed on
+    this branch, three of them found only because a Windows runner disagreed.
+
+    The gate is deliberately one-directional: it can only ever return BLOCKED or None,
+    never PASS, so it cannot turn an unprovable scenario into a claimed one. On a real
+    desktop session every failure below still fails.
+    """
+    if not IS_WIN:
+        return Result(BLOCKED, f"{what} needs a real Windows desktop session; this host is {sys.platform}",
+                      {"platform": sys.platform},
+                      fix="run `buddy accept` on the owner's Windows 11 machine")
+    try:
+        fg = buddy.Win32.foreground()
+    except Exception as e:
+        # no user32, no window station, no session to attach to
+        return Result(BLOCKED, f"{what} needs an interactive desktop session, and probing for one "
+                               f"failed: {type(e).__name__}: {buddy.clip(e, 120)}",
+                      {"platform": sys.platform, "probe_error": f"{type(e).__name__}: {e}"},
+                      unproven=what,
+                      fix="run `buddy accept` in a logged-in Windows session, not a service or a CI runner")
+    if not fg:
+        return Result(BLOCKED, f"{what} needs an interactive desktop session; GetForegroundWindow() "
+                               f"returned 0, so nobody is logged in here (a CI runner or a service) and "
+                               f"there is no window to read or drive",
+                      {"platform": sys.platform, "foreground": None},
+                      unproven=f"{what} on a real desktop, which is what this scenario exists to prove",
+                      fix="run `buddy accept` in a logged-in Windows session")
+    return None
 
 
 def s06_read_active_window(ctx: Ctx) -> Result:

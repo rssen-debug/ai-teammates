@@ -13,13 +13,13 @@ on:
       - 'omega/**'
       - 'integrations/majin-original/package.json'
       - 'integrations/majin-original/package-lock.json'
-      - '.github/workflows/omega.yml'
+      - '.github/**'   # the workflow and the CI annotation emitter
   pull_request:
     paths:
       - 'omega/**'
       - 'integrations/majin-original/package.json'
       - 'integrations/majin-original/package-lock.json'
-      - '.github/workflows/omega.yml'
+      - '.github/**'   # the workflow and the CI annotation emitter
   workflow_dispatch:
 
 permissions:
@@ -131,11 +131,17 @@ jobs:
           echo "acceptance.py exited ${rc}"
           if [ "$rc" -ne 0 ]; then
             echo "::error::acceptance.py exited ${rc} on ${{ matrix.os }} / py${{ matrix.python }}"
-            # "verify:" lines carry the installer's problems one per line. A scenario
-            # detail is clipped to 220 characters, and that clipping hid the real cause
-            # of this step's failure for two consecutive runs.
-            grep -E "^\s*[0-9]+\.|FAIL|BLOCKED|NOT TESTED|verify:|truncated" acceptance.txt \
-              | sed 's/^/::error::acc| /' | head -60 || true
+            # GitHub records at most ten error annotations per check run, so the budget
+            # must go to the lines that decide this step. Two runs were undecidable
+            # because it went to scenario headings instead of the one FAIL line, and
+            # the printed detail is clipped to 220 characters anyway. This reads the
+            # harness's own JSON report: summary, then every FAIL unclipped, then the
+            # blocked gaps.
+            ev=$(sed -n 's/^evidence: //p' acceptance.txt | tail -1)
+            if ! python .github/acceptance_annotations.py "${ev:+$ev/}acceptance-report.json"; then
+              grep -E "SUMMARY|FAIL|verify:|truncated|NOT COMPLETE" acceptance.txt \
+                | head -8 | sed 's/^/::error::acc| /' || true
+            fi
           fi
           exit 0
 
