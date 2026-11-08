@@ -36,6 +36,26 @@ class ObservationVaultTest(unittest.TestCase):
         self.assertNotIn("1234567890123", clean)
         self.assertIn("[email hidden]", clean)
 
+    def test_durable_knowledge_is_local_and_stable(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault = ObservationVault(Path(d))
+            ok, note = vault.record_knowledge("project", "Cisco Studies", "Module 3 review needed")
+            self.assertTrue(ok)
+            data = Path(note).read_text("utf-8")
+            self.assertIn("type: project", data)
+            self.assertIn("Module 3 review needed", data)
+            again, same_note = vault.record_knowledge("project", "Cisco Studies", "Module 3 practice")
+            self.assertTrue(again)
+            self.assertEqual(note, same_note)
+            self.assertIn("Module 3 practice", Path(note).read_text("utf-8"))
+
+    def test_durable_knowledge_rejects_secrets(self):
+        with tempfile.TemporaryDirectory() as d:
+            vault = ObservationVault(Path(d))
+            ok, _ = vault.record_knowledge("preference", "my password", "abcdef123")
+            self.assertFalse(ok)
+            self.assertFalse(list(Path(d).rglob("*.md")))
+
     def test_clear_removes_only_generated_notes(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
