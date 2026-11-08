@@ -6667,8 +6667,10 @@ async def main_async(app: Buddy) -> None:
     if IS_WIN and os.environ.get("BUDDY_SELECTION_AUTO") == "1":
         app.settings.set("selection_hotkey", True)
         app.settings.set("selection_auto", True)
-    if IS_WIN and os.environ.get("BUDDY_ENABLE_VOICE") == "1":
-        app.settings.set("voice_enabled", True)
+    # Owner preference: microphone OFF on EVERY startup, irrespective of the
+    # last session or an old BUDDY_ENABLE_VOICE environment variable.
+    # Only /voice (or /voice on) may start recording within this session.
+    app.settings.set("voice_enabled", False)
     if os.environ.get("BUDDY_STT_CPU") == "1":
         # CPU-efficient int8 Whisper; no GPU dependency, with a modest accuracy tradeoff.
         app.settings.set("stt_model", "base")
@@ -6704,9 +6706,7 @@ async def main_async(app: Buddy) -> None:
     recovered = app.tasks.recover(stale_after=0)
     if recovered:
         app.ui.event(f"resuming {len(recovered)} interrupted task(s) from their last checkpoint")
-    if app.settings.get("voice_enabled") and not os.environ.get("BUDDY_NO_VOICE"):
-        ok, msg = await asyncio.to_thread(app.voice.start)
-        app.ui.event(("voice on — " if ok else "voice could not start: ") + msg)
+    app.ui.event("Voice OFF on startup · type /voice to enable the microphone")
     app.ui.header()
     app.ui.prompt()
     try:
