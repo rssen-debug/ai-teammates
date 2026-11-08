@@ -7,6 +7,7 @@ NOT model training, intelligence or independently verified task completion.
 from __future__ import annotations
 
 import os
+from contextlib import closing
 import sqlite3
 import time
 from pathlib import Path
@@ -25,7 +26,7 @@ class ExperienceLedger:
     def __init__(self, path: Path | None = None):
         self.path = Path(path) if path is not None else default_path()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS outcomes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ts INTEGER NOT NULL,
@@ -45,7 +46,7 @@ class ExperienceLedger:
         if category not in CATEGORIES:
             category = "ÖVRIGT"
         timestamp = int(time.time() if now is None else now)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute("INSERT INTO outcomes(ts,category,ok) VALUES (?,?,?)",
                          (timestamp, category, int(bool(ok))))
             conn.commit()
@@ -57,7 +58,7 @@ class ExperienceLedger:
         """
         timestamp = int(time.time() if now is None else now)
         week = 7 * 86400
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             rows = conn.execute(
                 "SELECT category,ok,COUNT(*) FROM outcomes GROUP BY category,ok"
             ).fetchall()
