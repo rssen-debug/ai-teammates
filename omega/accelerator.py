@@ -73,8 +73,41 @@ def plan_from_failures(store, limit: int = MAX_EXERCISES) -> list[dict]:
     return examples
 
 
+def autopilot_cycle(app, workspace: Path, now_ts: float | None = None) -> dict:
+    """CPU-light automatic scheduler: at most one practice batch per local day.
+
+    Runs in a worker thread. Never competes with owner's active request or
+    queued work; never creates tasks from fabricated progress. A failed or
+    cancelled batch still counts for the day to prevent infinite retry loops.
+    """
+    if not app.settings.get("accelerator_auto", True):
+        return {"queued": 0, "reason": "autopilot disabled"}
+    if app.privacy.private or getattr(app, "shutting_down", False):
+        return {"queued": 0, "reason": "private mode or shutting down"}
+    if getattr(app, "current_run", None) or getattr(app.tasks, "current", {}):
+        return {"queued": 0, "reason": "owner or task already active"}
+    if getattr(app.tasks, "paused", False):
+        return {"queued": 0, "reason": "task worker paused"}
+    # Give previously requested work priority. Never consume spare compute
+    # while the universal agent has actual user work queued.
+    if app.store.one("SELECT id FROM tasks WHERE state IN ('queued','running') LIMIT 1"):
+        return {"queued": 0, "reason": "real user work has priority"}
+    at = time.time() if now_ts is None else float(now_ts)
+    day = time.strftime("%Y%m%d", time.localtime(at))
+    marker = f"{REHEARSAL_PREFIX} {day}-"
+    existing = app.store.one(
+        "SELECT id FROM tasks WHERE title LIKE ? LIMIT 1", (marker + "%",))
+    if existing:
+        return {"queued": 0, "reason": "daily practice already scheduled"}
+    # Prevent the gateway from being hit on each timer tick when no useful
+    # past failure exists. enqueue() will re-check all permission/key gates.
+    if not plan_from_failures(app.store):
+        return {"queued": 0, "reason": "no past failed task to practice"}
+    return enqueue(app, workspace, now_ts=at)
+
+
 def enqueue(app, workspace: Path, now_ts: float | None = None) -> dict:
-    """One explicit owner request => at most 3 safe, real, independently scored attempts.
+    """One bounded scheduling attempt => at most 3 tool-verified local practices.
 
     Uses existing permission gates, task budgets and verification, not a special
     unrestricted training engine. Each rehearsal is confined to a new scratch

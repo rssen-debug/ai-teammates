@@ -374,6 +374,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "first_run_done": False,
     "poll_seconds": 2.0,
     "screenshot_upload": "ask",  # ask | allow | deny
+    "accelerator_auto": True,  # owner-requested automatic, bounded local practice when idle
     "obsidian_auto_memory": False,  # opt in to storing screened activity descriptions locally
     "obsidian_vault": "",  # default HOME/obsidian-vault; configurable in CLI
 }
@@ -5935,7 +5936,7 @@ class Buddy:
             log("summary_failed", err=str(e))
 
     # ── slash commands ──
-    HELP = """/accelerate [status|run]  /teach TEXT  /correct TEXT  /continuity [status|sync]  /selection [on|off|auto on|auto off|status]  /voice style [narrator|default]  /help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
+    HELP = """/accelerate [status|on|off|run]  /teach TEXT  /correct TEXT  /continuity [status|sync]  /selection [on|off|auto on|auto off|status]  /voice style [narrator|default]  /help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
 /memory [list|search Q|forget ID|export|clear]  /obsidian [status|on|off|sync|path PATH|clear --yes]  /resources  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
 /grants [revoke]  /activate [all|status|off]  /presence  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
@@ -5976,6 +5977,10 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
             mod = sibling("accelerator")
             if mod is None:
                 o("Accelerator unavailable: " + _SIBLING_ERRORS.get("accelerator", "module not found"))
+            elif args and args[0].lower() in ("on", "off"):
+                enabled = args[0].lower() == "on"
+                self.settings.set("accelerator_auto", enabled)
+                o("Accelerator autopilot " + ("ON" if enabled else "OFF"))
             elif args and args[0].lower() == "run":
                 o("Accelerator: letar efter verkliga tidigare fel att öva på...")
                 result = await asyncio.to_thread(mod.enqueue, self, DIRS["workspace"])
@@ -5986,8 +5991,8 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 report = await asyncio.to_thread(mod.report, self.store)
                 o("Accelerator · verifierade resultat (ingen tidsbaserad levling):\n" +
                   jdump(report))
-                o("Använd /accelerate run för högst tre lokala träningsuppgifter "
-                  "baserade på tidigare verkliga misslyckanden.")
+                o("Autopilot: " + ("ON" if self.settings.get("accelerator_auto", True) else "OFF")
+                  + " · övar automatiskt när Buddy är ledig, högst en sats/dag.")
         elif cmd == "/continuity":
             sub = args[0] if args else "status"
             if sub == "sync":
@@ -6591,6 +6596,31 @@ def presence_report(app: Buddy, minutes: int = 20) -> str:
             + "  Ask 'Vad har du lärt dig om mina projekt?' for an evidence-grounded summary.")
 
 
+async def accelerator_autopilot_loop(app: Buddy, interval: float = 300) -> None:
+    """Quiet background practice dispatcher, yielding to real owner activity.
+
+    No clock-based XP, simulated successes, new permissions or unbounded model
+    polling. Any model/key/database I/O happens in a worker thread. The existing
+    TaskEngine handles approval, checkpoints, failures, and CPU budget.
+    """
+    await asyncio.sleep(45)
+    while not app.shutting_down:
+        if app.settings.get("accelerator_auto", True):
+            module = sibling("accelerator")
+            if module is not None:
+                try:
+                    outcome = await asyncio.to_thread(
+                        module.autopilot_cycle, app, DIRS["workspace"])
+                    if outcome.get("queued", 0):
+                        app.ui.event("Autopilot lärande: " + str(outcome["queued"]) +
+                                     " övningar köade från verkliga tidigare fel")
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    log("accelerator_autopilot_error", error=type(exc).__name__)
+        await asyncio.sleep(interval)
+
+
 async def memory_continuity_loop(app: Buddy, interval: float = 900) -> None:
     """Periodic local Obsidian reconciliation without model calls.
 
@@ -6717,6 +6747,7 @@ async def main_async(app: Buddy) -> None:
         app.ui.event("Tetris task cleanup failed: " + type(exc).__name__)
     worker = asyncio.ensure_future(app.tasks.worker())
     memory_sync = asyncio.create_task(memory_continuity_loop(app))
+    accelerator_task = asyncio.create_task(accelerator_autopilot_loop(app))
     if auto_enabled and (app.presence_task is None or app.presence_task.done()):
         app.presence_task = asyncio.ensure_future(presence_heartbeat(app))
     recovered = app.tasks.recover(stale_after=0)
@@ -6745,6 +6776,7 @@ async def main_async(app: Buddy) -> None:
     finally:
         worker.cancel()
         memory_sync.cancel()
+        accelerator_task.cancel()
         if app.selection_bridge is not None:
             app.selection_bridge.stop()
         if app.live_panel is not None:
