@@ -197,6 +197,9 @@ class LivePanel:
                 else "◌ VAKEN · INVÄNTAR CYKEL" if comp_enabled else "○ SOVER")
         add(mode, "bold #ff72b6" if active else "#bca8bc")
         add("AI  kilo-auto/free  ·  VOICE OFF", "#ffffff")
+        if running and app.current_run:
+            elapsed = max(0, int(now - float(app.current_run.t0)))
+            add(f"Väntat på AI: {elapsed // 60:02d}:{elapsed % 60:02d}", "#ffffff")
         add("──────────────────────────────────", "#744061")
         add("STEG: " + self.phase, "bold #ffe0f1")
         add("VERKTYG: " + self.tool, "#fbc4df")
