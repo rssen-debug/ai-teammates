@@ -84,6 +84,40 @@ class ObservationVault:
         self._last_digest, self._last_timestamp = digest, stamp
         return True, str(dest), text
 
+    KNOWLEDGE_KINDS = frozenset({
+        "preference", "fact", "project", "procedure", "fix", "summary",
+        "correction", "long_term", "procedural", "skill", "task_outcome",
+    })
+
+    def knowledge_path(self, kind: str, title: str) -> Path:
+        """Stable, scoped Markdown path; title cannot escape its vault directory."""
+        digest = hashlib.sha256((kind + "|" + title.lower()).encode("utf-8")).hexdigest()[:12]
+        safe_title = re.sub(r"[^A-Za-z0-9_-]", "_", title)[:48].strip("_") or "note"
+        return self.root / "knowledge" / kind / f"{safe_title}-{digest}.md"
+
+    def record_knowledge(self, kind: str, title: str, content: str,
+                         confidence: str = "unverified") -> tuple[bool, str]:
+        """Mirror explicitly saved durable memories, never all chat messages."""
+        if kind not in self.KNOWLEDGE_KINDS:
+            return False, "memory kind not eligible for knowledge vault"
+        clean_title = clean_observation(title)
+        clean_content = clean_observation(content)
+        if not clean_title or not clean_content:
+            return False, "sensitive or empty knowledge excluded"
+        confidence = confidence if confidence in ("verified", "unverified", "active") else "unverified"
+        path = self.knowledge_path(kind, title)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        body = ("---\n"
+                f"type: {kind}\n"
+                f"confidence: {confidence}\n"
+                "source: buddy_saved_memory\n"
+                f"updated: {dt.datetime.now().isoformat(timespec='seconds')}\n"
+                "---\n\n"
+                f"# {clean_title}\n\n{clean_content}\n\n"
+                "> Confirm the memory with the owner before relying on inferred preferences.\n")
+        path.write_text(body, encoding="utf-8")
+        return True, str(path)
+
     def clear_observations(self) -> int:
         """Erase only files created by this observer, never unrelated Obsidian notes."""
         folder = self.root / "observations"
