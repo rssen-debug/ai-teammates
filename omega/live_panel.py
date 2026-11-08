@@ -647,6 +647,14 @@ class LivePanel:
             if practice:
                 add("Öva mer på: " + practice, "#f2c78f")
             add("Historik ≠ bevisad intelligens", "#829c91")
+            # Only mature, repeatedly verified workflow patterns count as
+            # suggested playbooks. They never execute from this status panel.
+            try:
+                from genesis_playbooks import PlaybookStore
+                count = PlaybookStore().count()
+                add(f"Verifierade playbooks: {count}", "#baf3d2")
+            except (OSError, ValueError, sqlite3.DatabaseError):
+                add("Playbooks: underlag saknas", "#829c91")
         add("EVOLUTION · SENASTE HÄNDELSER", "bold #ff90c8")
         if self._evolution_timeline:
             for when, label in reversed(self._evolution_timeline):
