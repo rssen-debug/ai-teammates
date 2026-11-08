@@ -1677,7 +1677,8 @@ class Win32:
                 child = subprocess.run(["cmd", "/d", "/c", "start", "", resolved],
                                        stdin=subprocess.DEVNULL,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                       text=True, timeout=8, creationflags=flags)
+                                       text=True, encoding="utf-8", errors="replace",
+                                       timeout=8, creationflags=flags)
             except (OSError, subprocess.TimeoutExpired) as exc:
                 raise OSError(f"Cannot launch {name!r}: {type(exc).__name__}") from exc
             if child.returncode != 0 or child.stderr.strip():
