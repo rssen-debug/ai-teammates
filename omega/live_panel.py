@@ -225,6 +225,9 @@ class LivePanel:
         self.events: deque[str] = deque(maxlen=24)
         self._stream_text = ""
         self._stream_active = False
+        self._side_cache: list = []
+        self._side_cache_at = 0.0
+        self._side_dirty = True
         self.tool = "-"
         self.step_time = 0.0
         self.queue: asyncio.Queue[str] = asyncio.Queue()
@@ -260,7 +263,7 @@ class LivePanel:
             output=DummyOutput() if not __import__('sys').stdout.isatty() else None,
             mouse_support=True,
             key_bindings=keys,
-            refresh_interval=1.0,
+            refresh_interval=2.0,
             style=Style.from_dict({
                 "frame.border": "#b02d78",
                 "frame.label": "bold #ff79bb",
@@ -334,6 +337,8 @@ class LivePanel:
         return True
 
     def _refresh(self) -> None:
+        # Keep heavy sidebar rendering separate from each typed character.
+        self._side_dirty = True
         # No terminal cursor manipulation: prompt_toolkit owns the full layout.
         if self.application.is_running:
             if self._loop is not None and self._loop.is_running():
@@ -392,6 +397,11 @@ class LivePanel:
         self._refresh()
 
     def _side_text(self) -> list[tuple[str, str]]:
+        stamp = time.monotonic()
+        if not self._side_dirty and stamp - self._side_cache_at < 1.0:
+            return self._side_cache
+        self._side_dirty = False
+        self._side_cache_at = stamp
         app = self.app
         now = time.time()
         lines: list[tuple[str, str]] = []
@@ -508,6 +518,7 @@ class LivePanel:
         add("──────────────────────────────────", "#744061")
         add("Arbetsstatus, inte intern tankekedja.", "#d4b7c9")
         add("Skriv /presence för 20-minutersrapport.", "#d4b7c9")
+        self._side_cache = lines
         return lines
 
     # Below methods become overrides on an actual CLI subclass.

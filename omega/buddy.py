@@ -1653,14 +1653,36 @@ class Win32:
 
     @classmethod
     def launch(cls, target: str, args: list[str] | None = None) -> None:
+        """Launch Windows apps without letting child stdout corrupt the live TUI.
+
+        The old cmd/start fallback inherited Buddy's terminal and printed
+        error messages directly into the prompt_toolkit input screen.
+        """
         cls.need()
+        aliases = {"edge": "msedge.exe", "microsoft edge": "msedge.exe",
+                   "chrome": "chrome.exe", "notepad": "notepad.exe",
+                   "explorer": "explorer.exe"}
+        name = str(target).strip()
+        resolved = aliases.get(name.lower(), name)
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         if args:
-            subprocess.Popen([target, *args], close_fds=True)
+            subprocess.Popen([resolved, *args], close_fds=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, creationflags=flags)
             return
         try:
-            os.startfile(target)  # type: ignore[attr-defined]
-        except OSError:
-            subprocess.Popen(["cmd", "/c", "start", "", target], close_fds=True)
+            os.startfile(resolved)  # type: ignore[attr-defined]
+        except OSError as first:
+            try:
+                child = subprocess.run(["cmd", "/d", "/c", "start", "", resolved],
+                                       stdin=subprocess.DEVNULL,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                       text=True, encoding="utf-8", errors="replace",
+                                       timeout=8, creationflags=flags)
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                raise OSError(f"Cannot launch {name!r}: {type(exc).__name__}") from exc
+            if child.returncode != 0 or child.stderr.strip():
+                raise OSError(f"Cannot launch {name!r}: Windows could not locate or open the app") from first
 
 
 INTERACTIVE_ROLES = {"Button", "Edit", "ComboBox", "CheckBox", "RadioButton", "Hyperlink", "MenuItem", "TabItem", "ListItem",
