@@ -189,30 +189,32 @@ def pixel_companion(mode: str, frame: int = 0,
 
 
 def parse_tetris_move(answer: str, allowed: set[int]) -> tuple[int | None, str]:
-    """Parse only a model-originated choice, with no heuristic/fake fallback.
-
-    Accept JSON, fenced JSON, or a bare move id; refuse unknown ids.
-    The rationale is a short user-visible decision explanation, not private CoT.
-    """
+    """Only accept an actual model response specifying a valid choice."""
     import json
     raw = str(answer or "").strip()
-    reason = ""
     candidate = None
-    with __import__("contextlib").suppress(ValueError, TypeError):
-        data = json.loads(raw)
+    reason = ""
+    blocks = [raw]
+    obj = re.search(r'\{[^{}]*\}', raw, re.S)
+    if obj:
+        blocks.append(obj.group())
+    for block in blocks:
+        try:
+            data = json.loads(block)
+        except (ValueError, TypeError):
+            continue
         if isinstance(data, dict):
             candidate = data.get("move", data.get("move_id"))
             reason = str(data.get("reason") or data.get("why") or "")
-        elif type(data) is int:
+            break
+        if type(data) is int:
             candidate = data
+            break
     if candidate is None:
-        match = re.search(r'["\\\']?(?:move|move_id)["\\\']?\\s*[:=]\\s*["\\\']?(\\d+)', raw, re.I)
+        match = re.search(r'(?:move|move_id)["\x27\s]*[:=]\s*["\x27]?(\d+)', raw, re.I)
         if match:
             candidate = int(match.group(1))
-            why_match = re.search(r'["\\\']?(?:reason|why)["\\\']?\\s*[:=]\\s*["\\\']([^"\\\']+)', raw, re.I)
-            if why_match:
-                reason = why_match.group(1)
-        elif re.fullmatch(r"\\d+", raw):
+        elif re.fullmatch(r"\d+", raw):
             candidate = int(raw)
     if type(candidate) is not int or candidate not in allowed:
         return None, ""
