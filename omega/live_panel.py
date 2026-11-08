@@ -45,6 +45,61 @@ def clean_line(value: Any, limit: int = 52) -> str:
     return value[:limit - 1] + "…" if len(value) > limit else value
 
 
+def evidence_progress(snapshot: dict) -> dict:
+    """Genuine next-level evidence cap; quality may impose a stricter limit.
+
+    No wall-clock ETA: level progression depends on verified outcomes, not time.
+    """
+    try:
+        level = int(snapshot["level"])
+        count = int(snapshot["measured_events"])
+        full = int(snapshot.get("evidence_full") or 250)
+        raw = float(snapshot.get("raw_level", level))
+    except (TypeError, ValueError, KeyError):
+        return {"measured": False, "reason": "Nivådata saknas"}
+    if level >= 100:
+        return {"measured": True, "complete": True, "level": 100, "reason": "Maxnivå"}
+    next_level = level + 1
+    # See omega/level.py: floor(min(raw, 1 + 99*min(1,count/full))).
+    from math import ceil
+    required = ceil((next_level - 1) * full / 99)
+    if raw < next_level:
+        return {"measured": True, "complete": False, "level": level,
+                "target": next_level, "quality_limited": True,
+                "events": count, "required": required,
+                "remaining": max(0, required - count),
+                "reason": "Förbättra verifierad kvalitet"}
+    lower = max(0, ceil((level - 1) * full / 99))
+    span = max(1, required - lower)
+    portion = min(1.0, max(0.0, (count - lower) / span))
+    return {"measured": True, "complete": False, "level": level,
+            "target": next_level, "quality_limited": False,
+            "events": count, "required": required,
+            "remaining": max(0, required - count),
+            "fraction": portion,
+            "reason": "Mer verifierad evidens krävs"}
+
+
+def pixel_companion(mode: str, frame: int = 0) -> tuple[str, ...]:
+    """Cute 7-line terminal pixel pet; expressions match real agent activity."""
+    eyes, mouth = {
+        "working": ("◕ ◕", "ᴗ"),
+        "observing": ("● ●", "ᵕ"),
+        "awake": ("• •", "ω"),
+        "sleeping": ("─ ─", "﹏"),
+    }.get(mode, ("• •", "ᴗ"))
+    heart = "♡" if frame % 2 else "♥"
+    return (
+        "     ▄███▄     ",
+        "   ▄███████▄   ",
+        "   █  " + eyes + "  █   ",
+        "   █   " + mouth + "   █   ",
+        "   ▀█  " + heart + "  █▀   ",
+        "     ▀███▀     ",
+        "      ▀ ▀      ",
+    )
+
+
 class LivePanel:
     """Factory-backed UI: uses the existing CLI contract, not a second agent."""
 
@@ -64,7 +119,16 @@ class LivePanel:
         ui = self._ui
         ui._panel_state = self
         self.app = app
-        self.messages: deque[str] = deque(maxlen=450)
+        self.messages: deque[str] = deque(maxlen=220)
+        self._cached_level: dict = {}
+        self._last_level: int | None = None
+        self._last_level_change = 0.0
+        self._level_checked_at = 0.0
+        self._level_task: asyncio.Task | None = None
+        self._cached_companion: Any = None
+        self._cached_companion_options: dict = {}
+        self._cached_companion_enabled = False
+        self._companion_checked_at = 0.0
         self.trace: deque[tuple[str, bool | None, float]] = deque(maxlen=9)
         self.phase = "Väntar på uppgift"
         self.tool = "-"
@@ -79,7 +143,7 @@ class LivePanel:
                               scrollbar=True, wrap_lines=True, line_numbers=False)
         self._status_control = FormattedTextControl(self._side_text)
         right = Frame(Window(content=self._status_control, wrap_lines=True),
-                      title=" OMEGA · LIVE ", width=Dimension(preferred=43, min=36))
+                      title=" OMEGA · LIVE ", width=Dimension.exact(39))
         visibility = Condition(lambda: shutil.get_terminal_size((120, 35)).columns >= 94)
         self._layout = Layout(
             VSplit([
@@ -96,13 +160,13 @@ class LivePanel:
             full_screen=True,
             input=DummyInput() if not __import__('sys').stdin.isatty() else None,
             output=DummyOutput() if not __import__('sys').stdout.isatty() else None,
-            mouse_support=True,
+            mouse_support=False,
             refresh_interval=1.0,
             style=Style.from_dict({
-                "frame.border": "#145e36",
-                "frame.label": "bold #41e888",
-                "text-area": "#dedede",
-                "": "#c4e0cc bg:#07140f",
+                "frame.border": "#b02d78",
+                "frame.label": "bold #ff79bb",
+                "text-area": "#ffffff bg:#140d17",
+                "": "#ffffff bg:#140d17",
             }),
         )
 
@@ -127,9 +191,9 @@ class LivePanel:
         if entered:
             shown = re.sub(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}",
                            "[REDACTED-JWT]", entered)
-            self.messages.append("you › " + clean_line(shown, 900))
+            # Echo instantly into the visible conversation, not just the backing deque.
+            self._add("you › " + clean_line(shown, 900))
             self.queue.put_nowait(entered)
-            self._refresh()
         return True
 
     def _refresh(self) -> None:
@@ -139,10 +203,26 @@ class LivePanel:
                 self._loop.call_soon_threadsafe(self.application.invalidate)
 
     def _add(self, text: str) -> None:
-        with self._lock:
-            self.messages.append(str(text))
-            self._chat.text = "\n".join(self.messages)[-28000:]
-            self._chat.buffer.cursor_position = len(self._chat.text)
+        # Prior CLI output contains ANSI codes. In prompt_toolkit those were
+        # printed as visible escape garbage; render clean white text instead.
+        sanitized = re.sub(r"\x1b\[[0-9;]*m", "", str(text))
+        def update() -> None:
+            with self._lock:
+                self.messages.append(sanitized)
+                view = "\n".join(self.messages)[-16000:]
+                self._chat.text = view
+                self._chat.buffer.cursor_position = len(view)
+            self._refresh()
+        if self._loop and self._loop.is_running() and threading.current_thread() is not threading.main_thread():
+            self._loop.call_soon_threadsafe(update)
+        else:
+            update()
+
+    async def _refresh_level(self) -> None:
+        try:
+            self._cached_level = await asyncio.to_thread(lambda: self.app.settings.get("level") or self.app.level_snapshot())
+        except Exception:
+            self._cached_level = {}
         self._refresh()
 
     def _side_text(self) -> list[tuple[str, str]]:
@@ -153,26 +233,42 @@ class LivePanel:
             lines.append((style, clean_line(text, 55) + "\n"))
 
         running = bool(app.current_run)
-        comp = None
-        try:
-            if app.companion.present()[0]:
-                comp = app.companion.loop
-        except Exception:
-            pass
-        observing = bool(comp and comp.enabled and comp.captures > 0
+        # Avoid loading the profile/SQLite and lazy Companion subsystem on
+        # every 1-second redraw: doing so stalls the terminal input.
+        if time.monotonic() - self._companion_checked_at >= 8:
+            self._companion_checked_at = time.monotonic()
+            try:
+                self._cached_companion = app.companion.loop if app.companion.present()[0] else None
+                self._cached_companion_options = self._cached_companion.options() if self._cached_companion else {}
+                self._cached_companion_enabled = bool(self._cached_companion_options.get("enabled"))
+            except Exception:
+                self._cached_companion = None
+                self._cached_companion_enabled = False
+                self._cached_companion_options = {}
+        comp = self._cached_companion
+        comp_enabled = self._cached_companion_enabled
+        observing = bool(comp_enabled and comp and comp.captures > 0
                          and (now - comp.last_capture_at) < 90)
         active = running or observing
         mode = ("● ARBETAR" if running else "◉ OBSERVERAR" if observing
-                else "◌ VAKEN · INVÄNTAR CYKEL" if comp and comp.enabled else "○ SOVER")
-        add(mode, "bold #46f184" if active else "#899c91")
-        add("AI  kilo-auto/free  ·  VOICE OFF", "#b8f3c7")
-        add("──────────────────────────────────", "#1f5438")
-        add("STEG: " + self.phase, "bold #a1ffbe")
-        add("VERKTYG: " + self.tool, "#8edcaa")
-        add("──────────────────────────────────", "#1f5438")
-        add("COMPANION: " + ("LIVE" if comp and comp.enabled else "OFF"), "#41e888")
-        if comp and comp.enabled:
-            opts = comp.options()
+                else "◌ VAKEN · INVÄNTAR CYKEL" if comp_enabled else "○ SOVER")
+        add(mode, "bold #ff72b6" if active else "#bca8bc")
+        sprite_mode = ("working" if running else "observing" if observing else
+                       "awake" if comp_enabled else "sleeping")
+        for part in pixel_companion(sprite_mode, int(now // 2)):
+            add(part, "#ff8fc5")
+        add("Pixelkompis · " + sprite_mode, "#ffffff")
+        add("AI  kilo-auto/free  ·  VOICE OFF", "#ffffff")
+        if running and app.current_run:
+            elapsed = max(0, int(now - float(app.current_run.t0)))
+            add(f"Väntat på AI: {elapsed // 60:02d}:{elapsed % 60:02d}", "#ffffff")
+        add("──────────────────────────────────", "#744061")
+        add("STEG: " + self.phase, "bold #ffe0f1")
+        add("VERKTYG: " + self.tool, "#fbc4df")
+        add("──────────────────────────────────", "#744061")
+        add("COMPANION: " + ("LIVE" if comp_enabled else "OFF"), "#ff72b6")
+        if comp_enabled and comp:
+            opts = self._cached_companion_options
             add("Nästa Companion-tick: " + remaining_seconds(
                 comp.last_tick_at, float(opts.get("tick_seconds", 30)), now))
             capture_after = float(opts.get("capture_seconds", 30))
@@ -189,27 +285,60 @@ class LivePanel:
         else:
             add("Nästa skärmkoll: --:--")
             add("Reflektion: pausad")
-        add("──────────────────────────────────", "#1f5438")
-        add("AKTIVITET · VERKLIGA VERKTYG", "bold #65ef9e")
+        add("──────────────────────────────────", "#744061")
+        add("AKTIVITET · VERKLIGA VERKTYG", "bold #ff90c8")
         if self.trace:
             for label, ok, _at in list(self.trace)[-7:]:
                 mark = "✓" if ok is True else ("✕" if ok is False else "›")
-                add(" " + mark + " " + clean_line(label, 37), "#99efb5" if ok is True else "#d7ad74")
+                add(" " + mark + " " + clean_line(label, 37), "#ffffff" if ok is True else "#ffb3bc")
         else:
-            add(" Inga verktyg körda ännu.", "#899c91")
-        add("──────────────────────────────────", "#1f5438")
-        level = app.level_snapshot()
-        lvl = level.get("level")
+            add(" Inga verktyg körda ännu.", "#bca8bc")
+        add("──────────────────────────────────", "#744061")
+        # Evidence level can query the whole task/tool/memory history. Cache it.
+        if time.monotonic() - self._level_checked_at >= 45:
+            self._level_checked_at = time.monotonic()
+            try:
+                loop = asyncio.get_running_loop()
+                if self._level_task is None or self._level_task.done():
+                    self._level_task = loop.create_task(self._refresh_level())
+            except RuntimeError:
+                pass  # unit tests and headless status do not trigger expensive queries
+        lvl = self._cached_level.get("level")
         if isinstance(lvl, (float, int)):
-            green = min(20, max(0, round(lvl / 5)))
-            add("AI LEVEL: " + str(lvl) + "/100", "bold #a8fdbf")
-            add("●" * green + "○" * (20 - green), "#42e985")
+            current = int(lvl)
+            if self._last_level is None:
+                self._last_level = current
+            elif current != self._last_level:
+                self._last_level_change = now
+                self._last_level = current
+            pink = min(20, max(0, round(current / 5)))
+            add("AI LEVEL: " + str(current) + "/100", "bold #ffffff")
+            add("●" * pink + "○" * (20 - pink), "#ff76b7")
+            if self._last_level_change:
+                add("Senaste nivåbyte: " + datetime.fromtimestamp(
+                    self._last_level_change).strftime("%H:%M:%S"), "#ffffff")
+            progress = evidence_progress(self._cached_level)
+            if progress.get("measured"):
+                if progress.get("complete"):
+                    add("Maxnivå nådd.", "#ffffff")
+                elif progress.get("quality_limited"):
+                    add("Nästa LVL: " + str(progress["target"]), "bold #ffffff")
+                    add("Hinder: förbättra verifierade", "#ffd0e6")
+                    add("resultat (inte bara fler körningar)", "#ffd0e6")
+                else:
+                    add("Nästa LVL: " + str(progress["target"]), "bold #ffffff")
+                    fill = max(0, min(20, round(progress["fraction"] * 20)))
+                    add("[" + "█" * fill + "░" * (20-fill) + "]", "#ff8ec6")
+                    add(f"Evidens: {progress['events']}/{progress['required']} · saknas {progress['remaining']}", "#ffffff")
+            else:
+                add("Nästa level: saknar mätdata", "#ffffff")
+            add("Tid till level: okänd (ej tidstyrt)", "#d4b7c9")
         else:
-            add("AI LEVEL: ej uppmätt", "#899c91")
-        add("Nivån bygger på verifierad evidens.", "#7d9a86")
-        add("──────────────────────────────────", "#1f5438")
-        add("Arbetsstatus, inte intern tankekedja.", "#8aab94")
-        add("Skriv /presence för 20-minutersrapport.", "#8aab94")
+            add("AI LEVEL: ej uppmätt", "#bca8bc")
+        add("Nivån bygger på verifierad evidens.", "#bdafba")
+        add("──────────────────────────────────", "#744061")
+        add("Arbetsstatus, inte intern tankekedja.", "#d4b7c9")
+        add("Skriv /presence för 20-minutersrapport.", "#d4b7c9")
         return lines
 
     # Below methods become overrides on an actual CLI subclass.
