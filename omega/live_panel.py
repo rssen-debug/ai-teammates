@@ -235,7 +235,7 @@ class LivePanel:
                                 prompt="you › ", accept_handler=self._submit)
         self._chat = TextArea(read_only=True, focusable=False,
                               scrollbar=True, wrap_lines=True, line_numbers=False)
-        self._status_control = FormattedTextControl(self._side_text, mouse_handler=self._side_click)
+        self._status_control = FormattedTextControl(self._side_text)
         keys = KeyBindings()
         @keys.add("f2")
         def _toggle(_event: Any) -> None:
@@ -425,7 +425,7 @@ class LivePanel:
             elapsed = max(0, int(now - float(app.current_run.t0)))
             add(f"Väntat på AI: {elapsed // 60:02d}:{elapsed % 60:02d}", "#ffffff")
         add("──────────────────────────────────", "#744061")
-        add("TÄNKER · klicka här / F2", "bold #ff90c8")
+        lines.append(("bold #ff90c8", "TÄNKER · klicka här / F2\n", self._side_click))
         if self.show_thinking:
             add("LIVE ARBETSSPÅR · " + str(len(self.events)), "#ffffff")
             for detail in list(self.events)[-9:]:
