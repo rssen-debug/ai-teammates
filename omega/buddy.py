@@ -6569,6 +6569,9 @@ async def main_async(app: Buddy) -> None:
         app.settings.set("selection_hotkey", True)
     if IS_WIN and os.environ.get("BUDDY_ENABLE_VOICE") == "1":
         app.settings.set("voice_enabled", True)
+    if os.environ.get("BUDDY_STT_CPU") == "1":
+        # CPU-efficient int8 Whisper; no GPU dependency, with a modest accuracy tradeoff.
+        app.settings.set("stt_model", "base")
     if os.environ.get("BUDDY_VOICE_STYLE") == "narrator":
         app.settings.set("tts_engine", "edge")
         app.settings.set("tts_voice", "en-AU-WilliamNeural")
