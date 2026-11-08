@@ -626,6 +626,15 @@ class LivePanel:
             add("Blockerad: " + self._build_error, "#ff9ba6")
         add("Spelpoäng ≠ AI level", "#bca8bc")
 
+        add("── MARKERING + RÖST ──", "#ff90c8")
+        bridge = getattr(app, "selection_bridge", None)
+        add("MARKERA: " + (bridge.status if bridge else "OFF"), "#ffffff")
+        selected = getattr(app, "last_selection", None)
+        if selected and current - selected.get("created", 0) < 900:
+            add("Text: " + str(len(selected.get("text", ""))) + " tecken", "#ffcae6")
+            add("Från: " + clean_line(selected.get("app", ""), 20), "#ffffff")
+        voice = getattr(app, "voice", None)
+        add("RÖST: " + (voice.state_label() if voice else "OFF"), "#ffffff")
         add("── COMPANION ──", "#ff90c8")
         add("COMPANION: " + ("LIVE" if enabled else "OFF"), "#ffffff")
         if enabled and comp:
