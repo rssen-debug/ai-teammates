@@ -129,10 +129,18 @@ class PixelTetris:
 
     def display(self):
         display = [row[:] for row in self.board]
-        if self.active is not None:
+        if self.awaiting_move and self.shape is not None:
+            # Static preview of the real queued piece. No gravity/moves are
+            # applied until an actual valid Kilo decision arrives.
+            for dx, dy in self.shape:
+                x, y = 3 + dx, dy
+                if 0 <= y < HEIGHT and 0 <= x < WIDTH:
+                    display[y][x] = 3
+        elif self.active is not None:
             for dx, dy in self.active:
                 x, y = self.x + dx, self.y + dy
                 if 0 <= y < HEIGHT and 0 <= x < WIDTH:
                     display[y][x] = 2
-        return tuple("".join("▓" if value == 1 else "■" if value == 2 else "·" for value in row)
-                     for row in display)
+        return tuple("".join(
+            "▓" if value == 1 else "■" if value == 2 else "◇" if value == 3 else "·"
+            for value in row) for row in display)
