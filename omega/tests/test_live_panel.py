@@ -112,6 +112,36 @@ class PanelTest(unittest.TestCase):
         self.assertIn("STEGET MISSLYCKADES", failed)
         self.assertIn("UTFALL", failed)
 
+    def test_evolution_skill_map_uses_only_completed_real_tool_calls(self):
+        p = self.build()
+        first = "".join(fragment[1] for fragment in p._side_text())
+        self.assertIn("EVOLUTION · SKILL MAP", first)
+        self.assertEqual(p._skill_checks["FILER"], [0, 0])
+        for _ in range(4):
+            p._refresh()
+            p._side_text()
+        self.assertEqual(p._skill_checks["FILER"], [0, 0])
+        p.ui.step("Läser lokal fil")
+        self.assertEqual(p._skill_checks["FILER"], [0, 0])
+        p.ui.step_done(True)
+        self.assertEqual(p._skill_checks["FILER"], [1, 0])
+        p.ui.step("Läser lokal fil")
+        p.ui.step_done(False, "permission denied")
+        self.assertEqual(p._skill_checks["FILER"], [1, 1])
+        rendered = "".join(fragment[1] for fragment in p._side_text())
+        self.assertIn("SENASTE HÄNDELSER", rendered)
+        self.assertIn("FILER", rendered)
+        self.assertEqual(p._cached_level.get("level"), None)
+
+    def test_evolution_chat_does_not_masquerade_as_skill_progress(self):
+        p = self.build()
+        run = SimpleNamespace(ledger=[])
+        p.ui.summary(run, SimpleNamespace(status="answered", verified=True))
+        self.assertEqual(sum(sum(x) for x in p._skill_checks.values()), 0)
+        self.assertEqual(p._verified_work, 0)
+        self.assertEqual(len(p._evolution_timeline), 1)
+        self.assertIn("AI-svar levererat", p._evolution_timeline[0][1])
+
     def test_progress_does_not_change_ai_level_or_evidence(self):
         p = self.build()
         p._cached_level = {"level": 16}
