@@ -5285,7 +5285,13 @@ class Doctor:
             return sub == "all" or sub in k
         if want("runtime"):
             v = sys.version_info
-            add("python", "PASS" if v >= (3, 12) else "FAIL", f"{v.major}.{v.minor}.{v.micro}", "Install Python 3.12+ from python.org" if v < (3, 12) else "")
+            # Doctor and installer must use ONE runtime policy; 3.12 is only
+            # recommended, while supported Python 3.10-3.13 must not fail.
+            supported = (v.major, v.minor) >= PYTHON_MIN
+            add("python", "PASS" if supported else "FAIL",
+                f"{v.major}.{v.minor}.{v.micro}",
+                (f"Install Python {PYTHON_MIN[0]}.{PYTHON_MIN[1]}+ from python.org"
+                 if not supported else ""))
             add("operating system", "PASS" if IS_WIN else "BLOCKED", sys.platform + (" (Windows build %s)" % sys.getwindowsversion().build if IS_WIN else ""),  # type: ignore[attr-defined]
                 "" if IS_WIN else "Desktop/voice features need Windows 11; file/terminal/memory/autopilot work anywhere")
             miss = missing_deps()
