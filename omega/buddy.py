@@ -5541,7 +5541,7 @@ class Buddy:
     HELP = """/help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
 /memory [list|search Q|forget ID|export|clear]  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
-/grants [revoke]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
+/grants [revoke]  /owner [status|on --yes|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
 Just talk normally — Buddy decides when to use tools. Say "stop" at any time."""
 
     async def command(self, line: str) -> None:
@@ -5653,6 +5653,33 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
         elif cmd == "/task" and args:
             tid = self.tasks.create(" ".join(args)[:80], {"kind": "agent", "goal": " ".join(args)})
             o(f"queued {tid}. Background work only uses scopes you've already set to 'always' (see /grants).")
+        elif cmd == "/owner":
+            sub = args[0].lower() if args else "status"
+            if sub == "status":
+                grants = self.perms.all()
+                enabled = all(grants.get(k) == "always" for k in ("observe", "input", "write", "exec"))
+                upload = self.settings.get("screenshot_upload")
+                o(f"Owner Mode: {'ON' if enabled and upload == 'allow' else 'OFF/PARTIAL'}  grants={grants}  screenshots={upload}")
+                o("Sensitive actions and tools with explicit confirmation reasons still require approval. Private/protected windows remain blocked.")
+            elif sub == "on":
+                if "--yes" not in args[1:]:
+                    o("Owner Mode grants persistent observe/input/write/exec access and allows screenshots to be sent to KiloCode without repeated prompts.")
+                    o("This can expose screen contents and let the AI change files or run commands. Type /owner on --yes to explicitly enable.")
+                else:
+                    for scope in ("observe", "input", "write", "exec"):
+                        self.perms.set(scope, "always")
+                    self.settings.set("screenshot_upload", "allow")
+                    self.perms.audit("user", "owner_mode", "configuration", "enabled")
+                    o("Owner Mode ON: normal observe/input/write/exec operations pre-approved; screenshot uploads allowed.")
+                    o("Safety: sensitive tools, protected windows, private mode, and required per-action confirmations are NOT bypassed.")
+            elif sub == "off":
+                for scope in ("input", "write", "exec"):
+                    self.perms.set(scope, None)
+                self.settings.set("screenshot_upload", "ask")
+                self.perms.audit("user", "owner_mode", "configuration", "disabled")
+                o("Owner Mode OFF: input/write/exec require approval again; screenshot uploads ask again.")
+            else:
+                o("Usage: /owner [status | on --yes | off]")
         elif cmd == "/grants":
             if args and args[0] == "revoke":
                 self.perms.revoke_all()
