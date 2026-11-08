@@ -21,6 +21,23 @@ def default_path() -> Path:
         root = str(Path(os.environ.get("APPDATA", str(Path.home()))) / "StuddyBuddy")
     return Path(root) / "genesis-experience.sqlite3"
 
+PRACTICE_GUIDANCE = {
+    "FILER": "Before changing a file, confirm its path; after writing, read back the exact file.",
+    "WEBB": "Re-observe the active page before clicking; confirm URL and DOM result.",
+    "KOD": "Prefer a tiny reproducible test, then run it again after the fix.",
+    "WINDOWS": "Refresh the accessibility tree before using cached control references.",
+    "ÖVRIGT": "Verify the actual resulting state with an independent observation.",
+}
+
+
+def grounded_guidance(snapshot: dict) -> str | None:
+    """Bounded strategy hint, not permissions, an action command or an IQ score."""
+    category = snapshot.get("needs_practice") if isinstance(snapshot, dict) else None
+    if category not in PRACTICE_GUIDANCE:
+        return None
+    return PRACTICE_GUIDANCE[category]
+
+
 
 class ExperienceLedger:
     def __init__(self, path: Path | None = None):
