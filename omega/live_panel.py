@@ -208,6 +208,34 @@ def observed_skill(tool_label: str) -> str:
     return "ÖVRIGT"
 
 
+LEVEL_AXES = (
+    ("A", "UPPGIFTER"),
+    ("B", "ÅTERHÄMTNING"),
+    ("C", "VERKTYG"),
+    ("D", "MINNE"),
+    ("E", "BENCHMARK"),
+    ("F", "REGRESSION"),
+)
+
+def measured_axis_rows(snapshot: dict) -> list[tuple[str, str, float | None]]:
+    """Show only real persisted axis metrics; missing axes are unknown."""
+    if not isinstance(snapshot, dict):
+        return []
+    raw = snapshot.get("axes", [])
+    if not isinstance(raw, list):
+        return []
+    values = {}
+    for entry in raw:
+        if not isinstance(entry, dict) or entry.get("axis") not in dict(LEVEL_AXES):
+            continue
+        value = entry.get("value")
+        if entry.get("measured") is False or value is None or isinstance(value, bool):
+            values[entry["axis"]] = None
+        elif isinstance(value, (int, float)) and 0 <= value <= 1:
+            values[entry["axis"]] = float(value)
+    return [(key, name, values.get(key)) for key, name in LEVEL_AXES]
+
+
 class LivePanel:
     """Factory-backed UI: uses the existing CLI contract, not a second agent."""
 
@@ -568,11 +596,12 @@ class LivePanel:
         for skill, (won, lost) in self._skill_checks.items():
             total = won + lost
             if total:
-                blocks = min(8, won)
+                # Ratio describes completed tool calls, not level or mastery.
+                blocks = round(8 * won / total)
                 add(f"│ {skill:<8} {'▰' * blocks}{'▱' * (8-blocks)} {won}/{total}", "#baf3d2")
             else:
                 add(f"│ {skill:<8} ▱▱▱▱▱▱▱▱ --", "#839e92")
-        add("│ Staplar = lyckade tool calls/session", "#92aea3")
+        add("│ Staplar = andel OK, antal till höger", "#92aea3")
         add("╰── Inga nivåer från animationer ─╯", "#80f4b2")
         add("EVOLUTION · SENASTE HÄNDELSER", "bold #ff90c8")
         if self._evolution_timeline:
@@ -608,6 +637,22 @@ class LivePanel:
                 add("Nivåunderlag saknas", "#ffffff")
         else:
             add("AI LEVEL: väntar på mätning", "#ffffff")
+
+        rows = measured_axis_rows(self._cached_level)
+        if rows:
+            add("── KAPACITET · MÄTBARA AXELVÄRDEN ──", "bold #80f4b2")
+            known = [(name, val) for _, name, val in rows if val is not None]
+            for key, name, val in rows:
+                if val is None:
+                    add(f"{key} {name:<13} INGET UNDERLAG", "#829c91")
+                else:
+                    filled = round(8 * val)
+                    add(f"{key} {name:<13} {'■' * filled}{'·' * (8-filled)} {val:.0%}",
+                        "#a7f1c8" if val >= .7 else "#f2c78f")
+            if known:
+                weakest, score = min(known, key=lambda pair: pair[1])
+                add(f"FOKUS: {weakest} · {score:.0%}", "#ffcae6")
+                add("Förbättras via verkliga tester", "#829c91")
 
         lines.append(("bold #ff90c8", "MIN ARBETSPLAN · " + ("DÖLJ" if self.show_thinking else "VISA") + " / F2\n", self._side_click))
         if self.show_thinking:
