@@ -21,6 +21,8 @@ import time
 import textwrap
 from typing import Any
 
+from genesis_telemetry import ExperienceLedger
+
 from prompt_toolkit import Application
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.mouse_events import MouseEventType
@@ -319,6 +321,15 @@ class LivePanel:
         self._skill_checks = {name: [0, 0] for name in ("FILER", "WEBB", "KOD", "WINDOWS", "ÖVRIGT")}
         self._evolution_timeline: deque[tuple[str, str]] = deque(maxlen=6)
         self._current_skill = "ÖVRIGT"
+        # Persistent, category-only historical statistics; no content stored.
+        self._experience = None
+        self._experience_snapshot = {}
+        try:
+            self._experience = ExperienceLedger()
+            self._experience_snapshot = self._experience.snapshot()
+        except (OSError, ValueError, RuntimeError):
+            # A restricted/missing data directory must not break the UI.
+            pass
         self.show_thinking = True
         self.events: deque[str] = deque(maxlen=24)
         self._stream_text = ""
@@ -622,6 +633,19 @@ class LivePanel:
                 add(f"│ {skill:<8} ▱▱▱▱▱▱▱▱ --", "#839e92")
         add("│ Staplar = andel OK, antal till höger", "#92aea3")
         add("╰── Inga nivåer från animationer ─╯", "#80f4b2")
+        history = self._experience_snapshot
+        if history:
+            add("── GENESIS · MELLAN SESSIONER ──", "bold #80f4b2")
+            add(f"Historiska verktygssteg: {history['total']}", "#baf3d2")
+            trend = history.get("trend_pp")
+            if trend is None:
+                add("Veckotrend: underlag saknas", "#829c91")
+            else:
+                add(f"Veckotrend: {trend:+.1f} procentenheter", "#baf3d2" if trend >= 0 else "#ff9ba6")
+            practice = history.get("needs_practice")
+            if practice:
+                add("Öva mer på: " + practice, "#f2c78f")
+            add("Historik ≠ bevisad intelligens", "#829c91")
         add("EVOLUTION · SENASTE HÄNDELSER", "bold #ff90c8")
         if self._evolution_timeline:
             for when, label in reversed(self._evolution_timeline):
@@ -815,6 +839,13 @@ class LivePanel:
         category = observed_skill(panel.trace[-1][0]) if panel.trace else panel._current_skill
         counts = panel._skill_checks[category]
         counts[0 if ok else 1] += 1
+        if panel._experience is not None:
+            try:
+                panel._experience.record(category, bool(ok))
+                panel._experience_snapshot = panel._experience.snapshot()
+            except (OSError, ValueError, RuntimeError):
+                # Never fail a real user action because telemetry is unavailable.
+                pass
         panel._evolution_timeline.append((
             datetime.now().strftime("%H:%M"),
             ("✓ " if ok else "✕ ") + category + " · " + clean_line(panel.tool, 21)))
