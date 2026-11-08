@@ -83,6 +83,48 @@ class PanelTest(unittest.TestCase):
         self.assertIn("kontroll behövs", rendered)
         self.assertIn("ev100", rendered)
 
+    def test_progress_core_counts_only_real_completed_tools(self):
+        p = self.build()
+        initial = "".join(part[1] for part in p._side_text())
+        self.assertIn("PROGRESS CORE", initial)
+        self.assertIn("VÄNTAR PÅ RESULTAT", initial)
+        self.assertEqual(p._tool_successes, 0)
+        self.assertEqual(p._tool_failures, 0)
+        # Mere redraws or clock ticks never add progress.
+        for _ in range(20):
+            p._refresh()
+            p._side_text()
+        self.assertEqual(p._tool_successes, 0)
+        self.assertEqual(p._tool_streak, 0)
+        p.ui.step("Läser lokal fil")
+        self.assertEqual(p._tool_successes, 0)
+        working = "".join(part[1] for part in p._side_text())
+        self.assertIn("VERKTYG ARBETAR", working)
+        p.ui.step_done(True)
+        self.assertEqual(p._tool_successes, 1)
+        self.assertEqual(p._tool_streak, 1)
+        p.ui.step("Kontrollerar resultat")
+        p.ui.step_done(False, "Access denied")
+        self.assertEqual(p._tool_failures, 1)
+        self.assertEqual(p._tool_streak, 0)
+        self.assertEqual(list(p._progress_outcomes), [True, False])
+        failed = "".join(part[1] for part in p._side_text())
+        self.assertIn("STEGET MISSLYCKADES", failed)
+        self.assertIn("UTFALL", failed)
+
+    def test_progress_does_not_change_ai_level_or_evidence(self):
+        p = self.build()
+        p._cached_level = {"level": 16}
+        p.ui.step("Testar")
+        p.ui.step_done(True)
+        p.ui.step("Verifierar")
+        p.ui.step_done(True)
+        self.assertEqual(p._cached_level["level"], 16)
+        self.assertEqual(p._tool_successes, 2)
+        shown = "".join(part[1] for part in p._side_text())
+        self.assertIn("Verktygsutfall", shown)
+        self.assertIn("AI LEVEL: 16/100", shown)
+
     def test_next_level_uses_real_evidence_not_clock(self):
         a = evidence_progress({"level": 10, "measured_events": 23,
                                "raw_level": 40, "evidence_full": 250})
