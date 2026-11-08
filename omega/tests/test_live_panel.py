@@ -29,6 +29,23 @@ class PanelTest(unittest.TestCase):
                               level_snapshot=lambda: {"level": 10, "tier": "growing"})
         return LivePanel(app, FakeCLI)
 
+    def test_real_tetris_state_is_visible_but_not_ai_level(self):
+        from pixel_tetris import PixelTetris
+        p = self.build()
+        p._tetris = PixelTetris(seed=24)
+        p._build_state = "running"
+        p._build_step = 2
+        before_level = p._cached_level.get("level")
+        displayed = "".join(fragment[1] for fragment in p._side_text())
+        self.assertIn("PIXEL TETRIS", displayed)
+        self.assertIn("AI BYGGER: running", displayed)
+        self.assertIn("Agentsteg: 2", displayed)
+        self.assertEqual(p._cached_level.get("level"), before_level)
+        before = p._tetris.display()
+        for _ in range(5):
+            p._tetris.tick()
+        self.assertNotEqual(before, p._tetris.display())
+
     def test_next_level_uses_real_evidence_not_clock(self):
         a = evidence_progress({"level": 10, "measured_events": 23,
                                "raw_level": 40, "evidence_full": 250})
