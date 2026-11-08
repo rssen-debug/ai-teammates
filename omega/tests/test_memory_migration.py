@@ -339,6 +339,34 @@ class TestBackupAndRollback(MigrationTestBase):
         self.assertFalse(self.target.is_file(), "a dry run created the target database")
         self.assertGreater(rep.imported, 0, "a dry run should still report what it *would* import")
 
+    def test_rollback_names_the_cause_when_the_target_cannot_be_replaced(self) -> None:
+        """Windows refuses to replace a file any process holds open; POSIX allows it
+        and silently leaves the open connection reading the old inode. Neither is a
+        rollback, so the failure has to say which it was and what to do — a bare
+        `[WinError 5] Access is denied` tells an owner nothing, and it is what the
+        self-test reported on Windows CI until the caller released its handle.
+        """
+        from unittest import mock
+        self.build_world()
+        sink = mm.SqliteSink(self.target)
+        sink.save(mm.Record(kind="long_term", title="pre-existing", content="original knowledge"))
+        mig = mm.Migrator(sink, roots=self.roots)
+        rep = mig.run(dry_run=False)
+        self.assertTrue(rep.backup)
+
+        held = sqlite3.connect(self.target)          # what a live agent holds
+        self.addCleanup(held.close)
+        with mock.patch.object(mm.os, "replace",
+                               side_effect=PermissionError(13, "Access is denied", str(self.target))):
+            with self.assertRaises(RuntimeError) as cm:
+                mm.Migrator(mm.SqliteSink(self.target), roots=self.roots).rollback(rep.backup)
+        msg = str(cm.exception)
+        for fragment in ("still open", "Store.close()", "Store.reopen()"):
+            self.assertIn(fragment, msg, f"the remedy must be stated, not just the error: {msg}")
+        self.assertTrue(Path(rep.backup).is_file(), "a failed rollback must not cost the backup")
+        self.assertFalse(Path(str(self.target) + ".rollback-tmp").exists(),
+                         "the staging copy must be cleaned up, not left beside the database")
+
     def test_rule10_rollback_restores_the_exact_pre_migration_state(self) -> None:
         self.build_world()
         sink = mm.SqliteSink(self.target)

@@ -62,6 +62,33 @@ if sys.version_info < (3, 10):
 APP_NAME = "Studdy Buddy"
 APP_VERSION = "1.0.0"
 IS_WIN = sys.platform == "win32"
+
+
+def force_utf8_output() -> None:
+    """Make stdout and stderr UTF-8 with replacement, once, on every platform.
+
+    This product prints `●` thousands of times (V.dot), plus `·`, `—` and `✗`. A
+    stock Windows console defaults to cp1252, which does contain an em-dash but has
+    none of those glyphs, so the first decorated line raises UnicodeEncodeError.
+
+    It used to be configured only inside CLI.__init__, which just the interactive
+    REPL constructs — leaving every one-shot subcommand (`buddy level`,
+    `buddy doctor`, `buddy legacy status`, and the test reporters) writing to a
+    cp1252 stream. In run_all.py the crash landed on the line that prints a failure
+    bullet, so the reporter died precisely when there was a failure to report, and
+    the details of 14 failing tests were lost.
+
+    errors="replace" is the part that matters: an unencodable character degrades to
+    a placeholder instead of taking the process down. Losing a glyph is cosmetic.
+    Losing the report is not.
+    """
+    if IS_WIN:
+        with contextlib.suppress(Exception):
+            ctypes.windll.kernel32.SetConsoleOutputCP(65001)   # real consoles only
+    for stream in (sys.stdout, sys.stderr):
+        with contextlib.suppress(Exception):
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+
 SOURCE_FILE = Path(__file__).resolve()
 
 
@@ -442,7 +469,7 @@ class InstanceLock:
 
     def acquire(self) -> bool:
         ensure_dirs()
-        self.f = open(HOME / "buddy.lock", "a+")
+        self.f = open(HOME / "buddy.lock", "a+", encoding="utf-8")
         try:
             self.f.seek(0)
             if IS_WIN:
@@ -537,7 +564,7 @@ def pip_install(mods: list[str]) -> tuple[bool, str]:
     if not pk:
         return False, "no known packages"
     p = subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", *pk],
-                       capture_output=True, text=True, timeout=900)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
     importlib.invalidate_caches()
     return p.returncode == 0, clip((p.stdout + p.stderr)[-1500:], 1500)
 
@@ -2557,8 +2584,14 @@ class Skills:
         v += 1
         d = DIRS["skills"] / name / f"v{v}"
         d.mkdir(parents=True, exist_ok=True)
-        (d / "skill.py").write_text(code, encoding="utf-8")
-        (d / "spec.json").write_text(jdump({"name": name, "description": description, "parameters": parameters, "risk": risk}), encoding="utf-8")
+        # write_bytes, NOT write_text. The integrity check hashes `code.encode()` and
+        # later compares it against `path.read_bytes()`. A text-mode write translates
+        # "\n" to os.linesep, so on Windows the file holds CRLF while the stored hash
+        # was computed over LF — every skill then looks tampered with and can never
+        # run. Invisible on Linux and macOS, where there is no translation.
+        (d / "skill.py").write_bytes(code.encode("utf-8"))
+        (d / "spec.json").write_bytes(jdump({"name": name, "description": description,
+                                             "parameters": parameters, "risk": risk}).encode("utf-8"))
         h = hashlib.sha256(code.encode()).hexdigest()
         self.s.x("INSERT INTO skills(name,version,status,description,schema,path,code_hash,risk,created) VALUES(?,?,?,?,?,?,?,?,?)",
                  (name, v, "draft", description, jdump(parameters), str(d / "skill.py"), h, risk, now()))
@@ -2578,7 +2611,7 @@ class Skills:
             raise ToolError("skill code changed since it was tested/approved; refusing to run", "tampered")
         env = {k: v for k, v in os.environ.items() if k.upper() in ("PATH", "SYSTEMROOT", "TEMP", "TMP", "PATHEXT", "COMSPEC", "HOME", "USERPROFILE")}
         p = subprocess.run([sys.executable, "-I", "-c", SKILL_RUNNER, str(path)], input=json.dumps(args), capture_output=True,
-                           text=True, timeout=timeout, cwd=str(DIRS["workspace"]), env=env)
+                           text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=str(DIRS["workspace"]), env=env)
         if p.returncode != 0:
             raise ToolError(f"skill crashed: {clip(p.stderr, 600)}", "skill_error")
         if "@@RESULT@@" not in p.stdout:
@@ -2683,8 +2716,8 @@ DANGEROUS_CMD = re.compile(
 
 def run_proc(cmd: Any, cwd: Path, timeout: float, run: "AgentRun | None", shell: bool = True, max_out: int = 24000) -> dict:
     t0 = time.time()
-    p = subprocess.Popen(cmd, cwd=str(cwd), shell=shell, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                         encoding="utf-8", errors="replace", env=_child_env(),
+    p = subprocess.Popen(cmd, cwd=str(cwd), shell=shell, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                          env=_child_env(),
                          creationflags=(0x08000000 if IS_WIN else 0))
     out = ""
     timed_out = cancelled = False
@@ -4734,7 +4767,7 @@ class Voice:
               "$t = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:BUDDY_TTS_B64)); $s.Speak($t)")
         env = {**os.environ, "BUDDY_LANG": lang, "BUDDY_TTS_B64": base64.b64encode(text.encode()).decode()}
         p = subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], env=env, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, text=True, creationflags=0x08000000)
+                             stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", creationflags=0x08000000)
         with self.tts_lock:
             self.tts_proc = p
         _, err = p.communicate()
@@ -5017,7 +5050,7 @@ class Doctor:
 
 
 def print_report(items: list[dict]) -> int:
-    """Render a diagnostics report.
+    r"""Render a diagnostics report.
 
     The line shape here is a contract, not decoration: omega/tests/run_all.py
     parses `^\s*FAIL\s+(\S+)\s+(.+?)\s+—\s+(.*)$` to lift failing items into
@@ -5071,6 +5104,19 @@ def set_autostart(on: bool) -> tuple[bool, str]:
 # ════════════════════════════════════════════════════════════════════════════
 # THE APP
 # ════════════════════════════════════════════════════════════════════════════
+#: What the always-on observer asks the vision model. Deliberately about the activity
+#: rather than the content: the companion stores text describing what the owner is
+#: doing, pixels are never stored (observation.store_text_only), and a screenshot can
+#: hold other people's personal data — so the question asks for the shape of the work
+#: and explicitly not for names, messages or identifiers. Override per-owner with the
+#: `observation_question` setting.
+SCREEN_OBSERVE_QUESTION = (
+    "Describe the activity visible in this window in one or two sentences: which "
+    "application it is, what kind of document or page is open, and what the person "
+    "appears to be doing. Do not transcribe names, messages, identifiers or any other "
+    "personal data belonging to other people.")
+
+
 class CompanionSubsystem:
     """The always-on layer (omega/companion.py), loaded lazily like every sibling.
 
@@ -5135,9 +5181,25 @@ class CompanionSubsystem:
             return m.ScreenBackend(why_unavailable=f"screen_describe: {why}")
         if not self.app.gateway.key():
             return m.ScreenBackend(why_unavailable="reading the screen needs a vision model, and no API key is set")
+        # `screen_describe` asks for confirmation on every call unless the owner has
+        # set a standing upload policy. Background observation cannot answer a
+        # prompt, so without that policy every tick would fail with "needs
+        # interactive user approval". Say so once, here, instead of failing quietly
+        # thirty times a minute — and never grant the policy on the owner's behalf.
+        if self.app.settings.get("screenshot_upload") != "allow":
+            return m.ScreenBackend(why_unavailable=(
+                "screen_describe sends a screenshot to the model and asks for confirmation each time, "
+                "which background observation cannot answer; set a standing policy with "
+                "`/privacy upload allow`, or keep observation at depth 'titles', which sends no pixels"))
 
         async def acapture() -> Any:
-            res = await exec_tool(self.app, "screen_describe", {})
+            # `question` is a required argument of screen_describe. This call used to
+            # pass {}, so validate_args rejected every capture with "missing required
+            # argument 'question'" and screen observation could never work on any
+            # platform, however well configured — invisible here because the tool is
+            # Windows-only, so every non-Windows test returned unavailable first.
+            question = str(self.app.settings.get("observation_question") or SCREEN_OBSERVE_QUESTION)
+            res = await exec_tool(self.app, "screen_describe", {"question": question})
             if not res.ok:
                 raise ToolError(res.error or "screen_describe failed", res.category or "os_error")
             d = res.data if isinstance(res.data, dict) else {"text": str(res.data)}
@@ -5215,6 +5277,62 @@ class CompanionSubsystem:
         return {"available": True, **self.loop.status()}
 
 
+class LegacySubsystem:
+    """Encapsulating this installation so it can outlive its owner (omega/legacy.py).
+
+    Lazy behind sibling() like every other module, so a missing or broken legacy.py
+    degrades to a BLOCKED report with the real reason instead of taking the whole
+    product down at import time.
+
+    The profile that goes into a bundle is the companion's longitudinal model of the
+    owner — the same UserModel.build() that `buddy companion profile` prints. It is
+    deliberately not a second implementation: a bundle describing a different person
+    than the product describes would be worse than no bundle at all.
+    """
+
+    def __init__(self, app: "Buddy") -> None:
+        self.app = app
+        self._mod: Any = None
+        self._bundle: Any = None
+
+    @property
+    def mod(self) -> Any:
+        if self._mod is None and "legacy" not in _SIBLING_ERRORS:
+            self._mod = sibling("legacy")
+        return self._mod
+
+    def present(self) -> tuple[bool, str]:
+        if self.mod is None:
+            return False, _SIBLING_ERRORS.get("legacy", "omega/legacy.py could not be loaded")
+        return True, ""
+
+    def need(self) -> Any:
+        ok, why = self.present()
+        if not ok:
+            raise ToolError(why, "dependency_missing")
+        return self.mod
+
+    @property
+    def bundle(self) -> Any:
+        if self._bundle is None:
+            m = self.need()
+            self._bundle = m.LegacyBundle(self.app.store, profile_builder=self._profile,
+                                          product_version=APP_VERSION, log=log)
+        return self._bundle
+
+    def _profile(self, days: float) -> dict:
+        return self.app.companion.model.build(days=days)
+
+    def default_destination(self) -> Path:
+        """Where `buddy legacy build` writes when nobody names a path.
+
+        Under the workspace, which is_protected_path already treats as writable, so
+        the default cannot fail on the product's own path policy.
+        """
+        stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        return DIRS["workspace"] / "legacy" / f"studdybuddy-omega-legacy-{stamp}.tar.gz"
+
+
 class Buddy:
     def __init__(self, headless: bool = False) -> None:
         ensure_dirs()
@@ -5239,6 +5357,7 @@ class Buddy:
         self.doctor = Doctor(self)
         self.majin = MajinSubsystem(self)
         self.companion = CompanionSubsystem(self)
+        self.legacy = LegacySubsystem(self)
         self.ui: Any = NullUI() if headless else CLI(self)
         self.perms.confirm_fn = lambda p, al: self.ui.confirm(p, al)
         self.loop: Optional[asyncio.AbstractEventLoop] = None
@@ -5831,7 +5950,7 @@ class Suite:
 
 def _child(args: list[str], env_extra: dict | None = None, timeout: float = 120) -> subprocess.CompletedProcess:
     env = {**os.environ, **(env_extra or {}), "BUDDY_TEST_CHILD": "1"}
-    return subprocess.run([sys.executable, str(SOURCE_FILE), *args], env=env, capture_output=True, text=True, timeout=timeout)
+    return subprocess.run([sys.executable, str(SOURCE_FILE), *args], env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
 
 async def run_suite(live: bool) -> int:
@@ -5974,11 +6093,11 @@ async def run_suite(live: bool) -> int:
         tid = app.tasks.create("crash/recover test", {"kind": "steps", "steps": steps})
         p = _child(["--_child", "crash-task"], {"BUDDY_HOME": str(HOME), "BUDDY_TEST_CRASH_AT": "1"})
         crashed = p.returncode == 9
-        mid = counter.read_text() if counter.exists() else ""
+        mid = counter.read_text(encoding="utf-8") if counter.exists() else ""
         rec_ids = app.tasks.recover(stale_after=1e9)
         t = app.tasks.claim()
         st = await app.tasks.run_one(t) if t else "none"
-        final = counter.read_text() if counter.exists() else ""
+        final = counter.read_text(encoding="utf-8") if counter.exists() else ""
         ok = crashed and tid in rec_ids and st == "done" and final == "step1\nstep2\nstep3\n"
         s.rec("G", "process killed mid-task → restart resumes; completed effects not duplicated", "PASS" if ok else "FAIL",
               f"child_killed={crashed}, file_before_recovery={mid!r}, recovered={tid in rec_ids}, final={final!r}, attempts={app.tasks.get(tid)['attempts']}")
@@ -5998,7 +6117,7 @@ async def run_suite(live: bool) -> int:
         w.cancel()
         t = app.tasks.get(tid)
         rec_m = app.store.one("SELECT content FROM memories WHERE kind='task_outcome' AND title LIKE ?", (f"Task {tid}%",))
-        ok = t["state"] == "done" and f.exists() and f.read_text() == "done by autopilot" and rec_m is not None
+        ok = t["state"] == "done" and f.exists() and f.read_text(encoding="utf-8") == "done by autopilot" and rec_m is not None
         s.rec("L", "scheduled task runs by itself and leaves a completion record", "PASS" if ok else "FAIL", f"state={t['state']}, file={f.exists()}, record={'yes' if rec_m else 'no'}, err={t['error']}")
     except Exception as e:
         s.rec("L", "autopilot", "FAIL", f"{type(e).__name__}: {e}")
@@ -6009,10 +6128,16 @@ async def run_suite(live: bool) -> int:
         code = "def run(args):\n    return {'sum': args['a'] + args['b']}\n"
         pr = sk.propose("adder_demo", "adds two numbers", {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}}, "required": ["a", "b"]}, code)
         tr = sk.test("adder_demo", None, {"a": 2, "b": 3}, "5")
+        if not tr.get("passed"):
+            # Without this, activate() raises a generic "has not passed its test" and
+            # that is all the check reports. The actual reason — a hash mismatch, a
+            # crash, a missing interpreter — is stored in test_result and never
+            # surfaces, which is why this failure was undiagnosable from CI output.
+            raise ToolError(f"skill test failed: {tr.get('error') or tr.get('output') or 'no reason recorded'}")
         app.ui.answer = "once"
         act = await sk.activate("adder_demo")
         use = await exec_tool(app, "skill_adder_demo", {"a": 4, "b": 5})
-        Path(pr["path"]).write_text(code.replace("+", "-"))
+        Path(pr["path"]).write_text(code.replace("+", "-"), encoding="utf-8")
         tamper = await exec_tool(app, "skill_adder_demo", {"a": 4, "b": 5})
         app.ui.answer = "no"
         refused = False
@@ -6048,12 +6173,13 @@ async def run_suite(live: bool) -> int:
             try:
                 proj = tmp / "proj"
                 proj.mkdir()
-                (proj / "calc.py").write_text("def add(a, b):\n    return a - b\n\n\ndef mul(a, b):\n    return a * b\n")
+                (proj / "calc.py").write_text("def add(a, b):\n    return a - b\n\n\ndef mul(a, b):\n    return a * b\n",
+                                 encoding="utf-8")
                 (proj / "test_calc.py").write_text("import unittest\nfrom calc import add, mul\n\n\nclass T(unittest.TestCase):\n    def test_add(self):\n"
-                                                   "        self.assertEqual(add(2, 3), 5)\n\n    def test_mul(self):\n        self.assertEqual(mul(2, 3), 6)\n\n\nif __name__ == '__main__':\n    unittest.main()\n")
-                before = subprocess.run([sys.executable, "-m", "unittest", "discover"], cwd=proj, capture_output=True, text=True).returncode
+                                                   "        self.assertEqual(add(2, 3), 5)\n\n    def test_mul(self):\n        self.assertEqual(mul(2, 3), 6)\n\n\nif __name__ == '__main__':\n    unittest.main()\n", encoding="utf-8")
+                before = subprocess.run([sys.executable, "-m", "unittest", "discover"], cwd=proj, capture_output=True, text=True, encoding="utf-8", errors="replace").returncode
                 out, run = await converse(app, f"The Python project in {proj} has a failing test. Find the bug, fix it, run the tests and tell me the verified result.")
-                after = subprocess.run([sys.executable, "-m", "unittest", "discover"], cwd=proj, capture_output=True, text=True).returncode
+                after = subprocess.run([sys.executable, "-m", "unittest", "discover"], cwd=proj, capture_output=True, text=True, encoding="utf-8", errors="replace").returncode
                 ran_tests = any(l["tool"] in ("dev_run_tests", "run_command") and l["ok"] for l in run.ledger)
                 s.rec("F", "coding agent fixes a real bug and verifies with tests (live)", "PASS" if before != 0 and after == 0 and ran_tests and out.verified else "FAIL",
                       f"tests_before_rc={before}, after_rc={after}, ran_tests={ran_tests}, steps={run.steps}, tools={sorted({l['tool'] for l in run.ledger})}")
@@ -6335,11 +6461,23 @@ async def integration_tests(s: Suite, app: Buddy, tmp: Path) -> None:
             sha_ok = backup_ok and mm.file_sha256(Path(rep.backup)) == rep.backup_sha256
             sink2 = mm.SqliteSink(app.store.path)
             mig2 = mm.Migrator(sink2, roots=roots)
-            rolled = mig2.rollback(rep.backup) if backup_ok else False
-            # The rollback replaced the file under the live connection, so the
-            # agent must reconnect — otherwise it would keep reading the old
-            # inode and the restore would be theatre.
-            app.store.reopen()
+            # EVERY connection to the target has to be released before the swap, not
+            # just the obvious one. Windows refuses to replace a file any process holds
+            # open, so rollback failed outright there with WinError 5. POSIX lets the
+            # rename through and leaves the connection on the old inode, which is why
+            # the reopen was already here — closing first makes the restore real on
+            # both instead of impossible on one and theatrical on the other.
+            #
+            # There were two, and only one of them was visible at the call site: the
+            # agent's own Store, and the sink the N1 migration opened on the same file
+            # and never released. sink2 needs no closing here — rollback closes the
+            # sink it is given.
+            sink.close()
+            app.store.close()
+            try:
+                rolled = mig2.rollback(rep.backup) if backup_ok else False
+            finally:
+                app.store.reopen()
             after = app.store.one("SELECT COUNT(*) AS n FROM memories")["n"]
             legacy_left = app.store.one("SELECT COUNT(*) AS n FROM memories WHERE tags LIKE '%legacy%'")["n"]
             s.rec("N3", "migration backup + rollback restore the exact state",
@@ -6453,7 +6591,22 @@ async def windows_tests(s: Suite, app: Buddy, key: bool) -> None:
     try:
         t0 = time.time()
         rc, err = app.voice._speak_sapi("Studdy Buddy voice test.", "en")
-        s.rec("J4", "voice playback (SAPI process completed)", "PASS" if rc == 0 else "FAIL", f"rc={rc} in {time.time() - t0:.1f}s (audibility not machine-verifiable; --voice-test asks you)")
+        # Distinguish "SAPI is broken" from "this machine has nothing to play sound
+        # on". A CI runner has no audio output device at all, and calling that a
+        # product failure is a claim the product cannot support.
+        try:
+            audio_devices = int(ctypes.windll.winmm.waveOutGetNumDevs()) if IS_WIN else 0
+        except Exception:
+            audio_devices = -1
+        if rc == 0:
+            s.rec("J4", "voice playback (SAPI process completed)", "PASS",
+                  f"rc=0 in {time.time() - t0:.1f}s (audibility not machine-verifiable; --voice-test asks you)")
+        elif audio_devices == 0:
+            s.rec("J4", "voice playback (SAPI process completed)", "BLOCKED",
+                  f"rc={rc} and waveOutGetNumDevs()=0 — no audio output device on this machine")
+        else:
+            s.rec("J4", "voice playback (SAPI process completed)", "FAIL",
+                  f"rc={rc} in {time.time() - t0:.1f}s with {audio_devices} audio device(s): {clip(err, 120)}")
     except Exception as e:
         s.rec("J4", "voice playback", "FAIL", str(e))
     s.rec("J5", "speech recognition (real speech)", "NOT TESTED", "needs a spoken sentence: run `python buddy.py --voice-test`")
@@ -6465,12 +6618,23 @@ async def windows_tests(s: Suite, app: Buddy, key: bool) -> None:
             raise ToolError(r.error)
         hw = next((w["hwnd"] for w in r.data["new_windows"] if "notepad" in w["app"].lower()), None) or (r.data["foreground"] or {}).get("hwnd")
         found = await exec_tool(app, "ui_find", {"hwnd": hw, "role": "Edit"})
-        if not found.ok or not found.data["matches"]:
+        if not found.ok or not (found.data or {}).get("matches"):
             found = await exec_tool(app, "ui_find", {"hwnd": hw, "role": "Document"})
-        ref = found.data["matches"][0]["ref"]
+        matches = (found.data or {}).get("matches") or []
+        if not matches:
+            # A CI runner has no interactive desktop session: Notepad starts and
+            # presents nothing to drive. That is a statement about the machine, not a
+            # defect. Indexing found.data["matches"] while data is None reported it as
+            # `FAIL: TypeError: 'NoneType' object is not subscriptable` — the same
+            # host-precondition-as-failure mistake as benchmark B13.
+            s.rec("D", "Notepad: open → type → read back (real desktop)", "BLOCKED",
+                  f"launched, but no editable element was reachable ({found.error or 'ui_find returned nothing'})"
+                  " — this session has no interactive desktop")
+            return
+        ref = matches[0]["ref"]
         w = await exec_tool(app, "ui_set_text", {"ref": ref, "text": phrase})
         back = await exec_tool(app, "ui_read", {"ref": ref})
-        ok = w.ok and back.ok and phrase in (back.data.get("value") or "")
+        ok = w.ok and back.ok and phrase in ((back.data or {}).get("value") or "")
         s.rec("D", "Notepad: open → type → read back (real desktop)", "PASS" if ok else "FAIL", f"readback={clip(str((back.data or {}).get('value')), 60)!r}; close Notepad manually (don't save)")
     except Exception as e:
         s.rec("D", "Notepad control", "FAIL", f"{type(e).__name__}: {e}")
@@ -7520,6 +7684,28 @@ def _flag(args: list[str], name: str, default: str) -> str:
     return default
 
 
+def _positional(args: list[str], *valued: str) -> list[str]:
+    """Positional arguments only — dropping each `--flag` in `valued` AND its value.
+
+    Filtering on `startswith("--")` alone leaves the values behind, so
+    `heir set Anna --email a@b.c` yields ["Anna", "a@b.c"] and a name assembled by
+    joining positionals silently absorbs the email address.
+    """
+    out: list[str] = []
+    skip = False
+    for a in args:
+        if skip:
+            skip = False
+            continue
+        if any(a == v or a.startswith(v + "=") for v in valued):
+            skip = "=" not in a
+            continue
+        if a.startswith("--"):
+            continue
+        out.append(a)
+    return out
+
+
 def cmd_accept(rest: list[str]) -> int:
     """Run the 20 mandated end-to-end acceptance scenarios.
 
@@ -7599,9 +7785,9 @@ def cmd_update(rest: list[str]) -> int:
         print("  could not reach the remote; nothing was changed.")
         return 1
     branch = subprocess.run(["git", "-C", str(root), "rev-parse", "--abbrev-ref", "HEAD"],
-                            capture_output=True, text=True).stdout.strip()
+                            capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
     behind = subprocess.run(["git", "-C", str(root), "rev-list", "--count", f"HEAD..origin/{branch}"],
-                            capture_output=True, text=True).stdout.strip()
+                            capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
     print(f"  branch {branch}: {behind or '0'} commit(s) available upstream")
     if (behind or "0") == "0":
         print("  already up to date.\n")
@@ -7617,7 +7803,7 @@ def cmd_update(rest: list[str]) -> int:
     backup.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SOURCE_FILE.parent, backup, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     print(f"  backup of the current runtime → {backup}")
-    before = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    before = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
     rc = subprocess.call(["git", "-C", str(root), "merge", "--ff-only", f"origin/{branch}"])
     if rc != 0:
         print("  update did not fast-forward. Rolling back.")
@@ -7625,7 +7811,7 @@ def cmd_update(rest: list[str]) -> int:
         return 1
     # Verify before declaring success. A broken update is rolled back, not left.
     print("  verifying the updated runtime…")
-    check = subprocess.run([sys.executable, str(SOURCE_FILE), "--self-test"], capture_output=True, text=True, timeout=1800)
+    check = subprocess.run([sys.executable, str(SOURCE_FILE), "--self-test"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1800)
     m = re.search(r"SUMMARY\s+PASS=(\d+)\s+FAIL=(\d+)", check.stdout + check.stderr)
     if check.returncode != 0 or not m or int(m.group(2)) > 0:
         print(C.c(C.RED, "  the updated runtime failed its own self-test. Rolling back."))
@@ -7636,6 +7822,254 @@ def cmd_update(rest: list[str]) -> int:
 
     print(f"  rollback kept at {backup}; data in {HOME} was never touched.\n")
     return 0
+
+
+def cmd_legacy(rest: list[str]) -> int:
+    """Encapsulate this installation so it can outlive you — and hand it over safely.
+
+    Nothing here transmits anything, anywhere. `release` marks a verified bundle as
+    ready for a human to hand over and requires a confirmation phrase typed in,
+    because the recipient gets a working model of a person who is not in the room to
+    object. That is a third-party action, so it is not covered by `buddy trust on`.
+    """
+    usage = ("usage: buddy legacy [status | build [PATH] [--days N] | verify PATH | inspect PATH |\n"
+             "                          heir [show | set NAME [--email E] [--relation R] [--note N]] |\n"
+             "                          heartbeat | check [--grace-days N] | release PATH |\n"
+             "                          import PATH [--dry-run]]")
+    app = Buddy(headless=True)
+    try:
+        ok, why = app.legacy.present()
+        if not ok:
+            print(V.fail("the legacy module is not available", why))
+            return 2
+        lgm = app.legacy.need()
+        bundle = app.legacy.bundle
+        action = (rest[0] if rest else "status").lower()
+        args = rest[1:]
+        positional = _positional(args, "--days", "--email", "--relation", "--note",
+                                 "--grace-days", "--name")
+
+        if action in ("status", "show"):
+            heir = bundle.heir()
+            chk = bundle.check()
+            rel = bundle.released()
+            hb = bundle.last_heartbeat()
+            print()
+            print(V.dot("info") + " " + C.bold("LEGACY") + C.dim("  ·  ")
+                  + "what survives you, and who may read it")
+            # V.kv supplies its own two-space indent, so a dot goes in place of it
+            # rather than in front of it — otherwise the dotted row sits two columns
+            # right of every other row in the block.
+            W = 15
+
+            def kvdot(state: str, label: str, value: str) -> str:
+                return V.dot(state) + " " + f"{label:<{W}} {value}"
+
+            print(V.rule("hand-over"))
+            print(V.kv("heir", heir.get("name") or C.dim("not set — `buddy legacy heir set NAME`"), W))
+            if heir.get("contact"):
+                print(V.kv("contact", heir["contact"], W))
+            if heir.get("relationship"):
+                print(V.kv("relationship", heir["relationship"], W))
+            print(V.kv("last heartbeat", hb.get("at") or C.yellow("never recorded"), W))
+            dot = {"owner_recently_active": "ok", "never_recorded": "warn",
+                   "no_bundle_yet": "off", "grace_elapsed": "warn"}.get(chk["state"], "info")
+            print(kvdot(dot, "state", chk["state"].replace("_", " ")))
+            print(V.kv("grace period", f"{chk['grace_days']:g} days", W))
+            print(V.kv("released", rel.get("at") or C.dim("never"), W))
+            print(V.rule("what a bundle contains"))
+            print("  " + ", ".join(lgm.LegacyBundle.FILES))
+            print(V.rule("what is never in it"))
+            print("  credentials and API keys (excluded by construction, not filtered),")
+            print("  raw screen captures, keystrokes, anything marked private.")
+            print()
+            print(V.note("A bundle is a RECORD of a person, not the person. Nothing here"))
+            print(V.note("is ever transmitted automatically: `buddy legacy release` unlocks"))
+            print(V.note("a copy and a human decides what happens next."))
+            return 0
+
+        if action == "build":
+            dest = Path(positional[0]) if positional else app.legacy.default_destination()
+            days = float(_flag(args, "--days", "365"))
+            man = bundle.build(dest, profile_days=days)
+            print()
+            print(V.dot("ok") + " " + C.bold("BUILT") + C.dim("  ·  ") + str(man["path"]))
+            print(V.rule("contents"))
+            for k, v in man["counts"].items():
+                print(V.kv(k, str(v)))
+            print(V.kv("sealed", C.yellow("NO") + C.dim("  — plaintext, by design")))
+            if man["warnings"]:
+                print(V.rule("warnings"))
+                for w in man["warnings"]:
+                    print(textwrap.fill(w, width=V.WIDTH - 4, initial_indent="  ! ",
+                                        subsequent_indent="    "))
+            print()
+            print(V.note("The passphrase has to be held by someone other than you, or it"))
+            print(V.note("cannot survive you:"))
+            print(f"    gpg --symmetric --cipher-algo AES256 {man['path']}")
+            print(f"    age -p -o {man['path']}.age {man['path']}")
+            return 0
+
+        if action == "verify":
+            if not positional:
+                print(usage)
+                return 2
+            rep = bundle.verify(Path(positional[0]))
+            print()
+            print(V.dot("ok" if rep["ok"] else "fail") + " "
+                  + (C.bold(C.green("VERIFIED")) if rep["ok"] else C.bold(C.red("NOT VERIFIED")))
+                  + C.dim("  ·  ") + rep["path"])
+            if rep["ok"]:
+                for name in sorted((rep.get("manifest") or {}).get("checksums", {})):
+                    print("  " + V.dot("ok") + " sha256 " + name)
+            else:
+                for pr in rep["problems"]:
+                    print(V.fail(pr))
+            return 0 if rep["ok"] else 1
+
+        if action == "inspect":
+            if not positional:
+                print(usage)
+                return 2
+            info = bundle.inspect(Path(positional[0]))
+            print()
+            print(V.dot("ok" if info.get("verified") else "fail") + " " + C.bold("INSPECT")
+                  + C.dim("  ·  ") + info["path"])
+            print(V.rule("counts"))
+            for k, v in (info.get("counts") or {}).items():
+                print(V.kv(k, str(v)))
+            titles = info.get("sample_titles") or []
+            if titles:
+                print(V.rule("sample titles"))
+                for t in titles:
+                    print("  " + C.dim("·") + " " + t)
+            if not info.get("verified"):
+                for pr in info.get("problems", []):
+                    print(V.fail(pr))
+                return 1
+            print()
+            print(V.note("Nothing was imported. Inspecting never writes."))
+            return 0
+
+        if action == "heir":
+            sub = (positional[0] if positional else "show").lower()
+            if sub == "show":
+                h = bundle.heir()
+                if not h:
+                    print("  " + C.dim("no heir set. `buddy legacy heir set NAME --email E --relation R`"))
+                    return 0
+                print()
+                print(V.kv("name", h.get("name", "")))
+                print(V.kv("contact", h.get("contact", "") or C.dim("—")))
+                print(V.kv("relationship", h.get("relationship", "") or C.dim("—")))
+                print(V.kv("note", h.get("note", "") or C.dim("—")))
+                return 0
+            if sub == "set":
+                name = " ".join(positional[1:]) if len(positional) > 1 else _flag(args, "--name", "")
+                if not name:
+                    print(V.fail("a name is required", "buddy legacy heir set NAME --email E --relation R"))
+                    return 2
+                h = bundle.set_heir(name, _flag(args, "--email", ""), _flag(args, "--relation", ""),
+                                    _flag(args, "--note", ""))
+                print("  " + V.dot("ok") + " heir set: " + C.bold(h["name"])
+                      + C.dim("  ·  recorded locally; nothing was sent to them"))
+                return 0
+            print("usage: buddy legacy heir [show | set NAME [--email E] [--relation R] [--note N]]")
+            return 2
+
+        if action == "heartbeat":
+            hb = bundle.heartbeat()
+            print("  " + V.dot("ok") + " heartbeat recorded at " + hb["at"]
+                  + C.dim(f"  ·  grace {hb['grace_days']:g} days"))
+            print("  " + C.dim("this is the only thing that tells the grace period you are still here."))
+            return 0
+
+        if action == "check":
+            if "--grace-days" in args:
+                bundle.set_grace_days(float(_flag(args, "--grace-days", "90")))
+            chk = bundle.check()
+            dot = {"owner_recently_active": "ok", "never_recorded": "warn",
+                   "no_bundle_yet": "off", "grace_elapsed": "warn"}.get(chk["state"], "info")
+            print()
+            print(V.dot(dot) + " " + C.bold(chk["state"].replace("_", " ").upper()))
+            print(V.kv("releasable", (C.yellow("yes") if chk["releasable"] else "no")))
+            print(V.kv("grace period", f"{chk['grace_days']:g} days"))
+            if chk.get("days_since_heartbeat") is not None:
+                print(V.kv("since heartbeat", f"{chk['days_since_heartbeat']:.1f} days"))
+            print()
+            print(V.note(chk["detail"]))
+            return 0
+
+        if action == "release":
+            if not positional:
+                print(usage)
+                return 2
+            path = Path(positional[0])
+            rep = bundle.verify(path)
+            print()
+            if not rep["ok"]:
+                for pr in rep["problems"]:
+                    print(V.fail(pr))
+                return 1
+            print("  This bundle describes a real person and will be read by someone else.")
+            print("  Releasing it is a third-party action, so it is not covered by full trust.")
+            print("  It transmits nothing — it unlocks a copy for a human to hand over.")
+            print(f"\n  To accept, type exactly: {bundle.RELEASE_PHRASE}")
+            try:
+                phrase = input("  > ")
+            except EOFError:
+                print(C.c(C.R, "\n  no input available. Pipe the phrase in instead:"))
+                print(f'    echo "{bundle.RELEASE_PHRASE}" | buddy legacy release {path}')
+                return 2
+            r = bundle.release(path, phrase=phrase.rstrip("\n"))
+            if not r["ok"]:
+                for pr in r["problems"]:
+                    print(V.fail(pr, r.get("hint", "")))
+                return 2
+            print("  " + V.dot("ok") + " " + C.bold(C.green("RELEASED")) + C.dim("  ·  ") + str(path))
+            print(V.rule("still your job"))
+            print(textwrap.fill("the bundle is plaintext. Seal it, and give the passphrase to the "
+                                "heir or a lawyer — a secret only you hold cannot survive you.",
+                                width=V.WIDTH - 4, initial_indent="  ! ", subsequent_indent="    "))
+            print(f"      gpg --symmetric --cipher-algo AES256 {path}")
+            print()
+            print(V.note("Nothing was transmitted. Nothing left this machine."))
+            return 0
+
+        if action == "import":
+            if not positional:
+                print(usage)
+                return 2
+            dry = "--dry-run" in args
+            rep = bundle.import_bundle(Path(positional[0]), valid_kinds=Memory.KINDS,
+                                       dedupe_key=Memory.dedupe_key, dry_run=dry)
+            print()
+            print(V.dot("ok" if rep["ok"] else "warn" if rep["imported"] else "fail") + " "
+                  + C.bold("IMPORT" + (" (dry run)" if dry else ""))
+                  + C.dim("  ·  ") + rep["path"])
+            if not rep.get("verified"):
+                for pr in rep["problems"]:
+                    print(V.fail(pr))
+                return 1
+            b = rep.get("bundle") or {}
+            print(V.kv("bundle schema", str(b.get("schema") or "?")))
+            print(V.kv("created", str(b.get("created") or "?")))
+            print(V.kv("imported", str(rep["imported"])))
+            print(V.kv("already present", str(rep["skipped_existing"])))
+            if rep["rejected_kinds"]:
+                print(V.kv("rejected kinds", ", ".join(sorted(set(rep["rejected_kinds"])))))
+            for pr in rep["problems"]:
+                print("  " + C.yellow("!") + " " + pr)
+            if not dry and rep["imported"]:
+                print()
+                print(V.note("Imported rows keep their ORIGINAL timestamps, are tagged"))
+                print(V.note("`legacy` and carry provenance back to this bundle."))
+            return 0 if rep["ok"] else 1
+
+        print(usage)
+        return 2
+    finally:
+        _shutdown(app)
 
 
 USAGE = """
@@ -7713,6 +8147,24 @@ Always-on companion
                             recorded in the audit log. Third-party actions still confirm.
   buddy trust off           back to asking, according to your grants
 
+Legacy — what survives you
+  buddy legacy status       heir, heartbeat, grace period, and what a bundle never contains
+  buddy legacy build [PATH] [--days N]
+                            encapsulate this installation: memories, the model of you,
+                            verified skills, level history and an allowlist of settings.
+                            Credentials are excluded by construction. Plaintext by design.
+  buddy legacy verify PATH  SHA-256 every payload file; refuse a bundle that was altered
+  buddy legacy inspect PATH what is inside, without importing any of it
+  buddy legacy heir set NAME [--email E] [--relation R] [--note N]
+                            who inherits this. Recorded locally; nothing is sent to them.
+  buddy legacy heartbeat    record that you are alive. The grace period cannot tell otherwise.
+  buddy legacy check [--grace-days N]
+                            has the grace period elapsed? Reports a decision, takes no action.
+  buddy legacy release PATH unlock a verified bundle for hand-over. Typed confirmation;
+                            never transmits anything and is not covered by full trust.
+  buddy legacy import PATH [--dry-run]
+                            the receiving half: load a bundle here, keeping original timestamps
+
 MAJIN V6 subsystem
   buddy majin status        is MAJIN connected, and with which owner grants
   buddy majin search QUERY  search MAJIN's real authorized tool catalog
@@ -7763,6 +8215,7 @@ def render_usage() -> str:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    force_utf8_output()
     argv = list(sys.argv[1:] if argv is None else argv)
 
     # ── internal entrypoints used by the isolated test harness ──
@@ -7798,6 +8251,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             "key": cmd_key,
             "trust": cmd_trust,
             "companion": cmd_companion,
+            "legacy": cmd_legacy,
             "help": lambda r: (print(render_usage()), 0)[1],
             "--help": lambda r: (print(render_usage()), 0)[1],
             "version": lambda r: (print(f"Studdy Buddy Omega {APP_VERSION}"), 0)[1],

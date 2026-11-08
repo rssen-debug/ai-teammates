@@ -1214,7 +1214,23 @@ class Migrator:
                 close()
         tmp = target.with_name(target.name + ".rollback-tmp")
         shutil.copy2(backup, tmp)
-        os.replace(tmp, target)
+        try:
+            os.replace(tmp, target)
+        except PermissionError as e:
+            # Windows refuses to replace a file that ANY process holds open, so a
+            # caller keeping a live connection makes rollback impossible there.
+            # POSIX allows the rename and quietly leaves that connection on the old
+            # inode — the restore looks successful and changes nothing. Neither is a
+            # rollback, and a bare "[WinError 5] Access is denied" does not tell
+            # anyone what to do, so the cause and the remedy are stated.
+            with _suppress_ctx():
+                tmp.unlink()
+            raise RuntimeError(
+                f"cannot replace {target.name} because it is still open by another "
+                f"connection ({e}). On Windows a database file cannot be swapped while "
+                "any process holds it open: close every Buddy instance — in code, call "
+                "Store.close() before rollback and Store.reopen() after — and retry. "
+                "The backup was left untouched.") from e
         # WAL/SHM sidecars from the rolled-back database must not survive: they
         # belong to the state we are undoing and would replay it on next open.
         for suffix in ("-wal", "-shm"):
@@ -1341,7 +1357,23 @@ class Migrator:
 # ════════════════════════════════════════════════════════════════════════════
 # CLI
 # ════════════════════════════════════════════════════════════════════════════
+def _force_utf8_output() -> None:
+    """Widen stdout/stderr to UTF-8 before printing anything decorated.
+
+    This module is run as a child process and prints `→`, `●` and `—`. A stock
+    Windows console encodes cp1252, which has the em-dash but none of the others, so
+    the child would die part-way through its report — and the parent, decoding with
+    text=True, would see a truncated stream with no explanation attached.
+    """
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def main(argv: Optional[list[str]] = None) -> int:
+    _force_utf8_output()
     ap = argparse.ArgumentParser(prog="buddy migrate", description="Discover and import legacy Study Buddy / MAJIN / Obsidian / Omega memory")
     ap.add_argument("action", nargs="?", default="scan", choices=["scan", "plan", "run", "verify", "rollback"])
     ap.add_argument("--yes", action="store_true", help="actually write (default is a dry run)")

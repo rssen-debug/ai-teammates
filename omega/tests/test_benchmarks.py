@@ -18,6 +18,8 @@ What is guarded here:
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -43,13 +45,63 @@ def _import_tasks():
 def _run(ids: list[str], report: Path) -> dict:
     """Run the real runner in a real subprocess, exactly as `buddy bench` does."""
     proc = subprocess.run([sys.executable, str(RUNNER), *ids, "--report", str(report)],
-                          capture_output=True, text=True, timeout=900, cwd=str(OMEGA))
+                          capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900, cwd=str(OMEGA))
     if not report.is_file():
         raise AssertionError(f"the runner wrote no report (rc={proc.returncode}):\n{proc.stdout[-800:]}\n{proc.stderr[-800:]}")
     doc = json.loads(report.read_text(encoding="utf-8"))
     doc["_rc"] = proc.returncode
     doc["_stdout"] = proc.stdout
     return doc
+
+
+class TestSkipIsNeverAFailure(unittest.TestCase):
+    """A host precondition must be reported as a skip, never as a failure.
+
+    Not theoretical. `MajinBridge.__init__` defaults to `autostart=True`, so on a
+    machine without `npm install` the constructor raised MajinError OUTSIDE B13's
+    guard and the runner recorded a FAIL. axis E dropped from 1.000 to 0.929 for a
+    missing Node dependency — the level claimed the product had lost a capability
+    it never had on that host. B13 now constructs the bridge inert and starts it
+    inside the guard; this test is what keeps it that way.
+    """
+
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp(prefix="omega-skip-"))
+        self.addCleanup(lambda: shutil.rmtree(self.tmp, ignore_errors=True))
+        if not shutil.which("node"):
+            self.skipTest("Node.js is absent, so B13 would skip for a different reason")
+        # A directory that looks exactly like a MAJIN checkout to find_majin_root()
+        # — which requires both of these files — but has no node_modules.
+        root = self.tmp / "majin-root"
+        (root / "bin").mkdir(parents=True)
+        (root / "src" / "v6").mkdir(parents=True)
+        (root / "bin" / "majin-v6.mjs").write_text("// stub\n", encoding="utf-8")
+        (root / "src" / "v6" / "mcp.js").write_text("// stub\n", encoding="utf-8")
+        self.root = root
+
+    def test_missing_dependencies_skip_b13_instead_of_failing_it(self) -> None:
+        report = self.tmp / "report.json"
+        env = {**os.environ, "MAJIN_ROOT": str(self.root),
+               "BUDDY_HOME": str(self.tmp / "home"), "NO_COLOR": "1"}
+        proc = subprocess.run([sys.executable, str(RUNNER), "B13", "--report", str(report)],
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
+                              cwd=str(OMEGA), env=env)
+        self.assertTrue(report.is_file(), proc.stdout[-600:] + proc.stderr[-600:])
+        doc = json.loads(report.read_text(encoding="utf-8"))
+        task = next(t for t in doc["tasks"] if t["id"] == "B13")
+
+        # Per-task status is "skip"; the metric that counts them is "skipped".
+        self.assertEqual(task["status"], "skip",
+                         f"B13 must SKIP on missing deps, got {task['status']}: {task.get('detail')}")
+        self.assertIsNone(task["score"], "a skipped task has no score")
+        self.assertIn("dependencies are not installed", task["detail"])
+        self.assertTrue(task.get("fix"), "and it must tell the owner how to fix the host")
+
+        m = doc["metric"]
+        self.assertEqual(m["failures"], 0, "a missing dependency must never count as a failure")
+        self.assertEqual(m["skipped"], 1)
+        self.assertEqual(m["run"], 0, "and must not enter axis E's denominator either")
+        self.assertEqual(proc.returncode, 0, "the runner must not exit non-zero for a skip")
 
 
 class TestTaskTableIsWellFormed(unittest.TestCase):
@@ -172,7 +224,7 @@ class TestReproducibility(unittest.TestCase):
 class TestRunnerCli(unittest.TestCase):
     def test_list_does_not_run_anything(self) -> None:
         proc = subprocess.run([sys.executable, str(RUNNER), "--list"],
-                              capture_output=True, text=True, timeout=120, cwd=str(OMEGA))
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120, cwd=str(OMEGA))
         self.assertEqual(proc.returncode, 0)
         self.assertIn("CAPABILITY BENCHMARKS", proc.stdout)
         self.assertNotIn("axis E input", proc.stdout, "--list must not execute the suite")
@@ -181,7 +233,7 @@ class TestRunnerCli(unittest.TestCase):
         tmp = Path(tempfile.mkdtemp(prefix="buddy-bench-json-"))
         proc = subprocess.run([sys.executable, str(RUNNER), "B10", "--json",
                                "--report", str(tmp / "r.json")],
-                              capture_output=True, text=True, timeout=600, cwd=str(OMEGA))
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600, cwd=str(OMEGA))
         self.assertEqual(proc.returncode, 0, proc.stderr[-500:])
         doc = json.loads(proc.stdout)
         self.assertEqual([t["id"] for t in doc["tasks"]], ["B10"])
@@ -189,7 +241,7 @@ class TestRunnerCli(unittest.TestCase):
     def test_unknown_id_runs_nothing_and_says_so(self) -> None:
         tmp = Path(tempfile.mkdtemp(prefix="buddy-bench-none-"))
         proc = subprocess.run([sys.executable, str(RUNNER), "B99", "--report", str(tmp / "r.json")],
-                              capture_output=True, text=True, timeout=300, cwd=str(OMEGA))
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=str(OMEGA))
         doc = json.loads((tmp / "r.json").read_text(encoding="utf-8"))
         self.assertEqual(doc["tasks"], [], "an unknown id must not silently run the whole suite")
         self.assertEqual(doc["run"], 0)

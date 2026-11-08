@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -50,6 +51,11 @@ os.environ["BUDDY_HOME"] = str(_SCRATCH)
 sys.path.insert(0, str(HERE))
 
 import buddy  # noqa: E402  (must be imported after BUDDY_HOME is set)
+
+# Same reason as run_all.py: this harness prints decorated output, and a cp1252
+# Windows console cannot encode the glyphs. A crash here would look like a failed
+# scenario rather than what it is — a reporting problem.
+buddy.force_utf8_output()
 
 IS_WIN = sys.platform == "win32"
 PASS, FAIL, BLOCKED, NOT_TESTED = "PASS", "FAIL", "BLOCKED", "NOT TESTED"
@@ -116,7 +122,7 @@ class Ctx:
         e = dict(os.environ)
         e.update(env or {})
         return subprocess.run([sys.executable, str(buddy.SOURCE_FILE), *args], capture_output=True,
-                              text=True, timeout=timeout, env=e, cwd=str(HERE))
+                              text=True, encoding="utf-8", errors="replace", timeout=timeout, env=e, cwd=str(HERE))
 
 
 class Context:
@@ -145,6 +151,77 @@ def _majin_env(ctx: Ctx) -> Optional[dict]:
 # ════════════════════════════════════════════════════════════════════════════
 # 1–3 · INSTALLATION
 # ════════════════════════════════════════════════════════════════════════════
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+
+
+def windows_data_home() -> Path:
+    """The data home `install.ps1` derives by default: %APPDATA%\\StuddyBuddy.
+
+    Computed here instead of read from `buddy.HOME` because this harness repoints
+    BUDDY_HOME at a scratch directory at import time, while the installer verifies
+    the real one. Mirrors install.ps1's own fallback to %USERPROFILE%\\AppData\\Roaming.
+    """
+    appdata = os.environ.get("APPDATA") or os.path.join(os.environ.get("USERPROFILE", ""), "AppData", "Roaming")
+    return Path(appdata) / "StuddyBuddy"
+
+
+def install_is_present(data_home: Path | None = None) -> bool:
+    """True when `install.ps1` has been run on this machine at least once.
+
+    Both artifacts are the installer's own: it creates `venv\\` early and writes
+    `install-manifest.json` as its last step. Either one existing proves an install
+    was attempted and got somewhere; neither existing means this host has never run
+    the installer at all — which is the case on every CI runner.
+    """
+    home = data_home or windows_data_home()
+    return (home / "install-manifest.json").is_file() or (home / "venv").exists()
+
+
+def verify_problem_class(verify_output: str, installed: bool | None = None) -> tuple[str, list[str], str]:
+    """Classify a failing `install.ps1 -Verify` run: ("blocked"|"fail", problems, why).
+
+    The installer prints every problem as a line starting "x " and ends with
+    "x verification FAILED: N problem(s)".
+
+    The classification does NOT try to interpret the wording of those problems. It
+    asks one question that has an unambiguous answer on disk: has the installer ever
+    been run on this machine? If not, everything -Verify reports — no venv, no
+    launcher, no PATH entry, no importable dependency, a `buddy doctor runtime` that
+    fails through a fallback interpreter — is a true statement about THIS host rather
+    than a defect in the product, and the scenario is BLOCKED. Treating it as a
+    failure is the same host-precondition-as-failure mistake already fixed three times
+    on this branch (benchmark B13 reporting FAIL instead of SKIP, the Notepad check
+    crashing without an interactive desktop, the voice check treating "no audio
+    device" as a failure).
+
+    If an install IS present, the same findings are defects: the installer's whole job
+    was to leave a working venv, launcher, PATH entry and dependency set, so a problem
+    now describes a broken install and fails the scenario.
+
+    A non-zero exit that reports no problem line at all also fails: silence is a
+    defect, never an excuse.
+
+    Earlier versions of this function classified by matching problem text against a
+    list of expected phrasings. That is fragile in a way that is invisible from a
+    passing test — it guessed three of the installer's five absent-install messages
+    and misjudged the runner twice. Asking the filesystem removes the guessing.
+    """
+    out = _ANSI_RE.sub("", verify_output.replace("\u00a0", " "))
+    problems = [ln.strip() for ln in out.splitlines()
+                if re.match(r"^\s*x\s+\S", ln) and "verification FAILED" not in ln]
+    if installed is None:
+        installed = install_is_present()
+    if not problems:
+        return "fail", problems, ("-Verify exited non-zero but reported no problem line; "
+                                  "a silent failure is a defect, not a missing install")
+    if not installed:
+        return "blocked", problems, ("the installer has never been run on this host — no install "
+                                     "manifest and no venv — so every problem -Verify reports "
+                                     "describes this machine, not the installer")
+    return "fail", problems, ("an install IS present on this host, so what -Verify reports is "
+                              "about that install, and it is broken")
+
+
 def s01_fresh_install(ctx: Ctx) -> Result:
     """The installer must exist, be valid, and contain no hardcoded user paths."""
     if not INSTALLER.is_file():
@@ -169,10 +246,37 @@ def s01_fresh_install(ctx: Ctx) -> Result:
     detail = f"installer contract OK ({len(text.splitlines())} lines, no hardcoded user paths, multi-Python)"
     if IS_WIN:
         rc = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(INSTALLER),
-                             "-Verify"], capture_output=True, text=True, timeout=600)
-        ctx.save("01-installer-verify.txt", rc.stdout + rc.stderr)
+                             "-Verify"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
+        out = (rc.stdout or "") + (rc.stderr or "")
+        ctx.save("01-installer-verify.txt", out)
         if rc.returncode != 0:
-            return Result(FAIL, f"install.ps1 -Verify exited {rc.returncode}: {(rc.stderr or rc.stdout)[-400:]}", ev)
+            # A non-zero exit has two very different causes: this host has never run
+            # the installer, or an install exists here and is broken. Only the first
+            # is a BLOCKED, and which one it is is decided by the installer's own
+            # artifacts on disk, not by parsing what it printed.
+            installed = install_is_present()
+            kind, problems, reason = verify_problem_class(out, installed)
+            home = windows_data_home()
+            ev.update({"install_present": installed, "data_home": str(home),
+                       "verify_problems": problems, "verify_reason": reason})
+            # One problem per line, printed here rather than folded into the detail:
+            # the harness clips a scenario detail to 220 characters, and a joined list
+            # of Windows paths does not fit. That clipping is what hid the real cause
+            # of this scenario for two consecutive CI runs.
+            for problem in problems:
+                print(f"      verify: {problem[2:] if problem.startswith('x ') else problem}")
+            if kind == "blocked":
+                return Result(BLOCKED,
+                              f"no install on this host (no manifest, no venv at {home}); the "
+                              f"{len(problems)} problem(s) -Verify reports describe this machine, "
+                              f"not the installer", ev,
+                              unproven="executing the installer itself, which is what actually "
+                                       "creates the venv, writes the launcher and installs the "
+                                       "dependencies",
+                              fix="powershell -NoProfile -ExecutionPolicy Bypass -File omega/install/install.ps1")
+            return Result(FAIL, f"install.ps1 -Verify exited {rc.returncode} with {len(problems)} "
+                                f"problem(s) against an install that IS present — see the verify: "
+                                f"lines above", ev)
         return Result(PASS, detail + "; install.ps1 -Verify ran clean on Windows", ev)
     return Result(PASS, detail, ev,
                   unproven="actually executing the installer needs Windows; run `buddy accept 1` there",
@@ -218,7 +322,7 @@ def s02_upgrade_from_existing(ctx: Ctx) -> Result:
     ctx.save("02-upgrade.json", ev)
     shim = REPO / "studdy-buddy" / "omega" / "buddy.py"
     if shim.is_file():
-        rc = subprocess.run([sys.executable, str(shim), "version"], capture_output=True, text=True, timeout=120,
+        rc = subprocess.run([sys.executable, str(shim), "version"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
                             env={**os.environ, "BUDDY_HOME": str(ctx.tmp / "shim-home")})
         ev["legacy_entrypoint"] = {"path": str(shim), "rc": rc.returncode, "out": rc.stdout.strip()[:120]}
         ok = ok and rc.returncode == 0 and "Omega" in rc.stdout
@@ -237,13 +341,13 @@ def s03_python_detection(ctx: Ctx) -> Result:
     supported = (3, 10) <= (v.major, v.minor) <= (3, 13)
     real_exe = shutil.which(sys.executable) or sys.executable
     rc = subprocess.run([sys.executable, "-c", "import sys;print('%d.%d.%d'%sys.version_info[:3])"],
-                        capture_output=True, text=True, timeout=60)
+                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     reported = rc.stdout.strip()
     ev = {"running_python": reported, "executable": real_exe, "supported_range": "3.10–3.13",
           "in_range": supported, "buddy_minimum_enforced": bool(v >= (3, 10))}
     # `py` launcher on Windows is the other real discovery path the installer uses
     if IS_WIN:
-        py = subprocess.run(["py", "-0p"], capture_output=True, text=True, timeout=60)
+        py = subprocess.run(["py", "-0p"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         ev["py_launcher"] = py.stdout.strip()[:400] or f"exit {py.returncode}"
     ctx.save("03-python.json", ev)
     ok = supported and reported == f"{v.major}.{v.minor}.{v.micro}" and Path(real_exe).exists()
@@ -299,12 +403,68 @@ def s05_real_conversation(ctx: Ctx) -> Result:
 # ════════════════════════════════════════════════════════════════════════════
 # 6–10 · WINDOWS DESKTOP AND BROWSER
 # ════════════════════════════════════════════════════════════════════════════
-def _windows_gate(ctx: Ctx, what: str) -> Optional[Result]:
-    if IS_WIN:
+def _dependency_gap(what: str, res: Any) -> Optional[Result]:
+    """BLOCKED when a tool is registered but this machine lacks what it needs, else None.
+
+    `exec_tool` reports that as category "unavailable": the tool exists, its schema is
+    fine, and the host simply cannot run it — on a CI runner that is the whole UI
+    Automation chain, because `uiautomation` is a required Windows dependency that
+    install.ps1 installs and the runner never ran install.ps1.
+
+    Reporting it as a product failure would be the same host-precondition-as-failure
+    mistake as scenario 1 and as scenarios 6–9 below. Anything else — a real error
+    from a tool that could have run — is left alone and still fails.
+    """
+    if res.ok or getattr(res, "category", "") != "unavailable":
         return None
-    return Result(BLOCKED, f"{what} needs a real Windows desktop session; this host is {sys.platform}",
-                  {"platform": sys.platform},
-                  fix="run `buddy accept` on the owner's Windows 11 machine")
+    err = str(res.error or "")
+    found = re.search(r"package '([^']+)'", err)
+    fix = (f"pip install {found.group(1)} — or run omega/install/install.ps1, which installs it"
+           if found else "run `buddy deps`, then omega/install/install.ps1")
+    return Result(BLOCKED, f"{what} could not be attempted here: {buddy.clip(err, 200)}",
+                  {"error": err, "category": "unavailable"}, unproven=what, fix=fix)
+
+
+def _windows_gate(ctx: Ctx, what: str) -> Optional[Result]:
+    """BLOCKED unless this host can actually drive a Windows desktop, else None.
+
+    Two preconditions, and both are probed rather than assumed:
+
+      * Windows — the Win32 / UI Automation chain exists nowhere else;
+      * an interactive desktop session — a CI runner IS Windows, but nobody is logged
+        in. `GetForegroundWindow()` returns 0, a launched process presents no window
+        anyone can see, and there is nothing to read, click or type into.
+
+    Running the scenario anyway and reporting FAIL would be the same
+    host-precondition-as-failure mistake as benchmark B13, the self-test's Notepad and
+    voice checks, and acceptance scenario 1 — four instances of it already fixed on
+    this branch, three of them found only because a Windows runner disagreed.
+
+    The gate is deliberately one-directional: it can only ever return BLOCKED or None,
+    never PASS, so it cannot turn an unprovable scenario into a claimed one. On a real
+    desktop session every failure below still fails.
+    """
+    if not IS_WIN:
+        return Result(BLOCKED, f"{what} needs a real Windows desktop session; this host is {sys.platform}",
+                      {"platform": sys.platform},
+                      fix="run `buddy accept` on the owner's Windows 11 machine")
+    try:
+        fg = buddy.Win32.foreground()
+    except Exception as e:
+        # no user32, no window station, no session to attach to
+        return Result(BLOCKED, f"{what} needs an interactive desktop session, and probing for one "
+                               f"failed: {type(e).__name__}: {buddy.clip(e, 120)}",
+                      {"platform": sys.platform, "probe_error": f"{type(e).__name__}: {e}"},
+                      unproven=what,
+                      fix="run `buddy accept` in a logged-in Windows session, not a service or a CI runner")
+    if not fg:
+        return Result(BLOCKED, f"{what} needs an interactive desktop session; GetForegroundWindow() "
+                               f"returned 0, so nobody is logged in here (a CI runner or a service) and "
+                               f"there is no window to read or drive",
+                      {"platform": sys.platform, "foreground": None},
+                      unproven=f"{what} on a real desktop, which is what this scenario exists to prove",
+                      fix="run `buddy accept` in a logged-in Windows session")
+    return None
 
 
 def s06_read_active_window(ctx: Ctx) -> Result:
@@ -331,16 +491,32 @@ def s07_open_notepad(ctx: Ctx) -> Result:
         return gated
     app = ctx.app_instance()
     import asyncio
-    res = asyncio.run(buddy.exec_tool(app, "desktop_launch", {"target": "notepad.exe"}))
+    # `desktop_launch` never existed: the registered tool is `app_launch`, and the
+    # target is the name the engine's own self-test uses. A wrong tool name raises
+    # "unknown tool", which this scenario reported as a product failure — and nobody
+    # noticed, because on any non-Windows host the gate above returns first. The
+    # static registry cross-check in test_acceptance_contract.py now makes that
+    # impossible on every platform.
+    res = asyncio.run(buddy.exec_tool(app, "app_launch", {"target": "notepad"}))
     if not res.ok:
+        gap = _dependency_gap("launching Notepad", res)
+        if gap:
+            return gap
         return Result(FAIL, f"launch failed: {res.error}", {"category": res.category})
     time.sleep(2.5)
     wins = [w for w in buddy.Win32.windows() if "notepad" in (w.get("app") or "").lower()
             or "notepad" in (w.get("title") or "").lower()]
-    ev = {"launched": True, "notepad_windows": wins}
+    ev = {"launched": True, "notepad_windows": wins, "launch_data": buddy.clip(buddy.jdump(res.data), 400)}
     ctx.save("07-notepad-open.json", ev)
-    return Result(PASS if wins else FAIL,
-                  f"Notepad running: {len(wins)} window(s) — {buddy.clip(wins[0]['title'], 60) if wins else 'none'}", ev)
+    if not wins:
+        # Notepad started, but this session presents no window to enumerate — a CI
+        # runner has a window station and nobody logged into it. That is exactly the
+        # call the engine self-test's D check makes for the same situation.
+        return Result(BLOCKED, "Notepad launched but no window was enumerable in this session, so "
+                               "there is nothing to drive", ev,
+                      unproven="launching a real window on a desktop somebody is logged into",
+                      fix="run `buddy accept 7` in a logged-in Windows session")
+    return Result(PASS, f"Notepad running: {len(wins)} window(s) — {buddy.clip(wins[0]['title'], 60)}", ev)
 
 
 def s08_write_notepad(ctx: Ctx) -> Result:
@@ -352,17 +528,29 @@ def s08_write_notepad(ctx: Ctx) -> Result:
     marker = f"OMEGA-ACCEPT-{int(time.time())}"
     wins = [w for w in buddy.Win32.windows() if "notepad" in (w.get("app") or "").lower()]
     if not wins:
-        asyncio.run(buddy.exec_tool(app, "desktop_launch", {"target": "notepad.exe"}))
+        asyncio.run(buddy.exec_tool(app, "app_launch", {"target": "notepad"}))
         time.sleep(2.5)
         wins = [w for w in buddy.Win32.windows() if "notepad" in (w.get("app") or "").lower()]
     if not wins:
-        return Result(FAIL, "no Notepad window to type into")
+        # Scenario 9 already treated this as a gap rather than a failure, and it is
+        # one: with no window in the session there is nothing to type into.
+        return Result(BLOCKED, "no Notepad window in this session to type into; scenario 7 could not "
+                               "present one", {"marker": marker},
+                      unproven="typing into a real window",
+                      fix="run `buddy accept 7` first, in a logged-in Windows session")
     hwnd = wins[0]["hwnd"]
-    asyncio.run(buddy.exec_tool(app, "desktop_focus", {"hwnd": hwnd}))
-    typed = asyncio.run(buddy.exec_tool(app, "keyboard_type", {"text": marker, "hwnd": hwnd}))
-    ev = {"marker": marker, "hwnd": hwnd, "typed_ok": typed.ok, "typed_error": typed.error}
+    # `desktop_focus`/`keyboard_type` do not exist — the tools are `window_focus` and
+    # `type_text`, and `type_text` takes no hwnd: it types into whatever has the focus,
+    # which is why the focus call comes first.
+    focused = asyncio.run(buddy.exec_tool(app, "window_focus", {"hwnd": hwnd}))
+    typed = asyncio.run(buddy.exec_tool(app, "type_text", {"text": marker}))
+    ev = {"marker": marker, "hwnd": hwnd, "focus_ok": focused.ok, "focus_error": focused.error,
+          "typed_ok": typed.ok, "typed_error": typed.error, "typed_category": typed.category}
     ctx.save("08-notepad-write.json", ev)
     if not typed.ok:
+        gap = _dependency_gap("typing into Notepad", typed)
+        if gap:
+            return gap
         return Result(FAIL, f"typing failed: {typed.error}", ev)
     return Result(PASS, f"typed {marker!r} into Notepad hwnd={hwnd} via UI Automation/SendInput", ev,
                   unproven="scenario 9 reads it back — that is the proof this landed")
@@ -386,6 +574,9 @@ def s09_verify_notepad(ctx: Ctx) -> Result:
           "elements": len((snap.data or {}).get("elements") or []) if snap.ok else 0}
     ctx.save("09-notepad-verify.json", ev)
     if not snap.ok:
+        gap = _dependency_gap("reading Notepad contents back", snap)
+        if gap:
+            return gap
         return Result(FAIL, f"could not read the window back: {snap.error}", ev)
     # The point of this scenario: the claim is only accepted when the real
     # control text contains what was typed.
@@ -703,7 +894,7 @@ def s18_stop_active_task(ctx: Ctx) -> Result:
     proc_env = {"BUDDY_HOME": str(buddy.HOME)}
     proc = subprocess.Popen([sys.executable, str(buddy.SOURCE_FILE), "--_child", "crash-task"],
                             env={**os.environ, **proc_env}, cwd=str(HERE),
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     progressed = False
     size_at_stop = 0
     deadline = time.time() + 60

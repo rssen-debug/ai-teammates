@@ -16,6 +16,7 @@ cannot be silenced by accident.
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import shutil
@@ -217,6 +218,135 @@ class TestBenchmarkAndAcceptanceRunnersExist(unittest.TestCase):
                                msg="skipped tasks must not enter the denominator")
 
 
+class TestWindowsPortability(unittest.TestCase):
+    """This product targets Windows first, and Windows defaults to cp1252.
+
+    cp1252 has an em-dash but none of ●, ○, ·, ✗, ✓, ← or → — all of which this CLI
+    prints. Two failure modes follow, and both were real:
+
+      * a stream that is not widened raises UnicodeEncodeError on the first
+        decorated line, which in run_all.py happened on the line that prints a
+        FAILURE BULLET — so a failing suite crashed the reporter instead of being
+        reported, and the names of 14 failing tests were lost;
+      * a subprocess captured with text=True and no encoding decodes the child's
+        UTF-8 output as cp1252 and dies on a continuation byte (0x8f is the tail of
+        ●), which looks like a truncated stream with no explanation.
+
+    Neither is visible on Linux or macOS, where the default is already UTF-8, so
+    both are pinned here rather than left to a Windows-only surprise.
+    """
+
+    TEXT_IO = {"open": 3, "read_text": 0, "write_text": 1}
+    SUBPROCESS = {"run", "Popen", "check_output", "check_call"}
+    # objects whose .open() is not file I/O, or whose mode string is not a text mode
+    NOT_FILE_IO = ("tarfile", "webbrowser", "urllib", "op")
+
+    def offenders(self) -> list[str]:
+        out: list[str] = []
+        for f in sorted(OMEGA.rglob("*.py")):
+            tree = ast.parse(f.read_text(encoding="utf-8"))
+            for n in ast.walk(tree):
+                if not isinstance(n, ast.Call):
+                    continue
+                fn = n.func
+                name = fn.attr if isinstance(fn, ast.Attribute) else (
+                    fn.id if isinstance(fn, ast.Name) else None)
+                if not name:
+                    continue
+                kw = {k.arg for k in n.keywords if k.arg}
+                owner = fn.value.id if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name) else ""
+                where = f"{f.relative_to(OMEGA.parent)}:{n.lineno}"
+
+                # Matched on the CALLEE name, not on the module being spelled
+                # `subprocess`: `import subprocess as sp` is legal and would slip
+                # past an owner check, which a mutation probe caught this test doing.
+                if name in self.SUBPROCESS and isinstance(fn, ast.Attribute):
+                    textual = "text" in kw or "universal_newlines" in kw
+                    if textual and "encoding" not in kw:
+                        out.append(f"{where} captures a subprocess in text mode without an encoding")
+                    continue
+
+                if name in self.TEXT_IO and owner not in self.NOT_FILE_IO:
+                    if name == "open" and isinstance(fn, ast.Attribute):
+                        continue                     # something.open(), not the builtin
+                    mode = None
+                    if "mode" in kw:
+                        mode = next((k.value.value for k in n.keywords
+                                     if k.arg == "mode" and isinstance(k.value, ast.Constant)), None)
+                    elif name == "open" and len(n.args) > 1 and isinstance(n.args[1], ast.Constant):
+                        mode = n.args[1].value
+                    if mode and "b" in str(mode):
+                        continue                     # binary: no decoding, nothing to get wrong
+                    if "encoding" not in kw and len(n.args) <= self.TEXT_IO[name]:
+                        out.append(f"{where} {name}() uses the platform default encoding")
+        return out
+
+    def test_no_text_io_depends_on_the_platform_default_encoding(self) -> None:
+        self.assertEqual(self.offenders(), [],
+                         "every text stream, file and captured subprocess must name UTF-8 "
+                         "explicitly; the platform default is cp1252 on Windows")
+
+    def test_windows_only_subprocess_kwargs_are_real_parameters(self) -> None:
+        """Keyword names inside `if IS_WIN` branches are never executed on Linux.
+
+        A typo there passes every local test and only fires on Windows — the platform
+        this product targets. `majin_bridge` passed `windowsHide=True`, which is not a
+        Popen parameter, so the MAJIN bridge raised TypeError on start-up on Windows
+        and worked perfectly everywhere else. Validating the names against the real
+        signatures makes the branch checkable without a Windows machine.
+        """
+        import inspect
+        # NO whitelist of "Windows-only" parameters. An earlier version of this test
+        # had one, holding `windows_hide` and `creationflags`, and it was wrong in the
+        # most damaging way available: it blessed the exact bug the test exists to
+        # catch. `windows_hide` is not a Popen parameter on any platform — it is a
+        # Node.js option — while `creationflags` is in the shared signature and shows
+        # up in introspection even on POSIX. So the real signature is sufficient, and
+        # any name this test has to be told about is a name nobody has verified.
+        valid = (set(inspect.signature(subprocess.Popen.__init__).parameters)
+                 | set(inspect.signature(subprocess.run).parameters)) - {"self", "args"}
+        bad: list[str] = []
+        for f in sorted(OMEGA.rglob("*.py")):
+            tree = ast.parse(f.read_text(encoding="utf-8"))
+            for n in ast.walk(tree):
+                if not isinstance(n, ast.Call) or not isinstance(n.func, ast.Attribute):
+                    continue
+                owner = n.func.value.id if isinstance(n.func.value, ast.Name) else ""
+                if owner != "subprocess" or n.func.attr not in self.SUBPROCESS:
+                    continue
+                names = {k.arg for k in n.keywords if k.arg}
+                for k in n.keywords:
+                    # `**({"windows_hide": True} if IS_WIN else {})` — the platform
+                    # branch is where the bug lived, so its keys have to be read too.
+                    if k.arg is None and isinstance(k.value, (ast.Dict, ast.IfExp)):
+                        for d in ([k.value] if isinstance(k.value, ast.Dict)
+                                  else [k.value.body, k.value.orelse]):
+                            if isinstance(d, ast.Dict):
+                                names |= {e.value for e in d.keys
+                                          if isinstance(e, ast.Constant) and isinstance(e.value, str)}
+                for name in sorted(names - valid):
+                    bad.append(f"{f.relative_to(OMEGA.parent)}:{n.lineno} passes {name!r} to "
+                               f"subprocess.{n.func.attr}, which is not a parameter")
+        self.assertEqual(bad, [], "\n".join(bad))
+
+    def test_every_standalone_entry_point_widens_its_streams(self) -> None:
+        """Each of these can be run as a child process and prints decorated output."""
+        for rel in ("buddy.py", "acceptance.py", "tests/run_all.py", "benchmarks/runner.py",
+                    "level.py", "majin_bridge.py", "memory_migration.py"):
+            src = (OMEGA / rel).read_text(encoding="utf-8")
+            self.assertRegex(src, r"force_utf8_output|reconfigure\(encoding=\"utf-8\"",
+                             f"{rel} prints decorated output but never widens its streams")
+
+
+
+def _in_cp1252(ch: str) -> bool:
+    try:
+        ch.encode("cp1252")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
 class TestRendering(unittest.TestCase):
     """Help text and colour are user-facing contracts, so they get tested too.
 
@@ -238,7 +368,7 @@ class TestRendering(unittest.TestCase):
                if k not in ("NO_COLOR", "FORCE_COLOR", "CLICOLOR_FORCE", "TERM")}
         env.update({"BUDDY_HOME": self.home, **env_extra})
         p = subprocess.run([sys.executable, str(BUDDY), *args], capture_output=True,
-                           text=True, timeout=180, env=env, cwd=str(OMEGA.parent))
+                           text=True, encoding="utf-8", errors="replace", timeout=180, env=env, cwd=str(OMEGA.parent))
         return p.returncode, p.stdout + p.stderr
 
     def test_help_renders_every_documented_command(self) -> None:
@@ -256,6 +386,43 @@ class TestRendering(unittest.TestCase):
         rc, out = self.run_cli(["help"], {"FORCE_COLOR": "1", "TERM": "xterm-256color"})
         self.assertEqual(rc, 0)
         self.assertIn("\033[", out, "a pipe with FORCE_COLOR is how `buddy | less -R` works")
+
+    def test_decorated_output_survives_a_cp1252_console(self) -> None:
+        """A stock Windows console encodes cp1252, which has an em-dash but none of
+        ●, ·, ✗ or ✓ — and this CLI prints ● thousands of times.
+
+        The stream reconfiguration used to live in CLI.__init__, which only the
+        interactive REPL constructs, so every one-shot subcommand raised
+        UnicodeEncodeError on its first decorated line, on the product's own primary
+        platform. Worst instance: run_all.py died on the line that prints a failure
+        bullet, so a failing suite crashed the reporter instead of being reported and
+        the identities of 14 failing tests were lost.
+        """
+        for args in (["level"], ["legacy", "status"], ["help"], ["companion", "status"]):
+            rc, out = self.run_cli(args, {"PYTHONIOENCODING": "cp1252", "NO_COLOR": "1"})
+            self.assertNotIn("UnicodeEncodeError", out,
+                             f"`buddy {' '.join(args)}` crashed on a cp1252 console:\n{out[-500:]}")
+            self.assertNotIn("charmap", out)
+            self.assertEqual(rc, 0, out[-400:])
+            # Not "contains ●" — `buddy level` has no dot. The property that matters
+            # is that at least one character cp1252 CANNOT represent came out intact,
+            # which is the thing that used to raise.
+            exotic = sorted({ch for ch in out if not _in_cp1252(ch)})
+            self.assertTrue(exotic, f"`buddy {' '.join(args)}` emitted nothing outside cp1252, "
+                                    "so this case would pass even if the guard were removed")
+
+    def test_the_reporters_reconfigure_their_streams(self) -> None:
+        """Source-level, deliberately.
+
+        A reporter that crashes while reporting a failure cannot tell you it crashed
+        for that reason — the symptom is a traceback and a lost exit code, which on
+        CI looks like "the harness is broken". So the guard is pinned here rather
+        than left to a test that would need a failing suite to exercise it.
+        """
+        for rel in ("tests/run_all.py", "acceptance.py"):
+            src = (OMEGA / rel).read_text(encoding="utf-8")
+            self.assertRegex(src, r'reconfigure\(encoding="utf-8"|force_utf8_output\(\)',
+                             f"{rel} must widen stdout/stderr before printing decorated output")
 
     def test_a_dumb_terminal_gets_no_escapes(self) -> None:
         rc, out = self.run_cli(["help"], {"TERM": "dumb"})
