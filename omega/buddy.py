@@ -5883,6 +5883,8 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
         elif cmd == "/activate":
             sub = args[0].lower() if args else "status"
             if sub == "status":
+                o(f"Auto-start modules: {bool(self.settings.get('auto_mode_on_start'))}; "
+                  f"Companion mode: {'active' if self.companion.present()[0] and self.companion.loop.enabled else 'off'}")
                 o(f"Activity: {'ON' if self.activity.enabled else 'OFF'}; grants: {self.perms.all()}; "
                   f"screenshot uploads: {self.settings.get('screenshot_upload')}; "
                   f"companion: {'ON' if self.companion.present()[0] and self.companion.loop.enabled else 'OFF'}; "
@@ -6287,7 +6289,12 @@ async def main_async(app: Buddy) -> None:
         synced, filtered = await asyncio.to_thread(sync_owner_knowledge, app)
         app.ui.event(f"Obsidian sync: {synced} saved, {filtered} filtered")
         # Diagnostics are opt-in through saved presence, not a 30-second startup delay.
-        app.ui.event("RAM diagnostics are available through /resources (no continuous profiler).")
+        if IS_WIN:
+            ram_snapshot = await asyncio.to_thread(resources_report)
+            app.ui.event("RAM snapshot on startup (no continuous profiler):")
+            app.out("\n".join(ram_snapshot.splitlines()[:8]))
+        else:
+            app.ui.event("RAM diagnostics require Windows; /resources reports that explicitly.")
     if app.stop.requested():
         # A marker left by an earlier `buddy stop` must not silently paralyse a
         # session the owner just started on purpose.
