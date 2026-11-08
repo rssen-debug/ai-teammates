@@ -5215,6 +5215,62 @@ class CompanionSubsystem:
         return {"available": True, **self.loop.status()}
 
 
+class LegacySubsystem:
+    """Encapsulating this installation so it can outlive its owner (omega/legacy.py).
+
+    Lazy behind sibling() like every other module, so a missing or broken legacy.py
+    degrades to a BLOCKED report with the real reason instead of taking the whole
+    product down at import time.
+
+    The profile that goes into a bundle is the companion's longitudinal model of the
+    owner — the same UserModel.build() that `buddy companion profile` prints. It is
+    deliberately not a second implementation: a bundle describing a different person
+    than the product describes would be worse than no bundle at all.
+    """
+
+    def __init__(self, app: "Buddy") -> None:
+        self.app = app
+        self._mod: Any = None
+        self._bundle: Any = None
+
+    @property
+    def mod(self) -> Any:
+        if self._mod is None and "legacy" not in _SIBLING_ERRORS:
+            self._mod = sibling("legacy")
+        return self._mod
+
+    def present(self) -> tuple[bool, str]:
+        if self.mod is None:
+            return False, _SIBLING_ERRORS.get("legacy", "omega/legacy.py could not be loaded")
+        return True, ""
+
+    def need(self) -> Any:
+        ok, why = self.present()
+        if not ok:
+            raise ToolError(why, "dependency_missing")
+        return self.mod
+
+    @property
+    def bundle(self) -> Any:
+        if self._bundle is None:
+            m = self.need()
+            self._bundle = m.LegacyBundle(self.app.store, profile_builder=self._profile,
+                                          product_version=APP_VERSION, log=log)
+        return self._bundle
+
+    def _profile(self, days: float) -> dict:
+        return self.app.companion.model.build(days=days)
+
+    def default_destination(self) -> Path:
+        """Where `buddy legacy build` writes when nobody names a path.
+
+        Under the workspace, which is_protected_path already treats as writable, so
+        the default cannot fail on the product's own path policy.
+        """
+        stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        return DIRS["workspace"] / "legacy" / f"studdybuddy-omega-legacy-{stamp}.tar.gz"
+
+
 class Buddy:
     def __init__(self, headless: bool = False) -> None:
         ensure_dirs()
@@ -5239,6 +5295,7 @@ class Buddy:
         self.doctor = Doctor(self)
         self.majin = MajinSubsystem(self)
         self.companion = CompanionSubsystem(self)
+        self.legacy = LegacySubsystem(self)
         self.ui: Any = NullUI() if headless else CLI(self)
         self.perms.confirm_fn = lambda p, al: self.ui.confirm(p, al)
         self.loop: Optional[asyncio.AbstractEventLoop] = None
@@ -7520,6 +7577,28 @@ def _flag(args: list[str], name: str, default: str) -> str:
     return default
 
 
+def _positional(args: list[str], *valued: str) -> list[str]:
+    """Positional arguments only — dropping each `--flag` in `valued` AND its value.
+
+    Filtering on `startswith("--")` alone leaves the values behind, so
+    `heir set Anna --email a@b.c` yields ["Anna", "a@b.c"] and a name assembled by
+    joining positionals silently absorbs the email address.
+    """
+    out: list[str] = []
+    skip = False
+    for a in args:
+        if skip:
+            skip = False
+            continue
+        if any(a == v or a.startswith(v + "=") for v in valued):
+            skip = "=" not in a
+            continue
+        if a.startswith("--"):
+            continue
+        out.append(a)
+    return out
+
+
 def cmd_accept(rest: list[str]) -> int:
     """Run the 20 mandated end-to-end acceptance scenarios.
 
@@ -7638,6 +7717,254 @@ def cmd_update(rest: list[str]) -> int:
     return 0
 
 
+def cmd_legacy(rest: list[str]) -> int:
+    """Encapsulate this installation so it can outlive you — and hand it over safely.
+
+    Nothing here transmits anything, anywhere. `release` marks a verified bundle as
+    ready for a human to hand over and requires a confirmation phrase typed in,
+    because the recipient gets a working model of a person who is not in the room to
+    object. That is a third-party action, so it is not covered by `buddy trust on`.
+    """
+    usage = ("usage: buddy legacy [status | build [PATH] [--days N] | verify PATH | inspect PATH |\n"
+             "                          heir [show | set NAME [--email E] [--relation R] [--note N]] |\n"
+             "                          heartbeat | check [--grace-days N] | release PATH |\n"
+             "                          import PATH [--dry-run]]")
+    app = Buddy(headless=True)
+    try:
+        ok, why = app.legacy.present()
+        if not ok:
+            print(V.fail("the legacy module is not available", why))
+            return 2
+        lgm = app.legacy.need()
+        bundle = app.legacy.bundle
+        action = (rest[0] if rest else "status").lower()
+        args = rest[1:]
+        positional = _positional(args, "--days", "--email", "--relation", "--note",
+                                 "--grace-days", "--name")
+
+        if action in ("status", "show"):
+            heir = bundle.heir()
+            chk = bundle.check()
+            rel = bundle.released()
+            hb = bundle.last_heartbeat()
+            print()
+            print(V.dot("info") + " " + C.bold("LEGACY") + C.dim("  ·  ")
+                  + "what survives you, and who may read it")
+            # V.kv supplies its own two-space indent, so a dot goes in place of it
+            # rather than in front of it — otherwise the dotted row sits two columns
+            # right of every other row in the block.
+            W = 15
+
+            def kvdot(state: str, label: str, value: str) -> str:
+                return V.dot(state) + " " + f"{label:<{W}} {value}"
+
+            print(V.rule("hand-over"))
+            print(V.kv("heir", heir.get("name") or C.dim("not set — `buddy legacy heir set NAME`"), W))
+            if heir.get("contact"):
+                print(V.kv("contact", heir["contact"], W))
+            if heir.get("relationship"):
+                print(V.kv("relationship", heir["relationship"], W))
+            print(V.kv("last heartbeat", hb.get("at") or C.yellow("never recorded"), W))
+            dot = {"owner_recently_active": "ok", "never_recorded": "warn",
+                   "no_bundle_yet": "off", "grace_elapsed": "warn"}.get(chk["state"], "info")
+            print(kvdot(dot, "state", chk["state"].replace("_", " ")))
+            print(V.kv("grace period", f"{chk['grace_days']:g} days", W))
+            print(V.kv("released", rel.get("at") or C.dim("never"), W))
+            print(V.rule("what a bundle contains"))
+            print("  " + ", ".join(lgm.LegacyBundle.FILES))
+            print(V.rule("what is never in it"))
+            print("  credentials and API keys (excluded by construction, not filtered),")
+            print("  raw screen captures, keystrokes, anything marked private.")
+            print()
+            print(V.note("A bundle is a RECORD of a person, not the person. Nothing here"))
+            print(V.note("is ever transmitted automatically: `buddy legacy release` unlocks"))
+            print(V.note("a copy and a human decides what happens next."))
+            return 0
+
+        if action == "build":
+            dest = Path(positional[0]) if positional else app.legacy.default_destination()
+            days = float(_flag(args, "--days", "365"))
+            man = bundle.build(dest, profile_days=days)
+            print()
+            print(V.dot("ok") + " " + C.bold("BUILT") + C.dim("  ·  ") + str(man["path"]))
+            print(V.rule("contents"))
+            for k, v in man["counts"].items():
+                print(V.kv(k, str(v)))
+            print(V.kv("sealed", C.yellow("NO") + C.dim("  — plaintext, by design")))
+            if man["warnings"]:
+                print(V.rule("warnings"))
+                for w in man["warnings"]:
+                    print(textwrap.fill(w, width=V.WIDTH - 4, initial_indent="  ! ",
+                                        subsequent_indent="    "))
+            print()
+            print(V.note("The passphrase has to be held by someone other than you, or it"))
+            print(V.note("cannot survive you:"))
+            print(f"    gpg --symmetric --cipher-algo AES256 {man['path']}")
+            print(f"    age -p -o {man['path']}.age {man['path']}")
+            return 0
+
+        if action == "verify":
+            if not positional:
+                print(usage)
+                return 2
+            rep = bundle.verify(Path(positional[0]))
+            print()
+            print(V.dot("ok" if rep["ok"] else "fail") + " "
+                  + (C.bold(C.green("VERIFIED")) if rep["ok"] else C.bold(C.red("NOT VERIFIED")))
+                  + C.dim("  ·  ") + rep["path"])
+            if rep["ok"]:
+                for name in sorted((rep.get("manifest") or {}).get("checksums", {})):
+                    print("  " + V.dot("ok") + " sha256 " + name)
+            else:
+                for pr in rep["problems"]:
+                    print(V.fail(pr))
+            return 0 if rep["ok"] else 1
+
+        if action == "inspect":
+            if not positional:
+                print(usage)
+                return 2
+            info = bundle.inspect(Path(positional[0]))
+            print()
+            print(V.dot("ok" if info.get("verified") else "fail") + " " + C.bold("INSPECT")
+                  + C.dim("  ·  ") + info["path"])
+            print(V.rule("counts"))
+            for k, v in (info.get("counts") or {}).items():
+                print(V.kv(k, str(v)))
+            titles = info.get("sample_titles") or []
+            if titles:
+                print(V.rule("sample titles"))
+                for t in titles:
+                    print("  " + C.dim("·") + " " + t)
+            if not info.get("verified"):
+                for pr in info.get("problems", []):
+                    print(V.fail(pr))
+                return 1
+            print()
+            print(V.note("Nothing was imported. Inspecting never writes."))
+            return 0
+
+        if action == "heir":
+            sub = (positional[0] if positional else "show").lower()
+            if sub == "show":
+                h = bundle.heir()
+                if not h:
+                    print("  " + C.dim("no heir set. `buddy legacy heir set NAME --email E --relation R`"))
+                    return 0
+                print()
+                print(V.kv("name", h.get("name", "")))
+                print(V.kv("contact", h.get("contact", "") or C.dim("—")))
+                print(V.kv("relationship", h.get("relationship", "") or C.dim("—")))
+                print(V.kv("note", h.get("note", "") or C.dim("—")))
+                return 0
+            if sub == "set":
+                name = " ".join(positional[1:]) if len(positional) > 1 else _flag(args, "--name", "")
+                if not name:
+                    print(V.fail("a name is required", "buddy legacy heir set NAME --email E --relation R"))
+                    return 2
+                h = bundle.set_heir(name, _flag(args, "--email", ""), _flag(args, "--relation", ""),
+                                    _flag(args, "--note", ""))
+                print("  " + V.dot("ok") + " heir set: " + C.bold(h["name"])
+                      + C.dim("  ·  recorded locally; nothing was sent to them"))
+                return 0
+            print("usage: buddy legacy heir [show | set NAME [--email E] [--relation R] [--note N]]")
+            return 2
+
+        if action == "heartbeat":
+            hb = bundle.heartbeat()
+            print("  " + V.dot("ok") + " heartbeat recorded at " + hb["at"]
+                  + C.dim(f"  ·  grace {hb['grace_days']:g} days"))
+            print("  " + C.dim("this is the only thing that tells the grace period you are still here."))
+            return 0
+
+        if action == "check":
+            if "--grace-days" in args:
+                bundle.set_grace_days(float(_flag(args, "--grace-days", "90")))
+            chk = bundle.check()
+            dot = {"owner_recently_active": "ok", "never_recorded": "warn",
+                   "no_bundle_yet": "off", "grace_elapsed": "warn"}.get(chk["state"], "info")
+            print()
+            print(V.dot(dot) + " " + C.bold(chk["state"].replace("_", " ").upper()))
+            print(V.kv("releasable", (C.yellow("yes") if chk["releasable"] else "no")))
+            print(V.kv("grace period", f"{chk['grace_days']:g} days"))
+            if chk.get("days_since_heartbeat") is not None:
+                print(V.kv("since heartbeat", f"{chk['days_since_heartbeat']:.1f} days"))
+            print()
+            print(V.note(chk["detail"]))
+            return 0
+
+        if action == "release":
+            if not positional:
+                print(usage)
+                return 2
+            path = Path(positional[0])
+            rep = bundle.verify(path)
+            print()
+            if not rep["ok"]:
+                for pr in rep["problems"]:
+                    print(V.fail(pr))
+                return 1
+            print("  This bundle describes a real person and will be read by someone else.")
+            print("  Releasing it is a third-party action, so it is not covered by full trust.")
+            print("  It transmits nothing — it unlocks a copy for a human to hand over.")
+            print(f"\n  To accept, type exactly: {bundle.RELEASE_PHRASE}")
+            try:
+                phrase = input("  > ")
+            except EOFError:
+                print(C.c(C.R, "\n  no input available. Pipe the phrase in instead:"))
+                print(f'    echo "{bundle.RELEASE_PHRASE}" | buddy legacy release {path}')
+                return 2
+            r = bundle.release(path, phrase=phrase.rstrip("\n"))
+            if not r["ok"]:
+                for pr in r["problems"]:
+                    print(V.fail(pr, r.get("hint", "")))
+                return 2
+            print("  " + V.dot("ok") + " " + C.bold(C.green("RELEASED")) + C.dim("  ·  ") + str(path))
+            print(V.rule("still your job"))
+            print(textwrap.fill("the bundle is plaintext. Seal it, and give the passphrase to the "
+                                "heir or a lawyer — a secret only you hold cannot survive you.",
+                                width=V.WIDTH - 4, initial_indent="  ! ", subsequent_indent="    "))
+            print(f"      gpg --symmetric --cipher-algo AES256 {path}")
+            print()
+            print(V.note("Nothing was transmitted. Nothing left this machine."))
+            return 0
+
+        if action == "import":
+            if not positional:
+                print(usage)
+                return 2
+            dry = "--dry-run" in args
+            rep = bundle.import_bundle(Path(positional[0]), valid_kinds=Memory.KINDS,
+                                       dedupe_key=Memory.dedupe_key, dry_run=dry)
+            print()
+            print(V.dot("ok" if rep["ok"] else "warn" if rep["imported"] else "fail") + " "
+                  + C.bold("IMPORT" + (" (dry run)" if dry else ""))
+                  + C.dim("  ·  ") + rep["path"])
+            if not rep.get("verified"):
+                for pr in rep["problems"]:
+                    print(V.fail(pr))
+                return 1
+            b = rep.get("bundle") or {}
+            print(V.kv("bundle schema", str(b.get("schema") or "?")))
+            print(V.kv("created", str(b.get("created") or "?")))
+            print(V.kv("imported", str(rep["imported"])))
+            print(V.kv("already present", str(rep["skipped_existing"])))
+            if rep["rejected_kinds"]:
+                print(V.kv("rejected kinds", ", ".join(sorted(set(rep["rejected_kinds"])))))
+            for pr in rep["problems"]:
+                print("  " + C.yellow("!") + " " + pr)
+            if not dry and rep["imported"]:
+                print()
+                print(V.note("Imported rows keep their ORIGINAL timestamps, are tagged"))
+                print(V.note("`legacy` and carry provenance back to this bundle."))
+            return 0 if rep["ok"] else 1
+
+        print(usage)
+        return 2
+    finally:
+        _shutdown(app)
+
+
 USAGE = """
 STUDDY BUDDY OMEGA — one agent, one command
 
@@ -7712,6 +8039,24 @@ Always-on companion
   buddy trust on            full trust on your own machine. Typed confirmation required;
                             recorded in the audit log. Third-party actions still confirm.
   buddy trust off           back to asking, according to your grants
+
+Legacy — what survives you
+  buddy legacy status       heir, heartbeat, grace period, and what a bundle never contains
+  buddy legacy build [PATH] [--days N]
+                            encapsulate this installation: memories, the model of you,
+                            verified skills, level history and an allowlist of settings.
+                            Credentials are excluded by construction. Plaintext by design.
+  buddy legacy verify PATH  SHA-256 every payload file; refuse a bundle that was altered
+  buddy legacy inspect PATH what is inside, without importing any of it
+  buddy legacy heir set NAME [--email E] [--relation R] [--note N]
+                            who inherits this. Recorded locally; nothing is sent to them.
+  buddy legacy heartbeat    record that you are alive. The grace period cannot tell otherwise.
+  buddy legacy check [--grace-days N]
+                            has the grace period elapsed? Reports a decision, takes no action.
+  buddy legacy release PATH unlock a verified bundle for hand-over. Typed confirmation;
+                            never transmits anything and is not covered by full trust.
+  buddy legacy import PATH [--dry-run]
+                            the receiving half: load a bundle here, keeping original timestamps
 
 MAJIN V6 subsystem
   buddy majin status        is MAJIN connected, and with which owner grants
@@ -7798,6 +8143,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             "key": cmd_key,
             "trust": cmd_trust,
             "companion": cmd_companion,
+            "legacy": cmd_legacy,
             "help": lambda r: (print(render_usage()), 0)[1],
             "--help": lambda r: (print(render_usage()), 0)[1],
             "version": lambda r: (print(f"Studdy Buddy Omega {APP_VERSION}"), 0)[1],
