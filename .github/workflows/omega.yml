@@ -62,13 +62,22 @@ jobs:
 
       - name: Install MAJIN V6 dependencies
         working-directory: integrations/majin-original
-        run: npm install --no-audit --no-fund
+        # `npm ci`, NOT `npm install`. This matters more than it looks:
+        # `npm install` rewrites package-lock.json even when nothing is out of date
+        # (measured: 135854 -> 135886 bytes at the same lockfileVersion 3), so a
+        # workflow that installs with `npm install` and then asserts the lock is
+        # untouched fails on every runner, forever, and teaches everyone to ignore
+        # that check. `npm ci` installs exactly what the lock says and cannot write
+        # it — which is what makes the next step a real check instead of a formality,
+        # and makes CI reproducible rather than "whatever npm felt like today".
+        run: npm ci --no-audit --no-fund
 
       - name: Prove the MAJIN lockfile was not modified
         shell: bash
         run: |
           if ! git diff --exit-code -- integrations/majin-original/package-lock.json; then
-            echo "::error::npm install rewrote package-lock.json — the MAJIN checkout must stay byte-identical"
+            echo "::error::something rewrote package-lock.json — the MAJIN checkout must stay byte-identical"
+            echo "::error::use 'npm ci', never 'npm install', anywhere in this pipeline"
             exit 1
           fi
 
