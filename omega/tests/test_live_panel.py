@@ -91,7 +91,7 @@ class PanelTest(unittest.TestCase):
                 raise AssertionError("render unexpectedly accessed Companion: " + name)
         p.app.companion = FailsIfPolled()
         rendered = "".join(text for _, text in p._side_text())
-        self.assertIn("OMEGA", rendered.upper() + "OMEGA")
+        self.assertIn("COMPANION: OFF", rendered)
 
     def test_companion_cache_update_keeps_render_pure(self):
         p = self.build()
