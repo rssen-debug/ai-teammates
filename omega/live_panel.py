@@ -266,6 +266,7 @@ class LivePanel:
         self._build_state = "ej startad"
         self._build_step = 0
         self._build_error = ""
+        self._build_last_reported = None
         self._tetris_ai_state = "väntar"
         self._tetris_ai_calls = 0
         self._tetris_ai_moves = 0
@@ -562,9 +563,12 @@ class LivePanel:
                 self._build_state = str(related.get("state") or "unknown")
                 self._build_step = int(related.get("step_idx") or 0)
                 self._build_error = clean_line(related.get("error") or "", 90)
-                if self._build_state in ("failed", "blocked", "cancelled"):
+                marker = (self._build_state, self._build_step, self._build_error)
+                if marker != self._build_last_reported:
+                    self._build_last_reported = marker
                     self.events.append(datetime.now().strftime("%H:%M:%S") +
                                        " · Bygguppgift " + self._build_state +
+                                       " steg " + str(self._build_step) +
                                        (": " + self._build_error if self._build_error else ""))
                 if self._build_state == "done":
                     # A completed task is NOT necessarily a verified game.
