@@ -4563,8 +4563,17 @@ class CLI:
     def header(self) -> None:
         a = self.app
         ok_ai = a.ai_state
-        scr = a.caps.get("desktop")
-        screen = ("●", C.G, "Active") if scr == "working" else ("○", C.DIM, "Unavailable" if not IS_WIN else "Untested")
+        scr = a.caps.get("screen")
+        desktop = a.caps.get("desktop")
+        companion_screen = False
+        with contextlib.suppress(Exception):
+            companion_screen = a.companion.present()[0] and a.companion.loop.enabled and a.companion.observation.depth in ("capture", "continuous") and a.companion.observation.backend.available[0]
+        if companion_screen:
+            screen = ("●", C.G, "Active")
+        elif scr == "working" or desktop == "working":
+            screen = ("●", C.G, "Ready")
+        else:
+            screen = ("○", C.DIM, "Unavailable" if not IS_WIN else "Untested")
         active = len([t for t in a.tasks.list() if t["state"] in ("queued", "running")])
         comp_ok, _why = a.companion.present()
         comp_on = bool(comp_ok and a.companion.loop.enabled)
@@ -5546,7 +5555,7 @@ class Buddy:
     HELP = """/help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
 /memory [list|search Q|forget ID|export|clear]  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
-/grants [revoke]  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
+/grants [revoke]  /activate [all|status|off]  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
 Just talk normally — Buddy decides when to use tools. Say "stop" at any time."""
 
     async def command(self, line: str) -> None:
@@ -5658,6 +5667,58 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
         elif cmd == "/task" and args:
             tid = self.tasks.create(" ".join(args)[:80], {"kind": "agent", "goal": " ".join(args)})
             o(f"queued {tid}. Background work only uses scopes you've already set to 'always' (see /grants).")
+        elif cmd == "/activate":
+            sub = args[0].lower() if args else "status"
+            if sub == "status":
+                o(f"Activity: {'ON' if self.activity.enabled else 'OFF'}; grants: {self.perms.all()}; "
+                  f"screenshot uploads: {self.settings.get('screenshot_upload')}; "
+                  f"companion: {'ON' if self.companion.present()[0] and self.companion.loop.enabled else 'OFF'}; "
+                  f"voice: {'ON' if self.voice.running else 'OFF'}")
+            elif sub == "all":
+                self.settings.set("free_only", True)
+                self.settings.set("models", {role: "kilo-auto/free" for role in Router.ROLES})
+                self.settings.set("escalation_ladder", [])
+                for scope in ("observe", "input", "write", "exec"):
+                    self.perms.set(scope, "always")
+                self.settings.set("screenshot_upload", "allow")
+                self.settings.set("observe_enabled", True)
+                self.activity.start()
+                self.tasks.paused = False
+                self.settings.set("voice_enabled", False)
+                self.voice.stop()
+                ok, why = self.companion.present()
+                if ok:
+                    self.companion.loop.enable(True)
+                    observed, observation_message = self.companion.observation.set_depth("capture")
+                    if not observed:
+                        self.companion.observation.set_depth("titles")
+                        o("Screen observation fallback: " + observation_message)
+                    if self.companion_task is None or self.companion_task.done():
+                        self.start_companion()
+                else:
+                    o("Companion unavailable: " + why)
+                results = await asyncio.to_thread(self.doctor.run, "desktop")
+                for item in results:
+                    o(f"Screen check: {item['status']} {item['name']} — {item.get('detail', '')}")
+                self.perms.audit("user", "activate_all_except_voice", "configuration", "enabled")
+                o("Activated available modules: Kilo Auto Free, Owner grants, screenshot upload, activity, autopilot worker and companion. Voice OFF.")
+                o("Screenshots can be sent to KiloCode; protected and private windows remain excluded. Sensitive actions still require approval.")
+                self.ui.header()
+            elif sub == "off":
+                self.stop_companion()
+                if self.companion.present()[0]:
+                    self.companion.loop.enable(False)
+                    self.companion.observation.set_depth("off")
+                self.activity.stop()
+                self.settings.set("observe_enabled", False)
+                self.settings.set("screenshot_upload", "ask")
+                for scope in ("input", "write", "exec"):
+                    self.perms.set(scope, None)
+                self.perms.audit("user", "activate_all_except_voice", "configuration", "disabled")
+                o("Automatic observation and broad standing grants disabled. Voice remains under your control.")
+                self.ui.header()
+            else:
+                o("Usage: /activate [status | all | off]")
         elif cmd == "/owner":
             sub = args[0].lower() if args else "status"
             if sub == "status":
