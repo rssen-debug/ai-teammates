@@ -244,6 +244,14 @@ class LivePanel:
         self._last_tool_event_at = 0.0
         self._progress_phase = "IDLE"
         self._last_tool_duration = 0.0
+        # Conversational activity and independently checked work are distinct
+        # from tool executions and AI LEVEL. Never infer learning from a reply.
+        self._answers_delivered = 0
+        self._verified_work = 0
+        self._unverified_work = 0
+        self._last_answer_at = 0.0
+        self._run_state = "VÄNTAR"
+        self._run_state_detail = ""
         self.show_thinking = True
         self.events: deque[str] = deque(maxlen=24)
         self._stream_text = ""
@@ -504,6 +512,10 @@ class LivePanel:
                                   self.trace[-1][1] if self.trace else None), "#ffcae6")
         # No fake animation: progress derives solely from finished tool calls.
         add("╭──── OMEGA · PROGRESS CORE ───╮", "#ff90c8")
+        add("│ SESSION: " + self._run_state, "#ffcae6")
+        add(f"│ AI-SVAR {self._answers_delivered} · KONTROLLERADE {self._verified_work}", "#ffffff")
+        if self._unverified_work:
+            add(f"│ EJ VERIFIERADE UPPGIFTER {self._unverified_work}", "#ffcbac")
         pending = bool(self.trace and self.trace[-1][1] is None)
         if pending:
             core_state, core_style = "◉ VERKTYG ARBETAR", "bold #ff8fc5"
@@ -643,7 +655,11 @@ class LivePanel:
         panel.action_title = clean_line(action, 180)
         panel.action_reason = clean_line(reason, 240)
         panel.action_expect = clean_line(expect, 180)
-        panel.action_result = "Verktyget körs – resultat ej klart."
+        panel.action_result = ("Analyserar din fråga; inget verktygsresultat ännu."
+                               if action == "Analyserar din fråga"
+                               else "Verktyget körs – resultat ej klart.")
+        panel._run_state = "ARBETAR"
+        panel._run_state_detail = panel.action_title
         panel.action_evidence = ""
         panel.action_started = time.monotonic()
         panel.events.append(datetime.now().strftime("%H:%M:%S") +
@@ -673,6 +689,7 @@ class LivePanel:
         panel = self._panel_state
         panel.tool = clean_line(text, 150)
         panel.phase = "Kör verktyg"
+        panel.action_result = "Verktyget körs – inväntar faktiskt resultat."
         panel.step_time = time.monotonic()
         panel._progress_phase = "WORK"
         panel.trace.append((panel.tool, None, time.time()))
@@ -715,8 +732,30 @@ class LivePanel:
         panel = self._panel_state
         count = sum(1 for item in run.ledger if item.get("ok"))
         verified = bool(result.verified) and result.status in ("complete", "answered")
-        panel.phase = "Verifierat" if verified else "Ej fullständigt verifierat"
-        panel._add(f"RESULTAT · {count} lyckade steg · {panel.phase}")
+        # A fluent model answer is activity, never proof of new capability.
+        panel._answers_delivered += 1
+        panel._last_answer_at = time.monotonic()
+        independently_checked = bool(run.ledger) and verified and result.status == "complete"
+        if independently_checked:
+            panel._verified_work += 1
+            panel._run_state = "VERIFIERAD UPPGIFT"
+            panel.action_result = "Uppgiften klar med registrerade verktygsresultat."
+        elif verified and not run.ledger and result.status == "answered":
+            panel._run_state = "AI-SVAR KLART"
+            panel.action_result = "Svar levererat. Inga verktygssteg utfördes eller verifierades."
+        else:
+            panel._unverified_work += 1
+            panel._run_state = "EJ VERIFIERAT"
+            panel.action_result = "Körningen avslutad utan oberoende verifiering."
+        panel.action_title = "AI-svar levererat" if not run.ledger else "Uppgift avslutad"
+        panel.action_reason = ("Språkmodellen besvarade frågan direkt." if not run.ledger
+                               else "Verktygsresultaten ligger till grund för svaret.")
+        panel.action_expect = ("Ingen separat verktygskontroll gjord." if not run.ledger
+                               else "Bedömningen bygger på registrerade verktygsresultat.")
+        panel.phase = panel._run_state
+        panel.events.append(datetime.now().strftime("%H:%M:%S") +
+                            " · " + panel._run_state + f" · {count} lyckade verktygssteg")
+        panel._add(f"RESULTAT · {count} lyckade verktygssteg · {panel._run_state}")
         panel._refresh()
 
     def event(self, text: str) -> None:
