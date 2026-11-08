@@ -5707,7 +5707,7 @@ class Buddy:
     HELP = """/help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
 /memory [list|search Q|forget ID|export|clear]  /obsidian [status|on|off|sync|path PATH|clear --yes]  /resources  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
-/grants [revoke]  /activate [all|status|off]  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
+/grants [revoke]  /activate [all|status|off]  /presence  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
 Just talk normally — Buddy decides when to use tools. Say "stop" at any time."""
 
     async def command(self, line: str) -> None:
@@ -5827,6 +5827,8 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 o("Usage: /obsidian [status | on | off | sync | path ABSOLUTE_PATH | clear --yes]")
         elif cmd == "/resources":
             o(resources_report())
+        elif cmd == "/presence":
+            o(presence_report(self, minutes=20))
         elif cmd == "/doctor":
             o("Running diagnostics…")
             items = await asyncio.to_thread(self.doctor.run, "all")
@@ -5879,6 +5881,7 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                   f"last capture: {self.companion.loop.last_capture_note if self.companion.present()[0] else 'unavailable'}; "
                   f"Obsidian auto memory: {self.settings.get('obsidian_auto_memory', False)}")
             elif sub == "all":
+                self.settings.set("auto_mode_on_start", True)
                 self.settings.set("free_only", True)
                 self.settings.set("models", {role: "kilo-auto/free" for role in Router.ROLES})
                 self.settings.set("escalation_ladder", [])
@@ -5913,6 +5916,7 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 o("Screenshots can be sent to KiloCode; protected and private windows remain excluded. Sensitive actions still require approval.")
                 self.ui.header()
             elif sub == "off":
+                self.settings.set("auto_mode_on_start", False)
                 self.stop_companion()
                 if self.companion.present()[0]:
                     self.companion.loop.enable(False)
