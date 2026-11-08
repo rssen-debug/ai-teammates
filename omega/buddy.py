@@ -6114,7 +6114,7 @@ async def run_suite(live: bool) -> int:
         fb = app.router.resolve("chat")
         app.settings.set("models", DEFAULT_SETTINGS["models"])
         app.gateway._models = None
-        s.rec("T5", "model router: ladder escalation + never uses unlisted ids", "PASS" if esc == "kilo-auto/balanced" and fb == "kilo-auto/free" else "FAIL", f"escalate→{esc}, fallback→{fb}")
+        s.rec("T5", "free-only router: no paid escalation or fallback", "PASS" if esc is None and fb == "kilo-auto/free" else "FAIL", f"escalate→{esc}, effective_model→{fb}")
     except Exception as e:
         s.rec("T5", "router", "FAIL", str(e))
 
