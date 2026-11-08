@@ -91,6 +91,24 @@ class PanelTest(unittest.TestCase):
         self.assertFalse(p._tetris.awaiting_move)
         self.assertIn("giltigt AI-drag", p._tetris_last_decision)
 
+    def test_model_format_retry_requires_second_real_gateway_reply(self):
+        import asyncio
+        from pixel_tetris import PixelTetris
+        p = self.build()
+        p._tetris = PixelTetris(seed=11)
+        attempts = []
+        class Gateway:
+            async def chat(self, model, messages, **kwargs):
+                attempts.append(messages)
+                return {"message": {"content": "no move chosen" if len(attempts) == 1 else "0"}}
+        p.app.gateway = Gateway()
+        p.app.router = SimpleNamespace(resolve=lambda role: "kilo-auto/free")
+        asyncio.run(p._tetris_decide())
+        self.assertEqual(len(attempts), 2)
+        self.assertEqual(p._tetris_ai_calls, 2)
+        self.assertEqual(p._tetris_ai_moves, 1)
+        self.assertFalse(p._tetris.awaiting_move)
+
     def test_invalid_model_move_does_not_advance_game(self):
         import asyncio
         from pixel_tetris import PixelTetris
