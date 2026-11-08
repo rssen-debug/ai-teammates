@@ -4550,7 +4550,7 @@ class CLI:
         verdict = C.c(C.G, "VERIFIERAT") if verified else C.c(C.Y, str(outcome.status).upper())
         self._out(V.rule("resultat") + "\n" + f"  {verdict}  · {passed} lyckade verktyg"
                   + (f" · {failed} fel" if failed else "")
-                  + f" · {time.monotonic() - run.t0:.1f}s")
+                  + f" · {max(0.0, now() - run.t0):.1f}s")
 
     def event(self, s: str) -> None:
         self._out(C.c(C.MG, "◆ ") + C.c(C.DIM, s))
