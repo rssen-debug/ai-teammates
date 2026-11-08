@@ -236,6 +236,25 @@ def measured_axis_rows(snapshot: dict) -> list[tuple[str, str, float | None]]:
     return [(key, name, values.get(key)) for key, name in LEVEL_AXES]
 
 
+AXIS_NEXT_ACTION = {
+    "UPPGIFTER": "Testa en uppgift med kontroll",
+    "ÅTERHÄMTNING": "Testa säker felåterhämtning",
+    "VERKTYG": "Verifiera fler olika verktyg",
+    "MINNE": "Testa minnessökning + återbruk",
+    "BENCHMARK": "Kör reproducerbara benchmark",
+    "REGRESSION": "Kör hela regressionstestsviten",
+}
+
+def evidence_focus(snapshot: dict) -> tuple[str, str] | None:
+    """Pick lowest *measured* quality axis, never an unobserved guess."""
+    known = [(name, val) for _, name, val in measured_axis_rows(snapshot)
+             if val is not None]
+    if not known:
+        return None
+    name, value = min(known, key=lambda item: item[1])
+    return name, AXIS_NEXT_ACTION[name]
+
+
 class LivePanel:
     """Factory-backed UI: uses the existing CLI contract, not a second agent."""
 
@@ -633,6 +652,9 @@ class LivePanel:
                 else:
                     add("Evidens " + str(progress["events"]) + "/" +
                         str(progress["required"]) + " · -" + str(progress["remaining"]), "#ffffff")
+                    total = max(1, progress["required"])
+                    dots = round(16 * min(1.0, progress["events"] / total))
+                    add("Mot nästa nivå [" + "▰" * dots + "▱" * (16-dots) + "]", "#80f4b2")
             else:
                 add("Nivåunderlag saknas", "#ffffff")
         else:
@@ -652,7 +674,9 @@ class LivePanel:
             if known:
                 weakest, score = min(known, key=lambda pair: pair[1])
                 add(f"FOKUS: {weakest} · {score:.0%}", "#ffcae6")
-                add("Förbättras via verkliga tester", "#829c91")
+                focus = evidence_focus(self._cached_level)
+                if focus:
+                    add("NÄSTA TEST: " + focus[1], "#baf3d2")
 
         lines.append(("bold #ff90c8", "MIN ARBETSPLAN · " + ("DÖLJ" if self.show_thinking else "VISA") + " / F2\n", self._side_click))
         if self.show_thinking:
