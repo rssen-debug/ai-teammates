@@ -84,6 +84,35 @@ class PanelTest(unittest.TestCase):
         self.assertNotIn("run_command", p._chat.text)
         self.assertEqual(len(p.trace), 1)
 
+    def test_sidebar_redraw_never_calls_blocking_companion_methods(self):
+        p = self.build()
+        class FailsIfPolled:
+            def __getattr__(self, name):
+                raise AssertionError("render unexpectedly accessed Companion: " + name)
+        p.app.companion = FailsIfPolled()
+        rendered = "".join(fragment[1] for fragment in p._side_text())
+        self.assertIn("COMPANION: OFF", rendered)
+
+    def test_companion_cache_update_keeps_render_pure(self):
+        p = self.build()
+        class FakeLoop:
+            captures = 0
+            last_capture_at = 0
+            last_tick_at = 0
+            last_capture_note = "capture not configured"
+            ticks = 0
+            def options(self):
+                return {"enabled": True, "capture_seconds": 30, "tick_seconds": 30}
+            def idle_seconds(self):
+                return 12
+        loop = FakeLoop()
+        p.app.companion = SimpleNamespace(present=lambda: (True, ""), loop=loop)
+        p._read_companion_state()
+        self.assertEqual(p._cached_idle_seconds, 12)
+        self.assertTrue(p._cached_companion_enabled)
+        rendered = "".join(fragment[1] for fragment in p._side_text())
+        self.assertIn("COMPANION: LIVE", rendered)
+
     def test_submit_is_visible_before_agent_runs(self):
         p = self.build()
         field = SimpleNamespace(text="hej, kan du hjälpa mig?")
@@ -91,6 +120,35 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(field.text, "")
         self.assertIn("hej, kan du hjälpa mig?", p._chat.text)
         self.assertEqual(p.queue.get_nowait(), "hej, kan du hjälpa mig?")
+
+    def test_thinking_label_click_uses_supported_prompt_toolkit_fragments(self):
+        from prompt_toolkit.data_structures import Point
+        from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
+        p = self.build()
+        self.assertFalse(p.show_thinking)
+        p._status_control.create_content(width=39, height=35)
+        # The status text supplies an actual prompt_toolkit mouse handler.
+        clickable = [frag for frag in p._side_text() if len(frag) == 3]
+        self.assertEqual(len(clickable), 1)
+        clickable[0][2](MouseEvent(position=Point(x=1, y=0),
+                                   event_type=MouseEventType.MOUSE_UP,
+                                   button=MouseButton.LEFT, modifiers=frozenset()))
+        self.assertTrue(p.show_thinking)
+
+    def test_live_stream_preview_can_be_toggled_and_cleared(self):
+        p = self.build()
+        p.toggle_thinking()
+        self.assertTrue(p.show_thinking)
+        p.stream_begin()
+        p.stream_delta("He")
+        p.stream_delta("j!")
+        self.assertIn("Hej!", p._chat.text)
+        p.stream_end()
+        self.assertNotIn("Hej!", p._chat.text)
+        p.ui._out("buddy › Hej!")
+        self.assertEqual(p._chat.text.count("Hej!"), 1)
+        p.toggle_thinking()
+        self.assertFalse(p.show_thinking)
 
     def test_colour_and_ansi_are_clean(self):
         p = self.build()

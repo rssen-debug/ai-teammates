@@ -18,6 +18,8 @@ import time
 from typing import Any
 
 from prompt_toolkit import Application
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.mouse_events import MouseEventType
 from prompt_toolkit.input import DummyInput
 from prompt_toolkit.output import DummyOutput
 from prompt_toolkit.filters import Condition
@@ -211,12 +213,18 @@ class LivePanel:
         self._last_level_change = 0.0
         self._level_checked_at = 0.0
         self._level_task: asyncio.Task | None = None
+        self._companion_task: asyncio.Task | None = None
+        self._cached_idle_seconds: float = 0.0
         self._cached_companion: Any = None
         self._cached_companion_options: dict = {}
         self._cached_companion_enabled = False
         self._companion_checked_at = 0.0
         self.trace: deque[tuple[str, bool | None, float]] = deque(maxlen=9)
         self.phase = "Väntar på uppgift"
+        self.show_thinking = False
+        self.events: deque[str] = deque(maxlen=24)
+        self._stream_text = ""
+        self._stream_active = False
         self.tool = "-"
         self.step_time = 0.0
         self.queue: asyncio.Queue[str] = asyncio.Queue()
@@ -228,6 +236,10 @@ class LivePanel:
         self._chat = TextArea(read_only=True, focusable=False,
                               scrollbar=True, wrap_lines=True, line_numbers=False)
         self._status_control = FormattedTextControl(self._side_text)
+        keys = KeyBindings()
+        @keys.add("f2")
+        def _toggle(_event: Any) -> None:
+            self.toggle_thinking()
         right = Frame(Window(content=self._status_control, wrap_lines=True),
                       title=" OMEGA · LIVE ", width=Dimension.exact(39))
         visibility = Condition(lambda: shutil.get_terminal_size((120, 35)).columns >= 94)
@@ -246,7 +258,8 @@ class LivePanel:
             full_screen=True,
             input=DummyInput() if not __import__('sys').stdin.isatty() else None,
             output=DummyOutput() if not __import__('sys').stdout.isatty() else None,
-            mouse_support=False,
+            mouse_support=True,
+            key_bindings=keys,
             refresh_interval=1.0,
             style=Style.from_dict({
                 "frame.border": "#b02d78",
@@ -263,13 +276,51 @@ class LivePanel:
     def start(self) -> None:
         self._loop = asyncio.get_running_loop()
         self.task = self._loop.create_task(self.application.run_async())
+        self._companion_task = self._loop.create_task(self._companion_poll())
 
     async def read_line(self) -> str:
         return await self.queue.get()
 
     def close(self) -> None:
+        if self._companion_task is not None:
+            self._companion_task.cancel()
         if self.application.is_running:
             self.application.exit()
+
+    def toggle_thinking(self) -> None:
+        self.show_thinking = not self.show_thinking
+        self._refresh()
+
+    def _side_click(self, event: Any) -> None:
+        if event.event_type == MouseEventType.MOUSE_UP:
+            self.toggle_thinking()
+        return None
+
+    def _render_chat(self) -> None:
+        view = "\n".join(self.messages)[-16000:]
+        if self._stream_active and self._stream_text:
+            view += "\nbuddy › " + self._stream_text[-9000:]
+        self._chat.text = view
+        self._chat.buffer.cursor_position = len(view)
+        self._refresh()
+
+    def stream_begin(self) -> None:
+        self._stream_text = ""
+        self._stream_active = True
+        self._refresh()
+
+    def stream_delta(self, text: str) -> None:
+        if not self._stream_active:
+            return
+        self._stream_text += re.sub(r"\x1b\[[0-9;]*m", "", str(text))
+        # Do not rebuild an increasingly large conversation per character.
+        if len(self._stream_text) < 64 or len(self._stream_text) % 48 < len(text):
+            self._render_chat()
+
+    def stream_end(self) -> None:
+        self._stream_active = False
+        self._stream_text = ""
+        self._render_chat()
 
     def _submit(self, buffer: Any) -> bool:
         entered = buffer.text.strip()
@@ -295,14 +346,43 @@ class LivePanel:
         def update() -> None:
             with self._lock:
                 self.messages.append(sanitized)
-                view = "\n".join(self.messages)[-16000:]
-                self._chat.text = view
-                self._chat.buffer.cursor_position = len(view)
-            self._refresh()
+                self._render_chat()
         if self._loop and self._loop.is_running() and threading.current_thread() is not threading.main_thread():
             self._loop.call_soon_threadsafe(update)
         else:
             update()
+
+    async def _companion_poll(self) -> None:
+        """Collect potentially blocking settings/Windows idle data outside UI rendering."""
+        while True:
+            try:
+                await asyncio.to_thread(self._read_companion_state)
+                self._refresh()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                self._cached_companion = None
+                self._cached_companion_enabled = False
+                self._cached_companion_options = {}
+            await asyncio.sleep(8)
+
+    def _read_companion_state(self) -> None:
+        try:
+            companion = self.app.companion
+            loop = companion.loop if companion.present()[0] else None
+            options = loop.options() if loop else {}
+            idle = float(loop.idle_seconds()) if loop else 0.0
+            with self._lock:
+                self._cached_companion = loop
+                self._cached_companion_options = options
+                self._cached_companion_enabled = bool(options.get("enabled"))
+                self._cached_idle_seconds = idle
+        except Exception:
+            with self._lock:
+                self._cached_companion = None
+                self._cached_companion_options = {}
+                self._cached_companion_enabled = False
+                self._cached_idle_seconds = 0.0
 
     async def _refresh_level(self) -> None:
         try:
@@ -319,18 +399,8 @@ class LivePanel:
             lines.append((style, clean_line(text, 55) + "\n"))
 
         running = bool(app.current_run)
-        # Avoid loading the profile/SQLite and lazy Companion subsystem on
-        # every 1-second redraw: doing so stalls the terminal input.
-        if time.monotonic() - self._companion_checked_at >= 8:
-            self._companion_checked_at = time.monotonic()
-            try:
-                self._cached_companion = app.companion.loop if app.companion.present()[0] else None
-                self._cached_companion_options = self._cached_companion.options() if self._cached_companion else {}
-                self._cached_companion_enabled = bool(self._cached_companion_options.get("enabled"))
-            except Exception:
-                self._cached_companion = None
-                self._cached_companion_enabled = False
-                self._cached_companion_options = {}
+        # Rendering must NEVER query SQLite, discover plugins or poll Win32.
+        # The dedicated companion poll above maintains these cached values.
         comp = self._cached_companion
         comp_enabled = self._cached_companion_enabled
         observing = bool(comp_enabled and comp and comp.captures > 0
@@ -355,6 +425,13 @@ class LivePanel:
             elapsed = max(0, int(now - float(app.current_run.t0)))
             add(f"Väntat på AI: {elapsed // 60:02d}:{elapsed % 60:02d}", "#ffffff")
         add("──────────────────────────────────", "#744061")
+        lines.append(("bold #ff90c8", "TÄNKER · klicka här / F2\n", self._side_click))
+        if self.show_thinking:
+            add("LIVE ARBETSSPÅR · " + str(len(self.events)), "#ffffff")
+            for detail in list(self.events)[-9:]:
+                add(" " + detail, "#ffe0f1")
+            if not self.events:
+                add(" Inga arbetssteg ännu", "#bca8bc")
         add("STEG: " + self.phase, "bold #ffe0f1")
         add("VERKTYG: " + self.tool, "#fbc4df")
         add("──────────────────────────────────", "#744061")
@@ -368,7 +445,7 @@ class LivePanel:
             if comp.last_capture_at == 0:
                 next_capture = "första körning ej klar"
             add("Nästa skärmkoll: " + next_capture)
-            idle = max(0, float(comp.idle_seconds()))
+            idle = max(0, float(self._cached_idle_seconds))
             threshold = float(opts.get("idle_seconds", 180))
             add("Reflektion vid vila: " + f"{max(0, int(threshold-idle))} s")
             add("Lyckade skärmkoller: " + str(comp.captures))
@@ -440,6 +517,7 @@ class LivePanel:
     def status(self, text: str) -> None:
         panel = self._panel_state
         panel.phase = clean_line(text, 44)
+        panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.phase)
         panel._refresh()
 
     def step(self, text: str) -> None:
@@ -448,6 +526,7 @@ class LivePanel:
         panel.phase = "Kör verktyg"
         panel.step_time = time.monotonic()
         panel.trace.append((panel.tool, None, time.time()))
+        panel.events.append(datetime.now().strftime("%H:%M:%S") + " · Kör " + panel.tool)
         panel._refresh()
 
     def step_done(self, ok: bool, err: str = "") -> None:
@@ -456,6 +535,7 @@ class LivePanel:
             old = panel.trace.pop()
             panel.trace.append((old[0], bool(ok), old[2]))
         panel.phase = ("Steg klart" if ok else "Steg misslyckades")
+        panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.phase)
         if err and not ok:
             # Never dump raw exceptions here: provider errors can contain secrets.
             panel._add("Ett verktyg misslyckades. Se felstatus i panelen.")
@@ -472,6 +552,7 @@ class LivePanel:
     def event(self, text: str) -> None:
         panel = self._panel_state
         panel.phase = clean_line(text, 45)
+        panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.phase)
         panel._refresh()
 
     def prompt(self) -> None:
