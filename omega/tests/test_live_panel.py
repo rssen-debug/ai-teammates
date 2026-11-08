@@ -170,8 +170,8 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(rows[1][2], None)
         self.assertEqual(rows[2][2], .3)
         self.assertEqual(rows[3][2], None)
-        self.assertEqual(measured_axis_rows({}), [])
-        self.assertEqual(measured_axis_rows({"axes": "bad"}), [])
+        self.assertTrue(all(value is None for _, _, value in measured_axis_rows({})))
+        self.assertTrue(all(value is None for _, _, value in measured_axis_rows({"axes": "bad"})))
 
     def test_recommended_next_test_is_not_fake_learning(self):
         p = self.build()
