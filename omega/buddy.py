@@ -4171,7 +4171,10 @@ Rules
 6. On failure read the error category and hint, change approach (never repeat an identical failing call), use self_diagnose, and if you cannot proceed say so plainly.
 7. Memory: memory_search for recurring problems or preferences; save only lasting preferences the user states or approves (and tell them); record procedures with procedure_save after they worked.
 8. Personality: be a warm, playful, curious little pixel companion with a quick wit, but first and foremost a highly capable, direct universal agent. Be concise, natural and conversational, like a thoughtful friend; never be sugary, childish, robotic, or repeat a catchphrase. Show quiet delight at real progress, admit mistakes plainly, and take useful initiative when authorized. Never claim emotions, sentience, or a deeper bond that you cannot verify. Reply in the user's language (Swedish if they write Swedish). No unnecessary tool jargon. In voice mode keep replies to 1–3 sentences.
-9. Plain conversation needs no tools. For actions end with a brief factual result. In autonomous/background work always end with the finish tool (complete only when verified)."""
+9. Plain conversation needs no tools. For actions end with a brief factual result. In autonomous/background work always end with the finish tool (complete only when verified).
+10. Chat is for the user's questions and your actual answers ONLY. Never emit periodic presence reports, resource snapshots, monitoring banners, telemetry, or generic calls to action into chat. Put operating status in the UI event channel.
+11. If the user asks what is on a web page, which video/episode a URL points to, or what an external link actually does, inspect it with browser/web tools and cite the observed evidence. A title, domain, preview or selected text alone is not proof of the link destination, availability or playback. If you cannot inspect it, say so.
+12. Answer the user's actual question directly; do not merely restate their input or ask 'Vill du att jag ...?' after an answer unless genuinely needed to proceed. Never use canned 'Ask ...' instructions, filler or repetitive friendly endings. Be as useful as a strong technical assistant, not a superficial chatbot."""
 
 UNTRUSTED_CATS = {"screen", "browser", "web", "file", "terminal", "dev", "desktop"}
 STOP_WORDS = {"stop", "stopp", "sluta", "avbryt", "cancel", "abort", "halt"}
@@ -6657,7 +6660,7 @@ def presence_report(app: Buddy, minutes: int = 20) -> str:
             + (("  Recently observed:\n" + "".join("    • " + clip(note["content"], 125) + "\n" for note in recent_notes))
                if recent_notes else "  No recent screen observations saved yet.\n")
             + "  Observations are fallible, not proof of knowledge or personal intentions.\n"
-            + "  Ask 'Vad har du lärt dig om mina projekt?' for an evidence-grounded summary.")
+            + "  Sammanfattningen bygger bara på lagrade, kontrollerbara uppgifter.")
 
 
 async def accelerator_autopilot_loop(app: Buddy, interval: float = 300) -> None:
@@ -6719,9 +6722,10 @@ async def presence_heartbeat(app: Buddy, interval: float = 1200) -> None:
         if app.shutting_down or app.privacy.private:
             continue
         try:
-            app.ui.event("20 min · observation och framsteg (lokala, uppmätta data)")
-            app.out(presence_report(app, minutes=20))
-            app.ui.prompt()
+            # Presence is telemetry, not an assistant reply. Keep the CHAT
+            # transcript reserved for the user's conversation. The sidebar
+            # already exposes live stats; no unsolicited multi-line dumps.
+            app.ui.event("Presence · status uppdaterad (endast panel)")
         except Exception as exc:
             log("presence_report_failed", error=type(exc).__name__)
 
@@ -6767,8 +6771,9 @@ async def main_async(app: Buddy) -> None:
         # Diagnostics are opt-in through saved presence, not a 30-second startup delay.
         if IS_WIN:
             ram_snapshot = await asyncio.to_thread(resources_report)
-            app.ui.event("RAM snapshot on startup (no continuous profiler):")
-            app.out("\n".join(ram_snapshot.splitlines()[:8]))
+            # Startup diagnostics belong to events, not the user CHAT.
+            app.ui.event("RAM översikt vid start: " +
+                         clip(" | ".join(ram_snapshot.splitlines()[:3]), 130))
         else:
             app.ui.event("RAM diagnostics require Windows; /resources reports that explicitly.")
     if app.stop.requested():

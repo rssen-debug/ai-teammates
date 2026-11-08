@@ -586,6 +586,14 @@ class LivePanel:
         mode = ("ARBETAR" if running else "OBSERVERAR" if observing
                 else "VAKEN · VÄNTAR" if enabled else "SOVER")
         add("● " + mode, "bold #ff72b6" if running or observing else "#ffffff")
+        # Show the actual model policy; do not claim model IQ or run a costly
+        # network model discovery call during redraw.
+        config = getattr(app, "settings", None)
+        free_only = bool(config.get("free_only", True)) if config is not None else True
+        if free_only:
+            add("MODELL: kilo-auto/free · FREE ONLY", "#ffcbac")
+        else:
+            add("MODELL: val via roll-routing", "#baf3d2")
         sprite_mode = ("working" if running else "observing" if observing
                        else "awake" if enabled else "sleeping")
         level = self._cached_level.get("level")
