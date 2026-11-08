@@ -6685,34 +6685,18 @@ async def main_async(app: Buddy) -> None:
             app.selection_bridge.start()
         except Exception as exc:
             app.ui.event("Selection hotkey unavailable: " + type(exc).__name__)
-    # The owner requested a REAL agent-built Tetris project in the workspace.
-    # Queue exactly one tool-driven coding job when saved autonomous owner consent
-    # is active. The separate pixel game in the sidebar is a deterministic
-    # simulation and never contributes AI LEVEL evidence by itself.
-    if auto_enabled and app.gateway.key():
-        try:
-            existing = app.store.one(
-                "SELECT id FROM tasks WHERE title LIKE 'Pixel Tetris BUILD%' LIMIT 1")
-            if not existing:
-                goal = (
-                    "Build a real playable pixel-art Tetris game for the owner in "
-                    + str(DIRS["workspace"] / "pixel-tetris")
-                    + ". Use the real file_write / dev tool interfaces to write "
-                      "the source (a self-contained index.html with JS and CSS is fine). "
-                      "Implement seven tetrominoes, falling gravity, movement, rotation, "
-                      "line clearing, game over and restart. Do not claim a feature works "
-                      "unless you have actually executed checks verifying it. Create "
-                      "automated tests for the piece and line-clearing rules and run them. "
-                      "Use tool_search to discover tools, run tests, inspect their outputs, "
-                      "fix failures and only then finish with verified evidence. "
-                      "Report blockers truthfully. Work only inside this project folder. "
-                      "Do not alter Buddy core, send messages, or install software."
-                )
-                tid = app.tasks.create("Pixel Tetris BUILD · source + tests",
-                                       {"kind": "agent", "goal": goal})
-                app.ui.event("Pixel Tetris coding job queued: " + tid)
-        except Exception as exc:
-            app.ui.event("Pixel Tetris job not queued: " + type(exc).__name__)
+    # Owner retired the Tetris demo. Cancel only its queued/running agent
+    # tasks, leaving every other universal-agent task and memory untouched.
+    try:
+        retired = app.store.q(
+            "SELECT id FROM tasks WHERE title LIKE 'Pixel Tetris BUILD%' "
+            "AND state IN ('queued','running','blocked')")
+        for item in retired:
+            app.tasks.cancel(item["id"])
+        if retired:
+            app.ui.event(f"Retired {len(retired)} Pixel Tetris task(s); general agent stays active")
+    except Exception as exc:
+        app.ui.event("Tetris task cleanup failed: " + type(exc).__name__)
     worker = asyncio.ensure_future(app.tasks.worker())
     memory_sync = asyncio.create_task(memory_continuity_loop(app))
     if auto_enabled and (app.presence_task is None or app.presence_task.done()):
