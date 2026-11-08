@@ -588,7 +588,8 @@ class LivePanel:
         add("● " + mode, "bold #ff72b6" if running or observing else "#ffffff")
         # Show the actual model policy; do not claim model IQ or run a costly
         # network model discovery call during redraw.
-        free_only = bool(app.settings.get("free_only", True))
+        config = getattr(app, "settings", None)
+        free_only = bool(config.get("free_only", True)) if config is not None else True
         if free_only:
             add("MODELL: kilo-auto/free · FREE ONLY", "#ffcbac")
         else:
