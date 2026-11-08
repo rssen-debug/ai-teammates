@@ -479,6 +479,16 @@ class UserModel:
                                             "samples": int(r["n"])} for r in apps]
         out["evidence"]["activity_samples"] = sum(int(r["n"]) for r in apps)
 
+        observed_screen = self._q(
+            "SELECT content, updated FROM memories WHERE kind='episodic' "
+            "AND tags LIKE '%screen,observation%' AND updated>=? "
+            "ORDER BY updated DESC LIMIT 12", (since,))
+        out["observed"]["recent_screen_activity"] = [
+            {"description": str(r["content"] or "")[:240], "at": round(float(r["updated"]), 0),
+             "confidence": "unverified", "source": "screen_vision"}
+            for r in observed_screen]
+        out["evidence"]["screen_observations"] = len(observed_screen)
+
         hours = self._q("SELECT CAST(strftime('%H', start, 'unixepoch', 'localtime') AS INTEGER) AS h, "
                         "SUM(end-start) AS secs FROM activity WHERE start>=? GROUP BY h", (since,))
         by_hour = {int(r["h"]): round(float(r["secs"] or 0), 1) for r in hours if r["h"] is not None}
