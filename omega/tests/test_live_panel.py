@@ -233,6 +233,23 @@ class PanelTest(unittest.TestCase):
         shown = "".join(fragment[1] for fragment in p._side_text())
         self.assertIn("VERIFIERAD UPPGIFT", shown)
 
+    def test_failed_ledger_cannot_inflate_verified_work(self):
+        p = self.build()
+        run = SimpleNamespace(ledger=[{"ok": False}])
+        result = SimpleNamespace(status="complete", verified=True)
+        p.ui.summary(run, result)
+        self.assertEqual(p._verified_work, 0)
+        self.assertEqual(p._unverified_work, 1)
+        self.assertEqual(p._answers_delivered, 1)
+
+    def test_failed_runs_are_not_successful_answers(self):
+        p = self.build()
+        run = SimpleNamespace(ledger=[{"ok": False}])
+        result = SimpleNamespace(status="failed", verified=False)
+        p.ui.summary(run, result)
+        self.assertEqual(p._answers_delivered, 0)
+        self.assertEqual(p._unverified_work, 1)
+
     def test_unverified_work_cannot_increase_verified_counter(self):
         p = self.build()
         from types import SimpleNamespace
