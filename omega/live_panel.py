@@ -281,6 +281,7 @@ class LivePanel:
         self.app = app
         self.messages: deque[str] = deque(maxlen=220)
         self._cached_level: dict = {}
+        self._cached_playbooks = 0
         self._last_level: int | None = None
         self._last_level_change = 0.0
         self._level_checked_at = 0.0
@@ -550,6 +551,11 @@ class LivePanel:
             self._cached_level = await asyncio.to_thread(lambda: self.app.settings.get("level") or self.app.level_snapshot())
         except Exception:
             self._cached_level = {}
+        try:
+            from genesis_playbooks import PlaybookStore
+            self._cached_playbooks = await asyncio.to_thread(lambda: PlaybookStore().count())
+        except (OSError, ValueError, sqlite3.DatabaseError):
+            self._cached_playbooks = 0
         self._refresh()
 
     def _side_text(self) -> list[tuple[str, str]]:
@@ -649,12 +655,7 @@ class LivePanel:
             add("Historik ≠ bevisad intelligens", "#829c91")
             # Only mature, repeatedly verified workflow patterns count as
             # suggested playbooks. They never execute from this status panel.
-            try:
-                from genesis_playbooks import PlaybookStore
-                count = PlaybookStore().count()
-                add(f"Verifierade playbooks: {count}", "#baf3d2")
-            except (OSError, ValueError, sqlite3.DatabaseError):
-                add("Playbooks: underlag saknas", "#829c91")
+            add(f"Verifierade playbooks: {self._cached_playbooks}", "#baf3d2")
         add("EVOLUTION · SENASTE HÄNDELSER", "bold #ff90c8")
         if self._evolution_timeline:
             for when, label in reversed(self._evolution_timeline):
