@@ -5805,8 +5805,8 @@ class Buddy:
             "SELECT kind,content FROM memories WHERE tags LIKE '%owner-confirmed%' "
             "AND kind IN ('preference','correction') ORDER BY updated DESC LIMIT 5")
         if owner_rules:
-            parts.append("OWNER-CONFIRMED WORKING RULES (subject to current owner instructions):\\n"
-                         + "\\n".join(f"- {row['kind']}: {clip(row['content'], 260)}"
+            parts.append("OWNER-CONFIRMED WORKING RULES (subject to current owner instructions):\n"
+                         + "\n".join(f"- {row['kind']}: {clip(row['content'], 260)}"
                                       for row in owner_rules))
         mems = self.memory.search(run.goal, limit=4, touch=False)
         if mems:
