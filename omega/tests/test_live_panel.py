@@ -49,6 +49,27 @@ class PanelTest(unittest.TestCase):
         p._tetris.tick()
         self.assertNotEqual(before, p._tetris.display())
 
+    def test_real_model_move_parser_accepts_short_answer_and_reason(self):
+        from live_panel import parse_tetris_move
+        allowed = {0, 3, 9}
+        self.assertEqual(parse_tetris_move('{"move":3,"reason":"flat stack"}', allowed),
+                         (3, "flat stack"))
+        self.assertEqual(parse_tetris_move('3', allowed), (3, ""))
+        self.assertEqual(parse_tetris_move('Move: 9', allowed), (9, ""))
+        self.assertEqual(parse_tetris_move('{"move":999}', allowed), (None, ""))
+        self.assertEqual(parse_tetris_move('', allowed), (None, ""))
+
+    def test_tool_failure_reason_is_visible_and_not_echoed_into_input(self):
+        p = self.build()
+        p.ui.step("Skapar fil")
+        p.ui.step_done(False, "Access denied to target path")
+        self.assertEqual(p._typing.text, "")
+        self.assertIn("Access denied", p._last_tool_error)
+        self.assertNotIn("Ett verktyg misslyckades", p._chat.text)
+        p.toggle_thinking()
+        rendered = "".join(fragment[1] for fragment in p._side_text())
+        self.assertIn("Verktygsfel", rendered)
+
     def test_model_call_is_required_for_each_tetris_piece(self):
         import asyncio
         import json
@@ -61,7 +82,7 @@ class PanelTest(unittest.TestCase):
                 calls.append((model, messages, kwargs))
                 board = json.loads(messages[1]["content"])
                 return {"message": {"content": json.dumps({
-                    "move": board["legal_moves"][0]["id"]})}}
+                    "move": board["moves"][0][0]})}}
         p.app.gateway = Gateway()
         p.app.router = SimpleNamespace(resolve=lambda role: "kilo-auto/free")
         asyncio.run(p._tetris_decide())
