@@ -80,23 +80,109 @@ def evidence_progress(snapshot: dict) -> dict:
             "reason": "Mer verifierad evidens krävs"}
 
 
-def pixel_companion(mode: str, frame: int = 0) -> tuple[str, ...]:
-    """Cute 7-line terminal pixel pet; expressions match real agent activity."""
-    eyes, mouth = {
-        "working": ("◕ ◕", "ᴗ"),
-        "observing": ("● ●", "ᵕ"),
-        "awake": ("• •", "ω"),
-        "sleeping": ("─ ─", "﹏"),
-    }.get(mode, ("• •", "ᴗ"))
-    heart = "♡" if frame % 2 else "♥"
+def companion_stage(level: int | None) -> tuple[int, str]:
+    """Visual evolution tracks measured capability levels, never time or tokens."""
+    if not isinstance(level, (int, float)):
+        return 0, "okänd"
+    level = max(1, min(100, int(level)))
+    if level < 10:
+        return 0, "Frö"
+    if level < 25:
+        return 1, "Liten kompis"
+    if level < 50:
+        return 2, "Upptäckare"
+    if level < 75:
+        return 3, "Väktare"
+    return 4, "Stjärnkompis"
+
+
+def companion_personality(mode: str, level: int | None = None,
+                          success: bool | None = None) -> str:
+    """A playful one-liner derived from actual state, not claimed emotions."""
+    if success is False:
+        return "Oops! Kollar vad som gick fel."
+    phrases = {
+        "working": "På ett uppdrag! Verktyg i gång.",
+        "observing": "Nyfiken! Läser det jag får se.",
+        "awake": "Här finns jag. Redo för nästa idé.",
+        "sleeping": "Zzz... viloläge.",
+    }
+    if level is None:
+        return phrases.get(mode, "Redo när du behöver mig.")
+    stage, _ = companion_stage(level)
+    if mode == "working" and stage >= 3:
+        return "Fokusläge! Jag testar och verifierar."
+    return phrases.get(mode, "Redo när du behöver mig.")
+
+
+def pixel_companion(mode: str, frame: int = 0,
+                    level: int | None = None) -> tuple[str, ...]:
+    """Five pixel-art life stages tied to actual LEVEL 1-100 evidence.
+
+    Small idle blink/bob animations use time only for appearance. Growth itself
+    strictly follows the measured level from omega/level.py.
+    """
+    stage, _ = companion_stage(level)
+    blink = frame % 9 == 0
+    eyes = ("─ ─" if blink or mode == "sleeping" else
+            "◕ ◕" if mode == "working" else
+            "● ●" if mode == "observing" else "• •")
+    mouth = ("﹏" if mode == "sleeping" else
+             "ᴗ" if mode in ("working", "observing") else "ω")
+    heart = "♥" if frame % 2 == 0 else "♡"
+    if stage == 0:
+        return (
+            "     ▄██▄",
+            "    █ " + eyes + " █",
+            "    █  " + mouth + "  █",
+            "     ▀██▀",
+            "      ▀▀",
+        )
+    if stage == 1:
+        return (
+            "     ▄███▄",
+            "   ▄███████▄",
+            "   █  " + eyes + "  █",
+            "   █   " + mouth + "   █",
+            "   ▀█  " + heart + "  █▀",
+            "     ▀███▀",
+            "      ▀ ▀",
+        )
+    if stage == 2:
+        return (
+            "   ▄▄     ▄▄",
+            "  ▄██▄▄███▄▄",
+            " ▄██████████▄",
+            " ███  " + eyes + "  ███",
+            " ███   " + mouth + "   ███",
+            " ▀██   " + heart + "   ██▀",
+            "   ▀███████▀",
+            "    ▀▀ ▀▀",
+        )
+    if stage == 3:
+        return (
+            "  ✦ ▄▄     ▄▄ ✦",
+            "   ▄██▄▄███▄▄",
+            " ▄████████████▄",
+            " ███   " + eyes + "   ███",
+            " ███    " + mouth + "    ███",
+            " ███    " + heart + "    ███",
+            " ▀████████████▀",
+            "   ▀██▀ ▀██▀",
+            "    ▀▀   ▀▀",
+        )
     return (
-        "     ▄███▄     ",
-        "   ▄███████▄   ",
-        "   █  " + eyes + "  █   ",
-        "   █   " + mouth + "   █   ",
-        "   ▀█  " + heart + "  █▀   ",
-        "     ▀███▀     ",
-        "      ▀ ▀      ",
+        "       ✧   ✦",
+        "  ✦ ▄▄▄     ▄▄▄ ✦",
+        "   ▄████▄▄▄████▄",
+        "  ███████████████",
+        "  ████   " + eyes + "  ████",
+        "  ████    " + mouth + "   ████",
+        "  ████    " + heart + "   ████",
+        "  ▀█████████████▀",
+        "    ▀███▀ ▀███▀",
+        "      ▀▀   ▀▀",
+        "   ✧           ✧",
     )
 
 
@@ -255,9 +341,15 @@ class LivePanel:
         add(mode, "bold #ff72b6" if active else "#bca8bc")
         sprite_mode = ("working" if running else "observing" if observing else
                        "awake" if comp_enabled else "sleeping")
-        for part in pixel_companion(sprite_mode, int(now // 2)):
+        sprite_level = self._cached_level.get("level")
+        stage, stage_name = companion_stage(sprite_level)
+        for part in pixel_companion(sprite_mode, int(now // 2), sprite_level):
             add(part, "#ff8fc5")
-        add("Pixelkompis · " + sprite_mode, "#ffffff")
+        add(f"Pixelkompis · {stage_name} · form {stage + 1}/5", "#ffffff")
+        last_tool_ok = self.trace[-1][1] if self.trace else None
+        add(companion_personality(sprite_mode, sprite_level, last_tool_ok), "#ffcae6")
+        if sprite_level is None:
+            add("Växer först när level mäts.", "#d4b7c9")
         add("AI  kilo-auto/free  ·  VOICE OFF", "#ffffff")
         if running and app.current_run:
             elapsed = max(0, int(now - float(app.current_run.t0)))
