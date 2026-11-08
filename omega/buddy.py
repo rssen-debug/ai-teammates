@@ -4188,7 +4188,7 @@ class AgentRun:
             while self.inbox:
                 self.messages.append({"role": "user", "content": "(the user added while you were working) " + self.inbox.pop(0)})
             model = self.pick_model()
-            app.ui.status("Thinking")
+            app.ui.status("Analyserar nästa steg utifrån hittade resultat" if self.ledger else "Tolkar uppgiften och väljer verktyg")
             resp = await app.gateway.chat(model, self._compact(), self.tool_schemas(restricted), max_tokens=4096, timeout=150)
             self.steps += 1
             u = resp["usage"] or {}
@@ -4282,7 +4282,15 @@ class AgentRun:
             self.risky += 1
             if self.risky > self.budget["max_risky"]:
                 return await self._wrap_up(f"risk budget ({self.budget['max_risky']} state-changing actions) reached")
-        app.ui.step(spec.progress or spec.name.replace("_", " "))
+        label = (spec.progress or spec.name.replace("_", " ")).strip()
+        category = {"tool_search": "Kartlägger möjligheter", "desktop_context": "Kontrollerar datorn",
+                    "run_command": "Kör lokalt kommando", "process_list": "Kontrollerar processer",
+                    "file_read": "Läser fil", "file_write": "Skapar eller sparar fil",
+                    "screen_observe": "Läser skärmens UI", "screen_describe": "Analyserar skärmbild",
+                    "dev_run_tests": "Testar ändringarna", "browser_context": "Undersöker webbläsaren"}.get(name, label)
+        phase = ("VERIFIERAR" if spec.observes and self.last_effect >= 0 else
+                 "UTFÖR" if spec.effect else "UNDERSÖKER")
+        app.ui.step(f"{C.c(C.B, phase)}  {category}  {C.c(C.DIM, '[' + name + ']')}")
         res = await app.executor.execute(spec, args, ToolContext(app, self, self.task_id, self.background, self.resumed))
         self.seq += 1
         res.evidence_id = f"ev{self.seq}"
@@ -4482,9 +4490,10 @@ class NullUI:
         self.answer = answer
         self.log_lines: list[str] = []
 
-    def status(self, s: str) -> None: ...
+    def status(self, s: str) -> None: self.log_lines.append("status: " + s)
     def step(self, s: str) -> None: self.log_lines.append(s)
     def step_done(self, ok: bool, err: str = "") -> None: ...
+    def summary(self, run: Any, outcome: Any) -> None: ...
     def event(self, s: str) -> None: self.log_lines.append(s)
     def prompt(self) -> None: ...
     def say(self, s: str) -> None: ...
@@ -4500,6 +4509,9 @@ class CLI:
         self.allow_always = False
         self.lock = threading.Lock()
         self._line_open = False
+        self._phase = ""
+        self._step_at = 0.0
+        self._step_count = 0
         if IS_WIN:
             os.system("")  # enable VT sequences
             with contextlib.suppress(Exception):
@@ -4512,14 +4524,33 @@ class CLI:
             sys.stdout.flush()
             self._line_open = False
 
-    def status(self, s: str) -> None: ...
+    def status(self, s: str) -> None:
+        # Display concise phase changes without spamming on every model round-trip.
+        if s != self._phase:
+            self._phase = s
+            self._out(C.c(C.CY, "  ◇ ") + C.c(C.DIM, s))
 
     def step(self, s: str) -> None:
-        self._out(C.c(C.DIM, "● ") + C.c(C.DIM, s))
+        self._phase = ""
+        self._step_at = time.monotonic()
+        self._step_count += 1
+        self._out(C.c(C.CY, f"  {self._step_count:02d}  ") + s)
 
     def step_done(self, ok: bool, err: str = "") -> None:
-        if not ok:
-            self._out(C.c(C.RED, "  ✗ ") + C.c(C.DIM, clip(err, 160)))
+        duration = max(0.0, time.monotonic() - self._step_at)
+        if ok:
+            self._out("      " + C.c(C.G, "✓ klart") + C.c(C.DIM, f"  · {duration:.1f}s"))
+        else:
+            self._out("      " + C.c(C.RED, "✗ misslyckades") + C.c(C.DIM, f"  · {duration:.1f}s  · {clip(redact(err), 130)}"))
+
+    def summary(self, run: Any, outcome: Any) -> None:
+        passed = sum(1 for item in run.ledger if item["ok"])
+        failed = len(run.ledger) - passed
+        verified = bool(outcome.verified) and outcome.status in ("complete", "answered")
+        verdict = C.c(C.G, "VERIFIERAT") if verified else C.c(C.Y, str(outcome.status).upper())
+        self._out(V.rule("resultat") + "\n" + f"  {verdict}  · {passed} lyckade verktyg"
+                  + (f" · {failed} fel" if failed else "")
+                  + f" · {time.monotonic() - run.t0:.1f}s")
 
     def event(self, s: str) -> None:
         self._out(C.c(C.MG, "◆ ") + C.c(C.DIM, s))
@@ -5538,6 +5569,7 @@ class Buddy:
         self.memory.add_turn("assistant", stored, run.id, "reply")
         if out.status in ("complete", "answered") and out.verified and run.ledger:
             self.memory.mark_run_verified(run.id)
+        self.ui.summary(run, out)
         self.ui.say(out.summary)
         if out.footer:
             self.out(C.c(C.Y, out.footer))
