@@ -13,18 +13,18 @@ import re
 import time
 
 _SECRET_WORDS = re.compile(
-    r"(?i)\\b(password|passphrase|lösenord|bankid|private browsing|incognito|"
+    r"(?i)\b(password|passphrase|lösenord|bankid|private browsing|incognito|"
     r"inkognito|one.time.password|security code|verification code|"
-    r"personnummer|credit card|kreditkort|seed phrase|recovery phrase|api.key)\\b"
+    r"personnummer|credit card|kreditkort|seed phrase|recovery phrase|api.key)\b"
 )
-_EMAIL = re.compile(r"(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b")
-_URL_TOKEN = re.compile(r"(?i)\\b(?:bearer\\s+)?eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b")
-_LONG_NUMBER = re.compile(r"(?<!\\d)\\d{8,}(?!\\d)")
+_EMAIL = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
+_URL_TOKEN = re.compile(r"(?i)\b(?:bearer\s+)?eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
+_LONG_NUMBER = re.compile(r"(?<!\d)\d{8,}(?!\d)")
 
 
 def clean_observation(value: str) -> str:
     """Reject explicitly sensitive activity; otherwise minimise incidental identifiers."""
-    text = re.sub(r"\\s+", " ", str(value or "")).strip()[:1200]
+    text = re.sub(r"\s+", " ", str(value or "")).strip()[:1200]
     if not text or _SECRET_WORDS.search(text):
         return ""
     text = _EMAIL.sub("[email hidden]", text)
@@ -64,17 +64,17 @@ class ObservationVault:
         clock = dt.datetime.fromtimestamp(stamp)
         filename = f"{int(stamp * 1000)}-{digest[:12]}.md"
         dest = folder / filename
-        body = ("---\\n"
-                "type: observation\\n"
-                f"date: {clock.isoformat(timespec='seconds')}\\n"
-                "source: screen_vision\\n"
-                "confidence: unverified\\n"
-                "storage: local_obsidian_markdown\\n"
-                f"application: {re.sub(r'[^A-Za-z0-9_.-]', '_', app_name)}\\n"
-                "---\\n\\n"
-                "## Observed activity\\n\\n"
-                f"{text}\\n\\n"
-                "> AI interpretation, not a verified fact, intention or diagnosis.\\n")
+        body = ("---\n"
+                "type: observation\n"
+                f"date: {clock.isoformat(timespec='seconds')}\n"
+                "source: screen_vision\n"
+                "confidence: unverified\n"
+                "storage: local_obsidian_markdown\n"
+                f"application: {re.sub(r'[^A-Za-z0-9_.-]', '_', app_name)}\n"
+                "---\n\n"
+                "## Observed activity\n\n"
+                f"{text}\n\n"
+                "> AI interpretation, not a verified fact, intention or diagnosis.\n")
         # This file contains no raw screenshot and is stored only on the owner's machine.
         try:
             with dest.open("x", encoding="utf-8") as stream:
