@@ -840,7 +840,7 @@ class LivePanel:
         category = observed_skill(panel.trace[-1][0]) if panel.trace else panel._current_skill
         counts = panel._skill_checks[category]
         counts[0 if ok else 1] += 1
-        if panel._experience is not None:
+        if panel._experience is not None and not getattr(getattr(panel.app, "privacy", None), "private", False):
             try:
                 panel._experience.record(category, bool(ok))
                 panel._experience_snapshot = panel._experience.snapshot()
