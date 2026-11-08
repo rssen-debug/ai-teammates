@@ -51,11 +51,25 @@ class PanelTest(unittest.TestCase):
         self.assertNotIn("run_command", p._chat.text)
         self.assertEqual(len(p.trace), 1)
 
+    def test_submit_is_visible_before_agent_runs(self):
+        p = self.build()
+        field = SimpleNamespace(text="hej, kan du hjälpa mig?")
+        self.assertTrue(p._submit(field))
+        self.assertEqual(field.text, "")
+        self.assertIn("hej, kan du hjälpa mig?", p._chat.text)
+        self.assertEqual(p.queue.get_nowait(), "hej, kan du hjälpa mig?")
+
+    def test_colour_and_ansi_are_clean(self):
+        p = self.build()
+        p.ui._out("\x1b[36mbuddy › vit text\x1b[0m")
+        self.assertNotIn("\x1b", p._chat.text)
+        self.assertIn("vit text", p._chat.text)
+
     def test_bounded_chat_and_safe_compact_trace(self):
         p = self.build()
         for i in range(500):
             p.ui._out("Reply " + str(i))
-        self.assertLessEqual(len(p.messages), 450)
+        self.assertLessEqual(len(p.messages), 220)
         self.assertNotIn("\n", clean_line("line 1\nsecret", 30))
         self.assertIn("Reply 499", p._chat.text)
 
