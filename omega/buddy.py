@@ -374,6 +374,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "first_run_done": False,
     "poll_seconds": 2.0,
     "screenshot_upload": "ask",  # ask | allow | deny
+    "obsidian_auto_memory": False,  # opt in to storing screened activity descriptions locally
+    "obsidian_vault": "",  # default HOME/obsidian-vault; configurable in CLI
 }
 
 
@@ -5209,6 +5211,7 @@ class CompanionSubsystem:
         self._obs: Any = None
         self._model: Any = None
         self._loop: Any = None
+        self._personal_vault: Any = None
 
     @property
     def mod(self) -> Any:
@@ -5344,6 +5347,27 @@ class CompanionSubsystem:
             return {}
         return {"title": w.get("title", ""), "app": w.get("app", "")}
 
+    def _remember_screen(self, title: str, app_name: str, text: str) -> str:
+        """Durable, bounded and unverified; observation isn't a personal fact."""
+        if not self.app.settings.get("obsidian_auto_memory", False):
+            return "Obsidian memory off"
+        if self.app.privacy.private or self.app.privacy.protected_window(title, app_name):
+            return "protected activity not saved"
+        mod = sibling("personal_memory")
+        if mod is None:
+            return "Obsidian writer unavailable"
+        vault_root = Path(self.app.settings.get("obsidian_vault") or HOME / "obsidian-vault").expanduser()
+        if self._personal_vault is None or self._personal_vault.root != vault_root:
+            self._personal_vault = mod.ObservationVault(vault_root)
+        saved, note, safe_text = self._personal_vault.record(app_name, text)
+        if not saved:
+            return note
+        self.app.memory.save(
+            "episodic", f"Screen activity {iso()}",
+            safe_text, tags="companion,screen,observation", status="unverified",
+            provenance={"source": "screen_vision", "confidence": "unverified", "obsidian_file": note})
+        return "saved to Obsidian Markdown and searchable memory"
+
     @property
     def loop(self) -> Any:
         m = self.need()
@@ -5353,6 +5377,7 @@ class CompanionSubsystem:
                 store=self.app.store, memory=self.app.memory,
                 chat=self._chat, idle_probe=self.idle_seconds, pending_input=self._pending,
                 capture_context=self._screen_context,
+                on_observation=self._remember_screen,
                 log_fn=lambda ev, **kw: log(ev, **kw))
         return self._loop
 
@@ -5626,7 +5651,7 @@ class Buddy:
 
     # ── slash commands ──
     HELP = """/help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
-/memory [list|search Q|forget ID|export|clear]  /doctor  /pause  /resume  /stop  /quit /exit
+/memory [list|search Q|forget ID|export|clear]  /obsidian [status|on|off|path PATH]  /resources  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
 /grants [revoke]  /activate [all|status|off]  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
 Just talk normally — Buddy decides when to use tools. Say "stop" at any time."""
@@ -5699,6 +5724,32 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
             elif sub == "clear":
                 self.memory.forget_all()
                 o("All memories and conversation history deleted.")
+        elif cmd == "/obsidian":
+            sub = args[0].lower() if args else "status"
+            folder = Path(self.settings.get("obsidian_vault") or HOME / "obsidian-vault").expanduser()
+            if sub == "on":
+                self.settings.set("obsidian_auto_memory", True)
+                o(f"Obsidian observation memory enabled: {folder} (Markdown, local, no screenshots).")
+            elif sub == "off":
+                self.settings.set("obsidian_auto_memory", False)
+                o("Obsidian observation memory disabled; existing notes are kept.")
+            elif sub == "path" and len(args) > 1:
+                folder = Path(" ".join(args[1:])).expanduser()
+                if not folder.is_absolute():
+                    o("Please use an absolute vault path, e.g. C:\\Users\\you\\Documents\\ObsidianVault")
+                else:
+                    self.settings.set("obsidian_vault", str(folder))
+                    self.companion._personal_vault = None
+                    o(f"Obsidian vault path set: {folder}")
+            elif sub == "status":
+                o(f"Obsidian auto memory: {'ON' if self.settings.get('obsidian_auto_memory', False) else 'OFF'}")
+                o(f"Vault: {folder}  (can be opened as a vault in Obsidian)")
+                o("Stores short screened visual descriptions; source is unverified AI vision, not inferred personal facts.")
+                o("To disable: /obsidian off. Delete individual note files directly in Obsidian.")
+            else:
+                o("Usage: /obsidian [status | on | off | path ABSOLUTE_PATH]")
+        elif cmd == "/resources":
+            o(resources_report())
         elif cmd == "/doctor":
             o("Running diagnostics…")
             items = await asyncio.to_thread(self.doctor.run, "all")
@@ -5748,7 +5799,8 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                   f"companion: {'ON' if self.companion.present()[0] and self.companion.loop.enabled else 'OFF'}; "
                   f"voice: {'ON' if self.voice.running else 'OFF'}; "
                   f"screen captures: {self.companion.loop.captures if self.companion.present()[0] else 0}; "
-                  f"last capture: {self.companion.loop.last_capture_note if self.companion.present()[0] else 'unavailable'}")
+                  f"last capture: {self.companion.loop.last_capture_note if self.companion.present()[0] else 'unavailable'}; "
+                  f"Obsidian auto memory: {self.settings.get('obsidian_auto_memory', False)}")
             elif sub == "all":
                 self.settings.set("free_only", True)
                 self.settings.set("models", {role: "kilo-auto/free" for role in Router.ROLES})
@@ -5756,6 +5808,7 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 for scope in ("observe", "input", "write", "exec"):
                     self.perms.set(scope, "always")
                 self.settings.set("screenshot_upload", "allow")
+                self.settings.set("obsidian_auto_memory", True)
                 # Refresh cached backend after the owner has explicitly allowed screenshot uploads.
                 if self.companion.present()[0] and self.companion._obs is not None:
                     self.companion._obs.backend = self.companion._backend(self.companion.mod)
@@ -5790,6 +5843,7 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 self.activity.stop()
                 self.settings.set("observe_enabled", False)
                 self.settings.set("screenshot_upload", "ask")
+                self.settings.set("obsidian_auto_memory", False)
                 for scope in ("input", "write", "exec"):
                     self.perms.set(scope, None)
                 self.perms.audit("user", "activate_all_except_voice", "configuration", "disabled")
