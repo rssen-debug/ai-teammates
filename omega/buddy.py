@@ -6182,9 +6182,9 @@ def activate_saved_presence(app: Buddy) -> tuple[bool, str]:
         if not ok:
             app.companion.observation.set_depth("titles")
             return True, "screen capture unavailable (titles fallback): " + reason
-    app.settings.set("obsidian_auto_memory", True)
-    app.settings.set("observe_enabled", True)
-    return True, "owner-authorized modules restored; Voice respects its separate setting"
+    # Existing /activate all already stored these. Respect /obsidian off and
+    # /activity off if the owner changed those settings afterwards.
+    return True, "owner-authorized modules restored; activity/Obsidian/Voice retain their saved settings"
 
 
 def sync_owner_knowledge(app: Buddy) -> tuple[int, int]:
