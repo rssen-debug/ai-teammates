@@ -4628,9 +4628,12 @@ class CLI:
         desktop = a.caps.get("desktop")
         companion_screen = False
         with contextlib.suppress(Exception):
-            companion_screen = a.companion.present()[0] and a.companion.loop.enabled and a.companion.observation.depth in ("capture", "continuous") and a.companion.observation.backend.available[0]
+            lp = a.companion.loop if a.companion.present()[0] else None
+            companion_screen = bool(lp and lp.enabled and lp.captures > 0
+                                    and now() - lp.last_capture_at < 90
+                                    and lp.last_capture_note.startswith("captured and read"))
         if companion_screen:
-            screen = ("●", C.G, "Active")
+            screen = ("●", C.G, "Active · verified capture")
         elif scr == "working" or desktop == "working":
             screen = ("●", C.G, "Ready")
         else:
