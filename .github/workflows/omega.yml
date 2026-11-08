@@ -117,8 +117,24 @@ jobs:
           exit $rc
 
       - name: Acceptance scenarios
+        # This step deliberately does NOT fail the job on a non-zero exit code — the
+        # next step decides what that code means. GitHub runs `shell: bash` with
+        # `-eo pipefail`, so `python … | tee …` propagates the harness's exit status,
+        # and the step whose whole purpose is to tell FAIL from BLOCKED never ran.
+        # The judgement belongs in one place, and it is not here.
         shell: bash
-        run: python omega/acceptance.py | tee acceptance.txt
+        run: |
+          set +e
+          python omega/acceptance.py 2>&1 | tee acceptance.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "acceptance.py exited ${rc}"
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::acceptance.py exited ${rc} on ${{ matrix.os }} / py${{ matrix.python }}"
+            grep -E "^\s*[0-9]+\.|FAIL|BLOCKED|NOT TESTED" acceptance.txt \
+              | sed 's/^/::error::acc| /' | head -60 || true
+          fi
+          exit 0
 
       - name: Fail on acceptance FAIL, never on BLOCKED
         shell: bash
