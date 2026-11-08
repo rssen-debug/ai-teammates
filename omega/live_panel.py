@@ -446,6 +446,8 @@ class LivePanel:
             self._build_error = "Tetris engine: " + type(exc).__name__
             return
         last_tasks_poll = 0.0
+        last_key_check = 0.0
+        has_key = False
         while True:
             try:
                 current = time.monotonic()
@@ -453,11 +455,14 @@ class LivePanel:
                     last_tasks_poll = current
                     if getattr(self.app, "tasks", None) is not None:
                         await asyncio.to_thread(self._poll_build_state)
+                if current - last_key_check > 30:
+                    last_key_check = current
+                    # Windows credential vault lookups must never block input.
+                    has_key = await asyncio.to_thread(lambda: bool(self.app.gateway.key()))
                 if self._tetris.awaiting_move:
                     # Owner chat takes priority; autonomous coding tasks may
                     # continue concurrently with the independent Tetris model.
                     busy = bool(self.app.current_run) or bool(self._typing.text.strip())
-                    has_key = bool(self.app.gateway.key())
                     if busy:
                         self._tetris_ai_state = "pausad för användaren/uppgift"
                     elif not has_key:
