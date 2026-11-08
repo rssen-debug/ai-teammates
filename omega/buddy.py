@@ -4984,14 +4984,23 @@ class Voice:
             self.app.caps.report("voice", "blocked" if p["status"] == "BLOCKED" else "failing", self.error)
             return False, f"{p['name']} — {p['detail']}" + (f"\n    fix: {p['fix']}" if p["fix"] else "")
         try:
+            # Public Whisper models do NOT require an HF_TOKEN. The Hub warning
+            # is informational and must not escape into prompt_toolkit's screen.
+            # Quiet only the known Hub logger; keep actual errors visible.
+            import logging
+            os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+            os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
+            os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+            logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
             from faster_whisper import WhisperModel
             if self.model is None:
-                self.app.ui.event(f"loading speech model '{self.app.settings.get('stt_model')}' (first time downloads it)…")
+                self.app.ui.event(f"loading CPU speech model '{self.app.settings.get('stt_model')}' (first time downloads it)…")
                 self.model = WhisperModel(self.app.settings.get("stt_model"), device="cpu", compute_type="int8")
         except Exception as e:
             self.error = f"speech model failed: {type(e).__name__}: {e}"
             self.app.caps.report("voice", "failing", self.error)
             return False, self.error
+        self.error = ""
         self.stop_ev.clear()
         self.muted = False
         self.running = True
@@ -5133,6 +5142,10 @@ class Voice:
             self.app.ui.event(f"voice stopped: {self.error}")
         finally:
             self.running = False
+            if self.stop_ev.is_set():
+                self.app.ui.event("Röst avstängd")
+            elif self.error:
+                self.app.ui.event("Röst stoppad: " + self.error)
 
     def transcribe(self, audio: Any) -> tuple[str, str, float]:
         langs = self.app.settings.get("voice_languages")
