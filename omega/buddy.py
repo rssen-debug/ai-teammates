@@ -5696,7 +5696,7 @@ class Buddy:
 
     # ── slash commands ──
     HELP = """/help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
-/memory [list|search Q|forget ID|export|clear]  /obsidian [status|on|off|path PATH]  /resources  /doctor  /pause  /resume  /stop  /quit /exit
+/memory [list|search Q|forget ID|export|clear]  /obsidian [status|on|off|sync|path PATH|clear --yes]  /resources  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
 /grants [revoke]  /activate [all|status|off]  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
 Just talk normally — Buddy decides when to use tools. Say "stop" at any time."""
@@ -5786,6 +5786,18 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                     self.settings.set("obsidian_vault", str(folder))
                     self.companion._personal_vault = None
                     o(f"Obsidian vault path set: {folder}")
+            elif sub == "sync":
+                module = sibling("personal_memory")
+                if module is None:
+                    o("Obsidian writer unavailable: " + _SIBLING_ERRORS.get("personal_memory", "unknown"))
+                else:
+                    vault = module.ObservationVault(folder)
+                    count, skipped = 0, 0
+                    for mem in self.store.q("SELECT kind,title,content,status FROM memories"):
+                        ok, _ = vault.record_knowledge(mem["kind"], mem["title"], mem["content"], mem["status"] or "unverified")
+                        count += int(ok)
+                        skipped += int(not ok)
+                    o(f"Obsidian sync: {count} durable notes mirrored, {skipped} ineligible/filtered. Vault: {folder}")
             elif sub == "clear":
                 if "--yes" not in args[1:]:
                     o("This deletes all auto-generated observation notes (not unrelated vault files). Confirm with /obsidian clear --yes.")
@@ -5803,7 +5815,7 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 o("Stores short screened visual descriptions; source is unverified AI vision, not inferred personal facts.")
                 o("To disable: /obsidian off. Delete individual note files directly in Obsidian.")
             else:
-                o("Usage: /obsidian [status | on | off | path ABSOLUTE_PATH | clear --yes]")
+                o("Usage: /obsidian [status | on | off | sync | path ABSOLUTE_PATH | clear --yes]")
         elif cmd == "/resources":
             o(resources_report())
         elif cmd == "/doctor":
