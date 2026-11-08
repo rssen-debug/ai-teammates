@@ -121,7 +121,9 @@ class LivePanel:
         entered = buffer.text.strip()
         buffer.text = ""
         if entered:
-            self.messages.append("you › " + clean_line(entered, 900))
+            shown = re.sub(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}",
+                           "[REDACTED-JWT]", entered)
+            self.messages.append("you › " + clean_line(shown, 900))
             self.queue.put_nowait(entered)
             self._refresh()
         return True
@@ -230,7 +232,8 @@ class LivePanel:
             panel.trace.append((old[0], bool(ok), old[2]))
         panel.phase = ("Steg klart" if ok else "Steg misslyckades")
         if err and not ok:
-            panel._add("Verktygsfel: " + clean_line(err, 140))
+            # Never dump raw exceptions here: provider errors can contain secrets.
+            panel._add("Ett verktyg misslyckades. Se felstatus i panelen.")
         panel._refresh()
 
     def summary(self, run: Any, result: Any) -> None:
