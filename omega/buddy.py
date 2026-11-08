@@ -534,6 +534,7 @@ class StopSignal:
 DEPS: dict[str, dict[str, Any]] = {
     "uiautomation": {"pip": "uiautomation", "win_only": True, "required": True, "why": "Windows UI Automation (accessibility tree, controls)"},
     "PIL": {"pip": "pillow", "win_only": False, "required": True, "why": "Screenshots"},
+    "prompt_toolkit": {"pip": "prompt-toolkit>=3.0,<4", "win_only": False, "required": True, "why": "Split-screen live chat and status panel"},
     "sounddevice": {"pip": "sounddevice", "win_only": False, "required": False, "why": "Microphone capture"},
     "numpy": {"pip": "numpy", "win_only": False, "required": False, "why": "Audio processing"},
     "faster_whisper": {"pip": "faster-whisper", "win_only": False, "required": False, "why": "Local speech recognition (Swedish + English)"},
@@ -5520,6 +5521,7 @@ class Buddy:
         self.companion = CompanionSubsystem(self)
         self.legacy = LegacySubsystem(self)
         self.ui: Any = NullUI() if headless else CLI(self)
+        self.live_panel: Any = None
         self.perms.confirm_fn = lambda p, al: self.ui.confirm(p, al)
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.shutting_down = False
@@ -6277,6 +6279,25 @@ async def presence_heartbeat(app: Buddy, interval: float = 1200) -> None:
 
 async def main_async(app: Buddy) -> None:
     app.loop = asyncio.get_running_loop()
+    if (IS_WIN and isinstance(app.ui, CLI)
+            and sys.stdin.isatty() and sys.stdout.isatty()
+            and os.environ.get("BUDDY_NO_PANEL") != "1"):
+        panel_module = sibling("live_panel")
+        if panel_module is not None:
+            try:
+                panel = panel_module.LivePanel(app, CLI)
+                app.live_panel = panel
+                app.ui = panel.ui
+                app.perms.confirm_fn = lambda p, al: app.ui.confirm(p, al)
+                panel.start()
+                await asyncio.sleep(0.05)
+            except Exception as exc:
+                app.live_panel = None
+                app.ui = CLI(app)
+                app.perms.confirm_fn = lambda p, al: app.ui.confirm(p, al)
+                app.ui.event(f"Split-panel fallback: {type(exc).__name__}: {exc}")
+        else:
+            app.ui.event("Split-panel dependency missing; use installer to add prompt-toolkit.")
     import signal
 
     def on_sigint(*_: Any) -> None:
@@ -6323,7 +6344,8 @@ async def main_async(app: Buddy) -> None:
     try:
         while True:
             try:
-                line = await asyncio.to_thread(input, "")
+                line = (await app.live_panel.read_line() if app.live_panel is not None
+                        else await asyncio.to_thread(input, ""))
             except EOFError:
                 break
             if app.stop.requested():
@@ -6338,6 +6360,8 @@ async def main_async(app: Buddy) -> None:
         pass
     finally:
         worker.cancel()
+        if app.live_panel is not None:
+            app.live_panel.close()
         if app.presence_task is not None:
             app.presence_task.cancel()
             app.presence_task = None
