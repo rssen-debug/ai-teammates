@@ -4388,9 +4388,14 @@ class AgentRun:
             model = self.pick_model()
             app.ui.status("Analyserar nästa steg utifrån hittade resultat" if self.ledger else "Tolkar uppgiften och väljer verktyg")
             if not self.ledger and hasattr(app.ui, "explain_action"):
-                app.ui.explain_action(self.goal, "Analyserar din fråga",
-                    "Jag tar fram ett svar eller väljer ett verktyg utifrån uppgiften.",
-                    "Nästa steg blir ett svar eller ett registrerat verktygsanrop.")
+                # Human-readable, deterministic decision summary (NOT hidden
+                # chain-of-thought). Source: actual goal and tool availability.
+                app.ui.explain_action(
+                    self.goal, "V5 · " + self.decision.domain.upper(),
+                    self.decision.reason,
+                    ("Tillgängliga: " + ", ".join(self.decision.available_tools)
+                     if self.decision.available_tools else
+                     "Sök verktyg eller svara utan datoråtgärd."))
             start_wait = time.monotonic()
             fragments = 0
             first_token_at: float | None = None
