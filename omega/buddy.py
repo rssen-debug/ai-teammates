@@ -2584,8 +2584,14 @@ class Skills:
         v += 1
         d = DIRS["skills"] / name / f"v{v}"
         d.mkdir(parents=True, exist_ok=True)
-        (d / "skill.py").write_text(code, encoding="utf-8")
-        (d / "spec.json").write_text(jdump({"name": name, "description": description, "parameters": parameters, "risk": risk}), encoding="utf-8")
+        # write_bytes, NOT write_text. The integrity check hashes `code.encode()` and
+        # later compares it against `path.read_bytes()`. A text-mode write translates
+        # "\n" to os.linesep, so on Windows the file holds CRLF while the stored hash
+        # was computed over LF — every skill then looks tampered with and can never
+        # run. Invisible on Linux and macOS, where there is no translation.
+        (d / "skill.py").write_bytes(code.encode("utf-8"))
+        (d / "spec.json").write_bytes(jdump({"name": name, "description": description,
+                                             "parameters": parameters, "risk": risk}).encode("utf-8"))
         h = hashlib.sha256(code.encode()).hexdigest()
         self.s.x("INSERT INTO skills(name,version,status,description,schema,path,code_hash,risk,created) VALUES(?,?,?,?,?,?,?,?,?)",
                  (name, v, "draft", description, jdump(parameters), str(d / "skill.py"), h, risk, now()))
@@ -6093,6 +6099,12 @@ async def run_suite(live: bool) -> int:
         code = "def run(args):\n    return {'sum': args['a'] + args['b']}\n"
         pr = sk.propose("adder_demo", "adds two numbers", {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}}, "required": ["a", "b"]}, code)
         tr = sk.test("adder_demo", None, {"a": 2, "b": 3}, "5")
+        if not tr.get("passed"):
+            # Without this, activate() raises a generic "has not passed its test" and
+            # that is all the check reports. The actual reason — a hash mismatch, a
+            # crash, a missing interpreter — is stored in test_result and never
+            # surfaces, which is why this failure was undiagnosable from CI output.
+            raise ToolError(f"skill test failed: {tr.get('error') or tr.get('output') or 'no reason recorded'}")
         app.ui.answer = "once"
         act = await sk.activate("adder_demo")
         use = await exec_tool(app, "skill_adder_demo", {"a": 4, "b": 5})
@@ -6538,7 +6550,22 @@ async def windows_tests(s: Suite, app: Buddy, key: bool) -> None:
     try:
         t0 = time.time()
         rc, err = app.voice._speak_sapi("Studdy Buddy voice test.", "en")
-        s.rec("J4", "voice playback (SAPI process completed)", "PASS" if rc == 0 else "FAIL", f"rc={rc} in {time.time() - t0:.1f}s (audibility not machine-verifiable; --voice-test asks you)")
+        # Distinguish "SAPI is broken" from "this machine has nothing to play sound
+        # on". A CI runner has no audio output device at all, and calling that a
+        # product failure is a claim the product cannot support.
+        try:
+            audio_devices = int(ctypes.windll.winmm.waveOutGetNumDevs()) if IS_WIN else 0
+        except Exception:
+            audio_devices = -1
+        if rc == 0:
+            s.rec("J4", "voice playback (SAPI process completed)", "PASS",
+                  f"rc=0 in {time.time() - t0:.1f}s (audibility not machine-verifiable; --voice-test asks you)")
+        elif audio_devices == 0:
+            s.rec("J4", "voice playback (SAPI process completed)", "BLOCKED",
+                  f"rc={rc} and waveOutGetNumDevs()=0 — no audio output device on this machine")
+        else:
+            s.rec("J4", "voice playback (SAPI process completed)", "FAIL",
+                  f"rc={rc} in {time.time() - t0:.1f}s with {audio_devices} audio device(s): {clip(err, 120)}")
     except Exception as e:
         s.rec("J4", "voice playback", "FAIL", str(e))
     s.rec("J5", "speech recognition (real speech)", "NOT TESTED", "needs a spoken sentence: run `python buddy.py --voice-test`")
@@ -6550,12 +6577,23 @@ async def windows_tests(s: Suite, app: Buddy, key: bool) -> None:
             raise ToolError(r.error)
         hw = next((w["hwnd"] for w in r.data["new_windows"] if "notepad" in w["app"].lower()), None) or (r.data["foreground"] or {}).get("hwnd")
         found = await exec_tool(app, "ui_find", {"hwnd": hw, "role": "Edit"})
-        if not found.ok or not found.data["matches"]:
+        if not found.ok or not (found.data or {}).get("matches"):
             found = await exec_tool(app, "ui_find", {"hwnd": hw, "role": "Document"})
-        ref = found.data["matches"][0]["ref"]
+        matches = (found.data or {}).get("matches") or []
+        if not matches:
+            # A CI runner has no interactive desktop session: Notepad starts and
+            # presents nothing to drive. That is a statement about the machine, not a
+            # defect. Indexing found.data["matches"] while data is None reported it as
+            # `FAIL: TypeError: 'NoneType' object is not subscriptable` — the same
+            # host-precondition-as-failure mistake as benchmark B13.
+            s.rec("D", "Notepad: open → type → read back (real desktop)", "BLOCKED",
+                  f"launched, but no editable element was reachable ({found.error or 'ui_find returned nothing'})"
+                  " — this session has no interactive desktop")
+            return
+        ref = matches[0]["ref"]
         w = await exec_tool(app, "ui_set_text", {"ref": ref, "text": phrase})
         back = await exec_tool(app, "ui_read", {"ref": ref})
-        ok = w.ok and back.ok and phrase in (back.data.get("value") or "")
+        ok = w.ok and back.ok and phrase in ((back.data or {}).get("value") or "")
         s.rec("D", "Notepad: open → type → read back (real desktop)", "PASS" if ok else "FAIL", f"readback={clip(str((back.data or {}).get('value')), 60)!r}; close Notepad manually (don't save)")
     except Exception as e:
         s.rec("D", "Notepad control", "FAIL", f"{type(e).__name__}: {e}")

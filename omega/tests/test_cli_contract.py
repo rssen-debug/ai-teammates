@@ -296,15 +296,15 @@ class TestWindowsPortability(unittest.TestCase):
         signatures makes the branch checkable without a Windows machine.
         """
         import inspect
-        # Introspection alone cannot do this job, for the same reason the bug existed:
-        # Popen's signature is platform-specific, and on POSIX it does not list
-        # windows_hide or creationflags at all. Validating a Windows-only branch
-        # against a POSIX signature would reject the correct spelling, so the two
-        # documented Windows-only parameters are declared here explicitly.
-        WINDOWS_ONLY = {"windows_hide", "creationflags"}
-        valid = ((set(inspect.signature(subprocess.Popen.__init__).parameters)
-                  | set(inspect.signature(subprocess.run).parameters))
-                 - {"self", "args"}) | WINDOWS_ONLY
+        # NO whitelist of "Windows-only" parameters. An earlier version of this test
+        # had one, holding `windows_hide` and `creationflags`, and it was wrong in the
+        # most damaging way available: it blessed the exact bug the test exists to
+        # catch. `windows_hide` is not a Popen parameter on any platform — it is a
+        # Node.js option — while `creationflags` is in the shared signature and shows
+        # up in introspection even on POSIX. So the real signature is sufficient, and
+        # any name this test has to be told about is a name nobody has verified.
+        valid = (set(inspect.signature(subprocess.Popen.__init__).parameters)
+                 | set(inspect.signature(subprocess.run).parameters)) - {"self", "args"}
         bad: list[str] = []
         for f in sorted(OMEGA.rglob("*.py")):
             tree = ast.parse(f.read_text(encoding="utf-8"))

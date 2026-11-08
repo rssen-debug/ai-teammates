@@ -279,13 +279,21 @@ class MajinBridge:
         return subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True, encoding="utf-8", errors="replace",  bufsize=1,
                                 cwd=str(self.majin_root), env=env,
-                                # `windows_hide`, not `windowsHide`. The camelCase spelling is
-                                # not a Popen parameter, so it raises TypeError — but only inside
-                                # this `if IS_WIN` dict, which is empty on Linux and macOS. That is
-                                # how it survived every local test while making the bridge
-                                # unstartable on the one platform this product targets. Line 548 of
-                                # this same file already had it right.
-                                **({"windows_hide": True, "creationflags": 0x08000000} if IS_WIN else {}))
+                                # CREATE_NO_WINDOW, so spawning node does not flash a console.
+                                #
+                                # This used to pass `windowsHide=True` and was "corrected" to
+                                # `windows_hide=True`. Both raise TypeError, because neither is a
+                                # Popen parameter on ANY platform: `windows_hide` does not appear
+                                # anywhere in CPython's subprocess module (checked against the 3.11
+                                # and 3.13 sources). It is a Node.js child_process.spawn option —
+                                # which is very likely how the camelCase spelling got into a Python
+                                # file in a project that wraps a Node CLI in the first place.
+                                #
+                                # It survived every local test because the dict is empty unless
+                                # IS_WIN, so the branch never executes off Windows — and it made
+                                # the bridge unstartable on the one platform this product targets,
+                                # taking MAJIN's 16 tools and acceptance scenario 13 with it.
+                                **({"creationflags": 0x08000000} if IS_WIN else {}))
 
     def start(self) -> None:
         with self._lock:
@@ -551,7 +559,7 @@ class MajinBridge:
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", 
                                   timeout=timeout, cwd=str(self.majin_root), env=env,
-                                  **({"windows_hide": True} if IS_WIN else {}))
+                                  **({"creationflags": 0x08000000} if IS_WIN else {}))
         except subprocess.TimeoutExpired:
             raise MajinError(f"majin-v6 {' '.join(args)} timed out after {timeout:.0f}s",
                              kind="timeout", code="MAJIN_CLI_TIMEOUT", retryable=False) from None
