@@ -790,6 +790,107 @@ class Gateway:
         self.usage["calls"] += 1
         return {"message": ch.get("message") or {}, "finish": ch.get("finish_reason"), "usage": u, "model": resp.get("model", model)}
 
+    def chat_stream_sync(self, model: str, messages: list[dict],
+                         tools: list[dict] | None = None, max_tokens: int | None = None,
+                         timeout: float = 150, on_delta: Callable[[str], None] | None = None) -> dict:
+        """Read OpenAI-compatible SSE incrementally, including tool-call fragments.
+
+        Falls back to the standard endpoint ONLY before receiving any tokens, so
+        a truncated response cannot accidentally double-submit an action.
+        """
+        key = self.key()
+        if not key:
+            raise GatewayError("no_key", "No KiloCode API key configured.")
+        body: dict[str, Any] = {"model": model, "messages": messages, "stream": True}
+        if tools:
+            body["tools"] = tools
+            body["tool_choice"] = "auto"
+        if max_tokens:
+            body["max_tokens"] = max_tokens
+        last_error: Exception | None = None
+        for base in self.candidates:
+            received = False
+            try:
+                req = urllib.request.Request(base + "/chat/completions",
+                    data=json.dumps(body).encode("utf-8"), method="POST",
+                    headers={"Authorization": f"Bearer {key}",
+                             "Content-Type": "application/json",
+                             "Accept": "text/event-stream",
+                             "User-Agent": f"StuddyBuddy/{APP_VERSION}"})
+                content: list[str] = []
+                tool_parts: dict[int, dict] = {}
+                finish = None
+                usage: dict = {}
+                with urllib.request.urlopen(req, timeout=timeout) as response:
+                    content_type = response.headers.get("Content-Type", "")
+                    if "text/event-stream" not in content_type:
+                        # Some gateways return a complete JSON reply despite stream=true.
+                        raw = json.loads(response.read().decode("utf-8", "replace"))
+                        if "choices" not in raw:
+                            raise GatewayError("bad_request", "Gateway returned no choices.")
+                        ch = raw["choices"][0]
+                        return {"message": ch.get("message") or {}, "finish": ch.get("finish_reason"),
+                                "usage": raw.get("usage") or {}, "model": raw.get("model", model)}
+                    for line in response:
+                        if not line.startswith(b"data:"):
+                            continue
+                        payload = line[5:].strip()
+                        if payload == b"[DONE]":
+                            break
+                        if not payload:
+                            continue
+                        chunk = json.loads(payload.decode("utf-8", "replace"))
+                        received = True
+                        if isinstance(chunk.get("usage"), dict):
+                            usage = chunk["usage"]
+                        for choice in chunk.get("choices") or []:
+                            delta = choice.get("delta") or {}
+                            frag = delta.get("content")
+                            if isinstance(frag, str) and frag:
+                                content.append(frag)
+                                if on_delta:
+                                    on_delta(frag)
+                            for part in delta.get("tool_calls") or []:
+                                ix = int(part.get("index", 0))
+                                slot = tool_parts.setdefault(ix, {"id": "", "type": "function",
+                                    "function": {"name": "", "arguments": ""}})
+                                slot["id"] += part.get("id") or ""
+                                fn = part.get("function") or {}
+                                slot["function"]["name"] += fn.get("name") or ""
+                                slot["function"]["arguments"] += fn.get("arguments") or ""
+                            if choice.get("finish_reason"):
+                                finish = choice["finish_reason"]
+                self.base = base
+                self.usage["prompt"] += int(usage.get("prompt_tokens") or 0)
+                self.usage["completion"] += int(usage.get("completion_tokens") or 0)
+                self.usage["calls"] += 1
+                message = {"role": "assistant", "content": "".join(content)}
+                if tool_parts:
+                    message["tool_calls"] = [tool_parts[i] for i in sorted(tool_parts)]
+                return {"message": message, "finish": finish, "usage": usage, "model": model}
+            except (urllib.error.URLError, TimeoutError, socket.timeout, ValueError, GatewayError) as exc:
+                last_error = exc
+                if received:
+                    raise GatewayError("stream_interrupted",
+                                       f"AI stream stopped after partial output: {type(exc).__name__}")
+                # A provider may not support SSE. Fall back to the existing API
+                # before any output is shown rather than leaving chat unusable.
+                continue
+        if last_error:
+            return self.chat_sync(model, messages, tools, max_tokens=max_tokens, timeout=timeout)
+        raise GatewayError("network", "No working gateway endpoint.")
+
+    async def chat_stream(self, model: str, messages: list[dict], tools: list[dict] | None = None,
+                          max_tokens: int | None = None, timeout: float = 150,
+                          on_delta: Callable[[str], None] | None = None) -> dict:
+        loop = asyncio.get_running_loop()
+        def notify(delta: str) -> None:
+            if on_delta:
+                loop.call_soon_threadsafe(on_delta, delta)
+        return await asyncio.to_thread(
+            self.chat_stream_sync, model, messages, tools, max_tokens, timeout,
+            notify if on_delta else None)
+
     async def chat(self, *a: Any, **kw: Any) -> dict:
         return await asyncio.to_thread(self.chat_sync, *a, **kw)
 
@@ -4232,7 +4333,27 @@ class AgentRun:
                 self.messages.append({"role": "user", "content": "(the user added while you were working) " + self.inbox.pop(0)})
             model = self.pick_model()
             app.ui.status("Analyserar nästa steg utifrån hittade resultat" if self.ledger else "Tolkar uppgiften och väljer verktyg")
-            resp = await app.gateway.chat(model, self._compact(), self.tool_schemas(restricted), max_tokens=4096, timeout=150)
+            start_wait = time.monotonic()
+            fragments = 0
+            first_token_at: float | None = None
+            def on_token(delta: str) -> None:
+                nonlocal fragments, first_token_at
+                fragments += len(delta)
+                if first_token_at is None:
+                    first_token_at = time.monotonic()
+                    app.ui.event(f"AI svarar · första token efter {first_token_at - start_wait:.1f}s")
+                if hasattr(app.ui, "stream_delta"):
+                    app.ui.stream_delta(delta)
+            if hasattr(app.ui, "stream_begin"):
+                app.ui.stream_begin()
+            try:
+                resp = await app.gateway.chat_stream(model, self._compact(), self.tool_schemas(restricted),
+                                                    max_tokens=4096, timeout=150, on_delta=on_token)
+            finally:
+                if hasattr(app.ui, "stream_end"):
+                    app.ui.stream_end()
+            elapsed_ai = time.monotonic() - start_wait
+            app.ui.event(f"AI-anrop klart · {elapsed_ai:.1f}s · {fragments} strömmade tecken")
             self.steps += 1
             u = resp["usage"] or {}
             self.tokens += int(u.get("total_tokens") or (int(u.get("prompt_tokens") or 0) + int(u.get("completion_tokens") or 0)))
