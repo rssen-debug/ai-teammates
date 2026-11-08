@@ -683,7 +683,8 @@ class CompanionLoop:
         # the ones that matter. The loop still thinks every tick; it just does not
         # write down every single thought.
         "store_cooldown_seconds": 900.0,
-        "capture_seconds": 30.0,  # live capture cadence when owner enables capture observation
+        "capture_seconds": 60.0,  # rate-limited observation while the owner uses the computer
+        "active_reflection_seconds": 600.0,  # proactively reflect on new evidence, even while owner is active
     }
 
     def __init__(self, settings: Any, *, observation: ObservationPolicy, model: UserModel,
@@ -715,6 +716,8 @@ class CompanionLoop:
         self.last: Optional[TickReport] = None
         self.ticks = 0
         self.last_tick_at = 0.0
+        self.last_reflection_at = 0.0
+        self.reflection_attempts = 0
         self.errors: list[str] = []
 
     def options(self) -> dict:
@@ -728,7 +731,7 @@ class CompanionLoop:
         if key not in self.DEFAULTS:
             return False, f"unknown option {key!r}; known: {', '.join(sorted(self.DEFAULTS))}"
         o = self.options()
-        if key in ("idle_seconds", "tick_seconds") and float(value) < 5:
+        if key in ("idle_seconds", "tick_seconds", "capture_seconds", "active_reflection_seconds") and float(value) < 5:
             return False, f"{key} must be at least 5s, or the loop spins and burns budget for nothing"
         o[key] = value
         self.cfg.set(self.SETTING, o)
@@ -778,8 +781,15 @@ class CompanionLoop:
         if self._pending():
             return False, "the owner is waiting for an answer — replies come first"
         idle, need = self.idle_seconds(), float(self.options()["idle_seconds"])
+        cadence = max(300.0, float(self.options().get("active_reflection_seconds", 600)))
+        if self.last_reflection_at and _now() - self.last_reflection_at < cadence:
+            return False, "waiting for next scheduled reflection"
         if idle < need:
-            return False, f"the owner is active (idle {idle:.0f}s < {need:.0f}s)"
+            # Never generate private psychological guesses just from app titles.
+            # Active-owner reflection needs a recently successful visual observation.
+            if not (self.last_capture_text and self.last_capture_at
+                    and _now() - self.last_capture_at < max(180.0, cadence)):
+                return False, "owner active; awaiting new screen evidence for safe proactive reflection"
         if not self.budget.allows(1):
             return False, (f"daily reflection budget exhausted "
                            f"({self.budget.spent()}/{self.budget.max} tokens)")
@@ -864,6 +874,8 @@ class CompanionLoop:
             self.last = rep
             return rep
 
+        self.last_reflection_at = _now()
+        self.reflection_attempts += 1
         profile = self.model.build(days=float(self.options().get("window_days", 30)))
         obs_ok, obs_why = self.observe()
         rep.observed, rep.observation_note = obs_ok, obs_why
@@ -995,6 +1007,8 @@ class CompanionLoop:
                 "observation": self.obs.state(),
                 "errors": list(self.errors[-5:]),
                 "last_tick_at": self.last_tick_at,
+                "last_reflection_at": self.last_reflection_at,
+                "reflection_attempts": self.reflection_attempts,
                 "capture_count": self.captures, "last_capture_note": self.last_capture_note,
                 "last_capture_at": self.last_capture_at,
                 "last": self.last.to_dict() if self.last else None}
