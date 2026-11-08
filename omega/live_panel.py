@@ -552,13 +552,20 @@ class LivePanel:
 
     def _poll_build_state(self) -> None:
         try:
-            tasks = self.app.tasks.list(30)
-            related = next((task for task in tasks
-                            if str(task.get("title") or "").startswith("Pixel Tetris BUILD")), None)
+            # Query this exact persisted build job, not "latest 30 tasks".
+            # A busy universal agent may run dozens of other tasks meanwhile.
+            related = self.app.store.one(
+                "SELECT id,title,state,attempts,step_idx,error,error_class,result "
+                "FROM tasks WHERE title LIKE 'Pixel Tetris BUILD%' "
+                "ORDER BY created DESC LIMIT 1")
             if related:
                 self._build_state = str(related.get("state") or "unknown")
                 self._build_step = int(related.get("step_idx") or 0)
-                self._build_error = clean_line(related.get("error") or "", 35)
+                self._build_error = clean_line(related.get("error") or "", 90)
+                if self._build_state in ("failed", "blocked", "cancelled"):
+                    self.events.append(datetime.now().strftime("%H:%M:%S") +
+                                       " · Bygguppgift " + self._build_state +
+                                       (": " + self._build_error if self._build_error else ""))
                 if self._build_state == "done":
                     # A completed task is NOT necessarily a verified game.
                     import json
@@ -572,6 +579,8 @@ class LivePanel:
                         self._build_state = "klar · bevis saknas"
             else:
                 self._build_state = "ej köad"
+                self._build_error = ""
+                self._build_step = 0
         except Exception as exc:
             self._build_error = "task status: " + type(exc).__name__
 
