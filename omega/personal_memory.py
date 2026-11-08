@@ -83,3 +83,18 @@ class ObservationVault:
             return False, "observation already exists", ""
         self._last_digest, self._last_timestamp = digest, stamp
         return True, str(dest), text
+
+    def clear_observations(self) -> int:
+        """Erase only files created by this observer, never unrelated Obsidian notes."""
+        folder = self.root / "observations"
+        if not folder.is_dir():
+            return 0
+        count = 0
+        for child in folder.glob("*/*.md"):
+            if re.fullmatch(r"\d{13}-[0-9a-f]{12}\.md", child.name):
+                child.unlink()
+                count += 1
+        for day in folder.iterdir():
+            if day.is_dir() and not any(day.iterdir()):
+                day.rmdir()
+        return count
