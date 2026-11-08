@@ -465,7 +465,7 @@ class LivePanel:
         def add(text: str, style: str = "") -> None:
             lines.append((style, clean_line(text, 34) + "\n"))
 
-        running = bool(app.current_run) or bool(getattr(app.tasks, "current", {}))
+        running = bool(app.current_run) or bool(getattr(getattr(app, "tasks", None), "current", {}))
         # Rendering must NEVER query SQLite, discover plugins or poll Win32.
         # The dedicated companion poll above maintains these cached values.
         comp = self._cached_companion
