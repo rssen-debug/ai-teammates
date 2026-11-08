@@ -5331,7 +5331,11 @@ class CompanionSubsystem:
             # platform, however well configured — invisible here because the tool is
             # Windows-only, so every non-Windows test returned unavailable first.
             question = str(self.app.settings.get("observation_question") or SCREEN_OBSERVE_QUESTION)
-            res = await exec_tool(self.app, "screen_describe", {"question": question})
+            target = self._screen_context()
+            args = {"question": question}
+            if target.get("hwnd"):
+                args["hwnd"] = int(target["hwnd"])
+            res = await exec_tool(self.app, "screen_describe", args)
             if not res.ok:
                 raise ToolError(res.error or "screen_describe failed", res.category or "os_error")
             d = res.data if isinstance(res.data, dict) else {"text": str(res.data)}
@@ -5392,11 +5396,30 @@ class CompanionSubsystem:
                 "tokens": int(usage.get("total_tokens") or usage.get("tokens") or 0)}
 
     def _screen_context(self) -> dict:
-        """Never observe Buddy's own credential-bearing terminal as screen activity."""
-        w = self.app.world.target()
-        if not w or self.app.world.is_buddy_host(w):
+        """Choose an eligible window without capturing Buddy's own terminal.
+
+        The owner often leaves the Buddy terminal in the foreground. In that
+        situation there may be no remembered previous window, even when VS Code
+        or a browser is plainly open. Use the visible window list as a fallback;
+        never select a protected window or silently turn observation permission on.
+        """
+        if not IS_WIN or self.app.privacy.private:
             return {}
-        return {"title": w.get("title", ""), "app": w.get("app", "")}
+        w = self.app.world.target()
+        if not w or self.app.world.is_buddy_host(w) or self.app.privacy.protected_window(w.get("title", ""), w.get("app", "")):
+            w = None
+            for candidate in Win32.windows():
+                if (not candidate.get("title") or self.app.world.is_buddy_host(candidate)
+                        or self.app.privacy.protected_window(candidate.get("title", ""), candidate.get("app", ""))):
+                    continue
+                rect = candidate.get("rect") or []
+                if len(rect) == 4 and (rect[2] <= rect[0] or rect[3] <= rect[1]):
+                    continue
+                w = candidate
+                break
+        if not w:
+            return {}
+        return {"title": w.get("title", ""), "app": w.get("app", ""), "hwnd": w.get("hwnd")}
 
     def _remember_screen(self, title: str, app_name: str, text: str) -> str:
         """Durable, bounded and unverified; observation isn't a personal fact."""
