@@ -36,6 +36,17 @@ class ObservationVaultTest(unittest.TestCase):
         self.assertNotIn("1234567890123", clean)
         self.assertIn("[email hidden]", clean)
 
+    def test_clear_removes_only_generated_notes(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            vault = ObservationVault(root)
+            vault.record("Code.exe", "Editing a source file", timestamp=1794140000)
+            other = root / "observations" / "notes" / "my-study-notes.md"
+            other.parent.mkdir(parents=True, exist_ok=True)
+            other.write_text("keep this", encoding="utf-8")
+            self.assertEqual(vault.clear_observations(), 1)
+            self.assertTrue(other.exists())
+
     def test_deduplicates_and_caps(self):
         with tempfile.TemporaryDirectory() as d:
             vault = ObservationVault(Path(d), daily_cap=2, same_note_cooldown=900)
