@@ -10,7 +10,7 @@ from types import SimpleNamespace
 OMEGA = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(OMEGA))
 
-from live_panel import LivePanel, remaining_seconds, clean_line
+from live_panel import LivePanel, remaining_seconds, clean_line, evidence_progress, pixel_companion
 
 
 class FakeCLI:
@@ -28,6 +28,24 @@ class PanelTest(unittest.TestCase):
         app = SimpleNamespace(current_run=None, companion=FakeCompanion(),
                               level_snapshot=lambda: {"level": 10, "tier": "growing"})
         return LivePanel(app, FakeCLI)
+
+    def test_next_level_uses_real_evidence_not_clock(self):
+        a = evidence_progress({"level": 10, "measured_events": 23,
+                               "raw_level": 40, "evidence_full": 250})
+        self.assertTrue(a["measured"])
+        self.assertEqual(a["target"], 11)
+        self.assertGreaterEqual(a["required"], a["events"])
+        self.assertNotIn("seconds", a)
+        self.assertNotIn("eta", a)
+        b = evidence_progress({"level": 10, "measured_events": 25,
+                               "raw_level": 10.2, "evidence_full": 250})
+        self.assertTrue(b["quality_limited"])
+
+    def test_sprite_is_static_art_not_fake_tool_activity(self):
+        a = pixel_companion("sleeping")
+        b = pixel_companion("working")
+        self.assertEqual(len(a), 4)
+        self.assertNotEqual(a[1], b[1])
 
     def test_timers_never_guess(self):
         self.assertEqual(remaining_seconds(0, 30, 100), "--:--")
