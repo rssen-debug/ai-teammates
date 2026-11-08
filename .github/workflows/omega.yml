@@ -109,7 +109,10 @@ jobs:
               | sed 's/^/::error::exc| /' || true
             grep -E "ImportError|ModuleNotFoundError|_FailedTest|SyntaxWarning" run_all.txt \
               | sort -u | sed 's/^/::error::import| /' || true
-            tail -n 25 run_all.txt | sed 's/^/::error::tail| /'
+            # The ✗ lines carry the per-item detail (which self-test check failed and
+            # why). The suite summary alone says "FAIL=8" without naming a single one.
+            grep -F "✗" run_all.txt | sed 's/^/::error::item| /' || true
+            tail -n 60 run_all.txt | sed 's/^/::error::tail| /'
           fi
           exit $rc
 

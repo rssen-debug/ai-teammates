@@ -279,7 +279,13 @@ class MajinBridge:
         return subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True, encoding="utf-8", errors="replace",  bufsize=1,
                                 cwd=str(self.majin_root), env=env,
-                                **({"windowsHide": True, "creationflags": 0x08000000} if IS_WIN else {}))
+                                # `windows_hide`, not `windowsHide`. The camelCase spelling is
+                                # not a Popen parameter, so it raises TypeError — but only inside
+                                # this `if IS_WIN` dict, which is empty on Linux and macOS. That is
+                                # how it survived every local test while making the bridge
+                                # unstartable on the one platform this product targets. Line 548 of
+                                # this same file already had it right.
+                                **({"windows_hide": True, "creationflags": 0x08000000} if IS_WIN else {}))
 
     def start(self) -> None:
         with self._lock:

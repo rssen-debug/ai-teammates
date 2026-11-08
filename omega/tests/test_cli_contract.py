@@ -286,6 +286,49 @@ class TestWindowsPortability(unittest.TestCase):
                          "every text stream, file and captured subprocess must name UTF-8 "
                          "explicitly; the platform default is cp1252 on Windows")
 
+    def test_windows_only_subprocess_kwargs_are_real_parameters(self) -> None:
+        """Keyword names inside `if IS_WIN` branches are never executed on Linux.
+
+        A typo there passes every local test and only fires on Windows — the platform
+        this product targets. `majin_bridge` passed `windowsHide=True`, which is not a
+        Popen parameter, so the MAJIN bridge raised TypeError on start-up on Windows
+        and worked perfectly everywhere else. Validating the names against the real
+        signatures makes the branch checkable without a Windows machine.
+        """
+        import inspect
+        # Introspection alone cannot do this job, for the same reason the bug existed:
+        # Popen's signature is platform-specific, and on POSIX it does not list
+        # windows_hide or creationflags at all. Validating a Windows-only branch
+        # against a POSIX signature would reject the correct spelling, so the two
+        # documented Windows-only parameters are declared here explicitly.
+        WINDOWS_ONLY = {"windows_hide", "creationflags"}
+        valid = ((set(inspect.signature(subprocess.Popen.__init__).parameters)
+                  | set(inspect.signature(subprocess.run).parameters))
+                 - {"self", "args"}) | WINDOWS_ONLY
+        bad: list[str] = []
+        for f in sorted(OMEGA.rglob("*.py")):
+            tree = ast.parse(f.read_text(encoding="utf-8"))
+            for n in ast.walk(tree):
+                if not isinstance(n, ast.Call) or not isinstance(n.func, ast.Attribute):
+                    continue
+                owner = n.func.value.id if isinstance(n.func.value, ast.Name) else ""
+                if owner != "subprocess" or n.func.attr not in self.SUBPROCESS:
+                    continue
+                names = {k.arg for k in n.keywords if k.arg}
+                for k in n.keywords:
+                    # `**({"windows_hide": True} if IS_WIN else {})` — the platform
+                    # branch is where the bug lived, so its keys have to be read too.
+                    if k.arg is None and isinstance(k.value, (ast.Dict, ast.IfExp)):
+                        for d in ([k.value] if isinstance(k.value, ast.Dict)
+                                  else [k.value.body, k.value.orelse]):
+                            if isinstance(d, ast.Dict):
+                                names |= {e.value for e in d.keys
+                                          if isinstance(e, ast.Constant) and isinstance(e.value, str)}
+                for name in sorted(names - valid):
+                    bad.append(f"{f.relative_to(OMEGA.parent)}:{n.lineno} passes {name!r} to "
+                               f"subprocess.{n.func.attr}, which is not a parameter")
+        self.assertEqual(bad, [], "\n".join(bad))
+
     def test_every_standalone_entry_point_widens_its_streams(self) -> None:
         """Each of these can be run as a child process and prints decorated output."""
         for rel in ("buddy.py", "acceptance.py", "tests/run_all.py", "benchmarks/runner.py",
