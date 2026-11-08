@@ -45,7 +45,7 @@ def _import_tasks():
 def _run(ids: list[str], report: Path) -> dict:
     """Run the real runner in a real subprocess, exactly as `buddy bench` does."""
     proc = subprocess.run([sys.executable, str(RUNNER), *ids, "--report", str(report)],
-                          capture_output=True, text=True, timeout=900, cwd=str(OMEGA))
+                          capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900, cwd=str(OMEGA))
     if not report.is_file():
         raise AssertionError(f"the runner wrote no report (rc={proc.returncode}):\n{proc.stdout[-800:]}\n{proc.stderr[-800:]}")
     doc = json.loads(report.read_text(encoding="utf-8"))
@@ -84,7 +84,7 @@ class TestSkipIsNeverAFailure(unittest.TestCase):
         env = {**os.environ, "MAJIN_ROOT": str(self.root),
                "BUDDY_HOME": str(self.tmp / "home"), "NO_COLOR": "1"}
         proc = subprocess.run([sys.executable, str(RUNNER), "B13", "--report", str(report)],
-                              capture_output=True, text=True, timeout=300,
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
                               cwd=str(OMEGA), env=env)
         self.assertTrue(report.is_file(), proc.stdout[-600:] + proc.stderr[-600:])
         doc = json.loads(report.read_text(encoding="utf-8"))
@@ -224,7 +224,7 @@ class TestReproducibility(unittest.TestCase):
 class TestRunnerCli(unittest.TestCase):
     def test_list_does_not_run_anything(self) -> None:
         proc = subprocess.run([sys.executable, str(RUNNER), "--list"],
-                              capture_output=True, text=True, timeout=120, cwd=str(OMEGA))
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120, cwd=str(OMEGA))
         self.assertEqual(proc.returncode, 0)
         self.assertIn("CAPABILITY BENCHMARKS", proc.stdout)
         self.assertNotIn("axis E input", proc.stdout, "--list must not execute the suite")
@@ -233,7 +233,7 @@ class TestRunnerCli(unittest.TestCase):
         tmp = Path(tempfile.mkdtemp(prefix="buddy-bench-json-"))
         proc = subprocess.run([sys.executable, str(RUNNER), "B10", "--json",
                                "--report", str(tmp / "r.json")],
-                              capture_output=True, text=True, timeout=600, cwd=str(OMEGA))
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600, cwd=str(OMEGA))
         self.assertEqual(proc.returncode, 0, proc.stderr[-500:])
         doc = json.loads(proc.stdout)
         self.assertEqual([t["id"] for t in doc["tasks"]], ["B10"])
@@ -241,7 +241,7 @@ class TestRunnerCli(unittest.TestCase):
     def test_unknown_id_runs_nothing_and_says_so(self) -> None:
         tmp = Path(tempfile.mkdtemp(prefix="buddy-bench-none-"))
         proc = subprocess.run([sys.executable, str(RUNNER), "B99", "--report", str(tmp / "r.json")],
-                              capture_output=True, text=True, timeout=300, cwd=str(OMEGA))
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=str(OMEGA))
         doc = json.loads((tmp / "r.json").read_text(encoding="utf-8"))
         self.assertEqual(doc["tasks"], [], "an unknown id must not silently run the whole suite")
         self.assertEqual(doc["run"], 0)

@@ -124,7 +124,7 @@ def find_node(explicit: Optional[str] = None) -> Optional[str]:
 
 def node_major(node_exe: str) -> Optional[int]:
     try:
-        out = subprocess.run([node_exe, "--version"], capture_output=True, text=True, timeout=15)
+        out = subprocess.run([node_exe, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
         v = out.stdout.strip().lstrip("v")
         return int(v.split(".")[0]) if v else None
     except Exception:
@@ -277,7 +277,7 @@ class MajinBridge:
         env.setdefault("MAJIN_V6_HOME", str(self.v6_home))
         env["NODE_NO_WARNINGS"] = "1"
         return subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                text=True, encoding="utf-8", errors="replace", bufsize=1,
+                                text=True, encoding="utf-8", errors="replace",  bufsize=1,
                                 cwd=str(self.majin_root), env=env,
                                 **({"windowsHide": True, "creationflags": 0x08000000} if IS_WIN else {}))
 
@@ -543,7 +543,7 @@ class MajinBridge:
         env.update(extra_env or {})
         env["MAJIN_V6_HOME"] = str(self.v6_home)
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", 
                                   timeout=timeout, cwd=str(self.majin_root), env=env,
                                   **({"windows_hide": True} if IS_WIN else {}))
         except subprocess.TimeoutExpired:
@@ -836,5 +836,21 @@ def _selftest() -> int:
     return 1 if fails else 0
 
 
+def _force_utf8_output() -> None:
+    """Widen stdout/stderr to UTF-8 before printing anything decorated.
+
+    This module is run as a child process and prints `→`, `●` and `—`. A stock
+    Windows console encodes cp1252, which has the em-dash but none of the others, so
+    the child would die part-way through its report — and the parent, decoding with
+    text=True, would see a truncated stream with no explanation attached.
+    """
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 if __name__ == "__main__":
+    _force_utf8_output()
     sys.exit(_selftest())

@@ -497,7 +497,23 @@ def history(db_path: Path, limit: int = 50) -> list[dict]:
         conn.close()
 
 
+def _force_utf8_output() -> None:
+    """Widen stdout/stderr to UTF-8 before printing anything decorated.
+
+    This module is run as a child process and prints `→`, `●` and `—`. A stock
+    Windows console encodes cp1252, which has the em-dash but none of the others, so
+    the child would die part-way through its report — and the parent, decoding with
+    text=True, would see a truncated stream with no explanation attached.
+    """
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def main(argv: Optional[list[str]] = None) -> int:
+    _force_utf8_output()
     import argparse
     ap = argparse.ArgumentParser(prog="buddy level", description="Measured capability level 1–100")
     ap.add_argument("--db", default="", help="Omega database (default: the real home)")

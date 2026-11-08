@@ -45,7 +45,7 @@ def _run(cmd: list[str], cwd: Path, timeout: float, env: dict | None = None) -> 
     e = dict(os.environ)
     e.update(env or {})
     try:
-        p = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout, env=e)
+        p = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, env=e)
         return p.returncode, p.stdout or "", p.stderr or ""
     except subprocess.TimeoutExpired:
         return 124, "", f"timed out after {timeout:.0f}s"
@@ -75,7 +75,7 @@ def suite_unittest(quick: bool) -> dict:
             missing.append(f"{n}: {exc}")
     if not modules:
         missing.append("no test_*.py modules were discovered at all")
-    result = unittest.TextTestRunner(verbosity=0, stream=open(os.devnull, "w")).run(tests)
+    result = unittest.TextTestRunner(verbosity=0, stream=open(os.devnull, "w", encoding="utf-8")).run(tests)
     skipped = sum(1 for _case, _reason in result.skipped)
     status = "FAIL" if (result.failures or result.errors or missing) else "PASS"
     detail = (f"{result.testsRun} run across {len(modules) - len(missing)} module(s), "

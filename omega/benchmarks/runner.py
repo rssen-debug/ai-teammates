@@ -75,7 +75,7 @@ def _detect_node() -> bool:
         return False
     try:
         import subprocess
-        r = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=20)
+        r = subprocess.run([exe, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20)
         return r.returncode == 0
     except Exception:
         return False
@@ -206,7 +206,23 @@ def _render(doc: dict[str, Any]) -> None:
     print(C.c(C.DIM, f"\n  report: {doc.get('report_path')}\n"))
 
 
+def _force_utf8_output() -> None:
+    """Widen stdout/stderr to UTF-8 before printing anything decorated.
+
+    This module is run as a child process and prints `→`, `●` and `—`. A stock
+    Windows console encodes cp1252, which has the em-dash but none of the others, so
+    the child would die part-way through its report — and the parent, decoding with
+    text=True, would see a truncated stream with no explanation attached.
+    """
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def main(argv: Optional[list[str]] = None) -> int:
+    _force_utf8_output()
     ap = argparse.ArgumentParser(prog="buddy bench", description="run the reproducible capability benchmarks")
     ap.add_argument("ids", nargs="*", help="benchmark ids to run (default: all)")
     ap.add_argument("--json", action="store_true")

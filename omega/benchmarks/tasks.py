@@ -355,13 +355,13 @@ def b07_crash_recovery(ctx: BenchCtx) -> BenchOutcome:
     env = {**os.environ, "BUDDY_HOME": str(ctx.home), "BUDDY_TEST_CHILD": "1", "BUDDY_TEST_CRASH_AT": "1"}
     try:
         crash = subprocess.run([sys.executable, str(buddy.SOURCE_FILE), "--_child", "crash-task"],
-                               capture_output=True, text=True, timeout=240, env=env, cwd=str(OMEGA))
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=240, env=env, cwd=str(OMEGA))
         # Read the partial state HERE, between the crash and the resume. Reading
         # it afterwards would just re-read the finished file and prove nothing.
         partial = out.read_text(encoding="utf-8") if out.is_file() else ""
         state_at_crash = dict(app.tasks.get(tid) or {})
         resume = subprocess.run([sys.executable, str(buddy.SOURCE_FILE), "--_child", "resume-crashed"],
-                                capture_output=True, text=True, timeout=300,
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
                                 env={**os.environ, "BUDDY_HOME": str(ctx.home)}, cwd=str(OMEGA))
     except subprocess.TimeoutExpired as e:
         return skipped(f"a child process timed out ({e})")

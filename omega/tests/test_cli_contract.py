@@ -16,6 +16,7 @@ cannot be silenced by accident.
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import shutil
@@ -217,6 +218,84 @@ class TestBenchmarkAndAcceptanceRunnersExist(unittest.TestCase):
                                msg="skipped tasks must not enter the denominator")
 
 
+class TestWindowsPortability(unittest.TestCase):
+    """This product targets Windows first, and Windows defaults to cp1252.
+
+    cp1252 has an em-dash but none of ●, ○, ·, ✗, ✓, ← or → — all of which this CLI
+    prints. Two failure modes follow, and both were real:
+
+      * a stream that is not widened raises UnicodeEncodeError on the first
+        decorated line, which in run_all.py happened on the line that prints a
+        FAILURE BULLET — so a failing suite crashed the reporter instead of being
+        reported, and the names of 14 failing tests were lost;
+      * a subprocess captured with text=True and no encoding decodes the child's
+        UTF-8 output as cp1252 and dies on a continuation byte (0x8f is the tail of
+        ●), which looks like a truncated stream with no explanation.
+
+    Neither is visible on Linux or macOS, where the default is already UTF-8, so
+    both are pinned here rather than left to a Windows-only surprise.
+    """
+
+    TEXT_IO = {"open": 3, "read_text": 0, "write_text": 1}
+    SUBPROCESS = {"run", "Popen", "check_output", "check_call"}
+    # objects whose .open() is not file I/O, or whose mode string is not a text mode
+    NOT_FILE_IO = ("tarfile", "webbrowser", "urllib", "op")
+
+    def offenders(self) -> list[str]:
+        out: list[str] = []
+        for f in sorted(OMEGA.rglob("*.py")):
+            tree = ast.parse(f.read_text(encoding="utf-8"))
+            for n in ast.walk(tree):
+                if not isinstance(n, ast.Call):
+                    continue
+                fn = n.func
+                name = fn.attr if isinstance(fn, ast.Attribute) else (
+                    fn.id if isinstance(fn, ast.Name) else None)
+                if not name:
+                    continue
+                kw = {k.arg for k in n.keywords if k.arg}
+                owner = fn.value.id if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name) else ""
+                where = f"{f.relative_to(OMEGA.parent)}:{n.lineno}"
+
+                # Matched on the CALLEE name, not on the module being spelled
+                # `subprocess`: `import subprocess as sp` is legal and would slip
+                # past an owner check, which a mutation probe caught this test doing.
+                if name in self.SUBPROCESS and isinstance(fn, ast.Attribute):
+                    textual = "text" in kw or "universal_newlines" in kw
+                    if textual and "encoding" not in kw:
+                        out.append(f"{where} captures a subprocess in text mode without an encoding")
+                    continue
+
+                if name in self.TEXT_IO and owner not in self.NOT_FILE_IO:
+                    if name == "open" and isinstance(fn, ast.Attribute):
+                        continue                     # something.open(), not the builtin
+                    mode = None
+                    if "mode" in kw:
+                        mode = next((k.value.value for k in n.keywords
+                                     if k.arg == "mode" and isinstance(k.value, ast.Constant)), None)
+                    elif name == "open" and len(n.args) > 1 and isinstance(n.args[1], ast.Constant):
+                        mode = n.args[1].value
+                    if mode and "b" in str(mode):
+                        continue                     # binary: no decoding, nothing to get wrong
+                    if "encoding" not in kw and len(n.args) <= self.TEXT_IO[name]:
+                        out.append(f"{where} {name}() uses the platform default encoding")
+        return out
+
+    def test_no_text_io_depends_on_the_platform_default_encoding(self) -> None:
+        self.assertEqual(self.offenders(), [],
+                         "every text stream, file and captured subprocess must name UTF-8 "
+                         "explicitly; the platform default is cp1252 on Windows")
+
+    def test_every_standalone_entry_point_widens_its_streams(self) -> None:
+        """Each of these can be run as a child process and prints decorated output."""
+        for rel in ("buddy.py", "acceptance.py", "tests/run_all.py", "benchmarks/runner.py",
+                    "level.py", "majin_bridge.py", "memory_migration.py"):
+            src = (OMEGA / rel).read_text(encoding="utf-8")
+            self.assertRegex(src, r"force_utf8_output|reconfigure\(encoding=\"utf-8\"",
+                             f"{rel} prints decorated output but never widens its streams")
+
+
+
 def _in_cp1252(ch: str) -> bool:
     try:
         ch.encode("cp1252")
@@ -246,7 +325,7 @@ class TestRendering(unittest.TestCase):
                if k not in ("NO_COLOR", "FORCE_COLOR", "CLICOLOR_FORCE", "TERM")}
         env.update({"BUDDY_HOME": self.home, **env_extra})
         p = subprocess.run([sys.executable, str(BUDDY), *args], capture_output=True,
-                           text=True, timeout=180, env=env, cwd=str(OMEGA.parent))
+                           text=True, encoding="utf-8", errors="replace", timeout=180, env=env, cwd=str(OMEGA.parent))
         return p.returncode, p.stdout + p.stderr
 
     def test_help_renders_every_documented_command(self) -> None:

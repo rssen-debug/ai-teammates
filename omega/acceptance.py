@@ -121,7 +121,7 @@ class Ctx:
         e = dict(os.environ)
         e.update(env or {})
         return subprocess.run([sys.executable, str(buddy.SOURCE_FILE), *args], capture_output=True,
-                              text=True, timeout=timeout, env=e, cwd=str(HERE))
+                              text=True, encoding="utf-8", errors="replace", timeout=timeout, env=e, cwd=str(HERE))
 
 
 class Context:
@@ -174,7 +174,7 @@ def s01_fresh_install(ctx: Ctx) -> Result:
     detail = f"installer contract OK ({len(text.splitlines())} lines, no hardcoded user paths, multi-Python)"
     if IS_WIN:
         rc = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(INSTALLER),
-                             "-Verify"], capture_output=True, text=True, timeout=600)
+                             "-Verify"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
         ctx.save("01-installer-verify.txt", rc.stdout + rc.stderr)
         if rc.returncode != 0:
             return Result(FAIL, f"install.ps1 -Verify exited {rc.returncode}: {(rc.stderr or rc.stdout)[-400:]}", ev)
@@ -223,7 +223,7 @@ def s02_upgrade_from_existing(ctx: Ctx) -> Result:
     ctx.save("02-upgrade.json", ev)
     shim = REPO / "studdy-buddy" / "omega" / "buddy.py"
     if shim.is_file():
-        rc = subprocess.run([sys.executable, str(shim), "version"], capture_output=True, text=True, timeout=120,
+        rc = subprocess.run([sys.executable, str(shim), "version"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
                             env={**os.environ, "BUDDY_HOME": str(ctx.tmp / "shim-home")})
         ev["legacy_entrypoint"] = {"path": str(shim), "rc": rc.returncode, "out": rc.stdout.strip()[:120]}
         ok = ok and rc.returncode == 0 and "Omega" in rc.stdout
@@ -242,13 +242,13 @@ def s03_python_detection(ctx: Ctx) -> Result:
     supported = (3, 10) <= (v.major, v.minor) <= (3, 13)
     real_exe = shutil.which(sys.executable) or sys.executable
     rc = subprocess.run([sys.executable, "-c", "import sys;print('%d.%d.%d'%sys.version_info[:3])"],
-                        capture_output=True, text=True, timeout=60)
+                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     reported = rc.stdout.strip()
     ev = {"running_python": reported, "executable": real_exe, "supported_range": "3.10–3.13",
           "in_range": supported, "buddy_minimum_enforced": bool(v >= (3, 10))}
     # `py` launcher on Windows is the other real discovery path the installer uses
     if IS_WIN:
-        py = subprocess.run(["py", "-0p"], capture_output=True, text=True, timeout=60)
+        py = subprocess.run(["py", "-0p"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         ev["py_launcher"] = py.stdout.strip()[:400] or f"exit {py.returncode}"
     ctx.save("03-python.json", ev)
     ok = supported and reported == f"{v.major}.{v.minor}.{v.micro}" and Path(real_exe).exists()
@@ -708,7 +708,7 @@ def s18_stop_active_task(ctx: Ctx) -> Result:
     proc_env = {"BUDDY_HOME": str(buddy.HOME)}
     proc = subprocess.Popen([sys.executable, str(buddy.SOURCE_FILE), "--_child", "crash-task"],
                             env={**os.environ, **proc_env}, cwd=str(HERE),
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     progressed = False
     size_at_stop = 0
     deadline = time.time() + 60

@@ -1341,7 +1341,23 @@ class Migrator:
 # ════════════════════════════════════════════════════════════════════════════
 # CLI
 # ════════════════════════════════════════════════════════════════════════════
+def _force_utf8_output() -> None:
+    """Widen stdout/stderr to UTF-8 before printing anything decorated.
+
+    This module is run as a child process and prints `→`, `●` and `—`. A stock
+    Windows console encodes cp1252, which has the em-dash but none of the others, so
+    the child would die part-way through its report — and the parent, decoding with
+    text=True, would see a truncated stream with no explanation attached.
+    """
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def main(argv: Optional[list[str]] = None) -> int:
+    _force_utf8_output()
     ap = argparse.ArgumentParser(prog="buddy migrate", description="Discover and import legacy Study Buddy / MAJIN / Obsidian / Omega memory")
     ap.add_argument("action", nargs="?", default="scan", choices=["scan", "plan", "run", "verify", "rollback"])
     ap.add_argument("--yes", action="store_true", help="actually write (default is a dry run)")

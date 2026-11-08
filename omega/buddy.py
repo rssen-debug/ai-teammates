@@ -469,7 +469,7 @@ class InstanceLock:
 
     def acquire(self) -> bool:
         ensure_dirs()
-        self.f = open(HOME / "buddy.lock", "a+")
+        self.f = open(HOME / "buddy.lock", "a+", encoding="utf-8")
         try:
             self.f.seek(0)
             if IS_WIN:
@@ -564,7 +564,7 @@ def pip_install(mods: list[str]) -> tuple[bool, str]:
     if not pk:
         return False, "no known packages"
     p = subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", *pk],
-                       capture_output=True, text=True, timeout=900)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
     importlib.invalidate_caches()
     return p.returncode == 0, clip((p.stdout + p.stderr)[-1500:], 1500)
 
@@ -2605,7 +2605,7 @@ class Skills:
             raise ToolError("skill code changed since it was tested/approved; refusing to run", "tampered")
         env = {k: v for k, v in os.environ.items() if k.upper() in ("PATH", "SYSTEMROOT", "TEMP", "TMP", "PATHEXT", "COMSPEC", "HOME", "USERPROFILE")}
         p = subprocess.run([sys.executable, "-I", "-c", SKILL_RUNNER, str(path)], input=json.dumps(args), capture_output=True,
-                           text=True, timeout=timeout, cwd=str(DIRS["workspace"]), env=env)
+                           text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=str(DIRS["workspace"]), env=env)
         if p.returncode != 0:
             raise ToolError(f"skill crashed: {clip(p.stderr, 600)}", "skill_error")
         if "@@RESULT@@" not in p.stdout:
@@ -2710,8 +2710,8 @@ DANGEROUS_CMD = re.compile(
 
 def run_proc(cmd: Any, cwd: Path, timeout: float, run: "AgentRun | None", shell: bool = True, max_out: int = 24000) -> dict:
     t0 = time.time()
-    p = subprocess.Popen(cmd, cwd=str(cwd), shell=shell, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                         encoding="utf-8", errors="replace", env=_child_env(),
+    p = subprocess.Popen(cmd, cwd=str(cwd), shell=shell, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                          env=_child_env(),
                          creationflags=(0x08000000 if IS_WIN else 0))
     out = ""
     timed_out = cancelled = False
@@ -4761,7 +4761,7 @@ class Voice:
               "$t = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:BUDDY_TTS_B64)); $s.Speak($t)")
         env = {**os.environ, "BUDDY_LANG": lang, "BUDDY_TTS_B64": base64.b64encode(text.encode()).decode()}
         p = subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], env=env, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, text=True, creationflags=0x08000000)
+                             stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", creationflags=0x08000000)
         with self.tts_lock:
             self.tts_proc = p
         _, err = p.communicate()
@@ -5915,7 +5915,7 @@ class Suite:
 
 def _child(args: list[str], env_extra: dict | None = None, timeout: float = 120) -> subprocess.CompletedProcess:
     env = {**os.environ, **(env_extra or {}), "BUDDY_TEST_CHILD": "1"}
-    return subprocess.run([sys.executable, str(SOURCE_FILE), *args], env=env, capture_output=True, text=True, timeout=timeout)
+    return subprocess.run([sys.executable, str(SOURCE_FILE), *args], env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
 
 async def run_suite(live: bool) -> int:
@@ -6058,11 +6058,11 @@ async def run_suite(live: bool) -> int:
         tid = app.tasks.create("crash/recover test", {"kind": "steps", "steps": steps})
         p = _child(["--_child", "crash-task"], {"BUDDY_HOME": str(HOME), "BUDDY_TEST_CRASH_AT": "1"})
         crashed = p.returncode == 9
-        mid = counter.read_text() if counter.exists() else ""
+        mid = counter.read_text(encoding="utf-8") if counter.exists() else ""
         rec_ids = app.tasks.recover(stale_after=1e9)
         t = app.tasks.claim()
         st = await app.tasks.run_one(t) if t else "none"
-        final = counter.read_text() if counter.exists() else ""
+        final = counter.read_text(encoding="utf-8") if counter.exists() else ""
         ok = crashed and tid in rec_ids and st == "done" and final == "step1\nstep2\nstep3\n"
         s.rec("G", "process killed mid-task → restart resumes; completed effects not duplicated", "PASS" if ok else "FAIL",
               f"child_killed={crashed}, file_before_recovery={mid!r}, recovered={tid in rec_ids}, final={final!r}, attempts={app.tasks.get(tid)['attempts']}")
@@ -6082,7 +6082,7 @@ async def run_suite(live: bool) -> int:
         w.cancel()
         t = app.tasks.get(tid)
         rec_m = app.store.one("SELECT content FROM memories WHERE kind='task_outcome' AND title LIKE ?", (f"Task {tid}%",))
-        ok = t["state"] == "done" and f.exists() and f.read_text() == "done by autopilot" and rec_m is not None
+        ok = t["state"] == "done" and f.exists() and f.read_text(encoding="utf-8") == "done by autopilot" and rec_m is not None
         s.rec("L", "scheduled task runs by itself and leaves a completion record", "PASS" if ok else "FAIL", f"state={t['state']}, file={f.exists()}, record={'yes' if rec_m else 'no'}, err={t['error']}")
     except Exception as e:
         s.rec("L", "autopilot", "FAIL", f"{type(e).__name__}: {e}")
@@ -6096,7 +6096,7 @@ async def run_suite(live: bool) -> int:
         app.ui.answer = "once"
         act = await sk.activate("adder_demo")
         use = await exec_tool(app, "skill_adder_demo", {"a": 4, "b": 5})
-        Path(pr["path"]).write_text(code.replace("+", "-"))
+        Path(pr["path"]).write_text(code.replace("+", "-"), encoding="utf-8")
         tamper = await exec_tool(app, "skill_adder_demo", {"a": 4, "b": 5})
         app.ui.answer = "no"
         refused = False
@@ -6132,12 +6132,13 @@ async def run_suite(live: bool) -> int:
             try:
                 proj = tmp / "proj"
                 proj.mkdir()
-                (proj / "calc.py").write_text("def add(a, b):\n    return a - b\n\n\ndef mul(a, b):\n    return a * b\n")
+                (proj / "calc.py").write_text("def add(a, b):\n    return a - b\n\n\ndef mul(a, b):\n    return a * b\n",
+                                 encoding="utf-8")
                 (proj / "test_calc.py").write_text("import unittest\nfrom calc import add, mul\n\n\nclass T(unittest.TestCase):\n    def test_add(self):\n"
-                                                   "        self.assertEqual(add(2, 3), 5)\n\n    def test_mul(self):\n        self.assertEqual(mul(2, 3), 6)\n\n\nif __name__ == '__main__':\n    unittest.main()\n")
-                before = subprocess.run([sys.executable, "-m", "unittest", "discover"], cwd=proj, capture_output=True, text=True).returncode
+                                                   "        self.assertEqual(add(2, 3), 5)\n\n    def test_mul(self):\n        self.assertEqual(mul(2, 3), 6)\n\n\nif __name__ == '__main__':\n    unittest.main()\n", encoding="utf-8")
+                before = subprocess.run([sys.executable, "-m", "unittest", "discover"], cwd=proj, capture_output=True, text=True, encoding="utf-8", errors="replace").returncode
                 out, run = await converse(app, f"The Python project in {proj} has a failing test. Find the bug, fix it, run the tests and tell me the verified result.")
-                after = subprocess.run([sys.executable, "-m", "unittest", "discover"], cwd=proj, capture_output=True, text=True).returncode
+                after = subprocess.run([sys.executable, "-m", "unittest", "discover"], cwd=proj, capture_output=True, text=True, encoding="utf-8", errors="replace").returncode
                 ran_tests = any(l["tool"] in ("dev_run_tests", "run_command") and l["ok"] for l in run.ledger)
                 s.rec("F", "coding agent fixes a real bug and verifies with tests (live)", "PASS" if before != 0 and after == 0 and ran_tests and out.verified else "FAIL",
                       f"tests_before_rc={before}, after_rc={after}, ran_tests={ran_tests}, steps={run.steps}, tools={sorted({l['tool'] for l in run.ledger})}")
@@ -7705,9 +7706,9 @@ def cmd_update(rest: list[str]) -> int:
         print("  could not reach the remote; nothing was changed.")
         return 1
     branch = subprocess.run(["git", "-C", str(root), "rev-parse", "--abbrev-ref", "HEAD"],
-                            capture_output=True, text=True).stdout.strip()
+                            capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
     behind = subprocess.run(["git", "-C", str(root), "rev-list", "--count", f"HEAD..origin/{branch}"],
-                            capture_output=True, text=True).stdout.strip()
+                            capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
     print(f"  branch {branch}: {behind or '0'} commit(s) available upstream")
     if (behind or "0") == "0":
         print("  already up to date.\n")
@@ -7723,7 +7724,7 @@ def cmd_update(rest: list[str]) -> int:
     backup.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SOURCE_FILE.parent, backup, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     print(f"  backup of the current runtime → {backup}")
-    before = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    before = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
     rc = subprocess.call(["git", "-C", str(root), "merge", "--ff-only", f"origin/{branch}"])
     if rc != 0:
         print("  update did not fast-forward. Rolling back.")
@@ -7731,7 +7732,7 @@ def cmd_update(rest: list[str]) -> int:
         return 1
     # Verify before declaring success. A broken update is rolled back, not left.
     print("  verifying the updated runtime…")
-    check = subprocess.run([sys.executable, str(SOURCE_FILE), "--self-test"], capture_output=True, text=True, timeout=1800)
+    check = subprocess.run([sys.executable, str(SOURCE_FILE), "--self-test"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1800)
     m = re.search(r"SUMMARY\s+PASS=(\d+)\s+FAIL=(\d+)", check.stdout + check.stderr)
     if check.returncode != 0 or not m or int(m.group(2)) > 0:
         print(C.c(C.RED, "  the updated runtime failed its own self-test. Rolling back."))

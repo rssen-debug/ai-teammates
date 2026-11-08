@@ -42,7 +42,7 @@ assert Path(buddy.HOME) != _REAL_HOME, (
 def _import_calc(proj: Path) -> str:
     """Run a fresh interpreter that imports the module and reports what it computes."""
     r = subprocess.run([sys.executable, "-c", "import calc; print(calc.add(2, 3))"],
-                       capture_output=True, text=True, cwd=str(proj), timeout=60)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(proj), timeout=60)
     if r.returncode != 0:
         return f"<error: {r.stderr.strip()[:200]}>"
     return r.stdout.strip()
@@ -56,15 +56,15 @@ class TestAdvanceMtime(unittest.TestCase):
 
     def test_bumps_when_edit_lands_in_the_same_second(self) -> None:
         f = self.tmp / "a.txt"
-        f.write_text("x")
+        f.write_text("x", encoding="utf-8")
         before = f.stat().st_mtime_ns
-        f.write_text("y")  # same length, same second — invisible to a cache
+        f.write_text("y", encoding="utf-8")  # same length, same second — invisible to a cache
         self.assertTrue(buddy.advance_mtime(f, before), "a same-second edit must be bumped")
         self.assertGreater(f.stat().st_mtime_ns // 1_000_000_000, before // 1_000_000_000)
 
     def test_no_bump_when_the_second_already_advanced(self) -> None:
         f = self.tmp / "b.txt"
-        f.write_text("x")
+        f.write_text("x", encoding="utf-8")
         stale = f.stat().st_mtime_ns - 5_000_000_000  # pretend we read it 5 s ago
         mtime = f.stat().st_mtime_ns
         self.assertFalse(buddy.advance_mtime(f, stale), "an already-advanced mtime needs no bump")

@@ -176,7 +176,7 @@ class PosixLauncherExecuted(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if k != "BUDDY_PYTHON"}
         env.update({"BUDDY_HOME": self.home, "NO_COLOR": "1", **(env_extra or {})})
         return subprocess.run(["sh", str(launcher or POSIX), *args], capture_output=True,
-                              text=True, timeout=180, env=env, cwd=str(OMEGA.parent))
+                              text=True, encoding="utf-8", errors="replace", timeout=180, env=env, cwd=str(OMEGA.parent))
 
     def test_it_runs_the_product_and_passes_arguments_through(self) -> None:
         p = self.run_launcher(["version"])

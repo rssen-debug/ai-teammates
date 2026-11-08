@@ -463,7 +463,7 @@ class TestCli(LegacyCase):
     def run_cli(self, *argv: str, home: Path | None = None, stdin: str = "") -> tuple[int, str]:
         env = dict(os.environ, BUDDY_HOME=str(home or Path(buddy.HOME)), NO_COLOR="1")
         r = __import__("subprocess").run([sys.executable, str(OMEGA / "buddy.py"), *argv],
-                                         capture_output=True, text=True, input=stdin, env=env,
+                                         capture_output=True, text=True, encoding="utf-8", errors="replace", input=stdin, env=env,
                                          cwd=str(OMEGA.parent), timeout=180)
         out = (r.stdout or "") + (r.stderr or "")
         self.assertNotIn("Traceback", out,
