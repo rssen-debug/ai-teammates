@@ -70,7 +70,7 @@ class PresenceTests(unittest.TestCase):
 
     def test_prior_owner_activation_restored_without_voice_change(self):
         app = self.make_app(
-            {"screenshot_upload": "allow", "voice_enabled": False},
+            {"screenshot_upload": "allow", "voice_enabled": False, "obsidian_auto_memory": True},
             {k: "always" for k in ("observe", "input", "write", "exec")})
         activated, _ = buddy.activate_saved_presence(app)
         self.assertTrue(activated)
@@ -78,6 +78,16 @@ class PresenceTests(unittest.TestCase):
         self.assertEqual(app.settings.get("models")["chat"], "kilo-auto/free")
         self.assertTrue(app.settings.get("obsidian_auto_memory"))
         self.assertFalse(app.settings.get("voice_enabled"))
+
+    def test_previous_obsidian_off_is_respected(self):
+        app = self.make_app(
+            {"screenshot_upload": "allow", "obsidian_auto_memory": False,
+             "observe_enabled": False},
+            {k: "always" for k in ("observe", "input", "write", "exec")})
+        activated, _ = buddy.activate_saved_presence(app)
+        self.assertTrue(activated)
+        self.assertFalse(app.settings.get("obsidian_auto_memory"))
+        self.assertFalse(app.settings.get("observe_enabled"))
 
     def test_revoked_permission_never_regranted(self):
         app = self.make_app(
