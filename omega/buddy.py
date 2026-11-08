@@ -7046,6 +7046,44 @@ def cmd_doctor(rest: list[str]) -> int:
             app.majin.close()
 
 
+def resources_report() -> str:
+    """One-shot actual Windows process working sets; never guess Chrome tab attribution."""
+    if not IS_WIN:
+        return "Process RAM report requires Windows. See your OS process monitor."
+    shell = shutil.which("powershell.exe") or shutil.which("powershell")
+    if not shell:
+        return "Windows PowerShell not found; open Task Manager > Processes."
+    ps = (
+        "Get-Process | Sort-Object WorkingSet64 -Descending | "
+        "Select-Object -First 18 Name,Id,WorkingSet64,PrivateMemorySize64 | "
+        "ConvertTo-Json -Compress"
+    )
+    try:
+        proc = subprocess.run([shell, "-NoProfile", "-NonInteractive", "-Command", ps],
+                              capture_output=True, text=True, timeout=18, errors="replace")
+        if proc.returncode != 0:
+            return "Process snapshot failed: " + clip(redact(proc.stderr.strip()), 180)
+        data = json.loads(proc.stdout.strip() or "[]")
+        rows = data if isinstance(data, list) else [data]
+        out = ["  Process                   PID     RAM MB   Private MB",
+               "  ----------------------------------------------------"]
+        for row in rows:
+            ram = (row.get("WorkingSet64") or 0) / (1024 * 1024)
+            private = (row.get("PrivateMemorySize64") or 0) / (1024 * 1024)
+            out.append(f"  {str(row.get('Name', '?'))[:23]:<23} {str(row.get('Id', '?')):>6}  {ram:>8.1f}   {private:>9.1f}")
+        out.append("  RAM MB = actual resident working set (not memory uniquely owned by one browser tab).")
+        out.append("  For a Chrome tab: open Chrome Task Manager with Shift+Esc; sort Memory footprint.")
+        out.append("  Do not apply Electron memory flags to Chrome/Python without identifying the real process.")
+        return "\n".join(out)
+    except (OSError, subprocess.TimeoutExpired, ValueError, KeyError) as exc:
+        return f"Process snapshot unavailable ({type(exc).__name__}); use Windows Task Manager."
+
+
+def cmd_resources(rest: list[str]) -> int:
+    print(resources_report())
+    return 0
+
+
 def cmd_status(rest: list[str]) -> int:
     """Real operational state, read from the database and the live subsystems."""
     as_json = "--json" in rest
@@ -8493,6 +8531,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             "accept": cmd_accept,
             "bench": cmd_bench,
             "memory": cmd_memory,
+            "resources": cmd_resources,
             "tasks": cmd_tasks,
             "grants": cmd_grants,
             "models": cmd_models,
