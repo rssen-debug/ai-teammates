@@ -547,6 +547,9 @@ class LivePanel:
             detail(self.action_title or self.phase, "#f8c6e3", max_lines=2)
             if self.action_result:
                 detail(self.action_result, "#ffffff", max_lines=2)
+            if self._last_tool_error:
+                add("SENASTE FEL:", "#ff9ba6")
+                detail(self._last_tool_error, "#ff9ba6", max_lines=2)
         add("── MARKERING + RÖST ──", "#ff90c8")
         bridge = getattr(app, "selection_bridge", None)
         add("MARKERA: " + (bridge.status if bridge else "OFF"), "#ffffff")
