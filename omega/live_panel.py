@@ -9,12 +9,16 @@ only for an interactive terminal.
 from __future__ import annotations
 
 import asyncio
+import os
+import sys
+from pathlib import Path
 from collections import deque
 from datetime import datetime
 import re
 import shutil
 import threading
 import time
+import textwrap
 from typing import Any
 
 from prompt_toolkit import Application
@@ -221,26 +225,16 @@ class LivePanel:
         self._companion_checked_at = 0.0
         self.trace: deque[tuple[str, bool | None, float]] = deque(maxlen=9)
         self.phase = "Väntar på uppgift"
-        self.show_thinking = False
+        self.show_thinking = True
         self.events: deque[str] = deque(maxlen=24)
         self._stream_text = ""
         self._stream_active = False
         self._side_cache: list = []
         self._side_cache_at = 0.0
         self._side_dirty = True
-        self._tetris: Any = None
-        self._tetris_task: asyncio.Task | None = None
-        self._build_state = "ej startad"
-        self._build_step = 0
-        self._build_error = ""
-        self._tetris_ai_state = "väntar"
-        self._tetris_ai_calls = 0
-        self._tetris_ai_moves = 0
-        self._tetris_ai_failed = 0
-        self._tetris_last_decision = ""
-        self._tetris_retry_after = 0.0
-        self._tetris_wait_started = 0.0
-        self._tetris_decision_task: asyncio.Task | None = None
+        self._stderr_saved_fd = None
+        self._stderr_log_fd = None
+        self._last_tool_error = ""
         self.tool = "-"
         self.step_time = 0.0
         self.queue: asyncio.Queue[str] = asyncio.Queue()
@@ -257,7 +251,7 @@ class LivePanel:
         def _toggle(_event: Any) -> None:
             self.toggle_thinking()
         right = Frame(Window(content=self._status_control, wrap_lines=False),
-                      title=" OMEGA · LIVE ", width=Dimension.exact(39))
+                      title=" OMEGA · LIVE ", width=Dimension.exact(48))
         visibility = Condition(lambda: shutil.get_terminal_size((120, 35)).columns >= 94)
         self._layout = Layout(
             VSplit([
@@ -293,7 +287,7 @@ class LivePanel:
         self._loop = asyncio.get_running_loop()
         self.task = self._loop.create_task(self.application.run_async())
         self._companion_task = self._loop.create_task(self._companion_poll())
-        self._tetris_task = self._loop.create_task(self._tetris_loop())
+        self._redirect_stderr()
 
     async def read_line(self) -> str:
         return await self.queue.get()
@@ -301,10 +295,7 @@ class LivePanel:
     def close(self) -> None:
         if self._companion_task is not None:
             self._companion_task.cancel()
-        if self._tetris_task is not None:
-            self._tetris_task.cancel()
-        if self._tetris_decision_task is not None:
-            self._tetris_decision_task.cancel()
+        self._restore_stderr()
         if self.application.is_running:
             self.application.exit()
 
@@ -375,139 +366,46 @@ class LivePanel:
         else:
             update()
 
-    async def _tetris_decide(self) -> None:
-        """Every placement is a REAL gateway decision, checked against legal moves.
+    def _redirect_stderr(self) -> None:
+        """Keep native/C++ library warnings off prompt_toolkit's input screen.
 
-        This call uses the same configured provider, does not claim any learning,
-        and pauses instead of simulating AI moves when the API is unavailable.
+        Saves the actual OS stderr fd; Python logger streams bound to fd 2 and
+        native library output go to a private append-only diagnostic file.
+        Never touch stdout, which prompt_toolkit needs for full-screen drawing.
         """
-        game = self._tetris
-        if game is None or not game.awaiting_move:
+        if os.name != "nt" or not sys.stderr.isatty():
             return
         try:
-            from pixel_tetris import WIDTH, HEIGHT
-            import json
-            choices = game.choices()
-            if not choices:
-                self._tetris_ai_state = "inga lagliga drag"
-                self._tetris_retry_after = time.monotonic() + 30
-                return
-            # Send real board and each legal landing to the language model.
-            # Candidate ids are identifiers, NOT pre-ranked recommendations.
-            prompt = json.dumps({
-                "board": ["".join("#" if cell else "." for cell in row) for row in game.board],
-                "piece": [list(point) for point in game.shape],
-                "width": WIDTH, "height": HEIGHT,
-                "legal_moves": [{"id": m["id"], "x": m["x"],
-                                 "cells": [list(pt) for pt in m["cells"]],
-                                 "landing": m["landing"]} for m in choices],
-            }, separators=(",", ":"))
-            self._tetris_ai_state = "AI väljer drag..."
-            self._tetris_wait_started = time.monotonic()
-            self._refresh()
-            model = self.app.router.resolve("chat")
-            self._tetris_ai_calls += 1
-            result = await self.app.gateway.chat(
-                model, [{"role": "system", "content":
-                    "You are the real Tetris player. Choose one legal move id based on "
-                    "board geometry and expected survival / completed lines. "
-                    "Return only JSON with an integer field named move. "
-                    "Never invent an id not in legal_moves."},
-                    {"role": "user", "content": prompt}],
-                max_tokens=60, timeout=35)
-            answer = (result.get("message") or {}).get("content") or ""
-            match = re.search(r'\{[^{}]*"move"\s*:\s*(\d+)[^{}]*\}', answer)
-            if not match:
-                raise ValueError("AI svarade utan giltigt JSON-drag")
-            chosen = int(match.group(1))
-            if not game.choose(chosen):
-                raise ValueError("AI föreslog ogiltigt drag")
-            self._tetris_ai_moves += 1
-            elapsed = time.monotonic() - self._tetris_wait_started
-            self._tetris_last_decision = f"Drag {chosen} · {elapsed:.1f}s · giltigt AI-drag"
-            self._tetris_ai_state = "pjäs faller"
-            self.events.append(datetime.now().strftime("%H:%M:%S") + " · AI Tetris: " + self._tetris_last_decision)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self._tetris_ai_failed += 1
-            self._tetris_ai_state = "AI PAUSAD · " + type(exc).__name__
-            self._tetris_last_decision = "Inget drag godkänt"
-            self._tetris_retry_after = time.monotonic() + min(120, 10 * self._tetris_ai_failed)
-            self.events.append(datetime.now().strftime("%H:%M:%S") + " · AI Tetris blockerad: " + type(exc).__name__)
-        finally:
-            self._refresh()
-
-    async def _tetris_loop(self) -> None:
-        try:
-            from pixel_tetris import PixelTetris
-            self._tetris = PixelTetris()
-        except Exception as exc:
-            self._build_error = "Tetris engine: " + type(exc).__name__
-            return
-        last_tasks_poll = 0.0
-        last_key_check = 0.0
-        has_key = False
-        while True:
+            root = Path(os.environ.get("APPDATA") or str(Path.home())) / "StuddyBuddy" / "logs"
+            root.mkdir(parents=True, exist_ok=True)
+            target = os.open(str(root / "terminal-stderr.log"),
+                             os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o600)
+            backup = os.dup(2)
             try:
-                current = time.monotonic()
-                if current - last_tasks_poll > 5:
-                    last_tasks_poll = current
-                    if getattr(self.app, "tasks", None) is not None:
-                        await asyncio.to_thread(self._poll_build_state)
-                if current - last_key_check > 30:
-                    last_key_check = current
-                    # Windows credential vault lookups must never block input.
-                    has_key = await asyncio.to_thread(lambda: bool(self.app.gateway.key()))
-                if self._tetris.awaiting_move:
-                    # Owner chat takes priority; autonomous coding tasks may
-                    # continue concurrently with the independent Tetris model.
-                    busy = bool(self.app.current_run) or bool(self._typing.text.strip())
-                    if busy:
-                        self._tetris_ai_state = "pausad för användaren/uppgift"
-                    elif not has_key:
-                        self._tetris_ai_state = "BLOCKERAD · ingen AI-nyckel"
-                    elif (current >= self._tetris_retry_after and
-                          (self._tetris_decision_task is None or self._tetris_decision_task.done())):
-                        self._tetris_decision_task = asyncio.create_task(self._tetris_decide())
-                else:
-                    result = self._tetris.tick()
-                    if result in ("lock", "clear", "game_over"):
-                        self._tetris_ai_state = "nästa AI-beslut"
-                        self.events.append(datetime.now().strftime("%H:%M:%S") + " · Tetris " + result)
-                self._refresh()
-            except asyncio.CancelledError:
-                if self._tetris_decision_task:
-                    self._tetris_decision_task.cancel()
+                sys.stderr.flush()
+                os.dup2(target, 2)
+            except Exception:
+                os.close(backup)
                 raise
-            except Exception as exc:
-                self._build_error = type(exc).__name__
-            await asyncio.sleep(1.2)
+            self._stderr_saved_fd = backup
+            self._stderr_log_fd = target
+            self.events.append("Logg: externa varningar går till " + str(root))
+        except (OSError, ValueError):
+            self.events.append("Varning: stderr kunde inte isoleras")
 
-    def _poll_build_state(self) -> None:
-        try:
-            tasks = self.app.tasks.list(30)
-            related = next((task for task in tasks
-                            if str(task.get("title") or "").startswith("Pixel Tetris BUILD")), None)
-            if related:
-                self._build_state = str(related.get("state") or "unknown")
-                self._build_step = int(related.get("step_idx") or 0)
-                self._build_error = clean_line(related.get("error") or "", 35)
-                if self._build_state == "done":
-                    # A completed task is NOT necessarily a verified game.
-                    import json
-                    try:
-                        record = json.loads(related.get("result") or "{}")
-                        if not record.get("verified", False):
-                            self._build_state = "klar · ej verifierad"
-                        else:
-                            self._build_state = "klar · agentverifierad"
-                    except (ValueError, TypeError):
-                        self._build_state = "klar · bevis saknas"
-            else:
-                self._build_state = "ej köad"
-        except Exception as exc:
-            self._build_error = "task status: " + type(exc).__name__
+    def _restore_stderr(self) -> None:
+        if self._stderr_saved_fd is not None:
+            try:
+                sys.stderr.flush()
+                os.dup2(self._stderr_saved_fd, 2)
+            except (OSError, ValueError):
+                pass
+            finally:
+                os.close(self._stderr_saved_fd)
+                self._stderr_saved_fd = None
+        if self._stderr_log_fd is not None:
+            os.close(self._stderr_log_fd)
+            self._stderr_log_fd = None
 
     async def _companion_poll(self) -> None:
         """Collect potentially blocking settings/Windows idle data outside UI rendering."""
@@ -558,7 +456,15 @@ class LivePanel:
         current = time.time()
         lines: list = []
         def add(value: str, style: str = "") -> None:
-            lines.append((style, clean_line(value, 34) + "\n"))
+            lines.append((style, clean_line(value, 43) + "\n"))
+        def detail(value: str, style: str = "", max_lines: int = 2) -> None:
+            # Wrap real reasons/errors without leaking a long tool transcript or
+            # pushing the entire sidebar off-screen.
+            normalized = clean_line(value, 180)
+            wrapped = textwrap.wrap(normalized, width=42, break_long_words=False,
+                                    break_on_hyphens=False)
+            for item in wrapped[:max_lines]:
+                lines.append((style, item + "\n"))
 
         running = bool(app.current_run) or bool(getattr(getattr(app, "tasks", None), "current", {}))
         comp = self._cached_companion
@@ -606,26 +512,20 @@ class LivePanel:
         else:
             add("AI LEVEL: väntar på mätning", "#ffffff")
 
-        add("── PIXEL TETRIS · LIVE ──", "#ff90c8")
-        if self._tetris is not None:
-            for tetris_row in self._tetris.display():
-                add(" " + tetris_row, "#ff9bd0")
-            add(f"Poäng {self._tetris.score} · rader {self._tetris.lines} · pjäser {self._tetris.pieces}", "#ffffff")
-        else:
-            add("Spelmotor ej startad", "#bca8bc")
-        add("SPELARE: Kilo AI · " + self._tetris_ai_state, "#ff8fc5")
-        add(f"AI-drag {self._tetris_ai_moves} / anrop {self._tetris_ai_calls}", "#ffffff")
-        if self._tetris_last_decision:
-            add(self._tetris_last_decision, "#d4b7c9")
-        if self._tetris_ai_failed:
-            add("AI-fel: " + str(self._tetris_ai_failed), "#ff9ba6")
-        add("AI BYGGER: " + self._build_state, "#ff8fc5")
-        if self._build_step:
-            add("Agentsteg: " + str(self._build_step), "#ffffff")
-        if self._build_error:
-            add("Blockerad: " + self._build_error, "#ff9ba6")
-        add("Spelpoäng ≠ AI level", "#bca8bc")
-
+        lines.append(("bold #ff90c8", "ARBETSPROCESS · " + ("DÖLJ" if self.show_thinking else "VISA") + " / F2\n", self._side_click))
+        add("STEG: " + self.phase, "#ffe0f1")
+        if running and app.current_run:
+            duration = int(max(0, current - float(app.current_run.t0)))
+            add("AI uppgift: " + str(duration) + " sekunder", "#ffffff")
+        if self._last_tool_error:
+            add("SENASTE FEL:", "#ff9ba6")
+            detail(self._last_tool_error, "#ff9ba6", max_lines=3)
+        if self.show_thinking:
+            add("── VERKLIGA ARBETSSTEG ──", "#ff8fc5")
+            for event in list(self.events)[-7:]:
+                detail(" • " + event, "#ffe0f1", max_lines=2)
+        elif self.events:
+            add("SENAST: " + self.events[-1], "#d4b7c9")
         add("── MARKERING + RÖST ──", "#ff90c8")
         bridge = getattr(app, "selection_bridge", None)
         add("MARKERA: " + (bridge.status if bridge else "OFF"), "#ffffff")
@@ -637,6 +537,8 @@ class LivePanel:
             add("Från: " + clean_line(selected.get("app", ""), 20), "#ffffff")
         voice = getattr(app, "voice", None)
         add("RÖST: " + (voice.state_label() if voice else "OFF"), "#ffffff")
+        if voice and not voice.running and voice.error:
+            add("Röstfel: " + clean_line(voice.error, 100), "#ff9ba6")
         add("── COMPANION ──", "#ff90c8")
         add("COMPANION: " + ("LIVE" if enabled else "OFF"), "#ffffff")
         if enabled and comp:
@@ -648,14 +550,7 @@ class LivePanel:
         else:
             add("Inga observationer aktiva", "#d4b7c9")
 
-        lines.append(("bold #ff90c8", "TÄNKER · klicka här / F2\n", self._side_click))
-        add("STEG: " + self.phase, "#ffe0f1")
-        if running and app.current_run:
-            duration = int(max(0, current - float(app.current_run.t0)))
-            add("AI-anrop/uppgift: " + str(duration) + "s", "#ffffff")
-        if self.show_thinking:
-            for event in list(self.events)[-4:]:
-                add(" " + event, "#ffe0f1")
+
         add("AKTIVITET · VERKTYG", "bold #ff90c8")
         if self.trace:
             for label, ok, _when in list(self.trace)[-4:]:
@@ -663,7 +558,7 @@ class LivePanel:
                 add(" " + icon + " " + clean_line(label, 30), "#ffffff")
         else:
             add(" Inga verktyg körda", "#bca8bc")
-        add("Arbetslogg · inga dolda tankar", "#d4b7c9")
+        add("Beslut och verktyg · ingen påhittad tankekedja", "#d4b7c9")
         self._side_cache = lines
         return lines
 
@@ -679,11 +574,11 @@ class LivePanel:
 
     def step(self, text: str) -> None:
         panel = self._panel_state
-        panel.tool = clean_line(text, 48)
+        panel.tool = clean_line(text, 150)
         panel.phase = "Kör verktyg"
         panel.step_time = time.monotonic()
         panel.trace.append((panel.tool, None, time.time()))
-        panel.events.append(datetime.now().strftime("%H:%M:%S") + " · Kör " + panel.tool)
+        panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.tool)
         panel._refresh()
 
     def step_done(self, ok: bool, err: str = "") -> None:
@@ -692,10 +587,17 @@ class LivePanel:
             old = panel.trace.pop()
             panel.trace.append((old[0], bool(ok), old[2]))
         panel.phase = ("Steg klart" if ok else "Steg misslyckades")
-        panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.phase)
+        duration = max(0.0, time.monotonic() - panel.step_time)
+        panel.events.append(datetime.now().strftime("%H:%M:%S") +
+            (f" · ✓ Klart efter {duration:.1f}s" if ok
+             else f" · ✕ Misslyckades efter {duration:.1f}s"))
         if err and not ok:
-            # Never dump raw exceptions here: provider errors can contain secrets.
-            panel._add("Ett verktyg misslyckades. Se felstatus i panelen.")
+            from buddy import redact
+            panel._last_tool_error = clean_line(redact(str(err)), 110)
+            panel.events.append(datetime.now().strftime("%H:%M:%S") +
+                                " · Fel: " + panel._last_tool_error)
+        elif ok:
+            panel._last_tool_error = ""
         panel._refresh()
 
     def summary(self, run: Any, result: Any) -> None:
@@ -708,7 +610,7 @@ class LivePanel:
 
     def event(self, text: str) -> None:
         panel = self._panel_state
-        panel.phase = clean_line(text, 45)
+        panel.phase = clean_line(text, 80)
         panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.phase)
         panel._refresh()
 
