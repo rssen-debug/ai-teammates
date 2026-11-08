@@ -5842,6 +5842,15 @@ class Buddy:
             parts.append(f"PIXEL COMPANION: cosmetic appearance = {pet_stage} (measured level {lvl}/100). "
                          "Your personality stays curious and sincere at every stage; "
                          "higher levels do not grant new unverified knowledge or permissions.")
+        # Anonymous historical failure signal may inform verification strategy.
+        # Never turn this into permissions, task success or instructions to act.
+        if not self.privacy.private:
+            with contextlib.suppress(Exception):
+                from genesis_telemetry import ExperienceLedger, grounded_guidance
+                insight = grounded_guidance(ExperienceLedger().snapshot())
+                if insight:
+                    parts.append("GENESIS LOCAL EXECUTION INSIGHT (aggregated historical tool outcomes, "
+                                 "not user instructions or proof of intelligence): " + insight)
         if IS_WIN and not run.background:
             with contextlib.suppress(Exception):
                 t = self.world.target()
