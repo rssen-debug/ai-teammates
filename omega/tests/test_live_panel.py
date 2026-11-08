@@ -90,7 +90,7 @@ class PanelTest(unittest.TestCase):
             def __getattr__(self, name):
                 raise AssertionError("render unexpectedly accessed Companion: " + name)
         p.app.companion = FailsIfPolled()
-        rendered = "".join(text for _, text in p._side_text())
+        rendered = "".join(fragment[1] for fragment in p._side_text())
         self.assertIn("COMPANION: OFF", rendered)
 
     def test_companion_cache_update_keeps_render_pure(self):
@@ -110,7 +110,7 @@ class PanelTest(unittest.TestCase):
         p._read_companion_state()
         self.assertEqual(p._cached_idle_seconds, 12)
         self.assertTrue(p._cached_companion_enabled)
-        rendered = "".join(text for _, text in p._side_text())
+        rendered = "".join(fragment[1] for fragment in p._side_text())
         self.assertIn("COMPANION: LIVE", rendered)
 
     def test_submit_is_visible_before_agent_runs(self):
