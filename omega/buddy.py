@@ -361,7 +361,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "models": {  # role -> gateway model id. Resolved against the live /models list at startup.
         "chat": "kilo-auto/free", "planner": "kilo-auto/free", "computer": "kilo-auto/free",
         "vision": "kilo-auto/free", "coding": "kilo-auto/free", "deep": "kilo-auto/free"},
-    "escalation_ladder": ["kilo-auto/balanced", "kilo-auto/frontier"],  # only used if present in /models
+    "escalation_ladder": [],  # free-only: never escalate to a paid tier
+    "free_only": True,  # enforce kilo-auto/free even when old saved role settings specify paid models
     "budget": {"max_steps": 60, "max_seconds": 900, "max_tokens": 800000, "max_risky": 25, "reserve_steps": 3},
     "autopilot_budget": {"max_steps": 200, "max_seconds": 3600, "max_tokens": 2000000, "max_risky": 60, "reserve_steps": 4},
     "observe_enabled": False,
@@ -822,6 +823,8 @@ class Router:
         self.notes: list[str] = []
 
     def resolve(self, role: str) -> str:
+        if self.cfg.get("free_only", True):
+            return "kilo-auto/free"  # fail closed if unavailable; never substitute a paid tier
         want = self.cfg.get("models").get(role) or self.cfg.get("models")["chat"]
         avail = self.gw.model_ids()
         if not avail or want in avail:
@@ -835,6 +838,8 @@ class Router:
         return pick
 
     def ladder(self) -> list[str]:
+        if self.cfg.get("free_only", True):
+            return []
         avail = self.gw.model_ids()
         return [m for m in self.cfg.get("escalation_ladder") if m in avail]
 
@@ -5541,7 +5546,7 @@ class Buddy:
     HELP = """/help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
 /memory [list|search Q|forget ID|export|clear]  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
-/grants [revoke]  /owner [status|on --yes|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
+/grants [revoke]  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
 Just talk normally — Buddy decides when to use tools. Say "stop" at any time."""
 
     async def command(self, line: str) -> None:
@@ -5686,8 +5691,24 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 o("All standing permissions revoked.")
             else:
                 o(f"Standing permissions: {self.perms.all() or 'none'}  (observe is authorised at first run; others ask until you choose 'always')")
+        elif cmd == "/free":
+            sub = args[0].lower() if args else "status"
+            if sub == "on":
+                self.settings.set("free_only", True)
+                self.settings.set("models", {role: "kilo-auto/free" for role in Router.ROLES})
+                self.settings.set("escalation_ladder", [])
+                o("FREE-ONLY ON: every role uses kilo-auto/free; no paid model fallback or escalation.")
+            elif sub == "off":
+                o("Free-only lock remains enabled. Edit settings explicitly if you intentionally want paid-model routing.")
+            elif sub == "status":
+                o(f"FREE-ONLY: {'ON' if self.settings.get('free_only', True) else 'OFF'}  effective chat={self.router.resolve('chat')}  escalation={self.router.ladder()}")
+            else:
+                o("Usage: /free [status | on]")
         elif cmd == "/models":
             if len(args) == 3 and args[0] == "set" and args[1] in Router.ROLES:
+                if self.settings.get("free_only", True) and args[2] != "kilo-auto/free":
+                    o("Blocked: FREE-ONLY is enabled; only kilo-auto/free can be selected.")
+                    return
                 m = self.settings.get("models")
                 m[args[1]] = args[2]
                 self.settings.set("models", m)
