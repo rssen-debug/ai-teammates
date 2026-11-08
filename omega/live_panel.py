@@ -18,6 +18,7 @@ import re
 import shutil
 import threading
 import time
+import textwrap
 from typing import Any
 
 from prompt_toolkit import Application
@@ -456,6 +457,14 @@ class LivePanel:
         lines: list = []
         def add(value: str, style: str = "") -> None:
             lines.append((style, clean_line(value, 43) + "\n"))
+        def detail(value: str, style: str = "", max_lines: int = 2) -> None:
+            # Wrap real reasons/errors without leaking a long tool transcript or
+            # pushing the entire sidebar off-screen.
+            normalized = clean_line(value, 180)
+            wrapped = textwrap.wrap(normalized, width=42, break_long_words=False,
+                                    break_on_hyphens=False)
+            for item in wrapped[:max_lines]:
+                lines.append((style, item + "\n"))
 
         running = bool(app.current_run) or bool(getattr(getattr(app, "tasks", None), "current", {}))
         comp = self._cached_companion
@@ -509,11 +518,12 @@ class LivePanel:
             duration = int(max(0, current - float(app.current_run.t0)))
             add("AI uppgift: " + str(duration) + " sekunder", "#ffffff")
         if self._last_tool_error:
-            add("SENASTE FEL: " + self._last_tool_error, "#ff9ba6")
+            add("SENASTE FEL:", "#ff9ba6")
+            detail(self._last_tool_error, "#ff9ba6", max_lines=3)
         if self.show_thinking:
             add("── VERKLIGA ARBETSSTEG ──", "#ff8fc5")
-            for event in list(self.events)[-14:]:
-                add(" " + event, "#ffe0f1")
+            for event in list(self.events)[-7:]:
+                detail(" • " + event, "#ffe0f1", max_lines=2)
         elif self.events:
             add("SENAST: " + self.events[-1], "#d4b7c9")
         add("── MARKERING + RÖST ──", "#ff90c8")
@@ -564,11 +574,11 @@ class LivePanel:
 
     def step(self, text: str) -> None:
         panel = self._panel_state
-        panel.tool = clean_line(text, 48)
+        panel.tool = clean_line(text, 150)
         panel.phase = "Kör verktyg"
         panel.step_time = time.monotonic()
         panel.trace.append((panel.tool, None, time.time()))
-        panel.events.append(datetime.now().strftime("%H:%M:%S") + " · Kör " + panel.tool)
+        panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.tool)
         panel._refresh()
 
     def step_done(self, ok: bool, err: str = "") -> None:
@@ -577,7 +587,10 @@ class LivePanel:
             old = panel.trace.pop()
             panel.trace.append((old[0], bool(ok), old[2]))
         panel.phase = ("Steg klart" if ok else "Steg misslyckades")
-        panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.phase)
+        duration = max(0.0, time.monotonic() - panel.step_time)
+        panel.events.append(datetime.now().strftime("%H:%M:%S") +
+            (f" · ✓ Klart efter {duration:.1f}s" if ok
+             else f" · ✕ Misslyckades efter {duration:.1f}s"))
         if err and not ok:
             from buddy import redact
             panel._last_tool_error = clean_line(redact(str(err)), 110)
@@ -597,7 +610,7 @@ class LivePanel:
 
     def event(self, text: str) -> None:
         panel = self._panel_state
-        panel.phase = clean_line(text, 45)
+        panel.phase = clean_line(text, 80)
         panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.phase)
         panel._refresh()
 
