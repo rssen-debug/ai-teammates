@@ -1,0 +1,112 @@
+name: Omega CLI CI
+
+# omega/ had no CI at all. The existing studdy-buddy.yml is path-filtered to
+# studdy-buddy/**, so a pull request that only touched omega/ ran zero checks and
+# reported "no checks reported" — which reads like a green build to anyone who is
+# not looking for the absence. Everything below is the verification the product
+# already has, run on every change to it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'omega/**'
+      - 'integrations/majin-original/package.json'
+      - 'integrations/majin-original/package-lock.json'
+      - '.github/workflows/omega.yml'
+  pull_request:
+    paths:
+      - 'omega/**'
+      - 'integrations/majin-original/package.json'
+      - 'integrations/majin-original/package-lock.json'
+      - '.github/workflows/omega.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: omega-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: ${{ matrix.os }} · py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 and 3.13 bracket the supported range: the product floor is 3.10
+        # and 3.13 is the highest tested. Pinning one version here is how an
+        # installer ends up demanding it.
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.13']
+    env:
+      NO_COLOR: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prove the launcher contract holds
+        # Runs before the heavy suites: it is fast, and a launcher that cannot
+        # find an interpreter makes everything else untestable for a real user.
+        run: python -m unittest discover -s omega/tests -p 'test_launcher.py' -v
+
+      - name: Install MAJIN V6 dependencies
+        working-directory: integrations/majin-original
+        run: npm install --no-audit --no-fund
+
+      - name: Prove the MAJIN lockfile was not modified
+        shell: bash
+        run: |
+          if ! git diff --exit-code -- integrations/majin-original/package-lock.json; then
+            echo "::error::npm install rewrote package-lock.json — the MAJIN checkout must stay byte-identical"
+            exit 1
+          fi
+
+      - name: Full automated verification
+        # Exits non-zero if ANY suite fails. BLOCKED suites do not fail the build:
+        # a runner has no desktop session, no microphone and no Kilo key, and
+        # reporting that honestly is the product's whole point.
+        run: python omega/tests/run_all.py
+
+      - name: Acceptance scenarios
+        shell: bash
+        run: python omega/acceptance.py | tee acceptance.txt
+
+      - name: Fail on acceptance FAIL, never on BLOCKED
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          t = pathlib.Path("acceptance.txt").read_text(encoding="utf-8", errors="replace")
+          m = re.search(r"SUMMARY\s+PASS=(\d+)\s+FAIL=(\d+)\s+BLOCKED=(\d+)\s+NOT TESTED=(\d+)", t)
+          if not m:
+              sys.exit("no SUMMARY line — the acceptance harness did not run to completion")
+          p, f, b, n = map(int, m.groups())
+          print(f"acceptance: PASS={p} FAIL={f} BLOCKED={b} NOT_TESTED={n}")
+          # BLOCKED means this runner cannot prove the scenario. That is a true
+          # statement about the machine, not a defect, and it must not fail the
+          # build — nor may it ever be counted as a pass.
+          sys.exit(1 if f else 0)
+          PY
+
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-reports-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            omega/last_full_test_report.json
+            omega/last_selftest_report.json
+            acceptance.txt
+          if-no-files-found: ignore
+          retention-days: 14

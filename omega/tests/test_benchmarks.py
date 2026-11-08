@@ -18,6 +18,8 @@ What is guarded here:
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -50,6 +52,56 @@ def _run(ids: list[str], report: Path) -> dict:
     doc["_rc"] = proc.returncode
     doc["_stdout"] = proc.stdout
     return doc
+
+
+class TestSkipIsNeverAFailure(unittest.TestCase):
+    """A host precondition must be reported as a skip, never as a failure.
+
+    Not theoretical. `MajinBridge.__init__` defaults to `autostart=True`, so on a
+    machine without `npm install` the constructor raised MajinError OUTSIDE B13's
+    guard and the runner recorded a FAIL. axis E dropped from 1.000 to 0.929 for a
+    missing Node dependency — the level claimed the product had lost a capability
+    it never had on that host. B13 now constructs the bridge inert and starts it
+    inside the guard; this test is what keeps it that way.
+    """
+
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp(prefix="omega-skip-"))
+        self.addCleanup(lambda: shutil.rmtree(self.tmp, ignore_errors=True))
+        if not shutil.which("node"):
+            self.skipTest("Node.js is absent, so B13 would skip for a different reason")
+        # A directory that looks exactly like a MAJIN checkout to find_majin_root()
+        # — which requires both of these files — but has no node_modules.
+        root = self.tmp / "majin-root"
+        (root / "bin").mkdir(parents=True)
+        (root / "src" / "v6").mkdir(parents=True)
+        (root / "bin" / "majin-v6.mjs").write_text("// stub\n", encoding="utf-8")
+        (root / "src" / "v6" / "mcp.js").write_text("// stub\n", encoding="utf-8")
+        self.root = root
+
+    def test_missing_dependencies_skip_b13_instead_of_failing_it(self) -> None:
+        report = self.tmp / "report.json"
+        env = {**os.environ, "MAJIN_ROOT": str(self.root),
+               "BUDDY_HOME": str(self.tmp / "home"), "NO_COLOR": "1"}
+        proc = subprocess.run([sys.executable, str(RUNNER), "B13", "--report", str(report)],
+                              capture_output=True, text=True, timeout=300,
+                              cwd=str(OMEGA), env=env)
+        self.assertTrue(report.is_file(), proc.stdout[-600:] + proc.stderr[-600:])
+        doc = json.loads(report.read_text(encoding="utf-8"))
+        task = next(t for t in doc["tasks"] if t["id"] == "B13")
+
+        # Per-task status is "skip"; the metric that counts them is "skipped".
+        self.assertEqual(task["status"], "skip",
+                         f"B13 must SKIP on missing deps, got {task['status']}: {task.get('detail')}")
+        self.assertIsNone(task["score"], "a skipped task has no score")
+        self.assertIn("dependencies are not installed", task["detail"])
+        self.assertTrue(task.get("fix"), "and it must tell the owner how to fix the host")
+
+        m = doc["metric"]
+        self.assertEqual(m["failures"], 0, "a missing dependency must never count as a failure")
+        self.assertEqual(m["skipped"], 1)
+        self.assertEqual(m["run"], 0, "and must not enter axis E's denominator either")
+        self.assertEqual(proc.returncode, 0, "the runner must not exit non-zero for a skip")
 
 
 class TestTaskTableIsWellFormed(unittest.TestCase):

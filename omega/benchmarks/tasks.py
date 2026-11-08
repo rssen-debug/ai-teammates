@@ -61,10 +61,16 @@ class BenchOutcome:
     score: Optional[float]
     detail: str
     evidence: dict = field(default_factory=dict)
+    #: How to make THIS HOST able to run the task. Only meaningful for a skip.
+    #: It used to be passed as an evidence keyword and so ended up buried inside
+    #: the evidence dict — where neither the human renderer nor anything reading
+    #: --json would look for it. A skip without its remedy is just a shrug, so it
+    #: is a first-class field now.
+    fix: str = ""
 
 
-def skipped(why: str, **ev) -> BenchOutcome:
-    return BenchOutcome(None, f"SKIPPED: {why}", ev)
+def skipped(why: str, fix: str = "", **ev) -> BenchOutcome:
+    return BenchOutcome(None, f"SKIPPED: {why}", ev, fix=fix)
 
 
 def scored(hits: int, total: int, detail: str, **ev) -> BenchOutcome:
@@ -684,7 +690,14 @@ def b13_majin_exactly_once(ctx: BenchCtx) -> BenchOutcome:
     (v5 / "owner-mode.json").write_text(json.dumps({
         "schema": "majin.v4.owner-mode/v1", "version": 1, "lanes": ["files"],
         "folders": [str(ws)], "browserOrigins": [], "history": []}), encoding="utf-8")
-    bridge = mb.MajinBridge(majin_root=root, workspace=ws, v5_data_dir=v5, v6_home=ctx.tmp / "majin-v6")
+    # autostart=False matters. MajinBridge's constructor defaults to starting the
+    # server, so the MajinError for a host without `npm install` would be raised
+    # HERE — outside the guard below — and the runner would report B13 as a FAIL.
+    # A missing Node dependency is a property of the host, not a capability
+    # failure, and scoring it as one is exactly the lie the skip mechanism exists
+    # to prevent. Construct inert, then start inside the guard.
+    bridge = mb.MajinBridge(majin_root=root, workspace=ws, v5_data_dir=v5,
+                            v6_home=ctx.tmp / "majin-v6", autostart=False)
     try:
         try:
             bridge.start()   # returns None; raises MajinError when it cannot start

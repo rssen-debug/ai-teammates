@@ -1,0 +1,76 @@
+#!/bin/sh
+# ═══════════════════════════════════════════════════════════════════════════
+#  STUDDY BUDDY OMEGA — POSIX launcher
+#
+#  Installed on PATH as `buddy`. Finds a usable CPython and passes every
+#  argument through to omega/buddy.py.
+#
+#  POSIX sh, not bash: it has to run on a minimal install where bash may not be
+#  the default shell. No arrays, no [[ ]], no local.
+#
+#  Same two rules as the Windows launcher: never hardcode a Python version
+#  (>=3.10 is the only floor) and never hardcode a machine-specific path.
+# ═══════════════════════════════════════════════════════════════════════════
+set -eu
+
+here=$(cd "$(dirname "$0")" && pwd)
+omega=$(cd "$here/.." && pwd)
+target="$omega/buddy.py"
+
+if [ ! -f "$target" ]; then
+  printf 'buddy: cannot find %s\n' "$target" >&2
+  printf '       the launcher must sit in omega/launcher/ next to buddy.py\n' >&2
+  exit 2
+fi
+
+# Is this interpreter new enough? The product floor is 3.10, and that is the only
+# version check performed here — a hardcoded 3.12 is what broke the last installer.
+usable() {
+  [ -n "${1:-}" ] || return 1
+  command -v "$1" >/dev/null 2>&1 || return 1
+  "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' >/dev/null 2>&1
+}
+
+run() {
+  exec "$1" "$target" "$@"
+}
+
+# 1. An explicit interpreter always wins.
+if [ -n "${BUDDY_PYTHON:-}" ]; then
+  if usable "$BUDDY_PYTHON"; then
+    exec "$BUDDY_PYTHON" "$target" "$@"
+  fi
+  printf 'buddy: BUDDY_PYTHON=%s is not a usable CPython >= 3.10\n' "$BUDDY_PYTHON" >&2
+  exit 127
+fi
+
+# 2. What the installer recorded, if it recorded anything.
+manifest="$omega/install-manifest.json"
+if [ -f "$manifest" ]; then
+  recorded=$(sed -n 's/.*"python"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$manifest" | head -n 1)
+  if [ -n "$recorded" ] && usable "$recorded"; then
+    exec "$recorded" "$target" "$@"
+  fi
+fi
+
+# 3. Everything else on PATH, most specific first.
+for cand in python3.13 python3.12 python3.11 python3.10 python3 python; do
+  if usable "$cand"; then
+    exec "$cand" "$target" "$@"
+  fi
+done
+
+cat >&2 <<'MSG'
+
+  buddy could not find a usable Python.
+
+  It needs CPython 3.10 or newer; 3.12 is recommended.
+  Either install one, or point at an existing one:
+
+      export BUDDY_PYTHON=/path/to/python3
+
+  Checked: BUDDY_PYTHON, install-manifest.json, python3.13 … python3.10,
+  python3, python.
+
+MSG
+exit 127

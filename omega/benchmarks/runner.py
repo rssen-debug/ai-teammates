@@ -116,7 +116,8 @@ def run(only: Optional[list[str]] = None, report_path: Optional[Path] = None,
         else:
             status = "fail"
         rows.append({"id": bid, "name": name, "status": status, "score": out.score,
-                     "seconds": secs, "detail": out.detail, "evidence": out.evidence})
+                     "seconds": secs, "detail": out.detail, "fix": out.fix,
+                     "evidence": out.evidence})
         if not quiet:
             # Under --json these progress lines would make stdout unparseable, so
             # machine-readable output stays machine-readable.
@@ -195,6 +196,8 @@ def _render(doc: dict[str, Any]) -> None:
         for r in doc["tasks"]:
             if r["status"] == "skip":
                 print(C.c(C.DIM, f"    {r['id']}: {buddy.clip(r['detail'], 150)}"))
+                if r.get("fix"):
+                    print(C.c(C.CY, f"        fix: {r['fix']}"))
     if m["failures"]:
         print(C.c(C.R, "  failures — real defects, with evidence:"))
         for r in doc["tasks"]:
