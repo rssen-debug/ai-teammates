@@ -2040,9 +2040,18 @@ class Memory:
         return True
 
     def delete(self, mid: int) -> bool:
-        r = self.s.one("SELECT provenance FROM memories WHERE id=?", (mid,))
+        r = self.s.one("SELECT provenance,kind,title FROM memories WHERE id=?", (mid,))
         if not r:
             return False
+        vault = Path(Settings(self.s).get("obsidian_vault") or HOME / "obsidian-vault").expanduser().resolve()
+        module = sibling("personal_memory")
+        if module is not None and r["kind"] in module.ObservationVault.KNOWLEDGE_KINDS:
+            note_path = module.ObservationVault(vault).knowledge_path(r["kind"], r["title"]).resolve()
+            if note_path.is_relative_to(vault / "knowledge"):
+                try:
+                    note_path.unlink(missing_ok=True)
+                except OSError:
+                    return False
         with contextlib.suppress(ValueError, TypeError, json.JSONDecodeError):
             note = (json.loads(r["provenance"] or "{}") or {}).get("obsidian_file")
             if note:
