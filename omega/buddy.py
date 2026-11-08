@@ -4684,6 +4684,15 @@ class CLI:
         comp_ok, _why = a.companion.present()
         comp_on = bool(comp_ok and a.companion.loop.enabled)
         trust_mode = a.companion.trust.mode if comp_ok else "normal"
+        level_info = a.measure_level(record=False)
+        level_d = level_info.to_dict() if hasattr(level_info, "to_dict") else level_info
+        lv = level_d.get("level")
+        if isinstance(lv, (int, float)):
+            lit = max(0, min(20, int(round(float(lv) / 5))))
+            level_line = (C.c(C.G, "●" * lit) + C.c(C.DIM, "○" * (20 - lit))
+                          + f"  {int(lv)}/100 · verified evidence")
+        else:
+            level_line = C.dim("○" * 20 + "  not measured")
         out = [
             V.dot("ok" if ok_ai[0] else "warn") + " " + C.bold("STUDDY BUDDY OMEGA") + C.dim(f"  v{APP_VERSION}"),
             V.rule(),
@@ -4697,6 +4706,7 @@ class CLI:
             V.kv("Autopilot", f"{V.dot('info')} ready  " + C.dim(f"{active} active"), 11),
             V.kv("Companion", (f"{V.dot('ok')} loop on" if comp_on else f"{V.dot('off')} loop off")
                               + C.dim(f"  · trust {trust_mode}"), 11),
+            V.kv("Growth", level_line, 11),
             ""]
         self._out("\n".join(out))
 
@@ -6204,13 +6214,26 @@ def presence_report(app: Buddy, minutes: int = 20) -> str:
     runs = app.store.one("SELECT COUNT(*) c, SUM(CASE WHEN verified=1 THEN 1 ELSE 0 END) v "
                          "FROM runs WHERE ts>=?", (since,))
     mem_stats = app.memory.stats()
+    recent_notes = app.store.q("SELECT content FROM memories WHERE kind='episodic' "
+                                "AND tags LIKE '%screen,observation%' AND updated>=? "
+                                "ORDER BY updated DESC LIMIT 2", (since,))
     measured = app.measure_level(record=False)
     d = measured.to_dict() if hasattr(measured, "to_dict") else measured
     level = d.get("level")
     if isinstance(level, (int, float)):
         marks = max(0, min(20, int(round(float(level) / 5))))
         dots = C.c(C.G, "●" * marks) + C.c(C.DIM, "○" * (20 - marks))
-        progress = f"{dots}  LVL {level}/100 · {d.get('tier', 'unknown')}"
+        past = None
+        with contextlib.suppress(Exception):
+            history_mod = sibling("level")
+            if history_mod is not None:
+                history = history_mod.history(app.store.path, limit=150)
+                older = [h for h in history if float(h.get("ts") or 0) <= since]
+                if older:
+                    past = int(older[-1]["level"])
+        delta = ("  (Δ " + f"{int(level) - past:+d}" + " in period)" if past is not None else
+                 "  (no earlier measurement)")
+        progress = f"{dots}  LVL {level}/100 · {d.get('tier', 'unknown')}" + delta
     else:
         progress = "○" * 20 + "  not measured yet"
     observation = int((recent or {}).get("c") or 0)
@@ -6224,7 +6247,9 @@ def presence_report(app: Buddy, minutes: int = 20) -> str:
             + f"  Verified agent runs: {verified}/{attempted}\n"
             + f"  Searchable long-term memories: {mem_stats.get('total', 0)}\n"
             + f"  Obsidian auto-memory: {'ON' if app.settings.get('obsidian_auto_memory', False) else 'OFF'}\n"
-            + "  This is measured activity, not a claim to know your thoughts or feelings.\n"
+            + (("  Recently observed:\n" + "".join("    • " + clip(note["content"], 125) + "\n" for note in recent_notes))
+               if recent_notes else "  No recent screen observations saved yet.\n")
+            + "  Observations are fallible, not proof of knowledge or personal intentions.\n"
             + "  Ask 'Vad har du lärt dig om mina projekt?' for an evidence-grounded summary.")
 
 
