@@ -270,6 +270,7 @@ class LivePanel:
         self._tetris_ai_calls = 0
         self._tetris_ai_moves = 0
         self._tetris_ai_failed = 0
+        self._tetris_failure_streak = 0
         self._tetris_last_decision = ""
         self._tetris_reason = ""
         self._tetris_last_error = ""
@@ -293,7 +294,7 @@ class LivePanel:
         def _toggle(_event: Any) -> None:
             self.toggle_thinking()
         right = Frame(Window(content=self._status_control, wrap_lines=False),
-                      title=" OMEGA · LIVE ", width=Dimension.exact(39))
+                      title=" OMEGA · LIVE ", width=Dimension.exact(48))
         visibility = Condition(lambda: shutil.get_terminal_size((120, 35)).columns >= 94)
         self._layout = Layout(
             VSplit([
@@ -464,6 +465,8 @@ class LivePanel:
             self._tetris_last_error = ""
             self._tetris_ai_state = "Valt drag · pjäs faller"
             self._tetris_ai_moves += 1
+            self._tetris_failure_streak = 0
+            self._tetris_retry_after = 0.0
             elapsed = time.monotonic() - self._tetris_wait_started
             self._tetris_last_decision = f"Drag {chosen} · {elapsed:.1f}s · giltigt AI-drag"
             self._tetris_ai_state = "pjäs faller"
@@ -472,10 +475,11 @@ class LivePanel:
             raise
         except Exception as exc:
             self._tetris_ai_failed += 1
+            self._tetris_failure_streak += 1
             self._tetris_ai_state = "AI FEL · pausad"
             self._tetris_last_error = clean_line(str(exc), 110)
             self._tetris_last_decision = "Inget drag godkänt"
-            self._tetris_retry_after = time.monotonic() + min(120, 10 * self._tetris_ai_failed)
+            self._tetris_retry_after = time.monotonic() + min(120, 10 * self._tetris_failure_streak)
             self.events.append(datetime.now().strftime("%H:%M:%S") + " · AI Tetris: " + self._tetris_last_error)
         finally:
             self._refresh()
@@ -600,7 +604,7 @@ class LivePanel:
         current = time.time()
         lines: list = []
         def add(value: str, style: str = "") -> None:
-            lines.append((style, clean_line(value, 34) + "\n"))
+            lines.append((style, clean_line(value, 43) + "\n"))
 
         running = bool(app.current_run) or bool(getattr(getattr(app, "tasks", None), "current", {}))
         comp = self._cached_companion
@@ -648,6 +652,19 @@ class LivePanel:
         else:
             add("AI LEVEL: väntar på mätning", "#ffffff")
 
+        lines.append(("bold #ff90c8", "TÄNKER · öppna / F2\n", self._side_click))
+        add("STEG: " + self.phase, "#ffe0f1")
+        if running and app.current_run:
+            duration = int(max(0, current - float(app.current_run.t0)))
+            add("AI uppgift: " + str(duration) + " sekunder", "#ffffff")
+        if self._last_tool_error:
+            add("SENASTE FEL: " + self._last_tool_error, "#ff9ba6")
+        if self.show_thinking:
+            add("── VERKLIGA ARBETSSTEG ──", "#ff8fc5")
+            for event in list(self.events)[-10:]:
+                add(" " + event, "#ffe0f1")
+        elif self.events:
+            add("SENAST: " + self.events[-1], "#d4b7c9")
         add("── PIXEL TETRIS · LIVE ──", "#ff90c8")
         if self._tetris is not None:
             for tetris_row in self._tetris.display():
@@ -656,6 +673,8 @@ class LivePanel:
         else:
             add("Spelmotor ej startad", "#bca8bc")
         add("SPELARE: Kilo AI · " + self._tetris_ai_state, "#ff8fc5")
+        if self._tetris_retry_after > time.monotonic() and self._tetris is not None and self._tetris.awaiting_move:
+            add("Nästa försök om " + str(int(self._tetris_retry_after - time.monotonic())) + "s", "#ffd0e6")
         add(f"AI-drag {self._tetris_ai_moves} / anrop {self._tetris_ai_calls}", "#ffffff")
         if self._tetris_last_decision:
             add(self._tetris_last_decision, "#d4b7c9")
@@ -696,16 +715,7 @@ class LivePanel:
         else:
             add("Inga observationer aktiva", "#d4b7c9")
 
-        lines.append(("bold #ff90c8", "TÄNKER · klicka här / F2\n", self._side_click))
-        add("STEG: " + self.phase, "#ffe0f1")
-        if running and app.current_run:
-            duration = int(max(0, current - float(app.current_run.t0)))
-            add("AI-anrop/uppgift: " + str(duration) + "s", "#ffffff")
-        if self._last_tool_error:
-            add("Verktygsfel: " + self._last_tool_error, "#ff9ba6")
-        if self.show_thinking:
-            for event in list(self.events)[-8:]:
-                add(" " + event, "#ffe0f1")
+
         add("AKTIVITET · VERKTYG", "bold #ff90c8")
         if self.trace:
             for label, ok, _when in list(self.trace)[-4:]:
