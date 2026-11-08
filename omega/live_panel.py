@@ -629,6 +629,8 @@ class LivePanel:
         add("── MARKERING + RÖST ──", "#ff90c8")
         bridge = getattr(app, "selection_bridge", None)
         add("MARKERA: " + (bridge.status if bridge else "OFF"), "#ffffff")
+        if bridge and getattr(bridge, "auto_task", None) is not None:
+            add("AUTO: markerad text · aktiv", "#ff8fc5")
         selected = getattr(app, "last_selection", None)
         if selected and current - selected.get("created", 0) < 900:
             add("Text: " + str(len(selected.get("text", ""))) + " tecken", "#ffcae6")
