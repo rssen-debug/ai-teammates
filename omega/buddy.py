@@ -7137,7 +7137,7 @@ def resources_report() -> str:
     )
     try:
         proc = subprocess.run([shell, "-NoProfile", "-NonInteractive", "-Command", ps],
-                              capture_output=True, text=True, timeout=18, errors="replace")
+                              capture_output=True, text=True, encoding="utf-8", timeout=18, errors="replace")
         if proc.returncode != 0:
             return "Process snapshot failed: " + clip(redact(proc.stderr.strip()), 180)
         data = json.loads(proc.stdout.strip() or "[]")
@@ -8446,6 +8446,7 @@ Diagnostics and proof
   buddy doctor [section]    real diagnostics. sections: runtime gateway desktop voice browser
                             memory autopilot tasks majin level subsystems
   buddy status [--json]     operational state: key, models, memory, tasks, grants, MAJIN, level
+  buddy resources           inspect actual Windows per-process RAM usage (not browser tab attribution)
   buddy test [--quick]      every automated suite, each reported separately
   buddy prove               self-test + live Windows/AI scenarios (needs Windows + a Kilo key)
   buddy accept [N ...]      the 20 mandated end-to-end acceptance scenarios, for real, with
