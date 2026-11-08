@@ -479,6 +479,16 @@ class UserModel:
                                             "samples": int(r["n"])} for r in apps]
         out["evidence"]["activity_samples"] = sum(int(r["n"]) for r in apps)
 
+        observed_screen = self._q(
+            "SELECT content, updated FROM memories WHERE kind='episodic' "
+            "AND tags LIKE '%screen,observation%' AND updated>=? "
+            "ORDER BY updated DESC LIMIT 12", (since,))
+        out["observed"]["recent_screen_activity"] = [
+            {"description": str(r["content"] or "")[:240], "at": round(float(r["updated"]), 0),
+             "confidence": "unverified", "source": "screen_vision"}
+            for r in observed_screen]
+        out["evidence"]["screen_observations"] = len(observed_screen)
+
         hours = self._q("SELECT CAST(strftime('%H', start, 'unixepoch', 'localtime') AS INTEGER) AS h, "
                         "SUM(end-start) AS secs FROM activity WHERE start>=? GROUP BY h", (since,))
         by_hour = {int(r["h"]): round(float(r["secs"] or 0), 1) for r in hours if r["h"] is not None}
@@ -682,6 +692,7 @@ class CompanionLoop:
                  idle_probe: Optional[Callable[[], float]] = None,
                  pending_input: Optional[Callable[[], bool]] = None,
                  capture_context: Optional[Callable[[], dict]] = None,
+                 on_observation: Optional[Callable[[str, str, str], Any]] = None,
                  log_fn: Optional[Callable[..., None]] = None) -> None:
         self.cfg = settings
         self.obs = observation
@@ -694,6 +705,7 @@ class CompanionLoop:
         self._idle_probe = idle_probe
         self._pending = pending_input or (lambda: False)
         self._capture_context = capture_context or (lambda: {})
+        self._on_observation = on_observation
         self.last_capture_at = 0.0
         self.last_capture_text = ""
         self.last_capture_note = "not captured yet"
@@ -825,6 +837,16 @@ class CompanionLoop:
             if ok and text.strip():
                 self.last_capture_text = text[:2000]
                 self.captures += 1
+                if self._on_observation is not None:
+                    try:
+                        result = self._on_observation(title, app_name, text)
+                        if inspect.isawaitable(result):
+                            result = await result
+                        if isinstance(result, str) and result:
+                            self.last_capture_note += "; " + result[:150]
+                    except Exception as exc:
+                        self.errors.append("observation memory: " + type(exc).__name__)
+                        self.last_capture_note += "; memory write failed"
                 self._log("companion_screen_observed", chars=len(text), captures=self.captures)
         except Exception as e:
             self.last_capture_note = f"capture failed: {type(e).__name__}: {e}"
@@ -996,6 +1018,9 @@ class CompanionLoop:
                 self.errors.append(str(e))
                 self._log("companion_tick_error", err=str(e))
             out.append(rep)
+            # Long-lived companions must not retain every tick forever.
+            if len(out) > 120:
+                del out[:len(out) - 120]
             self.ticks += 1
             if max_ticks is not None and self.ticks >= max_ticks:
                 break

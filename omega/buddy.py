@@ -374,6 +374,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "first_run_done": False,
     "poll_seconds": 2.0,
     "screenshot_upload": "ask",  # ask | allow | deny
+    "obsidian_auto_memory": False,  # opt in to storing screened activity descriptions locally
+    "obsidian_vault": "",  # default HOME/obsidian-vault; configurable in CLI
 }
 
 
@@ -1880,6 +1882,19 @@ class Memory:
     def __init__(self, store: Store):
         self.s = store
 
+    def _mirror_obsidian(self, kind: str, title: str, content: str, status: str) -> None:
+        """Only explicit durable memory types are mirrored, not every chat line."""
+        if not Settings(self.s).get("obsidian_auto_memory", False):
+            return
+        module = sibling("personal_memory")
+        if module is None or kind not in module.ObservationVault.KNOWLEDGE_KINDS:
+            return
+        try:
+            vault = Path(Settings(self.s).get("obsidian_vault") or HOME / "obsidian-vault").expanduser()
+            module.ObservationVault(vault).record_knowledge(kind, title, content, status)
+        except Exception as exc:
+            log("obsidian_knowledge_mirror_failed", kind=kind, error=type(exc).__name__)
+
     @staticmethod
     def dedupe_key(kind: str, title: str, content: str) -> str:
         norm = re.sub(r"\s+", " ", f"{title}\n{content}".strip().lower())
@@ -1897,10 +1912,13 @@ class Memory:
             self.s.x("UPDATE memories SET content=?, tags=?, status=?, updated=?, source_run=?, dedupe=?, "
                      "provenance=COALESCE(?, provenance), scope=COALESCE(NULLIF(?,''), scope) WHERE id=?",
                      (content, tags, status, t, run_id, dedupe, prov, scope, ex["id"]))
+            self._mirror_obsidian(kind, title, content, status)
             return ex["id"]
-        return self.s.x("INSERT INTO memories(kind,title,content,tags,status,source_run,created,updated,dedupe,provenance,scope) "
-                        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                        (kind, title, content, tags, status, run_id, t, t, dedupe, prov, scope)).lastrowid
+        new_id = self.s.x("INSERT INTO memories(kind,title,content,tags,status,source_run,created,updated,dedupe,provenance,scope) "
+                          "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                          (kind, title, content, tags, status, run_id, t, t, dedupe, prov, scope)).lastrowid
+        self._mirror_obsidian(kind, title, content, status)
+        return new_id
 
     def search(self, query: str, kind: str | None = None, limit: int = 6, touch: bool = True,
                scope: str | None = None, kinds: tuple | None = None) -> list[dict]:
@@ -2022,6 +2040,30 @@ class Memory:
         return True
 
     def delete(self, mid: int) -> bool:
+        r = self.s.one("SELECT provenance,kind,title FROM memories WHERE id=?", (mid,))
+        if not r:
+            return False
+        vault = Path(Settings(self.s).get("obsidian_vault") or HOME / "obsidian-vault").expanduser().resolve()
+        module = sibling("personal_memory")
+        if module is not None and r["kind"] in module.ObservationVault.KNOWLEDGE_KINDS:
+            note_path = module.ObservationVault(vault).knowledge_path(r["kind"], r["title"]).resolve()
+            if note_path.is_relative_to(vault / "knowledge"):
+                try:
+                    note_path.unlink(missing_ok=True)
+                except OSError:
+                    return False
+        with contextlib.suppress(ValueError, TypeError, json.JSONDecodeError):
+            note = (json.loads(r["provenance"] or "{}") or {}).get("obsidian_file")
+            if note:
+                vault = Path(Settings(self.s).get("obsidian_vault") or HOME / "obsidian-vault").expanduser().resolve()
+                target = Path(note).resolve()
+                # Only the application's own generated observation paths may be removed.
+                if not target.is_relative_to(vault / "observations"):
+                    return False
+                try:
+                    target.unlink(missing_ok=True)
+                except OSError:
+                    return False
         return self.s.x("DELETE FROM memories WHERE id=?", (mid,)).rowcount > 0
 
     def list(self, kind: str | None = None, limit: int = 50) -> list[dict]:
@@ -5209,6 +5251,7 @@ class CompanionSubsystem:
         self._obs: Any = None
         self._model: Any = None
         self._loop: Any = None
+        self._personal_vault: Any = None
 
     @property
     def mod(self) -> Any:
@@ -5344,6 +5387,27 @@ class CompanionSubsystem:
             return {}
         return {"title": w.get("title", ""), "app": w.get("app", "")}
 
+    def _remember_screen(self, title: str, app_name: str, text: str) -> str:
+        """Durable, bounded and unverified; observation isn't a personal fact."""
+        if not self.app.settings.get("obsidian_auto_memory", False):
+            return "Obsidian memory off"
+        if self.app.privacy.private or self.app.privacy.protected_window(title, app_name):
+            return "protected activity not saved"
+        mod = sibling("personal_memory")
+        if mod is None:
+            return "Obsidian writer unavailable"
+        vault_root = Path(self.app.settings.get("obsidian_vault") or HOME / "obsidian-vault").expanduser()
+        if self._personal_vault is None or self._personal_vault.root != vault_root:
+            self._personal_vault = mod.ObservationVault(vault_root)
+        saved, note, safe_text = self._personal_vault.record(app_name, text)
+        if not saved:
+            return note
+        self.app.memory.save(
+            "episodic", f"Screen activity {iso()}",
+            safe_text, tags="companion,screen,observation", status="unverified",
+            provenance={"source": "screen_vision", "confidence": "unverified", "obsidian_file": note})
+        return "saved to Obsidian Markdown and searchable memory"
+
     @property
     def loop(self) -> Any:
         m = self.need()
@@ -5353,6 +5417,7 @@ class CompanionSubsystem:
                 store=self.app.store, memory=self.app.memory,
                 chat=self._chat, idle_probe=self.idle_seconds, pending_input=self._pending,
                 capture_context=self._screen_context,
+                on_observation=self._remember_screen,
                 log_fn=lambda ev, **kw: log(ev, **kw))
         return self._loop
 
@@ -5533,6 +5598,20 @@ class Buddy:
         mems = self.memory.search(run.goal, limit=4, touch=False)
         if mems:
             parts.append("RELEVANT MEMORY:\n" + "\n".join(f"- [{m['kind']}/{m['status']}] {m['title']}: {clip(m['content'], 300)}" for m in mems))
+        # Study help needs relevant reading context, even when the user only says
+        # "quiz me". Observations are evidence of an opened topic, not mastery.
+        if re.search(r"(?i)\b(studera|plugga|förhör|quiz|tenta|läxa|exam|study|studies|learn|testa mig)\b", run.goal):
+            recent = self.store.q(
+                "SELECT content,updated FROM memories WHERE kind='episodic' "
+                "AND tags LIKE '%screen,observation%' ORDER BY updated DESC LIMIT 6")
+            if recent:
+                parts.append("RECENT STUDY SCREEN CONTEXT (unverified, not proof of learning):\n"
+                             + "\n".join("- " + clip(row["content"], 220) for row in recent))
+            parts.append("STUDY COACH: Offer a focused question or short quiz grounded in the user's actual "
+                         "materials or confirmed knowledge. Ask one question at a time; after each answer "
+                         "explain errors precisely, adapt difficulty, and never pretend they mastered a topic "
+                         "merely because it was visible on screen.")
+
         summ = self.memory.history()[0]
         if summ and not run.background:
             parts.append("EARLIER CONVERSATION SUMMARY:\n" + summ)
@@ -5626,7 +5705,7 @@ class Buddy:
 
     # ── slash commands ──
     HELP = """/help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
-/memory [list|search Q|forget ID|export|clear]  /doctor  /pause  /resume  /stop  /quit /exit
+/memory [list|search Q|forget ID|export|clear]  /obsidian [status|on|off|sync|path PATH|clear --yes]  /resources  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
 /grants [revoke]  /activate [all|status|off]  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
 Just talk normally — Buddy decides when to use tools. Say "stop" at any time."""
@@ -5698,7 +5777,56 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 o(f"exported {self.memory.export_obsidian(DIRS['export'])} notes to {DIRS['export']} (Obsidian-compatible)")
             elif sub == "clear":
                 self.memory.forget_all()
-                o("All memories and conversation history deleted.")
+                o("SQLite memories/conversation cleared. Obsidian notes are separate; use /obsidian clear --yes if you also want those erased.")
+        elif cmd == "/obsidian":
+            sub = args[0].lower() if args else "status"
+            folder = Path(self.settings.get("obsidian_vault") or HOME / "obsidian-vault").expanduser()
+            if sub == "on":
+                self.settings.set("obsidian_auto_memory", True)
+                o(f"Obsidian observation memory enabled: {folder} (Markdown, local, no screenshots).")
+            elif sub == "off":
+                self.settings.set("obsidian_auto_memory", False)
+                o("Obsidian observation memory disabled; existing notes are kept.")
+            elif sub == "path" and len(args) > 1:
+                folder = Path(" ".join(args[1:])).expanduser()
+                if not folder.is_absolute():
+                    o("Please use an absolute vault path, e.g. C:\\Users\\you\\Documents\\ObsidianVault")
+                else:
+                    self.settings.set("obsidian_vault", str(folder))
+                    self.companion._personal_vault = None
+                    o(f"Obsidian vault path set: {folder}")
+            elif sub == "sync":
+                module = sibling("personal_memory")
+                if module is None:
+                    o("Obsidian writer unavailable: " + _SIBLING_ERRORS.get("personal_memory", "unknown"))
+                else:
+                    vault = module.ObservationVault(folder)
+                    count, skipped = 0, 0
+                    for mem in self.store.q("SELECT kind,title,content,status FROM memories"):
+                        ok, _ = vault.record_knowledge(mem["kind"], mem["title"], mem["content"], mem["status"] or "unverified")
+                        count += int(ok)
+                        skipped += int(not ok)
+                    o(f"Obsidian sync: {count} durable notes mirrored, {skipped} ineligible/filtered. Vault: {folder}")
+            elif sub == "clear":
+                if "--yes" not in args[1:]:
+                    o("This deletes all auto-generated observation notes (not unrelated vault files). Confirm with /obsidian clear --yes.")
+                else:
+                    mod = sibling("personal_memory")
+                    if mod is None:
+                        o("Obsidian writer unavailable; no notes deleted.")
+                    else:
+                        n = mod.ObservationVault(folder).clear_observations()
+                        self.store.x("DELETE FROM memories WHERE kind='episodic' AND tags='companion,screen,observation'")
+                        o(f"Deleted {n} generated observation notes and their matching SQLite memories.")
+            elif sub == "status":
+                o(f"Obsidian auto memory: {'ON' if self.settings.get('obsidian_auto_memory', False) else 'OFF'}")
+                o(f"Vault: {folder}  (can be opened as a vault in Obsidian)")
+                o("Stores short screened visual descriptions; source is unverified AI vision, not inferred personal facts.")
+                o("To disable: /obsidian off. Delete individual note files directly in Obsidian.")
+            else:
+                o("Usage: /obsidian [status | on | off | sync | path ABSOLUTE_PATH | clear --yes]")
+        elif cmd == "/resources":
+            o(resources_report())
         elif cmd == "/doctor":
             o("Running diagnostics…")
             items = await asyncio.to_thread(self.doctor.run, "all")
@@ -5748,7 +5876,8 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                   f"companion: {'ON' if self.companion.present()[0] and self.companion.loop.enabled else 'OFF'}; "
                   f"voice: {'ON' if self.voice.running else 'OFF'}; "
                   f"screen captures: {self.companion.loop.captures if self.companion.present()[0] else 0}; "
-                  f"last capture: {self.companion.loop.last_capture_note if self.companion.present()[0] else 'unavailable'}")
+                  f"last capture: {self.companion.loop.last_capture_note if self.companion.present()[0] else 'unavailable'}; "
+                  f"Obsidian auto memory: {self.settings.get('obsidian_auto_memory', False)}")
             elif sub == "all":
                 self.settings.set("free_only", True)
                 self.settings.set("models", {role: "kilo-auto/free" for role in Router.ROLES})
@@ -5756,6 +5885,7 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 for scope in ("observe", "input", "write", "exec"):
                     self.perms.set(scope, "always")
                 self.settings.set("screenshot_upload", "allow")
+                self.settings.set("obsidian_auto_memory", True)
                 # Refresh cached backend after the owner has explicitly allowed screenshot uploads.
                 if self.companion.present()[0] and self.companion._obs is not None:
                     self.companion._obs.backend = self.companion._backend(self.companion.mod)
@@ -5790,6 +5920,7 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 self.activity.stop()
                 self.settings.set("observe_enabled", False)
                 self.settings.set("screenshot_upload", "ask")
+                self.settings.set("obsidian_auto_memory", False)
                 for scope in ("input", "write", "exec"):
                     self.perms.set(scope, None)
                 self.perms.audit("user", "activate_all_except_voice", "configuration", "disabled")
@@ -6990,6 +7121,44 @@ def cmd_doctor(rest: list[str]) -> int:
     finally:
         with contextlib.suppress(Exception):
             app.majin.close()
+
+
+def resources_report() -> str:
+    """One-shot actual Windows process working sets; never guess Chrome tab attribution."""
+    if not IS_WIN:
+        return "Process RAM report requires Windows. See your OS process monitor."
+    shell = shutil.which("powershell.exe") or shutil.which("powershell")
+    if not shell:
+        return "Windows PowerShell not found; open Task Manager > Processes."
+    ps = (
+        "Get-Process | Sort-Object WorkingSet64 -Descending | "
+        "Select-Object -First 18 Name,Id,WorkingSet64,PrivateMemorySize64 | "
+        "ConvertTo-Json -Compress"
+    )
+    try:
+        proc = subprocess.run([shell, "-NoProfile", "-NonInteractive", "-Command", ps],
+                              capture_output=True, text=True, encoding="utf-8", timeout=18, errors="replace")
+        if proc.returncode != 0:
+            return "Process snapshot failed: " + clip(redact(proc.stderr.strip()), 180)
+        data = json.loads(proc.stdout.strip() or "[]")
+        rows = data if isinstance(data, list) else [data]
+        out = ["  Process                   PID     RAM MB   Private MB",
+               "  ----------------------------------------------------"]
+        for row in rows:
+            ram = (row.get("WorkingSet64") or 0) / (1024 * 1024)
+            private = (row.get("PrivateMemorySize64") or 0) / (1024 * 1024)
+            out.append(f"  {str(row.get('Name', '?'))[:23]:<23} {str(row.get('Id', '?')):>6}  {ram:>8.1f}   {private:>9.1f}")
+        out.append("  RAM MB = actual resident working set (not memory uniquely owned by one browser tab).")
+        out.append("  For a Chrome tab: open Chrome Task Manager with Shift+Esc; sort Memory footprint.")
+        out.append("  Do not apply Electron memory flags to Chrome/Python without identifying the real process.")
+        return "\n".join(out)
+    except (OSError, subprocess.TimeoutExpired, ValueError, KeyError) as exc:
+        return f"Process snapshot unavailable ({type(exc).__name__}); use Windows Task Manager."
+
+
+def cmd_resources(rest: list[str]) -> int:
+    print(resources_report())
+    return 0
 
 
 def cmd_status(rest: list[str]) -> int:
@@ -8277,6 +8446,7 @@ Diagnostics and proof
   buddy doctor [section]    real diagnostics. sections: runtime gateway desktop voice browser
                             memory autopilot tasks majin level subsystems
   buddy status [--json]     operational state: key, models, memory, tasks, grants, MAJIN, level
+  buddy resources           inspect actual Windows per-process RAM usage (not browser tab attribution)
   buddy test [--quick]      every automated suite, each reported separately
   buddy prove               self-test + live Windows/AI scenarios (needs Windows + a Kilo key)
   buddy accept [N ...]      the 20 mandated end-to-end acceptance scenarios, for real, with
@@ -8439,6 +8609,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             "accept": cmd_accept,
             "bench": cmd_bench,
             "memory": cmd_memory,
+            "resources": cmd_resources,
             "tasks": cmd_tasks,
             "grants": cmd_grants,
             "models": cmd_models,
