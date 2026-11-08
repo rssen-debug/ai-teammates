@@ -454,10 +454,30 @@ class LivePanel:
                     {"role": "user", "content": prompt}],
                 max_tokens=220, timeout=45)
             answer = (result.get("message") or {}).get("content") or ""
-            chosen, rationale = parse_tetris_move(answer, {m["id"] for m in choices})
+            allowed = {m["id"] for m in choices}
+            chosen, rationale = parse_tetris_move(answer, allowed)
             if chosen is None:
-                raise ValueError("Modellen gav inget lagligt drag: " +
-                                 clean_line(answer, 72))
+                # A formatting retry is still an actual Kilo decision. Never
+                # substitute a deterministic move, random choice or heuristic.
+                self._tetris_ai_state = "Modellsvar i fel format · frågar igen"
+                self.events.append(datetime.now().strftime("%H:%M:%S") +
+                                   " · Modellens första Tetris-svar saknade giltigt drag")
+                self._refresh()
+                self._tetris_ai_calls += 1
+                retry = await self.app.gateway.chat(
+                    model, [
+                        {"role": "system", "content":
+                         "You are playing Tetris. Respond with ONLY one legal integer id, "
+                         "no explanation or JSON. You must choose it."},
+                        {"role": "user", "content":
+                         "Choose the next move using the actual board and candidate landings. "
+                         "Allowed ids: " + ",".join(map(str, sorted(allowed))) +
+                         "\\nBoard and candidates: " + prompt},
+                    ], max_tokens=100, timeout=30)
+                retry_text = (retry.get("message") or {}).get("content") or ""
+                chosen, rationale = parse_tetris_move(retry_text, allowed)
+            if chosen is None:
+                raise ValueError("Kilo svarade inte med något giltigt drag efter två anrop")
             if not game.choose(chosen):
                 raise ValueError("Spelet avvisade modellens drag")
             self._tetris_reason = clean_line(rationale or
