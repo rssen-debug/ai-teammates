@@ -419,6 +419,20 @@ class TestCompanionLoop(CompanionCase):
         lp._idle_probe = lambda: 999.0
         self.assertTrue(lp.can_reflect()[0])
 
+    def test_active_user_can_trigger_periodic_evidence_based_reflection(self) -> None:
+        lp = self.loop(chat=lambda *a, **k: {"content": "a useful observation", "tokens": 20},
+                       idle=4.0, active_reflection_seconds=600)
+        ok, _ = lp.can_reflect()
+        self.assertFalse(ok, "activity without screen evidence must not be interpreted")
+        lp.last_capture_text = "User opened a Python tutorial."
+        lp.last_capture_at = time.time()
+        self.assertTrue(lp.can_reflect()[0], "recent observation may support proactive learning")
+        first = asyncio.run(lp.reflect())
+        self.assertTrue(first.reflected)
+        second = asyncio.run(lp.reflect())
+        self.assertFalse(second.reflected, "continuous inference is rate-limited")
+        self.assertEqual(lp.reflection_attempts, 1)
+
     def test_reflection_stops_when_the_budget_is_gone(self) -> None:
         self.budget.spend(10_000)
         lp = self.loop(chat=lambda *a, **k: "insight", idle=999.0)
@@ -554,9 +568,9 @@ class TestReflectionStorage(CompanionCase):
         first = asyncio.run(lp.reflect())
         self.assertTrue(first.stored)
         second = asyncio.run(lp.reflect())
-        self.assertTrue(second.reflected, "it still thinks every tick…")
-        self.assertFalse(second.stored, "…it just does not write down every thought")
-        self.assertIn("cooldown", second.store_note)
+        self.assertFalse(second.reflected, "reflection is rate-limited to avoid constant model work")
+        self.assertFalse(second.stored, "a skipped reflection cannot create a new memory")
+        self.assertTrue(any("scheduled reflection" in reason for reason in second.blocked))
         n = self.app.store.one("SELECT COUNT(*) AS n FROM memories WHERE kind='episodic'")["n"]
         self.assertEqual(n, 1)
 
