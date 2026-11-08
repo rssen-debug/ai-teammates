@@ -868,7 +868,7 @@ class Gateway:
                 if tool_parts:
                     message["tool_calls"] = [tool_parts[i] for i in sorted(tool_parts)]
                 return {"message": message, "finish": finish, "usage": usage, "model": model}
-            except (urllib.error.URLError, TimeoutError, socket.timeout, ValueError, GatewayError) as exc:
+            except (OSError, TimeoutError, ValueError, GatewayError) as exc:
                 last_error = exc
                 if received:
                     raise GatewayError("stream_interrupted",
