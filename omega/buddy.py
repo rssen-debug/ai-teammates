@@ -5104,6 +5104,19 @@ def set_autostart(on: bool) -> tuple[bool, str]:
 # ════════════════════════════════════════════════════════════════════════════
 # THE APP
 # ════════════════════════════════════════════════════════════════════════════
+#: What the always-on observer asks the vision model. Deliberately about the activity
+#: rather than the content: the companion stores text describing what the owner is
+#: doing, pixels are never stored (observation.store_text_only), and a screenshot can
+#: hold other people's personal data — so the question asks for the shape of the work
+#: and explicitly not for names, messages or identifiers. Override per-owner with the
+#: `observation_question` setting.
+SCREEN_OBSERVE_QUESTION = (
+    "Describe the activity visible in this window in one or two sentences: which "
+    "application it is, what kind of document or page is open, and what the person "
+    "appears to be doing. Do not transcribe names, messages, identifiers or any other "
+    "personal data belonging to other people.")
+
+
 class CompanionSubsystem:
     """The always-on layer (omega/companion.py), loaded lazily like every sibling.
 
@@ -5168,9 +5181,25 @@ class CompanionSubsystem:
             return m.ScreenBackend(why_unavailable=f"screen_describe: {why}")
         if not self.app.gateway.key():
             return m.ScreenBackend(why_unavailable="reading the screen needs a vision model, and no API key is set")
+        # `screen_describe` asks for confirmation on every call unless the owner has
+        # set a standing upload policy. Background observation cannot answer a
+        # prompt, so without that policy every tick would fail with "needs
+        # interactive user approval". Say so once, here, instead of failing quietly
+        # thirty times a minute — and never grant the policy on the owner's behalf.
+        if self.app.settings.get("screenshot_upload") != "allow":
+            return m.ScreenBackend(why_unavailable=(
+                "screen_describe sends a screenshot to the model and asks for confirmation each time, "
+                "which background observation cannot answer; set a standing policy with "
+                "`/privacy upload allow`, or keep observation at depth 'titles', which sends no pixels"))
 
         async def acapture() -> Any:
-            res = await exec_tool(self.app, "screen_describe", {})
+            # `question` is a required argument of screen_describe. This call used to
+            # pass {}, so validate_args rejected every capture with "missing required
+            # argument 'question'" and screen observation could never work on any
+            # platform, however well configured — invisible here because the tool is
+            # Windows-only, so every non-Windows test returned unavailable first.
+            question = str(self.app.settings.get("observation_question") or SCREEN_OBSERVE_QUESTION)
+            res = await exec_tool(self.app, "screen_describe", {"question": question})
             if not res.ok:
                 raise ToolError(res.error or "screen_describe failed", res.category or "os_error")
             d = res.data if isinstance(res.data, dict) else {"text": str(res.data)}

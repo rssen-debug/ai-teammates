@@ -403,6 +403,28 @@ def s05_real_conversation(ctx: Ctx) -> Result:
 # ════════════════════════════════════════════════════════════════════════════
 # 6–10 · WINDOWS DESKTOP AND BROWSER
 # ════════════════════════════════════════════════════════════════════════════
+def _dependency_gap(what: str, res: Any) -> Optional[Result]:
+    """BLOCKED when a tool is registered but this machine lacks what it needs, else None.
+
+    `exec_tool` reports that as category "unavailable": the tool exists, its schema is
+    fine, and the host simply cannot run it — on a CI runner that is the whole UI
+    Automation chain, because `uiautomation` is a required Windows dependency that
+    install.ps1 installs and the runner never ran install.ps1.
+
+    Reporting it as a product failure would be the same host-precondition-as-failure
+    mistake as scenario 1 and as scenarios 6–9 below. Anything else — a real error
+    from a tool that could have run — is left alone and still fails.
+    """
+    if res.ok or getattr(res, "category", "") != "unavailable":
+        return None
+    err = str(res.error or "")
+    found = re.search(r"package '([^']+)'", err)
+    fix = (f"pip install {found.group(1)} — or run omega/install/install.ps1, which installs it"
+           if found else "run `buddy deps`, then omega/install/install.ps1")
+    return Result(BLOCKED, f"{what} could not be attempted here: {buddy.clip(err, 200)}",
+                  {"error": err, "category": "unavailable"}, unproven=what, fix=fix)
+
+
 def _windows_gate(ctx: Ctx, what: str) -> Optional[Result]:
     """BLOCKED unless this host can actually drive a Windows desktop, else None.
 
@@ -469,16 +491,32 @@ def s07_open_notepad(ctx: Ctx) -> Result:
         return gated
     app = ctx.app_instance()
     import asyncio
-    res = asyncio.run(buddy.exec_tool(app, "desktop_launch", {"target": "notepad.exe"}))
+    # `desktop_launch` never existed: the registered tool is `app_launch`, and the
+    # target is the name the engine's own self-test uses. A wrong tool name raises
+    # "unknown tool", which this scenario reported as a product failure — and nobody
+    # noticed, because on any non-Windows host the gate above returns first. The
+    # static registry cross-check in test_acceptance_contract.py now makes that
+    # impossible on every platform.
+    res = asyncio.run(buddy.exec_tool(app, "app_launch", {"target": "notepad"}))
     if not res.ok:
+        gap = _dependency_gap("launching Notepad", res)
+        if gap:
+            return gap
         return Result(FAIL, f"launch failed: {res.error}", {"category": res.category})
     time.sleep(2.5)
     wins = [w for w in buddy.Win32.windows() if "notepad" in (w.get("app") or "").lower()
             or "notepad" in (w.get("title") or "").lower()]
-    ev = {"launched": True, "notepad_windows": wins}
+    ev = {"launched": True, "notepad_windows": wins, "launch_data": buddy.clip(buddy.jdump(res.data), 400)}
     ctx.save("07-notepad-open.json", ev)
-    return Result(PASS if wins else FAIL,
-                  f"Notepad running: {len(wins)} window(s) — {buddy.clip(wins[0]['title'], 60) if wins else 'none'}", ev)
+    if not wins:
+        # Notepad started, but this session presents no window to enumerate — a CI
+        # runner has a window station and nobody logged into it. That is exactly the
+        # call the engine self-test's D check makes for the same situation.
+        return Result(BLOCKED, "Notepad launched but no window was enumerable in this session, so "
+                               "there is nothing to drive", ev,
+                      unproven="launching a real window on a desktop somebody is logged into",
+                      fix="run `buddy accept 7` in a logged-in Windows session")
+    return Result(PASS, f"Notepad running: {len(wins)} window(s) — {buddy.clip(wins[0]['title'], 60)}", ev)
 
 
 def s08_write_notepad(ctx: Ctx) -> Result:
@@ -490,17 +528,29 @@ def s08_write_notepad(ctx: Ctx) -> Result:
     marker = f"OMEGA-ACCEPT-{int(time.time())}"
     wins = [w for w in buddy.Win32.windows() if "notepad" in (w.get("app") or "").lower()]
     if not wins:
-        asyncio.run(buddy.exec_tool(app, "desktop_launch", {"target": "notepad.exe"}))
+        asyncio.run(buddy.exec_tool(app, "app_launch", {"target": "notepad"}))
         time.sleep(2.5)
         wins = [w for w in buddy.Win32.windows() if "notepad" in (w.get("app") or "").lower()]
     if not wins:
-        return Result(FAIL, "no Notepad window to type into")
+        # Scenario 9 already treated this as a gap rather than a failure, and it is
+        # one: with no window in the session there is nothing to type into.
+        return Result(BLOCKED, "no Notepad window in this session to type into; scenario 7 could not "
+                               "present one", {"marker": marker},
+                      unproven="typing into a real window",
+                      fix="run `buddy accept 7` first, in a logged-in Windows session")
     hwnd = wins[0]["hwnd"]
-    asyncio.run(buddy.exec_tool(app, "desktop_focus", {"hwnd": hwnd}))
-    typed = asyncio.run(buddy.exec_tool(app, "keyboard_type", {"text": marker, "hwnd": hwnd}))
-    ev = {"marker": marker, "hwnd": hwnd, "typed_ok": typed.ok, "typed_error": typed.error}
+    # `desktop_focus`/`keyboard_type` do not exist — the tools are `window_focus` and
+    # `type_text`, and `type_text` takes no hwnd: it types into whatever has the focus,
+    # which is why the focus call comes first.
+    focused = asyncio.run(buddy.exec_tool(app, "window_focus", {"hwnd": hwnd}))
+    typed = asyncio.run(buddy.exec_tool(app, "type_text", {"text": marker}))
+    ev = {"marker": marker, "hwnd": hwnd, "focus_ok": focused.ok, "focus_error": focused.error,
+          "typed_ok": typed.ok, "typed_error": typed.error, "typed_category": typed.category}
     ctx.save("08-notepad-write.json", ev)
     if not typed.ok:
+        gap = _dependency_gap("typing into Notepad", typed)
+        if gap:
+            return gap
         return Result(FAIL, f"typing failed: {typed.error}", ev)
     return Result(PASS, f"typed {marker!r} into Notepad hwnd={hwnd} via UI Automation/SendInput", ev,
                   unproven="scenario 9 reads it back — that is the proof this landed")
@@ -524,6 +574,9 @@ def s09_verify_notepad(ctx: Ctx) -> Result:
           "elements": len((snap.data or {}).get("elements") or []) if snap.ok else 0}
     ctx.save("09-notepad-verify.json", ev)
     if not snap.ok:
+        gap = _dependency_gap("reading Notepad contents back", snap)
+        if gap:
+            return gap
         return Result(FAIL, f"could not read the window back: {snap.error}", ev)
     # The point of this scenario: the claim is only accepted when the real
     # control text contains what was typed.
