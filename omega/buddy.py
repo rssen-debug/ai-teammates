@@ -6495,9 +6495,18 @@ def sync_owner_knowledge(app: Buddy) -> tuple[int, int]:
     folder = Path(app.settings.get("obsidian_vault") or HOME / "obsidian-vault").expanduser()
     vault = mod.ObservationVault(folder)
     count = skipped = 0
-    for mem in app.store.q("SELECT kind,title,content,status FROM memories"):
+    for mem in app.store.q("SELECT kind,title,content,status,updated FROM memories"):
         if mem["kind"] not in mod.ObservationVault.KNOWLEDGE_KINDS:
             continue
+        # Only rewrite changed files: the full memory library may grow for years.
+        # The SQLite timestamp is authoritative for memory updates.
+        try:
+            existing = vault.knowledge_path(mem["kind"], mem["title"])
+            if existing.is_file() and existing.stat().st_mtime >= float(mem["updated"] or 0):
+                skipped += 1
+                continue
+        except OSError:
+            pass
         ok, _ = vault.record_knowledge(mem["kind"], mem["title"], mem["content"], mem["status"] or "unverified")
         count += int(ok)
         skipped += int(not ok)
