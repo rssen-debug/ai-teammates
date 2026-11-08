@@ -5935,7 +5935,7 @@ class Buddy:
             log("summary_failed", err=str(e))
 
     # ── slash commands ──
-    HELP = """/teach TEXT  /correct TEXT  /continuity [status|sync]  /selection [on|off|auto on|auto off|status]  /voice style [narrator|default]  /help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
+    HELP = """/accelerate [status|run]  /teach TEXT  /correct TEXT  /continuity [status|sync]  /selection [on|off|auto on|auto off|status]  /voice style [narrator|default]  /help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
 /memory [list|search Q|forget ID|export|clear]  /obsidian [status|on|off|sync|path PATH|clear --yes]  /resources  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
 /grants [revoke]  /activate [all|status|off]  /presence  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
@@ -5972,6 +5972,22 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                                  value, tags="owner-confirmed,personalization", status="verified",
                                  provenance={"source": "owner-explicit-command"})
                 o("Personlig regel sparad och synkas till Obsidian om minnet är aktiverat.")
+        elif cmd == "/accelerate":
+            mod = sibling("accelerator")
+            if mod is None:
+                o("Accelerator unavailable: " + _SIBLING_ERRORS.get("accelerator", "module not found"))
+            elif args and args[0].lower() == "run":
+                o("Accelerator: letar efter verkliga tidigare fel att öva på...")
+                result = await asyncio.to_thread(mod.enqueue, self, DIRS["workspace"])
+                o("Accelerator: " + jdump(result))
+                self.ui.event("Accelerator: " + str(result.get("queued", 0)) +
+                              " evidensbaserade övningar köade")
+            else:
+                report = await asyncio.to_thread(mod.report, self.store)
+                o("Accelerator · verifierade resultat (ingen tidsbaserad levling):\n" +
+                  jdump(report))
+                o("Använd /accelerate run för högst tre lokala träningsuppgifter "
+                  "baserade på tidigare verkliga misslyckanden.")
         elif cmd == "/continuity":
             sub = args[0] if args else "status"
             if sub == "sync":
