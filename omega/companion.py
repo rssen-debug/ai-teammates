@@ -673,6 +673,7 @@ class CompanionLoop:
         # the ones that matter. The loop still thinks every tick; it just does not
         # write down every single thought.
         "store_cooldown_seconds": 900.0,
+        "capture_seconds": 30.0,  # live capture cadence when owner enables capture observation
     }
 
     def __init__(self, settings: Any, *, observation: ObservationPolicy, model: UserModel,
@@ -680,6 +681,7 @@ class CompanionLoop:
                  chat: Optional[Callable[..., Any]] = None,
                  idle_probe: Optional[Callable[[], float]] = None,
                  pending_input: Optional[Callable[[], bool]] = None,
+                 capture_context: Optional[Callable[[], dict]] = None,
                  log_fn: Optional[Callable[..., None]] = None) -> None:
         self.cfg = settings
         self.obs = observation
@@ -691,6 +693,11 @@ class CompanionLoop:
         self._chat = chat
         self._idle_probe = idle_probe
         self._pending = pending_input or (lambda: False)
+        self._capture_context = capture_context or (lambda: {})
+        self.last_capture_at = 0.0
+        self.last_capture_text = ""
+        self.last_capture_note = "not captured yet"
+        self.captures = 0
         self._log = log_fn or (lambda *a, **k: None)
         self._stop = threading.Event()
         self.last: Optional[TickReport] = None
@@ -799,6 +806,30 @@ class CompanionLoop:
             return False, f"capture failed: {type(e).__name__}: {e}", ""
         return True, f"captured and read {len(text)} characters", text
 
+    async def observe_tick(self) -> None:
+        """Observe while owner is active too; reflection has a separate idle gate."""
+        if self.obs.depth not in ("capture", "continuous") or self._pending():
+            return
+        now_at = _now()
+        if now_at - self.last_capture_at < float(self.options().get("capture_seconds", 30.0)):
+            return
+        self.last_capture_at = now_at
+        try:
+            ctx = self._capture_context() or {}
+            title, app_name = str(ctx.get("title", "")), str(ctx.get("app", ""))
+            if not title and not app_name:
+                self.last_capture_note = "no eligible foreground app"
+                return
+            ok, note, text = await self.capture_once(title, app_name)
+            self.last_capture_note = note
+            if ok and text.strip():
+                self.last_capture_text = text[:2000]
+                self.captures += 1
+                self._log("companion_screen_observed", chars=len(text), captures=self.captures)
+        except Exception as e:
+            self.last_capture_note = f"capture failed: {type(e).__name__}: {e}"
+            self.errors.append(self.last_capture_note)
+
     async def reflect(self, estimate: int = 4000) -> TickReport:
         """One thinking cycle. Returns what it did, or precisely why it did not."""
         t0 = _now()
@@ -828,7 +859,7 @@ class CompanionLoop:
                   "observed about its owner. Write at most 120 words: one durable, useful insight that "
                   "is NOT already stored, or the single line 'nothing new'. Do not speculate about "
                   "health, relationships or anything not directly evidenced.\n\n"
-                  + _jdump(profile))
+                  + _jdump(profile) + ("\n\nLatest observed screen (unverified visual description): " + self.last_capture_text if self.last_capture_text else ""))
         try:
             out = self._chat(prompt, max_tokens=min(estimate, self.budget.remaining()))
             if inspect.isawaitable(out):
@@ -940,6 +971,8 @@ class CompanionLoop:
                 "why_not": "" if ok else why,
                 "observation": self.obs.state(),
                 "errors": list(self.errors[-5:]),
+                "capture_count": self.captures, "last_capture_note": self.last_capture_note,
+                "last_capture_at": self.last_capture_at,
                 "last": self.last.to_dict() if self.last else None}
 
     def request_stop(self) -> None:
@@ -951,6 +984,7 @@ class CompanionLoop:
         o = self.options()
         while not self._stop.is_set():
             try:
+                await self.observe_tick()
                 rep = await self.reflect()
             except asyncio.CancelledError:
                 raise
