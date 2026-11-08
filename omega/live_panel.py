@@ -460,137 +460,98 @@ class LivePanel:
         self._side_dirty = False
         self._side_cache_at = stamp
         app = self.app
-        now = time.time()
-        lines: list[tuple[str, str]] = []
-        def add(text: str, style: str = "") -> None:
-            lines.append((style, clean_line(text, 34) + "\n"))
+        current = time.time()
+        lines: list = []
+        def add(value: str, style: str = "") -> None:
+            lines.append((style, clean_line(value, 34) + "\n"))
 
         running = bool(app.current_run) or bool(getattr(getattr(app, "tasks", None), "current", {}))
-        # Rendering must NEVER query SQLite, discover plugins or poll Win32.
-        # The dedicated companion poll above maintains these cached values.
         comp = self._cached_companion
-        comp_enabled = self._cached_companion_enabled
-        observing = bool(comp_enabled and comp and comp.captures > 0
-                         and (now - comp.last_capture_at) < 90)
-        active = running or observing
-        mode = ("● ARBETAR" if running else "◉ OBSERVERAR" if observing
-                else "◌ VAKEN · INVÄNTAR CYKEL" if comp_enabled else "○ SOVER")
-        add(mode, "bold #ff72b6" if active else "#bca8bc")
-        sprite_mode = ("working" if running else "observing" if observing else
-                       "awake" if comp_enabled else "sleeping")
-        sprite_level = self._cached_level.get("level")
-        stage, stage_name = companion_stage(sprite_level)
-        for part in pixel_companion(sprite_mode, int(now // 2), sprite_level):
-            add(part, "#ff8fc5")
-        add(f"Pixelkompis · {stage_name} · form {stage + 1}/5", "#ffffff")
-        last_tool_ok = self.trace[-1][1] if self.trace else None
-        add(companion_personality(sprite_mode, sprite_level, last_tool_ok), "#ffcae6")
-        if sprite_level is None:
-            add("Växer först när level mäts.", "#d4b7c9")
-        add("AI kilo-auto/free · VOICE OFF", "#ffffff")
-        add("──── PIXEL TETRIS · LIVE ────", "#744061")
-        if self._tetris is not None:
-            for row in self._tetris.display():
-                add(" " + row, "#ff9bd0")
-            add(f"Spel: {self._tetris.score}p · {self._tetris.lines} rader", "#ffffff")
-            add(f"Riktiga lås: {self._tetris.pieces}", "#ffffff")
-        else:
-            add("Spelmotor ej startad", "#bca8bc")
-        # Game physics never contributes to AI LEVEL. A live project build is
-        # separately backed by the persistent task engine and its evidence.
-        add("AI BYGGER: " + self._build_state, "#ff8fc5")
-        if self._build_step:
-            add("Agentsteg: " + str(self._build_step), "#ffffff")
-        if self._build_error:
-            add("Hinder: " + self._build_error, "#ff9ba6")
-        add("Spel ≠ AI-framsteg", "#bca8bc")
-        if running and app.current_run:
-            elapsed = max(0, int(now - float(app.current_run.t0)))
-            add(f"Väntat på AI: {elapsed // 60:02d}:{elapsed % 60:02d}", "#ffffff")
-        add("──────────────────────────────────", "#744061")
-        lines.append(("bold #ff90c8", "TÄNKER · klicka här / F2\n", self._side_click))
-        if self.show_thinking:
-            add("LIVE ARBETSSPÅR · " + str(len(self.events)), "#ffffff")
-            for detail in list(self.events)[-9:]:
-                add(" " + detail, "#ffe0f1")
-            if not self.events:
-                add(" Inga arbetssteg ännu", "#bca8bc")
-        add("STEG: " + self.phase, "bold #ffe0f1")
-        add("VERKTYG: " + self.tool, "#fbc4df")
-        add("──────────────────────────────────", "#744061")
-        add("COMPANION: " + ("LIVE" if comp_enabled else "OFF"), "#ff72b6")
-        if comp_enabled and comp:
-            opts = self._cached_companion_options
-            add("Nästa Companion-tick: " + remaining_seconds(
-                comp.last_tick_at, float(opts.get("tick_seconds", 30)), now))
-            capture_after = float(opts.get("capture_seconds", 30))
-            next_capture = remaining_seconds(comp.last_capture_at, capture_after, now)
-            if comp.last_capture_at == 0:
-                next_capture = "första körning ej klar"
-            add("Nästa skärmkoll: " + next_capture)
-            idle = max(0, float(self._cached_idle_seconds))
-            threshold = float(opts.get("idle_seconds", 180))
-            add("Reflektion vid vila: " + f"{max(0, int(threshold-idle))} s")
-            add("Lyckade skärmkoller: " + str(comp.captures))
-            add("Senaste: " + clean_line(comp.last_capture_note, 37))
-            add("Cykler: " + str(comp.ticks))
-        else:
-            add("Nästa skärmkoll: --:--")
-            add("Reflektion: pausad")
-        add("──────────────────────────────────", "#744061")
-        add("AKTIVITET · VERKLIGA VERKTYG", "bold #ff90c8")
-        if self.trace:
-            for label, ok, _at in list(self.trace)[-7:]:
-                mark = "✓" if ok is True else ("✕" if ok is False else "›")
-                add(" " + mark + " " + clean_line(label, 37), "#ffffff" if ok is True else "#ffb3bc")
-        else:
-            add(" Inga verktyg körda ännu.", "#bca8bc")
-        add("──────────────────────────────────", "#744061")
-        # Evidence level can query the whole task/tool/memory history. Cache it.
-        if time.monotonic() - self._level_checked_at >= 45:
-            self._level_checked_at = time.monotonic()
+        enabled = self._cached_companion_enabled
+        observing = bool(enabled and comp and comp.captures > 0 and
+                         current - comp.last_capture_at < 90)
+        mode = ("ARBETAR" if running else "OBSERVERAR" if observing
+                else "VAKEN · VÄNTAR" if enabled else "SOVER")
+        add("● " + mode, "bold #ff72b6" if running or observing else "#ffffff")
+        sprite_mode = ("working" if running else "observing" if observing
+                       else "awake" if enabled else "sleeping")
+        level = self._cached_level.get("level")
+        stage, stage_name = companion_stage(level)
+        for frame in pixel_companion(sprite_mode, int(current // 2), level):
+            add(frame, "#ff8fc5")
+        add(f"Pixelkompis · {stage_name} · {stage+1}/5", "#ffffff")
+        add(companion_personality(sprite_mode, level,
+                                  self.trace[-1][1] if self.trace else None), "#ffcae6")
+
+        # Never re-read SQLite inside prompt_toolkit rendering.
+        if stamp - self._level_checked_at >= 45:
+            self._level_checked_at = stamp
             try:
                 loop = asyncio.get_running_loop()
                 if self._level_task is None or self._level_task.done():
                     self._level_task = loop.create_task(self._refresh_level())
             except RuntimeError:
-                pass  # unit tests and headless status do not trigger expensive queries
-        lvl = self._cached_level.get("level")
-        if isinstance(lvl, (float, int)):
-            current = int(lvl)
-            if self._last_level is None:
-                self._last_level = current
-            elif current != self._last_level:
-                self._last_level_change = now
-                self._last_level = current
-            pink = min(20, max(0, round(current / 5)))
-            add("AI LEVEL: " + str(current) + "/100", "bold #ffffff")
-            add("●" * pink + "○" * (20 - pink), "#ff76b7")
-            if self._last_level_change:
-                add("Senaste nivåbyte: " + datetime.fromtimestamp(
-                    self._last_level_change).strftime("%H:%M:%S"), "#ffffff")
+                pass
+        if isinstance(level, (int, float)):
+            value = max(0, min(100, int(level)))
+            add("AI LEVEL: " + str(value) + "/100", "bold #ffffff")
+            add("●" * round(value/5) + "○" * (20 - round(value/5)), "#ff76b7")
             progress = evidence_progress(self._cached_level)
-            if progress.get("measured"):
-                if progress.get("complete"):
-                    add("Maxnivå nådd.", "#ffffff")
-                elif progress.get("quality_limited"):
-                    add("Nästa LVL: " + str(progress["target"]), "bold #ffffff")
-                    add("Hinder: förbättra verifierade", "#ffd0e6")
-                    add("resultat (inte bara fler körningar)", "#ffd0e6")
+            if progress.get("complete"):
+                add("MAX LEVEL · verifierad", "#ffffff")
+            elif progress.get("measured"):
+                add("Nästa LVL " + str(progress["target"]), "#ffffff")
+                if progress.get("quality_limited"):
+                    add("Kräver bättre resultat", "#ffd0e6")
                 else:
-                    add("Nästa LVL: " + str(progress["target"]), "bold #ffffff")
-                    fill = max(0, min(20, round(progress["fraction"] * 20)))
-                    add("[" + "█" * fill + "░" * (20-fill) + "]", "#ff8ec6")
-                    add(f"Evidens: {progress['events']}/{progress['required']} · saknas {progress['remaining']}", "#ffffff")
+                    add("Evidens " + str(progress["events"]) + "/" +
+                        str(progress["required"]) + " · -" + str(progress["remaining"]), "#ffffff")
             else:
-                add("Nästa level: saknar mätdata", "#ffffff")
-            add("Tid till level: okänd (ej tidstyrt)", "#d4b7c9")
+                add("Nivåunderlag saknas", "#ffffff")
         else:
-            add("AI LEVEL: ej uppmätt", "#bca8bc")
-        add("Nivån bygger på verifierad evidens.", "#bdafba")
-        add("──────────────────────────────────", "#744061")
-        add("Arbetsstatus, inte intern tankekedja.", "#d4b7c9")
-        add("Skriv /presence för 20-minutersrapport.", "#d4b7c9")
+            add("AI LEVEL: väntar på mätning", "#ffffff")
+
+        add("── PIXEL TETRIS · LIVE ──", "#ff90c8")
+        if self._tetris is not None:
+            for tetris_row in self._tetris.display():
+                add(" " + tetris_row, "#ff9bd0")
+            add(f"Poäng {self._tetris.score} · rader {self._tetris.lines} · pjäser {self._tetris.pieces}", "#ffffff")
+        else:
+            add("Spelmotor ej startad", "#bca8bc")
+        add("AI BYGGER: " + self._build_state, "#ff8fc5")
+        if self._build_step:
+            add("Agentsteg: " + str(self._build_step), "#ffffff")
+        if self._build_error:
+            add("Blockerad: " + self._build_error, "#ff9ba6")
+        add("Spelpoäng ≠ AI level", "#bca8bc")
+
+        add("── COMPANION ──", "#ff90c8")
+        add("COMPANION: " + ("LIVE" if enabled else "OFF"), "#ffffff")
+        if enabled and comp:
+            options = self._cached_companion_options
+            add("Nästa tick: " + remaining_seconds(comp.last_tick_at,
+                float(options.get("tick_seconds", 30)), current), "#ffffff")
+            add("Skärm: " + str(comp.captures) + " lyckade", "#ffffff")
+            add("Senaste: " + clean_line(comp.last_capture_note, 25), "#d4b7c9")
+        else:
+            add("Inga observationer aktiva", "#d4b7c9")
+
+        lines.append(("bold #ff90c8", "TÄNKER · klicka här / F2\n", self._side_click))
+        add("STEG: " + self.phase, "#ffe0f1")
+        if running and app.current_run:
+            duration = int(max(0, current - float(app.current_run.t0)))
+            add("AI-anrop/uppgift: " + str(duration) + "s", "#ffffff")
+        if self.show_thinking:
+            for event in list(self.events)[-4:]:
+                add(" " + event, "#ffe0f1")
+        add("AKTIVITET · VERKTYG", "bold #ff90c8")
+        if self.trace:
+            for label, ok, _when in list(self.trace)[-4:]:
+                icon = "✓" if ok is True else "✕" if ok is False else "›"
+                add(" " + icon + " " + clean_line(label, 30), "#ffffff")
+        else:
+            add(" Inga verktyg körda", "#bca8bc")
+        add("Arbetslogg · inga dolda tankar", "#d4b7c9")
         self._side_cache = lines
         return lines
 
