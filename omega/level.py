@@ -66,8 +66,8 @@ UNMEASURED AXES ARE EXCLUDED, NOT ZEROED
     benchmark; the weight is redistributed over what was actually measured.
 
 EVIDENCE GATE — why level cannot be bought
-    measured_events = decided_runs + decided_tasks + tool_calls + memory_searches
-                      + benchmark_tasks + suite_runs
+    measured_events = runs_decided + tasks_total + tool_calls + memory_searches
+                      + effects_recorded + benchmark_tasks + suite_runs
     The raw score is mapped to a level, then capped by evidence volume:
 
         raw_level = 1 + 99 · score^1.35          (concave: early progress is
@@ -147,9 +147,18 @@ class LevelResult:
     version: str = LEVEL_VERSION
     warnings: list[str] = field(default_factory=list)
 
+    def measured_axes(self) -> list["Axis"]:
+        return [a for a in self.axes if a.measured]
+
+    def measured_weight(self) -> float:
+        """How much of the formula's weight actually contributed to this score."""
+        return sum(WEIGHTS[a.key] for a in self.measured_axes())
+
     def to_dict(self) -> dict:
         return {"level": self.level, "raw_level": round(self.raw_level, 2), "evidence_cap": round(self.cap, 2),
                 "score": round(self.score, 4), "tier": self.tier, "measured_events": self.measured_events,
+                "measured_axes": len(self.measured_axes()), "total_axes": len(self.axes),
+                "measured_weight": round(self.measured_weight(), 3),
                 "evidence": self.evidence, "axes": [a.to_dict() for a in self.axes],
                 "computed_at": self.computed_at, "formula_version": self.version,
                 "warnings": self.warnings,
@@ -158,7 +167,14 @@ class LevelResult:
     def render(self, width: int = 52) -> str:
         filled = int(round((self.level - 1) / 99 * width))
         bar = "█" * filled + "·" * (width - filled)
-        lines = [f"  LEVEL {self.level:>3} / 100   {self.tier}      score {self.score:.3f}",
+        head = f"  LEVEL {self.level:>3} / 100   {self.tier}      score {self.score:.3f}"
+        if self.measured_weight() < 0.999:
+            # A score averaged over one measured axis is not the same quantity as a
+            # score averaged over six, and printing both as "score 1.000" invites
+            # exactly that misreading. Say what it was computed from.
+            head += (f"  ← only {len(self.measured_axes())}/{len(self.axes)} axes measured"
+                     f" ({self.measured_weight():.0%} of the weight)")
+        lines = [head,
                  f"  [{bar}]",
                  f"  evidence {self.measured_events}/{EVIDENCE_FULL} measured events"
                  + (f"  (level capped at {int(self.cap)} until more real evidence exists)" if self.cap < self.raw_level else "")]

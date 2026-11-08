@@ -29,6 +29,15 @@ os.environ["BUDDY_HOME"] = str(_HOME)
 
 import buddy  # noqa: E402  (must be imported after BUDDY_HOME is set)
 
+# buddy resolves HOME once, at import. If another test module imported it first,
+# the BUDDY_HOME set above is ignored and this module would silently write
+# somewhere else — possibly the owner's real data. Check, do not assume.
+_REAL_HOME = (Path(os.environ.get("APPDATA", str(Path.home()))) / "StuddyBuddy"
+              if os.name == "nt" else Path.home() / ".studdybuddy")
+assert Path(buddy.HOME) != _REAL_HOME, (
+    f"buddy resolved HOME to the owner's real data directory ({buddy.HOME}); "
+    f"another test module imported buddy first. Refusing to run against real user data.")
+
 
 def _import_calc(proj: Path) -> str:
     """Run a fresh interpreter that imports the module and reports what it computes."""

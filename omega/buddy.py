@@ -951,6 +951,83 @@ def classify_error(e: BaseException) -> tuple[str, str]:
     return "unknown", "Inspect the error, try a different approach, or escalate."
 
 
+def stem(word: str) -> str:
+    """Conservative suffix stemming for tool routing.
+
+    The registry used to match whole tokens exactly, so a person asking about
+    "files" never reached a tool named `file_list`, and "processes" never reached
+    `process_kill`. Regular plural handling is the single highest-value
+    normalisation here. It is deliberately narrow — only regular English
+    suffixes, never a rewrite that could merge two unrelated words.
+    """
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 4 and word.endswith("es") and word[-3] in "sxzo":
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+#: How people phrase an action → the vocabulary tool names and descriptions
+#: actually use. This is general verb bridging, not a per-query lookup table:
+#: "find the file", "search the file" and "locate the file" are one intent, and a
+#: keyword router that cannot see that sends the agent to the wrong tool.
+#: Synonyms are scored well below direct matches (see `_WEIGHT_SYNONYM`) so they
+#: broaden recall without ever outranking a tool that literally matches.
+ROUTING_SYNONYMS: dict[str, frozenset] = {
+    "find": frozenset({"search", "list", "locate"}),
+    "search": frozenset({"find", "locate"}),
+    "locate": frozenset({"find", "search"}),
+    "open": frozenset({"launch", "start", "navigate"}),
+    "launch": frozenset({"open", "start", "run"}),
+    "start": frozenset({"launch", "run"}),
+    "run": frozenset({"execute", "start"}),
+    "execute": frozenset({"run"}),
+    "schedule": frozenset({"queue", "task", "delay"}),
+    "queue": frozenset({"schedule", "task"}),
+    "remember": frozenset({"memory", "save"}),
+    "recall": frozenset({"memory", "search"}),
+    "know": frozenset({"memory"}),
+    "knowledge": frozenset({"memory"}),
+    "kill": frozenset({"terminate", "stop"}),
+    "terminate": frozenset({"kill", "stop"}),
+    "delete": frozenset({"trash", "remove"}),
+    "remove": frozenset({"delete", "trash"}),
+    "fix": frozenset({"patch", "repair"}),
+    "repair": frozenset({"fix", "patch"}),
+    "change": frozenset({"patch", "edit", "replace"}),
+    "edit": frozenset({"patch", "write"}),
+    "show": frozenset({"read", "list"}),
+    "grab": frozenset({"capture"}),
+    "capture": frozenset({"grab", "screenshot"}),
+    "photo": frozenset({"screenshot", "capture"}),
+    "screenshot": frozenset({"capture", "screen"}),
+    "command": frozenset({"shell", "terminal"}),
+    "shell": frozenset({"command", "terminal"}),
+    "terminal": frozenset({"shell", "command"}),
+    "diagnose": frozenset({"diagnostic", "check"}),
+    "check": frozenset({"verify", "test"}),
+    "verify": frozenset({"check", "test"}),
+    "install": frozenset({"dependency", "setup"}),
+    "configure": frozenset({"setup", "setting"}),
+    "background": frozenset({"autopilot", "task"}),
+    "autopilot": frozenset({"background", "task"}),
+    "application": frozenset({"app", "program"}),
+    "program": frozenset({"app", "application"}),
+    "website": frozenset({"browser", "web", "url"}),
+    "web": frozenset({"browser", "website"}),
+    "url": frozenset({"web", "browser", "fetch"}),
+    "page": frozenset({"browser", "web", "dom"}),
+    "job": frozenset({"application", "task"}),
+    "cv": frozenset({"resume", "application"}),
+}
+
+#: Relative weight of each way a query word can reach a tool. A literal word beat
+#: a stem beats a synonym, so broadening recall never reorders a direct hit.
+_WEIGHT_LITERAL, _WEIGHT_STEM, _WEIGHT_SYNONYM = 1.0, 0.9, 0.45
+
+
 class Registry:
     def __init__(self) -> None:
         self.tools: dict[str, ToolSpec] = {}
@@ -968,17 +1045,38 @@ class Registry:
         return [t for t in self.tools.values() if t.core]
 
     def search(self, query: str, limit: int = 8) -> list[ToolSpec]:
-        words = [w for w in re.findall(r"[\wåäöÅÄÖ]+", query.lower()) if len(w) > 1]
+        """Rank tools against how a person actually phrased the request.
+
+        Each query word contributes in three ways — literally, stemmed, and
+        through a synonym — at descending weights, and tool names/descriptions are
+        stemmed the same way. That is what lets "find files whose name matches"
+        reach `file_search` and "schedule background work" reach `task_create`
+        instead of losing to whatever tool happens to contain the literal word.
+        """
+        raw = [w for w in re.findall(r"[\wåäöÅÄÖ]+", query.lower()) if len(w) > 1]
+        words: list[tuple[str, float]] = []
+        for w in raw:
+            words.append((w, _WEIGHT_LITERAL))
+            st = stem(w)
+            if st != w:
+                words.append((st, _WEIGHT_STEM))
+            for syn in ROUTING_SYNONYMS.get(w, frozenset()) | ROUTING_SYNONYMS.get(st, frozenset()):
+                words.append((syn, _WEIGHT_SYNONYM))
         scored = []
         for t in self.tools.values():
             if t.core:
                 continue
-            name_t = set(re.split(r"[_\W]+", t.name.lower()))
-            desc_t = set(re.findall(r"[\wåäö]+", t.description.lower()))
+            name_raw = set(re.split(r"[_\W]+", t.name.lower()))
+            name_t = name_raw | {stem(x) for x in name_raw}
+            desc_raw = set(re.findall(r"[\wåäö]+", t.description.lower()))
+            desc_t = desc_raw | {stem(x) for x in desc_raw}
+            name_low = t.name.lower()
+            cat = t.category.lower()
             s = 0.0
-            for w in words:
-                s += 3 * (w in name_t) + 2 * (w == t.category) + 1 * (w in desc_t) + 0.5 * any(w in x for x in desc_t if len(w) > 3)
-                s += 1.5 * (w in t.name.lower())
+            for w, weight in words:
+                s += weight * (3 * (w in name_t) + 2 * (w == cat) + 1 * (w in desc_t)
+                               + 0.5 * any(w in x for x in desc_t if len(w) > 3))
+                s += weight * 1.5 * (w in name_low)
             if s > 0:
                 scored.append((s, t))
         scored.sort(key=lambda x: -x[0])
@@ -1774,7 +1872,19 @@ class Memory:
 
     def search(self, query: str, kind: str | None = None, limit: int = 6, touch: bool = True,
                scope: str | None = None, kinds: tuple | None = None) -> list[dict]:
-        """Hybrid retrieval. Counts itself so capability can be measured."""
+        """Hybrid retrieval.
+
+        `touch=True` (the default) records the retrieval as evidence: it bumps each
+        returned row's `uses` and the `memory_searches`/`memory_hits` counters that
+        capability axis D and the level's evidence cap are computed from. That is
+        what the `memory_search` tool does, so a real agent run is measured.
+
+        `touch=False` reads without recording. Every internal and harness path uses
+        it — `context_for()`, the system-prompt build, the self-test, the acceptance
+        suite, the benchmarks, and `buddy memory search`. It has to: if running the
+        test suite incremented those counters, running the test suite would raise the
+        level, which is the one thing the level must not be able to do.
+        """
         where, params = [], []
         if kind:
             where.append("kind=?")
@@ -1787,7 +1897,8 @@ class Memory:
             params.append(scope)
         sql = "SELECT * FROM memories" + (f" WHERE {' AND '.join(where)}" if where else "")
         rows = self.s.q(sql, tuple(params))
-        self.s.stat_add("memory_searches")
+        if touch:
+            self.s.stat_add("memory_searches")
 
         qt = set(_tokens(query))
         qtri = _trigrams(query)
@@ -1824,8 +1935,12 @@ class Memory:
             scored.append((score, r))
         scored.sort(key=lambda x: (-x[0], -x[1]["updated"]))
         out = [r for _, r in scored[:limit]]
-        if out:
-            self.s.stat_add("memory_hits", len(out))
+        if out and touch:
+            # One per search that found something — NOT one per row. Axis D divides
+            # this by memory_searches to get a hit rate, so accumulating `len(out)`
+            # produced a ratio of up to 6.0 that the level then clamped to 1.0,
+            # which made the axis read as "perfect retrieval" after a single search.
+            self.s.stat_add("memory_hits")
         if touch and out:
             self.s.x(f"UPDATE memories SET uses=uses+1 WHERE id IN ({','.join('?' * len(out))})", tuple(r["id"] for r in out))
         return out
@@ -3023,7 +3138,7 @@ def build_tools(app: "Buddy") -> None:
         return {"tab": t["title"], "url": t["url"], "text": clip(v, int(a.get("max_chars", 8000)))}
 
     reg(name="browser_dom_text", category="browser", risk=Risk.OBSERVE, observes=True, available=cdp_ok, progress="Reading page",
-        description="Read innerText of a CSS selector (default body) from a tab via CDP.",
+        description="Read the text of a web page (innerText of a CSS selector, default body) from a browser tab via CDP.",
         parameters=schema_obj({"selector": {"type": "string"}, "tab_title_contains": {"type": "string"}, "max_chars": {"type": "integer"}}), handler=h_dom)
 
     def h_dom_click(a: dict, ctx: ToolContext) -> dict:
@@ -3328,7 +3443,7 @@ def build_tools(app: "Buddy") -> None:
         return {"path": str(p), "file_types": exts, "files": files, "project_markers": marks, "suggested_test_command": t if isinstance(t, str) else (" ".join(t) if t else None)}
 
     reg(name="dev_analyze_project", category="dev", risk=Risk.OBSERVE, observes=True, timeout=60, progress="Analyzing project",
-        description="Summarize a project folder: file types, files, build/test markers, suggested test command.",
+        description="Summarize a project, repository or codebase: file types, files, build/test markers, suggested test command.",
         parameters=schema_obj({"path": {"type": "string"}}, ["path"]), handler=h_analyze)
 
     def h_tests(a: dict, ctx: ToolContext) -> dict:
@@ -3374,7 +3489,7 @@ def build_tools(app: "Buddy") -> None:
     # ═════ memory ═════
     mem = app.memory
     reg(name="memory_search", category="memory", core=True, risk=Risk.OBSERVE, observes=True, progress="Checking memory",
-        description="Search persistent memory (preferences, verified procedures, known fixes, project goals). Verified procedures rank highest.",
+        description="Search persistent memory to recall what you already know: preferences, verified procedures, known fixes, project goals. Verified procedures rank highest.",
         parameters=schema_obj({"query": {"type": "string"}, "kind": {"type": "string", "enum": list(Memory.KINDS)}, "limit": {"type": "integer"}}, ["query"]),
         handler=lambda a, c: {"memories": [{k: m[k] for k in ("id", "kind", "title", "content", "status")} for m in mem.search(a["query"], a.get("kind"), int(a.get("limit", 6)))]})
     reg(name="memory_save", category="memory", risk=Risk.OBSERVE, progress="Saving to memory",
@@ -4184,13 +4299,142 @@ class AgentRun:
 # 9a. CLI USER INTERFACE
 # ════════════════════════════════════════════════════════════════════════════
 class C:
-    on = sys.stdout.isatty()
+    """ANSI colour, following the conventions that decide whether to use it.
+
+    Off when stdout is not a terminal, when NO_COLOR is set (the standard is
+    presence of the variable, not its value), or when TERM is dumb. FORCE_COLOR
+    and CLICOLOR_FORCE override the tty check, which is what makes `buddy | less -R`
+    and a CI log that captures a pty render properly instead of showing escapes.
+    """
+
+    @staticmethod
+    def _enabled() -> bool:
+        if os.environ.get("NO_COLOR") is not None:
+            return False
+        if os.environ.get("FORCE_COLOR") or os.environ.get("CLICOLOR_FORCE"):
+            return True
+        if str(os.environ.get("TERM", "")).lower() == "dumb":
+            return False
+        with contextlib.suppress(Exception):
+            return bool(sys.stdout.isatty())
+        return False
+
+    on = _enabled()
     R, DIM, B = "\033[0m", "\033[2m", "\033[1m"
-    G, Y, RED, CY, MG = "\033[32m", "\033[33m", "\033[31m", "\033[36m", "\033[35m"
+    G, Y, RED, CY, MG, BLU = "\033[32m", "\033[33m", "\033[31m", "\033[36m", "\033[35m", "\033[34m"
+    BG, BY, BR, BC = "\033[1;32m", "\033[1;33m", "\033[1;31m", "\033[1;36m"
 
     @classmethod
     def c(cls, code: str, s: str) -> str:
         return f"{code}{s}{cls.R}" if cls.on else s
+
+    @classmethod
+    def bold(cls, s: str) -> str: return cls.c(cls.B, s)
+
+    @classmethod
+    def dim(cls, s: str) -> str: return cls.c(cls.DIM, s)
+
+    @classmethod
+    def green(cls, s: str) -> str: return cls.c(cls.G, s)
+
+    @classmethod
+    def yellow(cls, s: str) -> str: return cls.c(cls.Y, s)
+
+    @classmethod
+    def red(cls, s: str) -> str: return cls.c(cls.RED, s)
+
+    @classmethod
+    def cyan(cls, s: str) -> str: return cls.c(cls.CY, s)
+
+
+class V:
+    """View helpers, so every command renders the same way.
+
+    One glyph vocabulary across the whole CLI: a filled dot means something is
+    live, an open dot means it is off or unavailable, and the colour carries the
+    verdict. Before this, each command invented its own markers and a reader had
+    to relearn what "●" meant four times.
+    """
+
+    WIDTH = 76
+
+    @staticmethod
+    def dot(state: str) -> str:
+        """state: ok | warn | fail | off | info"""
+        return {"ok": C.c(C.BG, "●"), "warn": C.c(C.BY, "●"), "fail": C.c(C.BR, "●"),
+                "off": C.c(C.DIM, "○"), "info": C.c(C.BC, "●")}.get(state, C.c(C.DIM, "○"))
+
+    @staticmethod
+    def kv(label: str, value: str, width: int = 13) -> str:
+        return f"  {label:<{width}} {value}"
+
+    @staticmethod
+    def rule(title: str = "", width: int = WIDTH) -> str:
+        """A section divider. With a title it becomes a labelled rule."""
+        if not title:
+            return C.dim("  " + "─" * max(0, width - 2))
+        head = "  ──"
+        rest = max(0, width - len(head) - len(title) - 3)
+        return C.dim(head) + C.bold(f" {title} ") + C.dim("─" * rest)
+
+    @staticmethod
+    def bar(frac: float, width: int = 52, state: str = "ok") -> str:
+        frac = 0.0 if frac is None else max(0.0, min(1.0, float(frac)))
+        filled = int(round(frac * width))
+        colour = {"ok": C.G, "warn": C.Y, "fail": C.RED, "info": C.CY}.get(state, C.G)
+        return C.c(colour, "█" * filled) + C.dim("·" * (width - filled))
+
+    @staticmethod
+    def table(rows: list[list[str]], headers: list[str] | None = None,
+              aligns: str = "", pad: int = 2, indent: int = 2) -> list[str]:
+        """Align columns on visible width, ignoring ANSI escapes.
+
+        len() counts escape bytes, so colouring a cell before measuring it pushes
+        every column to the right of it out of line. Stripping escapes for the
+        measurement is the only way coloured tables stay straight.
+        """
+        if not rows:
+            return []
+        cells = [[("" if c is None else str(c)) for c in r] for r in rows]
+        ncol = max(len(r) for r in cells)
+        for r in cells:
+            r += [""] * (ncol - len(r))
+        if headers:
+            cells.insert(0, [str(h) for h in headers])
+        widths = [max(len(_visible(r[i])) for r in cells) for i in range(ncol)]
+        out = []
+        for i, r in enumerate(cells):
+            parts = []
+            for j, cell in enumerate(r):
+                a = aligns[j] if j < len(aligns) else "<"
+                gap = widths[j] - len(_visible(cell))
+                parts.append((" " * gap + cell) if a == ">" else (cell + " " * gap))
+            line = " " * indent + (" " * pad).join(parts).rstrip()
+            out.append(line)
+            if headers and i == 0:
+                out.append(C.dim(" " * indent + (" " * pad).join("─" * w for w in widths)))
+        return out
+
+    @staticmethod
+    def note(text: str, indent: int = 2) -> str:
+        return C.dim(" " * indent + text)
+
+    @staticmethod
+    def fail(msg: str, hint: str = "", indent: int = 2) -> str:
+        head = " " * indent + V.dot("fail") + " " + C.red(msg)
+        return head + ("\n" + " " * indent + "  " + C.dim("→ " + hint) if hint else "")
+
+
+_ANSI_RE = re.compile(r"\033\[[0-9;]*m")
+
+
+def _visible(s: str) -> str:
+    """The string as it will actually appear, with escape sequences removed."""
+    return _ANSI_RE.sub("", s or "")
+
+
+def _vlen(s: str) -> int:
+    return len(_visible(s))
 
 
 class NullUI:
@@ -4283,12 +4527,24 @@ class CLI:
         ok_ai = a.ai_state
         scr = a.caps.get("desktop")
         screen = ("●", C.G, "Active") if scr == "working" else ("○", C.DIM, "Unavailable" if not IS_WIN else "Untested")
-        out = [C.c(C.B, "● STUDDY BUDDY") + C.c(C.DIM, f"  v{APP_VERSION}"), "",
-               f"AI         {C.c(C.G if ok_ai[0] else C.RED, '●')} KiloCode · {ok_ai[1]}",
-               f"Screen     {C.c(screen[1], screen[0])} {screen[2]}" + (C.c(C.DIM, "  · private mode") if a.privacy.private else ""),
-               f"Voice      {C.c(C.G, '● ON') if a.voice.running else C.c(C.DIM, '○ OFF')}  {C.c(C.DIM, a.voice.state_label() if a.voice.running else '')}",
-               f"Activity   {C.c(C.G, '● tracking') if a.activity.enabled else C.c(C.DIM, '○ off')}",
-               f"Autopilot  {C.c(C.G, '● Ready')} {C.c(C.DIM, str(len([t for t in a.tasks.list() if t['state'] in ('queued', 'running')])) + ' active')}", ""]
+        active = len([t for t in a.tasks.list() if t["state"] in ("queued", "running")])
+        comp_ok, _why = a.companion.present()
+        comp_on = bool(comp_ok and a.companion.loop.enabled)
+        trust_mode = a.companion.trust.mode if comp_ok else "normal"
+        out = [
+            V.dot("ok" if ok_ai[0] else "warn") + " " + C.bold("STUDDY BUDDY OMEGA") + C.dim(f"  v{APP_VERSION}"),
+            V.rule(),
+            V.kv("AI", f"{V.dot('ok' if ok_ai[0] else 'fail')} KiloCode · "
+                       + (ok_ai[1] if ok_ai[0] else C.yellow(ok_ai[1])), 11),
+            V.kv("Screen", f"{C.c(screen[1], screen[0])} {screen[2]}"
+                           + (C.dim("  · private mode") if a.privacy.private else ""), 11),
+            V.kv("Voice", (f"{V.dot('ok')} ON  " + C.dim(a.voice.state_label())) if a.voice.running
+                          else f"{V.dot('off')} OFF", 11),
+            V.kv("Activity", f"{V.dot('ok')} tracking" if a.activity.enabled else f"{V.dot('off')} off", 11),
+            V.kv("Autopilot", f"{V.dot('info')} ready  " + C.dim(f"{active} active"), 11),
+            V.kv("Companion", (f"{V.dot('ok')} loop on" if comp_on else f"{V.dot('off')} loop off")
+                              + C.dim(f"  · trust {trust_mode}"), 11),
+            ""]
         self._out("\n".join(out))
 
 
@@ -4761,13 +5017,24 @@ class Doctor:
 
 
 def print_report(items: list[dict]) -> int:
-    col = {"PASS": C.G, "FAIL": C.RED, "BLOCKED": C.Y, "NOT TESTED": C.DIM}
+    """Render a diagnostics report.
+
+    The line shape here is a contract, not decoration: omega/tests/run_all.py
+    parses `^\s*FAIL\s+(\S+)\s+(.+?)\s+—\s+(.*)$` to lift failing items into
+    its own summary. A leading status glyph would look nicer and silently cost the
+    full-suite report its failure details, so the status word stays first.
+    """
+    col = {"PASS": C.G, "FAIL": C.RED, "BLOCKED": C.Y, "NOT TESTED": C.DIM,
+           "NOT_TESTED": C.DIM, "SKIP": C.DIM}
     bad = 0
+    width = max((len(i["status"]) for i in items), default=10)
     for i in items:
-        print(f"  {C.c(col[i['status']], i['status'].ljust(10))} {i['name']}" + (f" — {i['detail']}" if i["detail"] else ""))
-        if i.get("fix") and i["status"] in ("FAIL", "BLOCKED"):
-            print(f"  {' ' * 10} {C.c(C.DIM, 'fix: ' + i['fix'])}")
-        bad += i["status"] == "FAIL"
+        st = i["status"]
+        print(f"  {C.c(col.get(st, C.DIM), st.ljust(width))}  {C.bold(i['name'])}"
+              + (C.dim(f" — {i['detail']}") if i.get("detail") else ""))
+        if i.get("fix") and st in ("FAIL", "BLOCKED"):
+            print(f"  {' ' * width}  {C.c(C.CY, '→ fix:')} {C.dim(i['fix'])}")
+        bad += st == "FAIL"
     return bad
 
 
@@ -4804,6 +5071,150 @@ def set_autostart(on: bool) -> tuple[bool, str]:
 # ════════════════════════════════════════════════════════════════════════════
 # THE APP
 # ════════════════════════════════════════════════════════════════════════════
+class CompanionSubsystem:
+    """The always-on layer (omega/companion.py), loaded lazily like every sibling.
+
+    Behind sibling() so a missing or broken companion module degrades to BLOCKED
+    with the real reason instead of taking the whole product down at import.
+    """
+
+    def __init__(self, app: "Buddy") -> None:
+        self.app = app
+        self._mod: Any = None
+        self._trust: Any = None
+        self._obs: Any = None
+        self._model: Any = None
+        self._loop: Any = None
+
+    @property
+    def mod(self) -> Any:
+        if self._mod is None and "companion" not in _SIBLING_ERRORS:
+            self._mod = sibling("companion")
+        return self._mod
+
+    def present(self) -> tuple[bool, str]:
+        if self.mod is None:
+            return False, _SIBLING_ERRORS.get("companion", "omega/companion.py could not be loaded")
+        return True, ""
+
+    def need(self) -> Any:
+        ok, why = self.present()
+        if not ok:
+            raise ToolError(why, "dependency_missing")
+        return self.mod
+
+    @property
+    def trust(self) -> Any:
+        m = self.need()
+        if self._trust is None:
+            self._trust = m.TrustPolicy(self.app.settings, self.app.perms)
+        return self._trust
+
+    @property
+    def observation(self) -> Any:
+        m = self.need()
+        if self._obs is None:
+            self._obs = m.ObservationPolicy(self.app.settings, self.app.privacy,
+                                            backend=self._backend(m))
+        return self._obs
+
+    def _backend(self, m: Any) -> Any:
+        """Real screen reading, through the tool layer so it is gated and audited.
+
+        `screen_describe` already returns text from the vision model, so one call
+        covers capture-and-read and the pixels are never stored — which is what
+        observation.store_text_only promises. It is Windows-only and needs a key,
+        so anywhere else this reports unavailable with the reason and the loop says
+        BLOCKED instead of pretending to have looked at the screen.
+        """
+        spec = self.app.registry.get("screen_describe")
+        if spec is None:
+            return m.ScreenBackend(why_unavailable="the screen_describe tool is not registered")
+        ok, why = spec.status()
+        if not ok:
+            return m.ScreenBackend(why_unavailable=f"screen_describe: {why}")
+        if not self.app.gateway.key():
+            return m.ScreenBackend(why_unavailable="reading the screen needs a vision model, and no API key is set")
+
+        async def acapture() -> Any:
+            res = await exec_tool(self.app, "screen_describe", {})
+            if not res.ok:
+                raise ToolError(res.error or "screen_describe failed", res.category or "os_error")
+            d = res.data if isinstance(res.data, dict) else {"text": str(res.data)}
+            return d.get("description") or d.get("text") or ""
+
+        async def aread(text: Any) -> str:
+            return text if isinstance(text, str) else str(text or "")
+
+        return m.ScreenBackend(acapture=acapture, aread_text=aread)
+
+    @property
+    def model(self) -> Any:
+        m = self.need()
+        if self._model is None:
+            self._model = m.UserModel(self.app.store)
+        return self._model
+
+    def idle_seconds(self) -> float:
+        """How long the owner has been away. Used to decide when to think.
+
+        On Windows this is the real input-idle time. Elsewhere it falls back to the
+        activity monitor's last sample — and when observation is off there is no way
+        to know, so it returns 0.0, which means "assume the owner is present". Guessing
+        idle would spend the reflection budget while the user is actually at the keyboard.
+        """
+        if IS_WIN:
+            try:
+                class _LII(ctypes.Structure):
+                    _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+                lii = _LII()
+                lii.cbSize = ctypes.sizeof(_LII)
+                if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(lii)):
+                    return max(0.0, (ctypes.windll.kernel32.GetTickCount() - lii.dwTime) / 1000.0)
+            except Exception as e:
+                log("idle_probe_failed", err=str(e))
+        if self.app.activity.enabled:
+            r = self.app.store.one("SELECT MAX(end) AS last FROM activity")
+            if r and r["last"]:
+                return max(0.0, now() - float(r["last"]))
+        return 0.0
+
+    def _pending(self) -> bool:
+        """True when the owner is waiting on an answer, which always outranks thinking."""
+        return bool(self.app.current_run) or bool(self.app.current_task) or self.app.stop.requested()
+
+    async def _chat(self, prompt: str, **kw: Any) -> dict:
+        role = str(kw.get("role") or "chat")
+        model = self.app.router.resolve(role)
+        r = await self.app.gateway.chat(
+            model,
+            [{"role": "system", "content": "You are the background reflection of a personal assistant. "
+                                           "Be brief, factual, and never invent evidence."},
+             {"role": "user", "content": prompt}],
+            max_tokens=int(kw.get("max_tokens") or 800))
+        msg = (r or {}).get("message", {}) if isinstance(r, dict) else {}
+        usage = (r or {}).get("usage", {}) if isinstance(r, dict) else {}
+        return {"content": msg.get("content", "") if isinstance(msg, dict) else str(msg),
+                "tokens": int(usage.get("total_tokens") or usage.get("tokens") or 0)}
+
+    @property
+    def loop(self) -> Any:
+        m = self.need()
+        if self._loop is None:
+            self._loop = m.CompanionLoop(
+                self.app.settings, observation=self.observation, model=self.model,
+                store=self.app.store, memory=self.app.memory,
+                chat=self._chat, idle_probe=self.idle_seconds, pending_input=self._pending,
+                log_fn=lambda ev, **kw: log(ev, **kw))
+        return self._loop
+
+    def status(self) -> dict:
+        ok, why = self.present()
+        if not ok:
+            return {"available": False, "reason": why}
+        return {"available": True, **self.loop.status()}
+
+
 class Buddy:
     def __init__(self, headless: bool = False) -> None:
         ensure_dirs()
@@ -4827,12 +5238,15 @@ class Buddy:
         self.voice = Voice(self)
         self.doctor = Doctor(self)
         self.majin = MajinSubsystem(self)
+        self.companion = CompanionSubsystem(self)
         self.ui: Any = NullUI() if headless else CLI(self)
         self.perms.confirm_fn = lambda p, al: self.ui.confirm(p, al)
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.shutting_down = False
+        self._closed = False
         self.current_run: Optional[AgentRun] = None
         self.current_task: Optional[asyncio.Task] = None
+        self.companion_task: Optional[asyncio.Task] = None
         self.ai_state: tuple[bool, str] = (False, "not checked")
         self.lock = InstanceLock()
         self.stop = StopSignal()
@@ -4840,6 +5254,48 @@ class Buddy:
         self.skills.load_active()
         if not IS_WIN:
             self.caps.report("desktop", "blocked", "not Windows")
+
+    # ── the always-on layer ──
+    def start_companion(self) -> Optional[asyncio.Task]:
+        """Start the companion loop if the owner turned it on. Never raises.
+
+        Announces what it will and will not be able to do, up front. A loop that is
+        on but cannot reflect — no key, no display, owner never idle — must say so
+        at startup rather than looking alive for a week while doing nothing.
+        """
+        ok, why = self.companion.present()
+        if not ok:
+            self.ui.event(f"companion unavailable: {why}")
+            return None
+        try:
+            lp = self.companion.loop
+            if not lp.enabled:
+                return None
+            st = lp.status()
+            obs = st["observation"]
+            self.ui.event(f"companion loop ON — observation={obs['depth']} ({obs['indicator']['label']}), "
+                          f"thinks when idle {int(st['idle_threshold'])}s, "
+                          f"budget {st['budget']['max_tokens_per_day']:,} tokens/day")
+            if not self.gateway.key():
+                self.ui.event("companion can observe and remember but cannot reflect: no API key "
+                              "(`buddy key set`)")
+            elif not obs["backend_available"] and obs["depth"] in ("capture", "continuous"):
+                self.ui.event(f"companion cannot capture the screen here: {obs['backend_note']}")
+            self.companion_task = asyncio.ensure_future(lp.run())
+            return self.companion_task
+        except Exception as e:
+            self.ui.event(f"companion loop could not start: {type(e).__name__}: {e}")
+            log("companion_start_failed", err=str(e))
+            return None
+
+    def stop_companion(self) -> None:
+        """Stop the loop before anything else shuts down."""
+        with contextlib.suppress(Exception):
+            if self.companion.present()[0]:
+                self.companion.loop.request_stop()
+        if self.companion_task is not None:
+            self.companion_task.cancel()
+            self.companion_task = None
 
     # ── prompt assembly: capability manifest, never generic disclaimers ──
     def manifest(self) -> dict:
@@ -4964,7 +5420,7 @@ class Buddy:
 
     # ── slash commands ──
     HELP = """/help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
-/memory [list|search Q|forget ID|export|clear]  /doctor  /pause  /resume  /stop  /quit
+/memory [list|search Q|forget ID|export|clear]  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
 /grants [revoke]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
 Just talk normally — Buddy decides when to use tools. Say "stop" at any time."""
@@ -5154,7 +5610,18 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
         self.measure_level(record=True)
 
     async def close(self) -> None:
+        if self._closed:
+            # Shutdown must be idempotent. It is reachable from a session's finally
+            # block, from a signal handler and from a caller that closes explicitly,
+            # and those overlap. A second pass used to raise "Cannot operate on a
+            # closed database" from Voice.stop(), which turned a clean exit into a
+            # traceback at exactly the moment the owner was leaving.
+            return
+        self._closed = True
         self.shutting_down = True
+        # First, because the loop reads the store, memory and gateway: stopping it
+        # after those are gone would turn a clean shutdown into a logged error.
+        self.stop_companion()
         self.voice.stop()
         self.activity.stop()
         self.tasks.cancel_all()
@@ -5246,6 +5713,7 @@ async def main_async(app: Buddy) -> None:
         app.stop.clear()
         app.ui.event(f"cleared a stop request left at {iso(detail.get('requested_at')) if detail.get('requested_at') else 'an earlier run'}")
     app.activity.start()
+    app.start_companion()
     worker = asyncio.ensure_future(app.tasks.worker())
     recovered = app.tasks.recover(stale_after=0)
     if recovered:
@@ -6198,27 +6666,43 @@ def cmd_status(rest: list[str]) -> int:
         if as_json:
             print(jdump(st))
             return 0
-        dot = C.c(C.G, "●") if st["ai_key"] == "configured" else C.c(C.RED, "●")
-        print(C.c(C.B, f"\n{dot} {st['product']}") + C.c(C.DIM, f"  ·  {st['platform']} · python {st['python']}\n"))
-        print(f"  interactive session   {'running (another process holds the lock)' if running else 'not running'}")
-        print(f"  api key               {st['ai_key']}")
-        print(f"  home                  {st['home']}")
-        print(f"  voice                 {st['voice']}")
-        print(f"  private mode          {'ON' if st['private_mode'] else 'off'}   observation {'ON' if st['observation'] else 'off'}")
-        print(f"  tokens this process   prompt={st['usage'].get('prompt', 0)} completion={st['usage'].get('completion', 0)} calls={st['usage'].get('calls', 0)}")
-        print(f"  memory                {mem.get('total', 0)} records"
-              + (f" ({', '.join(f'{k}={v}' for k, v in sorted(mem.get('by_kind', {}).items()))})" if mem.get("by_kind") else ""))
-        print(f"  retrieval             {mem.get('searches', 0)} searches, {mem.get('hits', 0)} hits")
+        key_ok = st["ai_key"] == "configured"
+        print("\n" + V.dot("ok" if key_ok else "fail") + " " + C.bold(st["product"])
+              + C.dim(f"   {st['platform']} · python {st['python']}"))
+        print(V.rule("runtime"))
+        print(V.kv("session", C.green("running") + C.dim("  (another process holds the lock)") if running
+                   else C.dim("not running"), 20))
+        print(V.kv("api key", (C.green("configured") if key_ok else C.red(st["ai_key"])), 20))
+        print(V.kv("home", C.dim(st["home"]), 20))
+        print(V.kv("voice", st["voice"], 20))
+        pm = C.yellow("ON") if st["private_mode"] else C.dim("off")
+        ob = C.green("ON") if st["observation"] else C.dim("off")
+        print(f"  {'private mode':<20} {pm}    {'observation':<12} {ob}")
+        u = st["usage"]
+        print(V.kv("tokens", f"prompt={u.get('prompt', 0)}  completion={u.get('completion', 0)}  "
+                             f"calls={u.get('calls', 0)}", 20))
+        print(V.rule("memory"))
+        kinds = ", ".join(f"{k}={v}" for k, v in sorted(mem.get("by_kind", {}).items()))
+        print(V.kv("records", f"{mem.get('total', 0)}" + (C.dim(f"  ({kinds})") if kinds else ""), 20))
+        sr, ht = mem.get("searches", 0), mem.get("hits", 0)
+        rate = f"{ht / sr:.2f}" if sr else "n/a"
+        print(V.kv("retrieval", f"{sr} searches · {ht} hits · rate {rate}", 20))
+        print(V.rule("work"))
         if st["tasks"]:
-            print(f"  autopilot tasks       {st['tasks']}")
+            print(V.kv("tasks", ", ".join(f"{k}={v}" for k, v in sorted(st["tasks"].items())), 20))
+        else:
+            print(V.kv("tasks", C.dim("none"), 20))
         if st["runs"]:
-            print(f"  run outcomes          {st['runs']}")
+            print(V.kv("run outcomes", ", ".join(f"{k}={v}" for k, v in sorted(st["runs"].items())), 20))
         grants = st["grants"]
-        print(f"  standing grants       {grants if isinstance(grants, str) else ', '.join(f'{k}={v}' for k, v in grants.items()) or 'none'}")
+        print(V.kv("grants", grants if isinstance(grants, str)
+                   else (", ".join(f"{k}={v}" for k, v in sorted(grants.items())) or C.dim("none")), 20))
         mj = st["majin"]
-        print(f"  majin v6              {'connected' if mj.get('available') else 'unavailable'}"
-              + (f" — {mj.get('authorized')}/{mj.get('registered')} tools authorized, lanes={mj.get('grantedLanes')}"
-                 if mj.get("available") else f" — {clip(mj.get('reason', ''), 150)}"))
+        print(V.rule("subsystems"))
+        print(V.kv("majin v6", (V.dot("ok") + " connected" + C.dim(
+                        f"  {mj.get('authorized')}/{mj.get('registered')} tools authorized, "
+                        f"lanes={mj.get('grantedLanes')}")) if mj.get("available")
+                   else (V.dot("warn") + " unavailable" + C.dim(f"  {clip(mj.get('reason', ''), 120)}")), 20))
         # `measure_level` returns a LevelResult (or a dict explaining why it
         # could not measure). Both shapes must surface a level line — hiding it
         # because the payload happens to carry an axis breakdown would leave the
@@ -6475,6 +6959,620 @@ def cmd_deps(rest: list[str]) -> int:
     return 1 if miss_req else 0
 
 
+def _shutdown(app: Any) -> None:
+    with contextlib.suppress(Exception):
+        asyncio.run(app.close())
+
+
+def cmd_trust(rest: list[str]) -> int:
+    """Full-trust autonomy. An owner decision, made out loud, revocable, audited."""
+    app = Buddy(headless=True)
+    try:
+        ok, why = app.companion.present()
+        if not ok:
+            print(C.c(C.R, f"  BLOCKED: {why}"))
+            return 1
+        trust = app.companion.trust
+        action = (rest[0] if rest else "status").lower()
+
+        if action in ("status", "show"):
+            st = trust.state()
+            full = st["mode"] == "full"
+            print()
+            print((V.dot("ok") if full else V.dot("off")) + " " + C.bold("TRUST")
+                  + C.dim("  ·  ") + (C.bold(C.green("FULL")) if full else "normal"))
+            print(V.rule("standing grants"))
+            print("  " + (", ".join(f"{k}={v}" for k, v in sorted(st["grants"].items()))
+                          or C.dim("none — everything asks")))
+            print(V.rule("always confirms, in every mode"))
+            for i in range(0, len(st["always_confirms"]), 4):
+                print("    " + ", ".join(st["always_confirms"][i:i + 4]))
+            print(V.rule("redirected instead of refused"))
+            print("  " + ", ".join(f"{C.cyan(k)}→{v}" for k, v in sorted(st["redirects_when_full"].items())))
+            print()
+            print(V.note("The list above reaches other people or their money. Autonomy over your"))
+            print(V.note("own machine does not extend to them, and that is not a setting."))
+            return 0
+
+        if action == "on":
+            print("  Full trust means Buddy acts on your machine without asking you first.")
+            print("  Permanent deletion is redirected to the trash. Anything that reaches another")
+            print("  person — messages, payments, applications — still confirms, always.")
+            print(f"\n  To accept, type exactly: {trust.CONFIRM_PHRASE}")
+            try:
+                phrase = input("  > ")
+            except EOFError:
+                print(C.c(C.R, "\n  no input available. Pipe the phrase in instead:"))
+                print(f'    echo "{trust.CONFIRM_PHRASE}" | buddy trust on')
+                return 2
+            ok, msg = trust.activate(phrase.rstrip("\n"))
+            print(("  " + C.c(C.G, msg)) if ok else ("  " + C.c(C.R, msg)))
+            return 0 if ok else 2
+
+        if action == "off":
+            ok, msg = trust.deactivate("turned off with `buddy trust off`")
+            print("  " + msg)
+            return 0
+
+        print("usage: buddy trust [status | on | off]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_companion(rest: list[str]) -> int:
+    """The always-on layer: observation, the model of you, and budgeted thinking."""
+    usage = ("usage: buddy companion [status | on | off | observe DEPTH | profile [--days N] |\n"
+             "                            reflect | budget [TOKENS] | ask QUESTION | set KEY VALUE]\n"
+             "  DEPTH: off | titles | capture | continuous")
+    app = Buddy(headless=True)
+    try:
+        ok, why = app.companion.present()
+        if not ok:
+            print(C.c(C.R, f"  BLOCKED: {why}"))
+            return 1
+        comp = app.companion
+        action = (rest[0] if rest else "status").lower()
+        args = rest[1:]
+
+        if action in ("status", "show"):
+            lp = comp.status()
+            o, b, ind = lp["observation"], lp["budget"], lp["observation"]["indicator"]
+            print()
+            print(V.dot("ok" if lp["enabled"] else "off") + " " + C.bold("COMPANION")
+                  + C.dim(f"  ·  {'loop on' if lp['enabled'] else 'loop off'}  ·  {lp['ticks']} ticks run"))
+            print(V.rule("thinking"))
+            print(V.kv("can think now", (V.dot("ok") + " yes") if lp["can_reflect_now"]
+                       else (V.dot("warn") + " no — " + C.yellow(lp["why_not"])), 15))
+            print(V.kv("idle", f"{lp['idle_seconds']:.0f}s " + C.dim(f"(reflects at {lp['idle_threshold']:.0f}s)"), 15))
+            frac = (b["spent_today"] / b["max_tokens_per_day"]) if b["max_tokens_per_day"] else 0.0
+            print(V.kv("budget today", f"{b['spent_today']:,} / {b['max_tokens_per_day']:,} tokens "
+                                       + C.dim(f"({b['remaining_today']:,} left)"), 15))
+            print("  " + " " * 15 + " " + V.bar(frac, 40, "warn" if frac > 0.8 else "ok"))
+            print(V.rule("observation"))
+            print(V.kv("depth", o["depth"] + "   " + ind["label"], 15))
+            print(V.kv("backend", (V.dot("ok") + " available") if o["backend_available"]
+                       else (V.dot("fail") + " BLOCKED: " + C.dim(o["backend_note"])), 15))
+            print(V.kv("exclusions", f"{len(o['exclusions'])} "
+                       + C.dim("(banking, password managers, private browsing, your own additions)"), 15))
+            print(V.kv("retention", f"{o['retention_days']} days · "
+                       + ("text only, pixels never kept" if o["store_text_only"] else "frames kept"), 15))
+            print(V.rule("autonomy"))
+            tr = comp.trust.state()
+            print(V.kv("trust", (V.dot("ok") + " FULL") if tr["mode"] == "full"
+                       else (V.dot("off") + " normal"), 15))
+            print(V.kv("always asks", C.dim(f"{len(tr['always_confirms'])} third-party actions "
+                                            "(messages, payments, applications)"), 15))
+            if o["depth"] in ("capture", "continuous") and not o["backend_available"]:
+                print()
+                print(V.fail("capture is asked for but impossible here",
+                             "nothing is being watched — this is a capability gap, not a choice"))
+            if lp.get("errors"):
+                print()
+                print(V.fail(f"{len(lp['errors'])} loop error(s) recorded", lp["errors"][-1]))
+            return 0 if (o["depth"] in ("off", "titles") or o["backend_available"]) else 1
+
+        if action in ("on", "off"):
+            ok, msg = comp.loop.enable(action == "on")
+            print("  " + msg)
+            return 0 if ok else 1
+
+        if action == "observe":
+            if not args:
+                print(usage)
+                return 2
+            depth = args[0].lower()
+            ok, msg = comp.observation.set_depth(depth)
+            print(("  " + C.c(C.G, msg)) if ok else ("  " + C.c(C.R, msg)))
+            if ok and depth in ("capture", "continuous"):
+                print(C.c(C.Y, "  ● screen capture is now on. The indicator is part of the product:"))
+                print(C.c(C.Y, "    capture nobody can see is capture nobody consented to."))
+            if ok:
+                return 0
+            # An unknown depth is a usage error; a known depth this host cannot
+            # honour is a capability failure. Different exit codes, same honesty.
+            return 2 if depth not in comp.observation.DEPTHS else 1
+
+        if action == "profile":
+            days = float(_flag(args, "--days", "30"))
+            prof = comp.model.build(days=days)
+            print(comp.model.render(prof))
+            if prof.get("errors"):
+                print(C.c(C.R, "\n  read failures: " + "; ".join(prof["errors"][:3])))
+                return 1
+            return 0
+
+        if action == "reflect":
+            rep = asyncio.run(comp.loop.reflect())
+            d = rep.to_dict()
+            if d["blocked"]:
+                for b in d["blocked"]:
+                    print(C.c(C.Y, f"  BLOCKED: {b}"))
+            if d["reflected"]:
+                print("  thought: " + clip(d["reflection"], 600))
+                print(f"  stored as unverified episodic memory: {d['stored']}")
+            elif not d["blocked"]:
+                print("  nothing new to record")
+            print(f"  tokens used: {d['tokens_used']} · {d['duration_s']}s")
+            return 0 if not d["blocked"] else 1
+
+        if action == "budget":
+            if args:
+                try:
+                    n = int(args[0])
+                except ValueError:
+                    print("  budget takes a whole number of tokens per day")
+                    return 2
+                ok, msg = comp.loop.set_option("max_tokens_per_day", n)
+                print("  " + msg)
+                return 0 if ok else 2
+            print("  " + jdump(comp.loop.budget.state()))
+            return 0
+
+        if action == "ask":
+            q = " ".join(a for a in args if not a.startswith("--")).strip()
+            if not q:
+                print("usage: buddy companion ask QUESTION")
+                return 2
+            ok, text = comp.loop.consult(q)
+            if not ok:
+                print(C.c(C.R, f"  BLOCKED: {text}"))
+                print(C.c(C.DIM, "  This asks another model through the gateway. It does not drive"))
+                print(C.c(C.DIM, "  claude.ai or chatgpt.com in a browser: that breaks their terms and"))
+                print(C.c(C.DIM, "  breaks again at every redeploy, for nothing this cannot already do."))
+                return 1
+            print("  " + text)
+            return 0
+
+        if action == "set":
+            if len(args) < 2:
+                print("usage: buddy companion set KEY VALUE")
+                return 2
+            try:
+                val: Any = int(args[1])
+            except ValueError:
+                try:
+                    val = float(args[1])
+                except ValueError:
+                    val = args[1]
+            ok, msg = comp.loop.set_option(args[0], val)
+            print("  " + msg)
+            return 0 if ok else 2
+
+        print(usage)
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_memory(rest: list[str]) -> int:
+    """Long-term memory from the CLI, not only from inside a conversation.
+
+    Every read path uses `touch=False`. Inspecting your own memory must not count
+    as a retrieval, because retrieval hit-rate is capability axis D — a command
+    that inflated it would let curiosity raise the level.
+    """
+    usage = ("usage: buddy memory [list [KIND] | search TEXT | show ID | forget ID |\n"
+             "                        stats | export | clear --yes]")
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "list").lower()
+        args = rest[1:]
+        if action in ("list", "ls"):
+            kind = args[0] if args and not args[0].startswith("-") else None
+            rows = app.memory.list(kind=kind, limit=int(_flag(args, "--limit", "50")))
+            if not rows:
+                print("  (nothing stored yet)")
+                return 0
+            for m in rows:
+                print(f"  #{m['id']:<5} [{m['kind']}/{m['status']}] {m['title']}: {clip(m['content'], 88)}")
+            total = app.store.one("SELECT COUNT(*) AS n FROM memories")["n"]
+            print(f"\n  {len(rows)} shown · {total} stored" + (f" · kind={kind}" if kind else ""))
+            return 0
+        if action in ("search", "find"):
+            q = " ".join(a for a in args if not a.startswith("--")).strip()
+            if not q:
+                print("usage: buddy memory search <text>")
+                return 2
+            rows = app.memory.search(q, limit=int(_flag(args, "--limit", "10")), touch=False)
+            if not rows:
+                print(f"  nothing matched {q!r}")
+                return 0
+            for m in rows:
+                print(f"  #{m['id']:<5} [{m['kind']}/{m['status']}] {m['title']}: {clip(m['content'], 88)}")
+            print(C.c(C.DIM, "\n  inspected with touch=False: looking at memory does not count as a retrieval"))
+            return 0
+        if action == "show":
+            if not args or not args[0].isdigit():
+                print("usage: buddy memory show ID")
+                return 2
+            r = app.store.one("SELECT * FROM memories WHERE id=?", (int(args[0]),))
+            if not r:
+                print(f"  no memory with id {args[0]}")
+                return 1
+            print(f"  #{r['id']} · {r['kind']} · status={r['status']}")
+            print(f"  title : {r['title']}")
+            print(f"  tags  : {r['tags'] or '-'}   scope: {r['scope'] or '-'}   uses: {r['uses']}")
+            print(f"  created: {time.strftime('%Y-%m-%d %H:%M', time.localtime(r['created']))}"
+                  f"   updated: {time.strftime('%Y-%m-%d %H:%M', time.localtime(r['updated']))}")
+            if r["provenance"]:
+                print(f"  provenance: {clip(r['provenance'], 300)}")
+            print("  " + "-" * 60)
+            print(r["content"])
+            return 0
+        if action == "forget":
+            if not args or not args[0].isdigit():
+                print("usage: buddy memory forget ID")
+                return 2
+            r = app.store.one("SELECT title FROM memories WHERE id=?", (int(args[0]),))
+            if not r:
+                print(f"  no memory with id {args[0]}")
+                return 1
+            app.memory.delete(int(args[0]))
+            print(f"  deleted #{args[0]} ({r['title']})")
+            return 0
+        if action == "stats":
+            st = app.memory.stats()
+            print(f"  total      {st['total']}")
+            print(f"  by kind    {jdump(st['by_kind'])}")
+            print(f"  by status  {jdump(st['by_status'])}")
+            searches, hits = st["searches"], st["hits"]
+            rate = (hits / searches) if searches else None
+            print(f"  retrieval  {hits} hits / {searches} searches"
+                  + (f" = {rate:.2f}" if rate is not None else " (nothing measured yet)"))
+            print(C.c(C.DIM, "  this hit-rate is capability axis D — it only moves on real agent runs"))
+            return 0
+        if action == "export":
+            n = app.memory.export_obsidian(DIRS["export"])
+            print(f"  exported {n} note(s) to {DIRS['export']} (Obsidian-compatible Markdown)")
+            return 0
+        if action == "clear":
+            if "--yes" not in args:
+                print("  this deletes every memory and the whole conversation history.")
+                print("  re-run with --yes if that is really what you want.")
+                return 2
+            app.memory.forget_all()
+            print("  all memories and conversation history deleted")
+            return 0
+        print(usage)
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_tasks(rest: list[str]) -> int:
+    """The durable background queue, from the CLI."""
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "list").lower()
+        args = rest[1:]
+        if action in ("list", "ls"):
+            rows = app.tasks.list(int(_flag(args, "--limit", "20")))
+            if not rows:
+                print("  no background tasks")
+                return 0
+            for t in rows:
+                err = f"  ← {clip(t['error'] or '', 70)}" if t.get("error") else ""
+                print(f"  {t['id']}  {t['state']:<10} {clip(t['title'] or '', 44)}{err}")
+            return 0
+        if action in ("status", "show"):
+            if not args:
+                print("usage: buddy tasks status ID")
+                return 2
+            t = app.tasks.get(args[0])
+            if not t:
+                print(f"  no task {args[0]}")
+                return 1
+            print(jdump({k: t[k] for k in ("id", "title", "state", "attempts", "step_idx", "run_at",
+                                           "created", "updated", "heartbeat", "owner_pid", "error",
+                                           "error_class", "result") if k in t}))
+            ck = app.tasks.last_checkpoint(args[0])
+            print(f"  last checkpoint: step {ck['step_idx']}" if ck else "  no checkpoint yet")
+            return 0
+        if action == "cancel":
+            if not args:
+                print("usage: buddy tasks cancel ID")
+                return 2
+            ok = app.tasks.cancel(args[0])
+            print("  cancelled" if ok else "  not cancellable (already finished, or unknown id)")
+            return 0 if ok else 1
+        if action == "retry":
+            if not args:
+                print("usage: buddy tasks retry ID")
+                return 2
+            ok = app.tasks.retry(args[0])
+            print("  re-queued" if ok else "  not retryable (only failed, blocked or cancelled tasks are)")
+            return 0 if ok else 1
+        if action in ("create", "add"):
+            goal = " ".join(a for a in args if not a.startswith("--")).strip()
+            if not goal:
+                print("usage: buddy tasks create GOAL")
+                return 2
+            tid = app.tasks.create(clip(goal, 80), {"kind": "agent", "goal": goal})
+            print(f"  queued {tid}")
+            print(C.c(C.DIM, "  background work may only use scopes already granted 'always' — see `buddy grants`"))
+            print(C.c(C.DIM, "  it runs while a Buddy session is alive; `buddy` then leave it open"))
+            return 0
+        print("usage: buddy tasks [list | status ID | cancel ID | retry ID | create GOAL]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_grants(rest: list[str]) -> int:
+    """Standing permissions. Security-relevant, so the current state is the default."""
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "show").lower()
+        args = rest[1:]
+        if action in ("show", "list"):
+            grants = app.perms.all()
+            print("  standing permissions:")
+            for scope in ("observe", "input", "write", "exec", "sensitive"):
+                mode = grants.get(scope)
+                mark = C.c(C.G, "●") if mode == "always" else (C.c(C.R, "●") if mode == "deny" else C.c(C.DIM, "○"))
+                print(f"    {mark} {scope:<10} {mode or 'asks every time'}")
+            extra = {k: v for k, v in grants.items()
+                     if k not in ("observe", "input", "write", "exec", "sensitive")}
+            for k, v in sorted(extra.items()):
+                print(f"    ● {k:<10} {v}")
+            print(C.c(C.DIM, "\n  SENSITIVE actions always ask, in every mode. Background work has nobody to ask,"))
+            print(C.c(C.DIM, "  so it is refused unless a scope is granted 'always'."))
+            return 0
+        if action == "set":
+            if len(args) < 2:
+                print("usage: buddy grants set SCOPE always|deny|ask")
+                return 2
+            scope, mode = args[0].lower(), args[1].lower()
+            if mode not in ("always", "deny", "ask"):
+                print("  mode must be always, deny or ask (ask removes the standing grant)")
+                return 2
+            app.perms.set(scope, None if mode == "ask" else mode)
+            print(f"  {scope} → {mode}")
+            if mode == "always":
+                print(C.c(C.Y, f"  '{scope}' will now run without asking, including in background tasks."))
+            return 0
+        if action == "revoke":
+            app.perms.revoke_all()
+            print("  all standing permissions revoked — everything asks again")
+            return 0
+        print("usage: buddy grants [show | set SCOPE always|deny|ask | revoke]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_models(rest: list[str]) -> int:
+    """Model routing: what the gateway really offers, and what each role uses."""
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "show").lower()
+        args = rest[1:]
+        if action in ("show", "list"):
+            roles = app.settings.get("models") or {}
+            print("  role → model:")
+            for r in Router.ROLES:
+                print(f"    {r:<10} {roles.get(r) or C.c(C.DIM, '(gateway default)')}")
+            ladder = app.router.ladder()
+            print(f"\n  fallback ladder: {ladder or 'none offered'}")
+            if not app.gateway.key():
+                print(C.c(C.Y, "\n  no API key — the gateway cannot be queried for its real model list."))
+                print(C.c(C.DIM, "  run `buddy key set` first."))
+                return 1
+            ids = sorted(app.gateway.model_ids())
+            print(f"\n  the gateway offers {len(ids)} model(s):")
+            print("    " + ", ".join(ids[:40]) + (" …" if len(ids) > 40 else ""))
+            print(C.c(C.DIM, "\n  Omega only routes to models the gateway actually lists — it never invents one."))
+            return 0
+        if action == "set":
+            if len(args) < 2 or args[0] not in Router.ROLES:
+                print(f"usage: buddy models set ROLE MODEL_ID   (roles: {', '.join(Router.ROLES)})")
+                return 2
+            role, mid = args[0], args[1]
+            known = set(app.gateway.model_ids())
+            if known and mid not in known:
+                print(C.c(C.R, f"  the gateway does not offer {mid!r}, so it is not being set."))
+                print("  real options: " + ", ".join(sorted(known)[:25]))
+                return 1
+            m = app.settings.get("models") or {}
+            m[role] = mid
+            app.settings.set("models", m)
+            print(f"  {role} → {mid}" + ("" if known else C.c(C.Y, "  (unverified: no key, so the id could not be checked)")))
+            return 0
+        if action == "ping":
+            if not app.gateway.key():
+                print("  no API key configured — run `buddy key set`")
+                return 1
+            try:
+                ok, detail = app.gateway.ping(app.router.resolve(args[0] if args else "chat"))
+            except GatewayError as e:
+                print(f"  gateway error ({e.kind}): {clip(str(e), 200)}")
+                return 1
+            print(("  reachable: " if ok else "  NOT reachable: ") + str(detail))
+            return 0 if ok else 1
+        print("usage: buddy models [show | set ROLE MODEL_ID | ping [ROLE]]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_skills(rest: list[str]) -> int:
+    """Verified skills: what has been tested and approved, and what is active."""
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "list").lower()
+        args = rest[1:]
+        if action in ("list", "ls"):
+            rows = app.skills.list()
+            if not rows:
+                print("  no skills yet — they are proposed from work that actually succeeded,")
+                print("  then tested, then approved by you before they become a tool.")
+                return 0
+            for sk in rows:
+                print(f"  {sk['name']} v{sk['version']} [{sk['status']}] {clip(sk.get('description') or '', 60)}")
+            print(C.c(C.DIM, "\n  a skill runs through the same permission gate as any other tool"))
+            return 0
+        if action in ("show", "status"):
+            if not args:
+                print("usage: buddy skills show NAME")
+                return 2
+            row = app.skills._row(args[0])
+            if not row:
+                print(f"  no skill named {args[0]}")
+                return 1
+            print(jdump({k: row[k] for k in row if k not in ("code",)}))
+            return 0
+        if action == "rollback":
+            if not args:
+                print("usage: buddy skills rollback NAME")
+                return 2
+            out = asyncio.run(app.skills.rollback(args[0]))
+            print("  " + jdump(out))
+            return 0 if out.get("ok", True) else 1
+        print("usage: buddy skills [list | show NAME | rollback NAME]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def cmd_key(rest: list[str]) -> int:
+    """The Kilo Code credential. Never printed, never written to a plain file."""
+    app = Buddy(headless=True)
+    try:
+        action = (rest[0] if rest else "status").lower()
+        if action in ("status", "show"):
+            from_env = bool(os.environ.get("KILO_API_KEY"))
+            stored = app.vault.get("kilo_api_key")
+            if from_env:
+                print("  ● key present in the environment (KILO_API_KEY)")
+            if stored:
+                print(f"  ● key stored in the vault ({_vault_location()})")
+            if not from_env and not stored:
+                print("  ○ no key configured")
+                print("    set one with:  buddy key set")
+                print("    or export:     KILO_API_KEY=... (environment wins over the vault)")
+                return 1
+            print(C.c(C.DIM, "  the value is never printed. On Windows it is sealed with DPAPI."))
+            return 0
+        if action == "set":
+            import getpass
+            k = getpass.getpass("KiloCode API key (hidden, not stored in shell history): ").strip()
+            if not k:
+                print("  nothing entered; the existing key is unchanged")
+                return 1
+            app.vault.set("kilo_api_key", k)
+            print(f"  saved to {_vault_location()}")
+            try:
+                ok, detail = app.gateway.ping(app.router.resolve("chat"))
+            except GatewayError as e:
+                print(C.c(C.R, f"  stored, but the gateway rejected it ({e.kind}): {clip(str(e), 160)}"))
+                return 1
+            if ok:
+                print(C.c(C.G, f"  verified against the live gateway: {detail}"))
+                return 0
+            print(C.c(C.Y, f"  stored, but a live check did not succeed: {clip(str(detail), 160)}"))
+            return 1
+        if action == "clear":
+            if "--yes" not in rest[1:]:
+                print("  this removes the stored key. Re-run with --yes to confirm.")
+                return 2
+            app.vault.delete("kilo_api_key")
+            print("  stored key removed" + ("  (KILO_API_KEY is still set in the environment)"
+                                           if os.environ.get("KILO_API_KEY") else ""))
+            return 0
+        print("usage: buddy key [status | set | clear --yes]")
+        return 2
+    finally:
+        _shutdown(app)
+
+
+def _vault_location() -> str:
+    return "DPAPI, per-user" if IS_WIN else str(HOME / "vault (obfuscated, not plaintext)")
+
+
+def _flag(args: list[str], name: str, default: str) -> str:
+    """Read `--name VALUE` or `--name=VALUE` out of a CLI argument list."""
+    for i, a in enumerate(args):
+        if a == name and i + 1 < len(args):
+            return args[i + 1]
+        if a.startswith(name + "="):
+            return a.split("=", 1)[1]
+    return default
+
+
+def cmd_accept(rest: list[str]) -> int:
+    """Run the 20 mandated end-to-end acceptance scenarios.
+
+    This must run in a **child process**: `acceptance.py` points BUDDY_HOME at a
+    scratch directory at import time, and by then this process has already
+    resolved the owner's real HOME. Running it in-process would quietly execute
+    the acceptance suite against the owner's real data.
+    """
+    runner = SOURCE_FILE.parent / "acceptance.py"
+    if not runner.is_file():
+        print(f"the acceptance runner is missing: {runner}")
+        return 1
+    return subprocess.call([sys.executable, str(runner), *rest])
+
+
+def cmd_bench(rest: list[str]) -> int:
+    """Run the reproducible capability benchmarks that feed level axis E.
+
+    Also a child process, so the benchmarks run against a disposable data
+    directory and can never disturb the owner's memory, tasks or settings. The
+    report is written into the real home, which is where `omega/level.py` reads
+    axis E from — so `buddy bench` followed by `buddy level` shows the axis move
+    from unmeasured to measured.
+    """
+    runner = SOURCE_FILE.parent / "benchmarks" / "runner.py"
+    if not runner.is_file():
+        print(f"the benchmark runner is missing: {runner}")
+        return 1
+    ensure_dirs()
+    args = [sys.executable, str(runner)]
+    if not any(a.startswith("--report") for a in rest):
+        args += ["--report", str(HOME / "last_benchmark_report.json")]
+    args += rest
+    rc = subprocess.call(args)
+    report = HOME / "last_benchmark_report.json"
+    if report.is_file() and "--json" not in rest:
+        with contextlib.suppress(Exception):
+            app = Buddy(headless=True)
+            try:
+                lv = app.measure_level(record=False)
+                if not isinstance(lv, dict):
+                    axis_e = next((a for a in lv.axes if a.key == "E"), None)
+                    if axis_e is not None and axis_e.measured:
+                        print(C.c(C.G, f"\n  axis E measured: {axis_e.note}"))
+                    measured = sum(1 for a in lv.axes if a.measured)
+                    print(C.c(C.DIM, f"  capability level {lv.level}/100 ({lv.tier}) · score {lv.score:.3f} · "
+                                     f"{measured}/{len(lv.axes)} axes measured\n"))
+            finally:
+                with contextlib.suppress(Exception):
+                    asyncio.run(app.close())
+    return rc
+
+
 def cmd_test(rest: list[str]) -> int:
     """Run every automated suite and report each one separately."""
     runner = SOURCE_FILE.parent / "tests" / "run_all.py"
@@ -6548,7 +7646,7 @@ STUDDY BUDDY OMEGA — one agent, one command
 
 Diagnostics and proof
   buddy doctor [section]    real diagnostics. sections: runtime gateway desktop voice browser
-                            memory autopilot majin level subsystems
+                            memory autopilot tasks majin level subsystems
   buddy status [--json]     operational state: key, models, memory, tasks, grants, MAJIN, level
   buddy test [--quick]      every automated suite, each reported separately
   buddy prove               self-test + live Windows/AI scenarios (needs Windows + a Kilo key)
@@ -6556,6 +7654,13 @@ Diagnostics and proof
                             evidence written to disk. Each reports PASS / FAIL / BLOCKED /
                             NOT TESTED — BLOCKED means this machine cannot prove it, and it is
                             never upgraded to a pass. --list shows them, --json is machine-readable.
+  buddy bench [ID ...]      reproducible capability benchmarks. These are the evidence behind
+                            level axis E; a task this host cannot run is skipped and excluded,
+                            never counted as a failure. --list shows them, --json is machine-readable.
+  buddy deps [--json]       the dependency list and the Python version policy the product itself
+                            declares — the installer reads this, so the two cannot drift apart.
+  buddy autostart on|off|status
+                            start Buddy (minimised) when you log in. Windows only.
   buddy self-test           automated acceptance tests in an isolated data dir
   buddy voice-test          real microphone + speaker test
   buddy level [--history]   measured capability level 1–100 and the evidence behind it
@@ -6565,10 +7670,48 @@ Control
   buddy update [--apply]    check, back up, update, verify, roll back on failure
 
 Memory
+  buddy memory [list|search TEXT|show ID|forget ID|stats|export|clear --yes]
+                            your long-term memory. Reads never count as a retrieval, so
+                            looking at it cannot inflate the level.
   buddy migrate scan        what legacy data actually exists on this machine
   buddy migrate plan        dry-run import plan (default; writes nothing)
   buddy migrate run --yes   import, with a verified backup first
+  buddy migrate verify      re-check an import: record counts, provenance and retrieval
   buddy migrate rollback --backup PATH
+
+Work, permissions and models
+  buddy tasks [list|status ID|cancel ID|retry ID|create GOAL]
+                            the durable background queue and its checkpoints
+  buddy grants [show|set SCOPE always|deny|ask|revoke]
+                            standing permissions. SENSITIVE actions always ask, in every
+                            mode; background work is refused unless a scope is granted.
+  buddy models [show|set ROLE ID|ping]
+                            real gateway models and per-role routing. A model the gateway
+                            does not offer is refused rather than silently accepted.
+  buddy key [status|set|clear --yes]
+                            the Kilo Code credential. Never printed; sealed with DPAPI on
+                            Windows. `set` verifies it against the live gateway.
+  buddy skills [list|show NAME|rollback NAME]
+                            tested, approved skills. They run through the same permission
+                            gate as every other tool.
+
+Always-on companion
+  buddy companion status    the loop, the budget, what it is watching and what it cannot do
+  buddy companion on|off    start or stop the 24/7 loop
+  buddy companion observe off|titles|capture|continuous
+                            how much it may see. capture needs a working screen backend
+                            and a visible recording indicator — it will not run without one.
+  buddy companion profile [--days N]
+                            what it has learned about you, with observed facts kept
+                            separate from inferences and every claim carrying its evidence
+  buddy companion reflect   one thinking cycle now; reports BLOCKED with the reason if it cannot
+  buddy companion budget [TOKENS_PER_DAY]
+                            hard daily ceiling on autonomous thinking (enforced, not advisory)
+  buddy companion ask Q     a second opinion from another model through the gateway
+  buddy trust status        current autonomy level and the floor that cannot be removed
+  buddy trust on            full trust on your own machine. Typed confirmation required;
+                            recorded in the audit log. Third-party actions still confirm.
+  buddy trust off           back to asking, according to your grants
 
 MAJIN V6 subsystem
   buddy majin status        is MAJIN connected, and with which owner grants
@@ -6582,6 +7725,41 @@ MAJIN V6 subsystem
 The agent can also just use MAJIN, migration and its own level from inside a
 conversation — these commands exist so you can inspect and control it directly.
 """
+
+QUICK_START = """  start here
+    buddy                       just talk — first-run setup happens once, by itself
+    buddy key set               connect the AI; almost nothing works before this
+    buddy doctor                what works on this machine, and what to do about what does not
+    buddy companion status      the always-on layer: what it watches and what it may do
+"""
+
+
+def render_usage() -> str:
+    """Colour the help text.
+
+    USAGE itself stays plain on purpose: omega/tests/test_cli_contract.py parses
+    that string to prove every documented command is really dispatched and every
+    dispatched command is really documented. Colouring the source would break the
+    check that keeps the CLI honest, so the colour is applied on the way out.
+    """
+    out = ["", V.dot("ok") + " " + C.bold("STUDDY BUDDY OMEGA") + C.dim(f"  v{APP_VERSION}  ·  one agent, one command"),
+           "", QUICK_START.rstrip(), V.rule()]
+    for line in USAGE.splitlines():
+        if not line.strip():
+            continue
+        if line.strip().startswith("STUDDY BUDDY OMEGA"):
+            continue                                  # already rendered as the title
+        if not line.startswith(" ") and line.strip():
+            out.append("")
+            out.append(V.rule(line.strip()))
+        elif line.strip().startswith("buddy"):
+            body = line.strip()
+            out.append("  " + C.bold("buddy") + body[len("buddy"):])
+        else:
+            out.append(C.dim(line.rstrip()))
+    return "\n".join(out)
+
+
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -6610,8 +7788,18 @@ def main(argv: Optional[list[str]] = None) -> int:
             "voice-test": lambda r: _voice_test_cmd(),
             "autostart": cmd_autostart,
             "deps": cmd_deps,
-            "help": lambda r: (print(USAGE), 0)[1],
-            "--help": lambda r: (print(USAGE), 0)[1],
+            "accept": cmd_accept,
+            "bench": cmd_bench,
+            "memory": cmd_memory,
+            "tasks": cmd_tasks,
+            "grants": cmd_grants,
+            "models": cmd_models,
+            "skills": cmd_skills,
+            "key": cmd_key,
+            "trust": cmd_trust,
+            "companion": cmd_companion,
+            "help": lambda r: (print(render_usage()), 0)[1],
+            "--help": lambda r: (print(render_usage()), 0)[1],
             "version": lambda r: (print(f"Studdy Buddy Omega {APP_VERSION}"), 0)[1],
         }
         fn = table.get(cmd)
@@ -6633,7 +7821,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("-h", "--help", action="store_true")
     a, extra = ap.parse_known_args(argv)
     if a.help or (argv and argv[0] in ("-h", "--help")):
-        print(USAGE)
+        print(render_usage())
         return 0
     if a.doctor:
         return cmd_doctor(extra)
