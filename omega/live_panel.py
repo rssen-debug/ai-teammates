@@ -203,6 +203,8 @@ class LivePanel:
             "status": LivePanel.status,
             "step": LivePanel.step,
             "step_done": LivePanel.step_done,
+            "explain_action": LivePanel.explain_action,
+            "explain_result": LivePanel.explain_result,
             "summary": LivePanel.summary,
             "event": LivePanel.event,
             "prompt": LivePanel.prompt,
@@ -225,6 +227,13 @@ class LivePanel:
         self._companion_checked_at = 0.0
         self.trace: deque[tuple[str, bool | None, float]] = deque(maxlen=9)
         self.phase = "Väntar på uppgift"
+        self.goal = ""
+        self.action_title = ""
+        self.action_reason = ""
+        self.action_expect = ""
+        self.action_result = ""
+        self.action_evidence = ""
+        self.action_started = 0.0
         self.show_thinking = True
         self.events: deque[str] = deque(maxlen=24)
         self._stream_text = ""
@@ -512,20 +521,35 @@ class LivePanel:
         else:
             add("AI LEVEL: väntar på mätning", "#ffffff")
 
-        lines.append(("bold #ff90c8", "ARBETSPROCESS · " + ("DÖLJ" if self.show_thinking else "VISA") + " / F2\n", self._side_click))
-        add("STEG: " + self.phase, "#ffe0f1")
-        if running and app.current_run:
-            duration = int(max(0, current - float(app.current_run.t0)))
-            add("AI uppgift: " + str(duration) + " sekunder", "#ffffff")
-        if self._last_tool_error:
-            add("SENASTE FEL:", "#ff9ba6")
-            detail(self._last_tool_error, "#ff9ba6", max_lines=3)
+        lines.append(("bold #ff90c8", "MIN ARBETSPLAN · " + ("DÖLJ" if self.show_thinking else "VISA") + " / F2\n", self._side_click))
         if self.show_thinking:
-            add("── VERKLIGA ARBETSSTEG ──", "#ff8fc5")
-            for event in list(self.events)[-7:]:
-                detail(" • " + event, "#ffe0f1", max_lines=2)
-        elif self.events:
-            add("SENAST: " + self.events[-1], "#d4b7c9")
+            add("01  MÅL", "bold #ff8fc5")
+            detail(self.goal or "Väntar på din nästa uppgift", "#ffffff", max_lines=3)
+            add("02  VAD JAG GÖR", "bold #ff8fc5")
+            detail(self.action_title or self.phase, "#ffffff", max_lines=2)
+            add("03  VARFÖR DETTA STEG", "bold #ff8fc5")
+            detail(self.action_reason or
+                   "Inget verktygsbeslut registrerat ännu.", "#f8c6e3", max_lines=3)
+            add("04  HUR JAG KONTROLLERAR", "bold #ff8fc5")
+            detail(self.action_expect or
+                   "Väntar på ett resultat att kontrollera.", "#d9b7cf", max_lines=2)
+            add("05  FAKTISKT RESULTAT", "bold #ff8fc5")
+            detail(self.action_result or "Pågår / ännu inget resultat.", "#ffffff", max_lines=3)
+            if self.action_evidence:
+                add("Händelse-ID: " + self.action_evidence, "#9bcfb1")
+            if self._last_tool_error:
+                add("SENASTE FEL:", "#ff9ba6")
+                detail(self._last_tool_error, "#ff9ba6", max_lines=2)
+            add("── HÄNDELSER · LIVE ──", "#ff8fc5")
+            for item in list(self.events)[-4:]:
+                detail(" • " + item, "#cfb5c6", max_lines=2)
+        else:
+            detail(self.action_title or self.phase, "#f8c6e3", max_lines=2)
+            if self.action_result:
+                detail(self.action_result, "#ffffff", max_lines=2)
+            if self._last_tool_error:
+                add("SENASTE FEL:", "#ff9ba6")
+                detail(self._last_tool_error, "#ff9ba6", max_lines=2)
         add("── MARKERING + RÖST ──", "#ff90c8")
         bridge = getattr(app, "selection_bridge", None)
         add("MARKERA: " + (bridge.status if bridge else "OFF"), "#ffffff")
@@ -570,6 +594,39 @@ class LivePanel:
         panel = self._panel_state
         panel.phase = clean_line(text, 44)
         panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.phase)
+        panel._refresh()
+
+    def explain_action(self, goal: str, action: str, reason: str, expect: str) -> None:
+        """Structured, user-facing decision summary, never private model reasoning."""
+        panel = self._panel_state
+        panel.goal = clean_line(goal, 240)
+        panel.action_title = clean_line(action, 180)
+        panel.action_reason = clean_line(reason, 240)
+        panel.action_expect = clean_line(expect, 180)
+        panel.action_result = "Verktyget körs – resultat ej klart."
+        panel.action_evidence = ""
+        panel.action_started = time.monotonic()
+        panel.events.append(datetime.now().strftime("%H:%M:%S") +
+                            " · Start: " + panel.action_title)
+        panel._refresh()
+
+    def explain_result(self, ok: bool, evidence_id: str, observation: bool,
+                       effect: bool, category: str = "") -> None:
+        panel = self._panel_state
+        elapsed = max(0, time.monotonic() - panel.action_started) if panel.action_started else 0.0
+        if ok:
+            if effect and not observation:
+                note = "Åtgärd lyckades; kontroll behövs för att bekräfta effekten."
+            elif observation:
+                note = "Verktyget läste tillbaka underlag för kontroll."
+            else:
+                note = "Verktyget avslutades utan rapporterat fel."
+        else:
+            note = "Steget misslyckades; se senaste fel nedan."
+        panel.action_result = f"{note} ({elapsed:.1f}s)"
+        panel.action_evidence = clean_line(evidence_id, 30) if ok else ""
+        panel.events.append(datetime.now().strftime("%H:%M:%S") +
+                            " · " + ("✓ " if ok else "✕ ") + panel.action_result)
         panel._refresh()
 
     def step(self, text: str) -> None:

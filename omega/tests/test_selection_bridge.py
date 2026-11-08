@@ -30,6 +30,21 @@ class SelectionTest(unittest.TestCase):
             FakeTextPattern(["real highlighted text", "second range"])))
         self.assertEqual(selected_text(auto), "real highlighted text\nsecond range")
 
+    def test_unsupported_focused_control_is_normal_not_attribute_error(self):
+        auto = SimpleNamespace(GetFocusedControl=lambda: SimpleNamespace(Name="Editor"))
+        self.assertEqual(selected_text(auto), "")
+
+    def test_missing_selection_method_does_not_crash_autopilot(self):
+        auto = SimpleNamespace(GetFocusedControl=lambda:
+            SimpleNamespace(GetTextPattern=lambda: SimpleNamespace()))
+        self.assertEqual(selected_text(auto), "")
+
+    def test_text_range_without_get_text_is_safely_skipped(self):
+        auto = SimpleNamespace(GetFocusedControl=lambda:
+            SimpleNamespace(GetTextPattern=lambda:
+                SimpleNamespace(GetSelection=lambda: [SimpleNamespace()])))
+        self.assertEqual(selected_text(auto), "")
+
     def test_no_selection_produces_no_context(self):
         auto = SimpleNamespace(GetFocusedControl=lambda: FakeControl(FakeTextPattern([])))
         self.assertEqual(selected_text(auto), "")

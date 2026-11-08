@@ -44,8 +44,44 @@ class PanelTest(unittest.TestCase):
         p = self.build()
         self.assertTrue(p.show_thinking)
         rendered = "".join(fragment[1] for fragment in p._side_text())
-        self.assertIn("ARBETSPROCESS", rendered)
+        self.assertIn("MIN ARBETSPLAN", rendered)
         self.assertNotIn("TETRIS", rendered)
+
+    def test_live_panel_explains_actual_goal_action_reason_and_result(self):
+        p = self.build()
+        p.ui.explain_action(
+            "Hitta min programmeringsfil och kontrollera den",
+            "Läser fil [file_read]",
+            "Samla befintligt innehåll som underlag",
+            "Läsa tillbaka resultatet")
+        pending = "".join(f[1] for f in p._side_text())
+        self.assertIn("MIN ARBETSPLAN", pending)
+        self.assertIn("01 MÅL", pending)
+        self.assertIn("Hitta min programmeringsfil", pending)
+        self.assertIn("03 VARFÖR DETTA STEG", pending)
+        self.assertIn("Samla befintligt innehåll", pending)
+        self.assertIn("Verktyget körs", pending)
+        p.ui.explain_result(True, "ev42", observation=True, effect=False)
+        result = "".join(f[1] for f in p._side_text())
+        self.assertIn("FAKTISKT RESULTAT", result)
+        self.assertIn("läste tillbaka underlag", result)
+        self.assertIn("ev42", result)
+        self.assertEqual(p._typing.text, "")
+
+    def test_action_evidence_is_only_shown_after_success(self):
+        p = self.build()
+        p.ui.explain_action("test goal", "Sparar fil", "Ändra innehållet",
+                            "Läs tillbaka filen")
+        p.ui.explain_result(False, "ev99", observation=False, effect=True)
+        rendered = "".join(f[1] for f in p._side_text())
+        self.assertNotIn("Bevis: ev99", rendered)
+        self.assertIn("Steget misslyckades", rendered)
+        p.ui.explain_action("test goal", "Sparar fil", "Ändra innehållet",
+                            "Läs tillbaka filen")
+        p.ui.explain_result(True, "ev100", observation=False, effect=True)
+        rendered = "".join(f[1] for f in p._side_text())
+        self.assertIn("kontroll behövs", rendered)
+        self.assertIn("ev100", rendered)
 
     def test_next_level_uses_real_evidence_not_clock(self):
         a = evidence_progress({"level": 10, "measured_events": 23,

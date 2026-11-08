@@ -4359,6 +4359,10 @@ class AgentRun:
                 self.messages.append({"role": "user", "content": "(the user added while you were working) " + self.inbox.pop(0)})
             model = self.pick_model()
             app.ui.status("Analyserar nästa steg utifrån hittade resultat" if self.ledger else "Tolkar uppgiften och väljer verktyg")
+            if not self.ledger and hasattr(app.ui, "explain_action"):
+                app.ui.explain_action(self.goal, "Analyserar din fråga",
+                    "Jag tar fram ett svar eller väljer ett verktyg utifrån uppgiften.",
+                    "Nästa steg blir ett svar eller ett registrerat verktygsanrop.")
             start_wait = time.monotonic()
             fragments = 0
             first_token_at: float | None = None
@@ -4493,6 +4497,34 @@ class AgentRun:
                "process_list": "kontrollerar om arbetet är klart",
                "dev_run_tests": "kontrollerar att ändringen fungerar",
                "browser_context": "kontrollerar aktuell webbsida"}.get(name, "")
+        if hasattr(app.ui, "explain_action"):
+            # State the OBSERVABLE purpose derived from tool metadata, not
+            # a fabricated private thought transcript. Never display raw tool
+            # arguments, which could contain secrets or selected user content.
+            purpose = {
+                "tool_search": "Hitta ett verktyg som kan utföra nästa del av din uppgift.",
+                "desktop_context": "Se vilket program och fönster som är relevant.",
+                "screen_observe": "Hämta aktuell UI-text som underlag innan ett beslut.",
+                "screen_describe": "Beskriva det synliga fönstret när UI-text inte räcker.",
+                "file_read": "Läsa befintligt innehåll innan ett svar eller en ändring.",
+                "file_write": "Spara en konkret ändring som behövs för uppgiften.",
+                "run_command": "Utföra ett lokalt kommando för nästa tekniska steg.",
+                "process_list": "Kontrollera processerna på datorn.",
+                "dev_run_tests": "Testa om den genomförda ändringen fungerar.",
+                "browser_context": "Hämta webbläsarens aktuella sammanhang.",
+            }.get(name, (
+                "Kontrollera effekten av ett tidigare steg."
+                if spec.observes and self.last_effect >= 0 else
+                "Genomföra ett arbetssteg med ett tillgängligt verktyg."
+                if spec.effect else
+                "Samla relevant underlag för nästa steg."))
+            expected = ("Läsa tillbaka resultatet och se om det stöder uppgiften."
+                        if spec.observes else
+                        "Åtgärden behöver följas av en separat kontroll."
+                        if spec.effect else
+                        "Kontrollera verktygets rapporterade resultat.")
+            app.ui.explain_action(self.goal, category + " [" + name + "]",
+                                  purpose, expected)
         app.ui.step(f"{C.c(C.B, phase)}  {category}"
                     + (C.c(C.DIM, '  · ' + why) if why else "")
                     + f"  {C.c(C.DIM, '[' + name + ']')}")
@@ -4501,6 +4533,9 @@ class AgentRun:
         res.evidence_id = f"ev{self.seq}"
         self.ledger.append({"id": res.evidence_id, "tool": name, "ok": res.ok, "seq": self.seq, "effect": spec.effect, "observes": spec.observes})
         app.ui.step_done(res.ok, "" if res.ok else res.error)
+        if hasattr(app.ui, "explain_result"):
+            app.ui.explain_result(res.ok, res.evidence_id, bool(spec.observes),
+                                  bool(spec.effect), str(res.category or ""))
         if res.ok:
             self.consec_fail = 0
             if sig in self.fail_count:
