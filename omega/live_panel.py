@@ -234,6 +234,16 @@ class LivePanel:
         self.action_result = ""
         self.action_evidence = ""
         self.action_started = 0.0
+        # Session-only real tool outcomes, NOT persisted learning evidence.
+        self._progress_outcomes: deque[bool] = deque(maxlen=14)
+        self._tool_successes = 0
+        self._tool_failures = 0
+        self._tool_streak = 0
+        self._best_tool_streak = 0
+        self._last_tool_success_at = 0.0
+        self._last_tool_event_at = 0.0
+        self._progress_phase = "IDLE"
+        self._last_tool_duration = 0.0
         self.show_thinking = True
         self.events: deque[str] = deque(maxlen=24)
         self._stream_text = ""
@@ -492,6 +502,36 @@ class LivePanel:
         add(f"Pixelkompis · {stage_name} · {stage+1}/5", "#ffffff")
         add(companion_personality(sprite_mode, level,
                                   self.trace[-1][1] if self.trace else None), "#ffcae6")
+        # No fake animation: progress derives solely from finished tool calls.
+        add("╭──── OMEGA · PROGRESS CORE ───╮", "#ff90c8")
+        pending = bool(self.trace and self.trace[-1][1] is None)
+        if pending:
+            core_state, core_style = "◉ VERKTYG ARBETAR", "bold #ff8fc5"
+        elif self._last_tool_event_at == 0:
+            core_state, core_style = "◎ VÄNTAR PÅ RESULTAT", "#cdb3c4"
+        elif self._progress_phase == "FAIL":
+            core_state, core_style = "✕ STEGET MISSLYCKADES", "#ff9ba6"
+        else:
+            core_state, core_style = "✓ STEGET LYCKADES", "#9bcfb1"
+        add("│ " + core_state, core_style)
+        recent = list(self._progress_outcomes)
+        if recent:
+            ratio = sum(recent) / len(recent)
+            filled = max(0, min(14, round(14 * ratio)))
+            add("│ UTFALL [" + "█" * filled + "░" * (14-filled) + "]", "#9bcfb1")
+            add("│ SENASTE " + "".join("●" if x else "×" for x in recent), "#ffb6dc")
+        else:
+            add("│ UTFALL [░░░░░░░░░░░░░░]", "#a795a6")
+            add("│ SENASTE · inga mätta steg", "#bca8bc")
+        add(f"│ VERKTYG ✓ {self._tool_successes}  ✕ {self._tool_failures}", "#ffffff")
+        add(f"│ SVIT {self._tool_streak}  REKORD {self._best_tool_streak}", "#ffcae6")
+        if self._last_tool_success_at:
+            age = max(0, int(stamp - self._last_tool_success_at))
+            add(f"│ SENAST LYCKAT {age}s sedan", "#d9b7cf")
+        else:
+            add("│ SENAST LYCKAT · ännu inget", "#d9b7cf")
+        add("╰── Bara riktiga verktygshändelser ─╯", "#ff90c8")
+        add("Verktygsutfall ≠ verifierad AI-level", "#a795a6")
 
         # Never re-read SQLite inside prompt_toolkit rendering.
         if stamp - self._level_checked_at >= 45:
@@ -634,6 +674,7 @@ class LivePanel:
         panel.tool = clean_line(text, 150)
         panel.phase = "Kör verktyg"
         panel.step_time = time.monotonic()
+        panel._progress_phase = "WORK"
         panel.trace.append((panel.tool, None, time.time()))
         panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.tool)
         panel._refresh()
@@ -645,6 +686,19 @@ class LivePanel:
             panel.trace.append((old[0], bool(ok), old[2]))
         panel.phase = ("Steg klart" if ok else "Steg misslyckades")
         duration = max(0.0, time.monotonic() - panel.step_time)
+        panel._last_tool_duration = duration
+        panel._last_tool_event_at = time.monotonic()
+        panel._progress_outcomes.append(bool(ok))
+        if ok:
+            panel._tool_successes += 1
+            panel._tool_streak += 1
+            panel._best_tool_streak = max(panel._best_tool_streak, panel._tool_streak)
+            panel._last_tool_success_at = panel._last_tool_event_at
+            panel._progress_phase = "SUCCESS"
+        else:
+            panel._tool_failures += 1
+            panel._tool_streak = 0
+            panel._progress_phase = "FAIL"
         panel.events.append(datetime.now().strftime("%H:%M:%S") +
             (f" · ✓ Klart efter {duration:.1f}s" if ok
              else f" · ✕ Misslyckades efter {duration:.1f}s"))
