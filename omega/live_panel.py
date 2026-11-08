@@ -536,7 +536,7 @@ class LivePanel:
             add("05  FAKTISKT RESULTAT", "bold #ff8fc5")
             detail(self.action_result or "Pågår / ännu inget resultat.", "#ffffff", max_lines=3)
             if self.action_evidence:
-                add("Bevis: " + self.action_evidence, "#9bcfb1")
+                add("Händelse-ID: " + self.action_evidence, "#9bcfb1")
             if self._last_tool_error:
                 add("SENASTE FEL:", "#ff9ba6")
                 detail(self._last_tool_error, "#ff9ba6", max_lines=2)
