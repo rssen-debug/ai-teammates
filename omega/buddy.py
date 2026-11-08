@@ -5527,6 +5527,7 @@ class Buddy:
         self.current_run: Optional[AgentRun] = None
         self.current_task: Optional[asyncio.Task] = None
         self.companion_task: Optional[asyncio.Task] = None
+        self.presence_task: Optional[asyncio.Task] = None
         self.ai_state: tuple[bool, str] = (False, "not checked")
         self.lock = InstanceLock()
         self.stop = StopSignal()
@@ -5923,12 +5924,17 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 results = await asyncio.to_thread(self.doctor.run, "desktop")
                 for item in results:
                     o(f"Screen check: {item['status']} {item['name']} — {item.get('detail', '')}")
+                if self.presence_task is None or self.presence_task.done():
+                    self.presence_task = asyncio.ensure_future(presence_heartbeat(self))
                 self.perms.audit("user", "activate_all_except_voice", "configuration", "enabled")
                 o("Activated available modules: Kilo Auto Free, Owner grants, screenshot upload, activity, autopilot worker and companion. Voice OFF.")
                 o("Screenshots can be sent to KiloCode; protected and private windows remain excluded. Sensitive actions still require approval.")
                 self.ui.header()
             elif sub == "off":
                 self.settings.set("auto_mode_on_start", False)
+                if self.presence_task is not None:
+                    self.presence_task.cancel()
+                    self.presence_task = None
                 self.stop_companion()
                 if self.companion.present()[0]:
                     self.companion.loop.enable(False)
@@ -6304,7 +6310,8 @@ async def main_async(app: Buddy) -> None:
     app.activity.start()
     app.start_companion()
     worker = asyncio.ensure_future(app.tasks.worker())
-    presence_task = asyncio.ensure_future(presence_heartbeat(app)) if auto_enabled else None
+    if auto_enabled and (app.presence_task is None or app.presence_task.done()):
+        app.presence_task = asyncio.ensure_future(presence_heartbeat(app))
     recovered = app.tasks.recover(stale_after=0)
     if recovered:
         app.ui.event(f"resuming {len(recovered)} interrupted task(s) from their last checkpoint")
@@ -6331,8 +6338,9 @@ async def main_async(app: Buddy) -> None:
         pass
     finally:
         worker.cancel()
-        if presence_task is not None:
-            presence_task.cancel()
+        if app.presence_task is not None:
+            app.presence_task.cancel()
+            app.presence_task = None
         await app.close()
         print(C.c(C.DIM, "\nBuddy stopped: no background work, microphone or tracking is running."))
 
