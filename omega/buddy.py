@@ -4299,13 +4299,142 @@ class AgentRun:
 # 9a. CLI USER INTERFACE
 # ════════════════════════════════════════════════════════════════════════════
 class C:
-    on = sys.stdout.isatty()
+    """ANSI colour, following the conventions that decide whether to use it.
+
+    Off when stdout is not a terminal, when NO_COLOR is set (the standard is
+    presence of the variable, not its value), or when TERM is dumb. FORCE_COLOR
+    and CLICOLOR_FORCE override the tty check, which is what makes `buddy | less -R`
+    and a CI log that captures a pty render properly instead of showing escapes.
+    """
+
+    @staticmethod
+    def _enabled() -> bool:
+        if os.environ.get("NO_COLOR") is not None:
+            return False
+        if os.environ.get("FORCE_COLOR") or os.environ.get("CLICOLOR_FORCE"):
+            return True
+        if str(os.environ.get("TERM", "")).lower() == "dumb":
+            return False
+        with contextlib.suppress(Exception):
+            return bool(sys.stdout.isatty())
+        return False
+
+    on = _enabled()
     R, DIM, B = "\033[0m", "\033[2m", "\033[1m"
-    G, Y, RED, CY, MG = "\033[32m", "\033[33m", "\033[31m", "\033[36m", "\033[35m"
+    G, Y, RED, CY, MG, BLU = "\033[32m", "\033[33m", "\033[31m", "\033[36m", "\033[35m", "\033[34m"
+    BG, BY, BR, BC = "\033[1;32m", "\033[1;33m", "\033[1;31m", "\033[1;36m"
 
     @classmethod
     def c(cls, code: str, s: str) -> str:
         return f"{code}{s}{cls.R}" if cls.on else s
+
+    @classmethod
+    def bold(cls, s: str) -> str: return cls.c(cls.B, s)
+
+    @classmethod
+    def dim(cls, s: str) -> str: return cls.c(cls.DIM, s)
+
+    @classmethod
+    def green(cls, s: str) -> str: return cls.c(cls.G, s)
+
+    @classmethod
+    def yellow(cls, s: str) -> str: return cls.c(cls.Y, s)
+
+    @classmethod
+    def red(cls, s: str) -> str: return cls.c(cls.RED, s)
+
+    @classmethod
+    def cyan(cls, s: str) -> str: return cls.c(cls.CY, s)
+
+
+class V:
+    """View helpers, so every command renders the same way.
+
+    One glyph vocabulary across the whole CLI: a filled dot means something is
+    live, an open dot means it is off or unavailable, and the colour carries the
+    verdict. Before this, each command invented its own markers and a reader had
+    to relearn what "●" meant four times.
+    """
+
+    WIDTH = 76
+
+    @staticmethod
+    def dot(state: str) -> str:
+        """state: ok | warn | fail | off | info"""
+        return {"ok": C.c(C.BG, "●"), "warn": C.c(C.BY, "●"), "fail": C.c(C.BR, "●"),
+                "off": C.c(C.DIM, "○"), "info": C.c(C.BC, "●")}.get(state, C.c(C.DIM, "○"))
+
+    @staticmethod
+    def kv(label: str, value: str, width: int = 13) -> str:
+        return f"  {label:<{width}} {value}"
+
+    @staticmethod
+    def rule(title: str = "", width: int = WIDTH) -> str:
+        """A section divider. With a title it becomes a labelled rule."""
+        if not title:
+            return C.dim("  " + "─" * max(0, width - 2))
+        head = "  ──"
+        rest = max(0, width - len(head) - len(title) - 3)
+        return C.dim(head) + C.bold(f" {title} ") + C.dim("─" * rest)
+
+    @staticmethod
+    def bar(frac: float, width: int = 52, state: str = "ok") -> str:
+        frac = 0.0 if frac is None else max(0.0, min(1.0, float(frac)))
+        filled = int(round(frac * width))
+        colour = {"ok": C.G, "warn": C.Y, "fail": C.RED, "info": C.CY}.get(state, C.G)
+        return C.c(colour, "█" * filled) + C.dim("·" * (width - filled))
+
+    @staticmethod
+    def table(rows: list[list[str]], headers: list[str] | None = None,
+              aligns: str = "", pad: int = 2, indent: int = 2) -> list[str]:
+        """Align columns on visible width, ignoring ANSI escapes.
+
+        len() counts escape bytes, so colouring a cell before measuring it pushes
+        every column to the right of it out of line. Stripping escapes for the
+        measurement is the only way coloured tables stay straight.
+        """
+        if not rows:
+            return []
+        cells = [[("" if c is None else str(c)) for c in r] for r in rows]
+        ncol = max(len(r) for r in cells)
+        for r in cells:
+            r += [""] * (ncol - len(r))
+        if headers:
+            cells.insert(0, [str(h) for h in headers])
+        widths = [max(len(_visible(r[i])) for r in cells) for i in range(ncol)]
+        out = []
+        for i, r in enumerate(cells):
+            parts = []
+            for j, cell in enumerate(r):
+                a = aligns[j] if j < len(aligns) else "<"
+                gap = widths[j] - len(_visible(cell))
+                parts.append((" " * gap + cell) if a == ">" else (cell + " " * gap))
+            line = " " * indent + (" " * pad).join(parts).rstrip()
+            out.append(line)
+            if headers and i == 0:
+                out.append(C.dim(" " * indent + (" " * pad).join("─" * w for w in widths)))
+        return out
+
+    @staticmethod
+    def note(text: str, indent: int = 2) -> str:
+        return C.dim(" " * indent + text)
+
+    @staticmethod
+    def fail(msg: str, hint: str = "", indent: int = 2) -> str:
+        head = " " * indent + V.dot("fail") + " " + C.red(msg)
+        return head + ("\n" + " " * indent + "  " + C.dim("→ " + hint) if hint else "")
+
+
+_ANSI_RE = re.compile(r"\033\[[0-9;]*m")
+
+
+def _visible(s: str) -> str:
+    """The string as it will actually appear, with escape sequences removed."""
+    return _ANSI_RE.sub("", s or "")
+
+
+def _vlen(s: str) -> int:
+    return len(_visible(s))
 
 
 class NullUI:
@@ -4398,12 +4527,24 @@ class CLI:
         ok_ai = a.ai_state
         scr = a.caps.get("desktop")
         screen = ("●", C.G, "Active") if scr == "working" else ("○", C.DIM, "Unavailable" if not IS_WIN else "Untested")
-        out = [C.c(C.B, "● STUDDY BUDDY") + C.c(C.DIM, f"  v{APP_VERSION}"), "",
-               f"AI         {C.c(C.G if ok_ai[0] else C.RED, '●')} KiloCode · {ok_ai[1]}",
-               f"Screen     {C.c(screen[1], screen[0])} {screen[2]}" + (C.c(C.DIM, "  · private mode") if a.privacy.private else ""),
-               f"Voice      {C.c(C.G, '● ON') if a.voice.running else C.c(C.DIM, '○ OFF')}  {C.c(C.DIM, a.voice.state_label() if a.voice.running else '')}",
-               f"Activity   {C.c(C.G, '● tracking') if a.activity.enabled else C.c(C.DIM, '○ off')}",
-               f"Autopilot  {C.c(C.G, '● Ready')} {C.c(C.DIM, str(len([t for t in a.tasks.list() if t['state'] in ('queued', 'running')])) + ' active')}", ""]
+        active = len([t for t in a.tasks.list() if t["state"] in ("queued", "running")])
+        comp_ok, _why = a.companion.present()
+        comp_on = bool(comp_ok and a.companion.loop.enabled)
+        trust_mode = a.companion.trust.mode if comp_ok else "normal"
+        out = [
+            V.dot("ok" if ok_ai[0] else "warn") + " " + C.bold("STUDDY BUDDY OMEGA") + C.dim(f"  v{APP_VERSION}"),
+            V.rule(),
+            V.kv("AI", f"{V.dot('ok' if ok_ai[0] else 'fail')} KiloCode · "
+                       + (ok_ai[1] if ok_ai[0] else C.yellow(ok_ai[1])), 11),
+            V.kv("Screen", f"{C.c(screen[1], screen[0])} {screen[2]}"
+                           + (C.dim("  · private mode") if a.privacy.private else ""), 11),
+            V.kv("Voice", (f"{V.dot('ok')} ON  " + C.dim(a.voice.state_label())) if a.voice.running
+                          else f"{V.dot('off')} OFF", 11),
+            V.kv("Activity", f"{V.dot('ok')} tracking" if a.activity.enabled else f"{V.dot('off')} off", 11),
+            V.kv("Autopilot", f"{V.dot('info')} ready  " + C.dim(f"{active} active"), 11),
+            V.kv("Companion", (f"{V.dot('ok')} loop on" if comp_on else f"{V.dot('off')} loop off")
+                              + C.dim(f"  · trust {trust_mode}"), 11),
+            ""]
         self._out("\n".join(out))
 
 
@@ -4876,13 +5017,24 @@ class Doctor:
 
 
 def print_report(items: list[dict]) -> int:
-    col = {"PASS": C.G, "FAIL": C.RED, "BLOCKED": C.Y, "NOT TESTED": C.DIM}
+    """Render a diagnostics report.
+
+    The line shape here is a contract, not decoration: omega/tests/run_all.py
+    parses `^\s*FAIL\s+(\S+)\s+(.+?)\s+—\s+(.*)$` to lift failing items into
+    its own summary. A leading status glyph would look nicer and silently cost the
+    full-suite report its failure details, so the status word stays first.
+    """
+    col = {"PASS": C.G, "FAIL": C.RED, "BLOCKED": C.Y, "NOT TESTED": C.DIM,
+           "NOT_TESTED": C.DIM, "SKIP": C.DIM}
     bad = 0
+    width = max((len(i["status"]) for i in items), default=10)
     for i in items:
-        print(f"  {C.c(col[i['status']], i['status'].ljust(10))} {i['name']}" + (f" — {i['detail']}" if i["detail"] else ""))
-        if i.get("fix") and i["status"] in ("FAIL", "BLOCKED"):
-            print(f"  {' ' * 10} {C.c(C.DIM, 'fix: ' + i['fix'])}")
-        bad += i["status"] == "FAIL"
+        st = i["status"]
+        print(f"  {C.c(col.get(st, C.DIM), st.ljust(width))}  {C.bold(i['name'])}"
+              + (C.dim(f" — {i['detail']}") if i.get("detail") else ""))
+        if i.get("fix") and st in ("FAIL", "BLOCKED"):
+            print(f"  {' ' * width}  {C.c(C.CY, '→ fix:')} {C.dim(i['fix'])}")
+        bad += st == "FAIL"
     return bad
 
 
@@ -6514,27 +6666,43 @@ def cmd_status(rest: list[str]) -> int:
         if as_json:
             print(jdump(st))
             return 0
-        dot = C.c(C.G, "●") if st["ai_key"] == "configured" else C.c(C.RED, "●")
-        print(C.c(C.B, f"\n{dot} {st['product']}") + C.c(C.DIM, f"  ·  {st['platform']} · python {st['python']}\n"))
-        print(f"  interactive session   {'running (another process holds the lock)' if running else 'not running'}")
-        print(f"  api key               {st['ai_key']}")
-        print(f"  home                  {st['home']}")
-        print(f"  voice                 {st['voice']}")
-        print(f"  private mode          {'ON' if st['private_mode'] else 'off'}   observation {'ON' if st['observation'] else 'off'}")
-        print(f"  tokens this process   prompt={st['usage'].get('prompt', 0)} completion={st['usage'].get('completion', 0)} calls={st['usage'].get('calls', 0)}")
-        print(f"  memory                {mem.get('total', 0)} records"
-              + (f" ({', '.join(f'{k}={v}' for k, v in sorted(mem.get('by_kind', {}).items()))})" if mem.get("by_kind") else ""))
-        print(f"  retrieval             {mem.get('searches', 0)} searches, {mem.get('hits', 0)} hits")
+        key_ok = st["ai_key"] == "configured"
+        print("\n" + V.dot("ok" if key_ok else "fail") + " " + C.bold(st["product"])
+              + C.dim(f"   {st['platform']} · python {st['python']}"))
+        print(V.rule("runtime"))
+        print(V.kv("session", C.green("running") + C.dim("  (another process holds the lock)") if running
+                   else C.dim("not running"), 20))
+        print(V.kv("api key", (C.green("configured") if key_ok else C.red(st["ai_key"])), 20))
+        print(V.kv("home", C.dim(st["home"]), 20))
+        print(V.kv("voice", st["voice"], 20))
+        pm = C.yellow("ON") if st["private_mode"] else C.dim("off")
+        ob = C.green("ON") if st["observation"] else C.dim("off")
+        print(f"  {'private mode':<20} {pm}    {'observation':<12} {ob}")
+        u = st["usage"]
+        print(V.kv("tokens", f"prompt={u.get('prompt', 0)}  completion={u.get('completion', 0)}  "
+                             f"calls={u.get('calls', 0)}", 20))
+        print(V.rule("memory"))
+        kinds = ", ".join(f"{k}={v}" for k, v in sorted(mem.get("by_kind", {}).items()))
+        print(V.kv("records", f"{mem.get('total', 0)}" + (C.dim(f"  ({kinds})") if kinds else ""), 20))
+        sr, ht = mem.get("searches", 0), mem.get("hits", 0)
+        rate = f"{ht / sr:.2f}" if sr else "n/a"
+        print(V.kv("retrieval", f"{sr} searches · {ht} hits · rate {rate}", 20))
+        print(V.rule("work"))
         if st["tasks"]:
-            print(f"  autopilot tasks       {st['tasks']}")
+            print(V.kv("tasks", ", ".join(f"{k}={v}" for k, v in sorted(st["tasks"].items())), 20))
+        else:
+            print(V.kv("tasks", C.dim("none"), 20))
         if st["runs"]:
-            print(f"  run outcomes          {st['runs']}")
+            print(V.kv("run outcomes", ", ".join(f"{k}={v}" for k, v in sorted(st["runs"].items())), 20))
         grants = st["grants"]
-        print(f"  standing grants       {grants if isinstance(grants, str) else ', '.join(f'{k}={v}' for k, v in grants.items()) or 'none'}")
+        print(V.kv("grants", grants if isinstance(grants, str)
+                   else (", ".join(f"{k}={v}" for k, v in sorted(grants.items())) or C.dim("none")), 20))
         mj = st["majin"]
-        print(f"  majin v6              {'connected' if mj.get('available') else 'unavailable'}"
-              + (f" — {mj.get('authorized')}/{mj.get('registered')} tools authorized, lanes={mj.get('grantedLanes')}"
-                 if mj.get("available") else f" — {clip(mj.get('reason', ''), 150)}"))
+        print(V.rule("subsystems"))
+        print(V.kv("majin v6", (V.dot("ok") + " connected" + C.dim(
+                        f"  {mj.get('authorized')}/{mj.get('registered')} tools authorized, "
+                        f"lanes={mj.get('grantedLanes')}")) if mj.get("available")
+                   else (V.dot("warn") + " unavailable" + C.dim(f"  {clip(mj.get('reason', ''), 120)}")), 20))
         # `measure_level` returns a LevelResult (or a dict explaining why it
         # could not measure). Both shapes must surface a level line — hiding it
         # because the payload happens to carry an axis breakdown would leave the
@@ -6809,17 +6977,21 @@ def cmd_trust(rest: list[str]) -> int:
 
         if action in ("status", "show"):
             st = trust.state()
-            mark = C.c(C.G, "● FULL") if st["mode"] == "full" else C.c(C.DIM, "○ normal")
-            print(f"  trust mode   {mark}")
-            print("  standing grants: " + (", ".join(f"{k}={v}" for k, v in sorted(st["grants"].items()))
-                                          or "none — everything asks"))
-            print("\n  always confirms, in every mode:")
+            full = st["mode"] == "full"
+            print()
+            print((V.dot("ok") if full else V.dot("off")) + " " + C.bold("TRUST")
+                  + C.dim("  ·  ") + (C.bold(C.green("FULL")) if full else "normal"))
+            print(V.rule("standing grants"))
+            print("  " + (", ".join(f"{k}={v}" for k, v in sorted(st["grants"].items()))
+                          or C.dim("none — everything asks")))
+            print(V.rule("always confirms, in every mode"))
             for i in range(0, len(st["always_confirms"]), 4):
                 print("    " + ", ".join(st["always_confirms"][i:i + 4]))
-            print("  redirected instead of refused (full trust): "
-                  + ", ".join(f"{k}→{v}" for k, v in sorted(st["redirects_when_full"].items())))
-            print(C.c(C.DIM, "\n  These reach other people or their money. Autonomy over your own"))
-            print(C.c(C.DIM, "  machine does not extend to them, and that is not a setting."))
+            print(V.rule("redirected instead of refused"))
+            print("  " + ", ".join(f"{C.cyan(k)}→{v}" for k, v in sorted(st["redirects_when_full"].items())))
+            print()
+            print(V.note("The list above reaches other people or their money. Autonomy over your"))
+            print(V.note("own machine does not extend to them, and that is not a setting."))
             return 0
 
         if action == "on":
@@ -6864,24 +7036,41 @@ def cmd_companion(rest: list[str]) -> int:
         args = rest[1:]
 
         if action in ("status", "show"):
-            st = comp.status()
-            lp = st
-            print(f"  loop        {'ON' if lp['enabled'] else 'off'}   ticks run: {lp['ticks']}")
-            print(f"  can think now  {'yes' if lp['can_reflect_now'] else 'no — ' + lp['why_not']}")
-            print(f"  idle        {lp['idle_seconds']:.0f}s (reflects at {lp['idle_threshold']:.0f}s)")
-            b = lp["budget"]
-            print(f"  budget      {b['spent_today']:,} / {b['max_tokens_per_day']:,} tokens today "
-                  f"({b['remaining_today']:,} left)")
-            o = lp["observation"]
-            ind = o["indicator"]
-            print(f"  observation depth={o['depth']}  {ind['label']}")
-            print(f"  backend     {'available' if o['backend_available'] else 'BLOCKED: ' + o['backend_note']}")
-            print(f"  exclusions  {len(o['exclusions'])} (banking, password managers, private browsing, …)")
-            print(f"  retention   {o['retention_days']} days · store_text_only={o['store_text_only']}")
+            lp = comp.status()
+            o, b, ind = lp["observation"], lp["budget"], lp["observation"]["indicator"]
+            print()
+            print(V.dot("ok" if lp["enabled"] else "off") + " " + C.bold("COMPANION")
+                  + C.dim(f"  ·  {'loop on' if lp['enabled'] else 'loop off'}  ·  {lp['ticks']} ticks run"))
+            print(V.rule("thinking"))
+            print(V.kv("can think now", (V.dot("ok") + " yes") if lp["can_reflect_now"]
+                       else (V.dot("warn") + " no — " + C.yellow(lp["why_not"])), 15))
+            print(V.kv("idle", f"{lp['idle_seconds']:.0f}s " + C.dim(f"(reflects at {lp['idle_threshold']:.0f}s)"), 15))
+            frac = (b["spent_today"] / b["max_tokens_per_day"]) if b["max_tokens_per_day"] else 0.0
+            print(V.kv("budget today", f"{b['spent_today']:,} / {b['max_tokens_per_day']:,} tokens "
+                                       + C.dim(f"({b['remaining_today']:,} left)"), 15))
+            print("  " + " " * 15 + " " + V.bar(frac, 40, "warn" if frac > 0.8 else "ok"))
+            print(V.rule("observation"))
+            print(V.kv("depth", o["depth"] + "   " + ind["label"], 15))
+            print(V.kv("backend", (V.dot("ok") + " available") if o["backend_available"]
+                       else (V.dot("fail") + " BLOCKED: " + C.dim(o["backend_note"])), 15))
+            print(V.kv("exclusions", f"{len(o['exclusions'])} "
+                       + C.dim("(banking, password managers, private browsing, your own additions)"), 15))
+            print(V.kv("retention", f"{o['retention_days']} days · "
+                       + ("text only, pixels never kept" if o["store_text_only"] else "frames kept"), 15))
+            print(V.rule("autonomy"))
+            tr = comp.trust.state()
+            print(V.kv("trust", (V.dot("ok") + " FULL") if tr["mode"] == "full"
+                       else (V.dot("off") + " normal"), 15))
+            print(V.kv("always asks", C.dim(f"{len(tr['always_confirms'])} third-party actions "
+                                            "(messages, payments, applications)"), 15))
             if o["depth"] in ("capture", "continuous") and not o["backend_available"]:
-                print(C.c(C.Y, "\n  capture is asked for but impossible here, so nothing is being watched."))
-            return 0 if (o["depth"] == "off" or o["backend_available"]
-                         or o["depth"] == "titles") else 1
+                print()
+                print(V.fail("capture is asked for but impossible here",
+                             "nothing is being watched — this is a capability gap, not a choice"))
+            if lp.get("errors"):
+                print()
+                print(V.fail(f"{len(lp['errors'])} loop error(s) recorded", lp["errors"][-1]))
+            return 0 if (o["depth"] in ("off", "titles") or o["backend_available"]) else 1
 
         if action in ("on", "off"):
             ok, msg = comp.loop.enable(action == "on")
@@ -7537,6 +7726,41 @@ The agent can also just use MAJIN, migration and its own level from inside a
 conversation — these commands exist so you can inspect and control it directly.
 """
 
+QUICK_START = """  start here
+    buddy                       just talk — first-run setup happens once, by itself
+    buddy key set               connect the AI; almost nothing works before this
+    buddy doctor                what works on this machine, and what to do about what does not
+    buddy companion status      the always-on layer: what it watches and what it may do
+"""
+
+
+def render_usage() -> str:
+    """Colour the help text.
+
+    USAGE itself stays plain on purpose: omega/tests/test_cli_contract.py parses
+    that string to prove every documented command is really dispatched and every
+    dispatched command is really documented. Colouring the source would break the
+    check that keeps the CLI honest, so the colour is applied on the way out.
+    """
+    out = ["", V.dot("ok") + " " + C.bold("STUDDY BUDDY OMEGA") + C.dim(f"  v{APP_VERSION}  ·  one agent, one command"),
+           "", QUICK_START.rstrip(), V.rule()]
+    for line in USAGE.splitlines():
+        if not line.strip():
+            continue
+        if line.strip().startswith("STUDDY BUDDY OMEGA"):
+            continue                                  # already rendered as the title
+        if not line.startswith(" ") and line.strip():
+            out.append("")
+            out.append(V.rule(line.strip()))
+        elif line.strip().startswith("buddy"):
+            body = line.strip()
+            out.append("  " + C.bold("buddy") + body[len("buddy"):])
+        else:
+            out.append(C.dim(line.rstrip()))
+    return "\n".join(out)
+
+
+
 
 def main(argv: Optional[list[str]] = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -7574,8 +7798,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             "key": cmd_key,
             "trust": cmd_trust,
             "companion": cmd_companion,
-            "help": lambda r: (print(USAGE), 0)[1],
-            "--help": lambda r: (print(USAGE), 0)[1],
+            "help": lambda r: (print(render_usage()), 0)[1],
+            "--help": lambda r: (print(render_usage()), 0)[1],
             "version": lambda r: (print(f"Studdy Buddy Omega {APP_VERSION}"), 0)[1],
         }
         fn = table.get(cmd)
@@ -7597,7 +7821,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("-h", "--help", action="store_true")
     a, extra = ap.parse_known_args(argv)
     if a.help or (argv and argv[0] in ("-h", "--help")):
-        print(USAGE)
+        print(render_usage())
         return 0
     if a.doctor:
         return cmd_doctor(extra)

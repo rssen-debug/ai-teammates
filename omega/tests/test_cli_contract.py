@@ -16,7 +16,12 @@ cannot be silenced by accident.
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -210,6 +215,57 @@ class TestBenchmarkAndAcceptanceRunnersExist(unittest.TestCase):
         e = next(a for a in partial.axes if a.key == "E")
         self.assertAlmostEqual(e.value or 0, 0.9, places=6,
                                msg="skipped tasks must not enter the denominator")
+
+
+class TestRendering(unittest.TestCase):
+    """Help text and colour are user-facing contracts, so they get tested too.
+
+    These run the real CLI as a subprocess. Importing buddy in-process would make
+    the colour decision untestable, because `C.on` is computed once at import from
+    the environment that happens to be there.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.home = tempfile.mkdtemp(prefix="omega-cli-render-")
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        shutil.rmtree(cls.home, ignore_errors=True)
+
+    def run_cli(self, args: list[str], env_extra: dict) -> tuple[int, str]:
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("NO_COLOR", "FORCE_COLOR", "CLICOLOR_FORCE", "TERM")}
+        env.update({"BUDDY_HOME": self.home, **env_extra})
+        p = subprocess.run([sys.executable, str(BUDDY), *args], capture_output=True,
+                           text=True, timeout=180, env=env, cwd=str(OMEGA.parent))
+        return p.returncode, p.stdout + p.stderr
+
+    def test_help_renders_every_documented_command(self) -> None:
+        rc, out = self.run_cli(["help"], {"NO_COLOR": "1"})
+        self.assertEqual(rc, 0, out[-400:])
+        missing = sorted(c for c in documented_commands() if f"buddy {c}" not in out)
+        self.assertEqual(missing, [], "help must surface every command USAGE documents")
+
+    def test_no_color_wins_over_force_color(self) -> None:
+        rc, out = self.run_cli(["help"], {"NO_COLOR": "1", "FORCE_COLOR": "1"})
+        self.assertEqual(rc, 0)
+        self.assertNotIn("\033[", out, "NO_COLOR must win: it is a user's explicit request")
+
+    def test_force_color_enables_escapes_without_a_tty(self) -> None:
+        rc, out = self.run_cli(["help"], {"FORCE_COLOR": "1", "TERM": "xterm-256color"})
+        self.assertEqual(rc, 0)
+        self.assertIn("\033[", out, "a pipe with FORCE_COLOR is how `buddy | less -R` works")
+
+    def test_a_dumb_terminal_gets_no_escapes(self) -> None:
+        rc, out = self.run_cli(["help"], {"TERM": "dumb"})
+        self.assertEqual(rc, 0)
+        self.assertNotIn("\033[", out, "TERM=dumb must not receive literal escape codes")
+
+    def test_a_plain_pipe_gets_no_escapes(self) -> None:
+        rc, out = self.run_cli(["status"], {})
+        self.assertEqual(rc, 0)
+        self.assertNotIn("\033[", out, "captured output is read by scripts, not eyes")
 
 
 if __name__ == "__main__":
