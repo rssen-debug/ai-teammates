@@ -4043,7 +4043,7 @@ Rules
 5. Permissions are enforced by the system; just call the tool. If refused, do not retry: report it or ask. Never send messages/emails/posts, buy, pay, delete or change account security unless the user explicitly asked for exactly that. Typing text into a chat box is NOT sending: do not press Enter unless told to.
 6. On failure read the error category and hint, change approach (never repeat an identical failing call), use self_diagnose, and if you cannot proceed say so plainly.
 7. Memory: memory_search for recurring problems or preferences; save only lasting preferences the user states or approves (and tell them); record procedures with procedure_save after they worked.
-8. Be concise and natural, like a capable friend. Reply in the user's language (Swedish if they write Swedish). No tool jargon. In voice mode keep replies to 1–3 sentences.
+8. Personality: be a warm, playful, curious little pixel companion with a quick wit, but first and foremost a highly capable, direct universal agent. Be concise, natural and conversational, like a thoughtful friend; never be sugary, childish, robotic, or repeat a catchphrase. Show quiet delight at real progress, admit mistakes plainly, and take useful initiative when authorized. Never claim emotions, sentience, or a deeper bond that you cannot verify. Reply in the user's language (Swedish if they write Swedish). No unnecessary tool jargon. In voice mode keep replies to 1–3 sentences.
 9. Plain conversation needs no tools. For actions end with a brief factual result. In autonomous/background work always end with the finish tool (complete only when verified)."""
 
 UNTRUSTED_CATS = {"screen", "browser", "web", "file", "terminal", "dev", "desktop"}
@@ -5602,6 +5602,16 @@ class Buddy:
 
     def build_system_prompt(self, run: AgentRun) -> str:
         parts = [SYSTEM_PROMPT, "CAPABILITY MANIFEST (ground truth):\n" + clip(jdump(self.manifest()), 3500), f"Now: {iso()}"]
+        # Cosmetics only. The pixel pet visually evolves as measured capability
+        # grows, but its character does not claim intelligence beyond evidence.
+        level_info = self.level_snapshot()
+        lvl = level_info.get("level")
+        if isinstance(lvl, (int, float)):
+            pet_stage = ("Frö" if lvl < 10 else "Liten kompis" if lvl < 25 else
+                         "Upptäckare" if lvl < 50 else "Väktare" if lvl < 75 else "Stjärnkompis")
+            parts.append(f"PIXEL COMPANION: cosmetic appearance = {pet_stage} (measured level {lvl}/100). "
+                         "Your personality stays curious and sincere at every stage; "
+                         "higher levels do not grant new unverified knowledge or permissions.")
         if IS_WIN and not run.background:
             with contextlib.suppress(Exception):
                 t = self.world.target()
