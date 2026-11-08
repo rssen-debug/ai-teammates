@@ -228,6 +228,19 @@ class LivePanel:
         self._side_cache: list = []
         self._side_cache_at = 0.0
         self._side_dirty = True
+        self._tetris: Any = None
+        self._tetris_task: asyncio.Task | None = None
+        self._build_state = "ej startad"
+        self._build_step = 0
+        self._build_error = ""
+        self._tetris_ai_state = "väntar"
+        self._tetris_ai_calls = 0
+        self._tetris_ai_moves = 0
+        self._tetris_ai_failed = 0
+        self._tetris_last_decision = ""
+        self._tetris_retry_after = 0.0
+        self._tetris_wait_started = 0.0
+        self._tetris_decision_task: asyncio.Task | None = None
         self.tool = "-"
         self.step_time = 0.0
         self.queue: asyncio.Queue[str] = asyncio.Queue()
@@ -243,7 +256,7 @@ class LivePanel:
         @keys.add("f2")
         def _toggle(_event: Any) -> None:
             self.toggle_thinking()
-        right = Frame(Window(content=self._status_control, wrap_lines=True),
+        right = Frame(Window(content=self._status_control, wrap_lines=False),
                       title=" OMEGA · LIVE ", width=Dimension.exact(39))
         visibility = Condition(lambda: shutil.get_terminal_size((120, 35)).columns >= 94)
         self._layout = Layout(
@@ -280,6 +293,7 @@ class LivePanel:
         self._loop = asyncio.get_running_loop()
         self.task = self._loop.create_task(self.application.run_async())
         self._companion_task = self._loop.create_task(self._companion_poll())
+        self._tetris_task = self._loop.create_task(self._tetris_loop())
 
     async def read_line(self) -> str:
         return await self.queue.get()
@@ -287,6 +301,10 @@ class LivePanel:
     def close(self) -> None:
         if self._companion_task is not None:
             self._companion_task.cancel()
+        if self._tetris_task is not None:
+            self._tetris_task.cancel()
+        if self._tetris_decision_task is not None:
+            self._tetris_decision_task.cancel()
         if self.application.is_running:
             self.application.exit()
 
@@ -357,6 +375,140 @@ class LivePanel:
         else:
             update()
 
+    async def _tetris_decide(self) -> None:
+        """Every placement is a REAL gateway decision, checked against legal moves.
+
+        This call uses the same configured provider, does not claim any learning,
+        and pauses instead of simulating AI moves when the API is unavailable.
+        """
+        game = self._tetris
+        if game is None or not game.awaiting_move:
+            return
+        try:
+            from pixel_tetris import WIDTH, HEIGHT
+            import json
+            choices = game.choices()
+            if not choices:
+                self._tetris_ai_state = "inga lagliga drag"
+                self._tetris_retry_after = time.monotonic() + 30
+                return
+            # Send real board and each legal landing to the language model.
+            # Candidate ids are identifiers, NOT pre-ranked recommendations.
+            prompt = json.dumps({
+                "board": ["".join("#" if cell else "." for cell in row) for row in game.board],
+                "piece": [list(point) for point in game.shape],
+                "width": WIDTH, "height": HEIGHT,
+                "legal_moves": [{"id": m["id"], "x": m["x"],
+                                 "cells": [list(pt) for pt in m["cells"]],
+                                 "landing": m["landing"]} for m in choices],
+            }, separators=(",", ":"))
+            self._tetris_ai_state = "AI väljer drag..."
+            self._tetris_wait_started = time.monotonic()
+            self._refresh()
+            model = self.app.router.resolve("chat")
+            self._tetris_ai_calls += 1
+            result = await self.app.gateway.chat(
+                model, [{"role": "system", "content":
+                    "You are the real Tetris player. Choose one legal move id based on "
+                    "board geometry and expected survival / completed lines. "
+                    "Return only JSON with an integer field named move. "
+                    "Never invent an id not in legal_moves."},
+                    {"role": "user", "content": prompt}],
+                max_tokens=60, timeout=35)
+            answer = (result.get("message") or {}).get("content") or ""
+            match = re.search(r'\{[^{}]*"move"\s*:\s*(\d+)[^{}]*\}', answer)
+            if not match:
+                raise ValueError("AI svarade utan giltigt JSON-drag")
+            chosen = int(match.group(1))
+            if not game.choose(chosen):
+                raise ValueError("AI föreslog ogiltigt drag")
+            self._tetris_ai_moves += 1
+            elapsed = time.monotonic() - self._tetris_wait_started
+            self._tetris_last_decision = f"Drag {chosen} · {elapsed:.1f}s · giltigt AI-drag"
+            self._tetris_ai_state = "pjäs faller"
+            self.events.append(datetime.now().strftime("%H:%M:%S") + " · AI Tetris: " + self._tetris_last_decision)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self._tetris_ai_failed += 1
+            self._tetris_ai_state = "AI PAUSAD · " + type(exc).__name__
+            self._tetris_last_decision = "Inget drag godkänt"
+            self._tetris_retry_after = time.monotonic() + min(120, 10 * self._tetris_ai_failed)
+            self.events.append(datetime.now().strftime("%H:%M:%S") + " · AI Tetris blockerad: " + type(exc).__name__)
+        finally:
+            self._refresh()
+
+    async def _tetris_loop(self) -> None:
+        try:
+            from pixel_tetris import PixelTetris
+            self._tetris = PixelTetris()
+        except Exception as exc:
+            self._build_error = "Tetris engine: " + type(exc).__name__
+            return
+        last_tasks_poll = 0.0
+        last_key_check = 0.0
+        has_key = False
+        while True:
+            try:
+                current = time.monotonic()
+                if current - last_tasks_poll > 5:
+                    last_tasks_poll = current
+                    if getattr(self.app, "tasks", None) is not None:
+                        await asyncio.to_thread(self._poll_build_state)
+                if current - last_key_check > 30:
+                    last_key_check = current
+                    # Windows credential vault lookups must never block input.
+                    has_key = await asyncio.to_thread(lambda: bool(self.app.gateway.key()))
+                if self._tetris.awaiting_move:
+                    # Owner chat takes priority; autonomous coding tasks may
+                    # continue concurrently with the independent Tetris model.
+                    busy = bool(self.app.current_run) or bool(self._typing.text.strip())
+                    if busy:
+                        self._tetris_ai_state = "pausad för användaren/uppgift"
+                    elif not has_key:
+                        self._tetris_ai_state = "BLOCKERAD · ingen AI-nyckel"
+                    elif (current >= self._tetris_retry_after and
+                          (self._tetris_decision_task is None or self._tetris_decision_task.done())):
+                        self._tetris_decision_task = asyncio.create_task(self._tetris_decide())
+                else:
+                    result = self._tetris.tick()
+                    if result in ("lock", "clear", "game_over"):
+                        self._tetris_ai_state = "nästa AI-beslut"
+                        self.events.append(datetime.now().strftime("%H:%M:%S") + " · Tetris " + result)
+                self._refresh()
+            except asyncio.CancelledError:
+                if self._tetris_decision_task:
+                    self._tetris_decision_task.cancel()
+                raise
+            except Exception as exc:
+                self._build_error = type(exc).__name__
+            await asyncio.sleep(1.2)
+
+    def _poll_build_state(self) -> None:
+        try:
+            tasks = self.app.tasks.list(30)
+            related = next((task for task in tasks
+                            if str(task.get("title") or "").startswith("Pixel Tetris BUILD")), None)
+            if related:
+                self._build_state = str(related.get("state") or "unknown")
+                self._build_step = int(related.get("step_idx") or 0)
+                self._build_error = clean_line(related.get("error") or "", 35)
+                if self._build_state == "done":
+                    # A completed task is NOT necessarily a verified game.
+                    import json
+                    try:
+                        record = json.loads(related.get("result") or "{}")
+                        if not record.get("verified", False):
+                            self._build_state = "klar · ej verifierad"
+                        else:
+                            self._build_state = "klar · agentverifierad"
+                    except (ValueError, TypeError):
+                        self._build_state = "klar · bevis saknas"
+            else:
+                self._build_state = "ej köad"
+        except Exception as exc:
+            self._build_error = "task status: " + type(exc).__name__
+
     async def _companion_poll(self) -> None:
         """Collect potentially blocking settings/Windows idle data outside UI rendering."""
         while True:
@@ -403,121 +555,104 @@ class LivePanel:
         self._side_dirty = False
         self._side_cache_at = stamp
         app = self.app
-        now = time.time()
-        lines: list[tuple[str, str]] = []
-        def add(text: str, style: str = "") -> None:
-            lines.append((style, clean_line(text, 55) + "\n"))
+        current = time.time()
+        lines: list = []
+        def add(value: str, style: str = "") -> None:
+            lines.append((style, clean_line(value, 34) + "\n"))
 
-        running = bool(app.current_run)
-        # Rendering must NEVER query SQLite, discover plugins or poll Win32.
-        # The dedicated companion poll above maintains these cached values.
+        running = bool(app.current_run) or bool(getattr(getattr(app, "tasks", None), "current", {}))
         comp = self._cached_companion
-        comp_enabled = self._cached_companion_enabled
-        observing = bool(comp_enabled and comp and comp.captures > 0
-                         and (now - comp.last_capture_at) < 90)
-        active = running or observing
-        mode = ("● ARBETAR" if running else "◉ OBSERVERAR" if observing
-                else "◌ VAKEN · INVÄNTAR CYKEL" if comp_enabled else "○ SOVER")
-        add(mode, "bold #ff72b6" if active else "#bca8bc")
-        sprite_mode = ("working" if running else "observing" if observing else
-                       "awake" if comp_enabled else "sleeping")
-        sprite_level = self._cached_level.get("level")
-        stage, stage_name = companion_stage(sprite_level)
-        for part in pixel_companion(sprite_mode, int(now // 2), sprite_level):
-            add(part, "#ff8fc5")
-        add(f"Pixelkompis · {stage_name} · form {stage + 1}/5", "#ffffff")
-        last_tool_ok = self.trace[-1][1] if self.trace else None
-        add(companion_personality(sprite_mode, sprite_level, last_tool_ok), "#ffcae6")
-        if sprite_level is None:
-            add("Växer först när level mäts.", "#d4b7c9")
-        add("AI  kilo-auto/free  ·  VOICE OFF", "#ffffff")
-        if running and app.current_run:
-            elapsed = max(0, int(now - float(app.current_run.t0)))
-            add(f"Väntat på AI: {elapsed // 60:02d}:{elapsed % 60:02d}", "#ffffff")
-        add("──────────────────────────────────", "#744061")
-        lines.append(("bold #ff90c8", "TÄNKER · klicka här / F2\n", self._side_click))
-        if self.show_thinking:
-            add("LIVE ARBETSSPÅR · " + str(len(self.events)), "#ffffff")
-            for detail in list(self.events)[-9:]:
-                add(" " + detail, "#ffe0f1")
-            if not self.events:
-                add(" Inga arbetssteg ännu", "#bca8bc")
-        add("STEG: " + self.phase, "bold #ffe0f1")
-        add("VERKTYG: " + self.tool, "#fbc4df")
-        add("──────────────────────────────────", "#744061")
-        add("COMPANION: " + ("LIVE" if comp_enabled else "OFF"), "#ff72b6")
-        if comp_enabled and comp:
-            opts = self._cached_companion_options
-            add("Nästa Companion-tick: " + remaining_seconds(
-                comp.last_tick_at, float(opts.get("tick_seconds", 30)), now))
-            capture_after = float(opts.get("capture_seconds", 30))
-            next_capture = remaining_seconds(comp.last_capture_at, capture_after, now)
-            if comp.last_capture_at == 0:
-                next_capture = "första körning ej klar"
-            add("Nästa skärmkoll: " + next_capture)
-            idle = max(0, float(self._cached_idle_seconds))
-            threshold = float(opts.get("idle_seconds", 180))
-            add("Reflektion vid vila: " + f"{max(0, int(threshold-idle))} s")
-            add("Lyckade skärmkoller: " + str(comp.captures))
-            add("Senaste: " + clean_line(comp.last_capture_note, 37))
-            add("Cykler: " + str(comp.ticks))
-        else:
-            add("Nästa skärmkoll: --:--")
-            add("Reflektion: pausad")
-        add("──────────────────────────────────", "#744061")
-        add("AKTIVITET · VERKLIGA VERKTYG", "bold #ff90c8")
-        if self.trace:
-            for label, ok, _at in list(self.trace)[-7:]:
-                mark = "✓" if ok is True else ("✕" if ok is False else "›")
-                add(" " + mark + " " + clean_line(label, 37), "#ffffff" if ok is True else "#ffb3bc")
-        else:
-            add(" Inga verktyg körda ännu.", "#bca8bc")
-        add("──────────────────────────────────", "#744061")
-        # Evidence level can query the whole task/tool/memory history. Cache it.
-        if time.monotonic() - self._level_checked_at >= 45:
-            self._level_checked_at = time.monotonic()
+        enabled = self._cached_companion_enabled
+        observing = bool(enabled and comp and comp.captures > 0 and
+                         current - comp.last_capture_at < 90)
+        mode = ("ARBETAR" if running else "OBSERVERAR" if observing
+                else "VAKEN · VÄNTAR" if enabled else "SOVER")
+        add("● " + mode, "bold #ff72b6" if running or observing else "#ffffff")
+        sprite_mode = ("working" if running else "observing" if observing
+                       else "awake" if enabled else "sleeping")
+        level = self._cached_level.get("level")
+        stage, stage_name = companion_stage(level)
+        for frame in pixel_companion(sprite_mode, int(current // 2), level):
+            add(frame, "#ff8fc5")
+        add(f"Pixelkompis · {stage_name} · {stage+1}/5", "#ffffff")
+        add(companion_personality(sprite_mode, level,
+                                  self.trace[-1][1] if self.trace else None), "#ffcae6")
+
+        # Never re-read SQLite inside prompt_toolkit rendering.
+        if stamp - self._level_checked_at >= 45:
+            self._level_checked_at = stamp
             try:
                 loop = asyncio.get_running_loop()
                 if self._level_task is None or self._level_task.done():
                     self._level_task = loop.create_task(self._refresh_level())
             except RuntimeError:
-                pass  # unit tests and headless status do not trigger expensive queries
-        lvl = self._cached_level.get("level")
-        if isinstance(lvl, (float, int)):
-            current = int(lvl)
-            if self._last_level is None:
-                self._last_level = current
-            elif current != self._last_level:
-                self._last_level_change = now
-                self._last_level = current
-            pink = min(20, max(0, round(current / 5)))
-            add("AI LEVEL: " + str(current) + "/100", "bold #ffffff")
-            add("●" * pink + "○" * (20 - pink), "#ff76b7")
-            if self._last_level_change:
-                add("Senaste nivåbyte: " + datetime.fromtimestamp(
-                    self._last_level_change).strftime("%H:%M:%S"), "#ffffff")
+                pass
+        if isinstance(level, (int, float)):
+            value = max(0, min(100, int(level)))
+            add("AI LEVEL: " + str(value) + "/100", "bold #ffffff")
+            add("●" * round(value/5) + "○" * (20 - round(value/5)), "#ff76b7")
             progress = evidence_progress(self._cached_level)
-            if progress.get("measured"):
-                if progress.get("complete"):
-                    add("Maxnivå nådd.", "#ffffff")
-                elif progress.get("quality_limited"):
-                    add("Nästa LVL: " + str(progress["target"]), "bold #ffffff")
-                    add("Hinder: förbättra verifierade", "#ffd0e6")
-                    add("resultat (inte bara fler körningar)", "#ffd0e6")
+            if progress.get("complete"):
+                add("MAX LEVEL · verifierad", "#ffffff")
+            elif progress.get("measured"):
+                add("Nästa LVL " + str(progress["target"]), "#ffffff")
+                if progress.get("quality_limited"):
+                    add("Kräver bättre resultat", "#ffd0e6")
                 else:
-                    add("Nästa LVL: " + str(progress["target"]), "bold #ffffff")
-                    fill = max(0, min(20, round(progress["fraction"] * 20)))
-                    add("[" + "█" * fill + "░" * (20-fill) + "]", "#ff8ec6")
-                    add(f"Evidens: {progress['events']}/{progress['required']} · saknas {progress['remaining']}", "#ffffff")
+                    add("Evidens " + str(progress["events"]) + "/" +
+                        str(progress["required"]) + " · -" + str(progress["remaining"]), "#ffffff")
             else:
-                add("Nästa level: saknar mätdata", "#ffffff")
-            add("Tid till level: okänd (ej tidstyrt)", "#d4b7c9")
+                add("Nivåunderlag saknas", "#ffffff")
         else:
-            add("AI LEVEL: ej uppmätt", "#bca8bc")
-        add("Nivån bygger på verifierad evidens.", "#bdafba")
-        add("──────────────────────────────────", "#744061")
-        add("Arbetsstatus, inte intern tankekedja.", "#d4b7c9")
-        add("Skriv /presence för 20-minutersrapport.", "#d4b7c9")
+            add("AI LEVEL: väntar på mätning", "#ffffff")
+
+        add("── PIXEL TETRIS · LIVE ──", "#ff90c8")
+        if self._tetris is not None:
+            for tetris_row in self._tetris.display():
+                add(" " + tetris_row, "#ff9bd0")
+            add(f"Poäng {self._tetris.score} · rader {self._tetris.lines} · pjäser {self._tetris.pieces}", "#ffffff")
+        else:
+            add("Spelmotor ej startad", "#bca8bc")
+        add("SPELARE: Kilo AI · " + self._tetris_ai_state, "#ff8fc5")
+        add(f"AI-drag {self._tetris_ai_moves} / anrop {self._tetris_ai_calls}", "#ffffff")
+        if self._tetris_last_decision:
+            add(self._tetris_last_decision, "#d4b7c9")
+        if self._tetris_ai_failed:
+            add("AI-fel: " + str(self._tetris_ai_failed), "#ff9ba6")
+        add("AI BYGGER: " + self._build_state, "#ff8fc5")
+        if self._build_step:
+            add("Agentsteg: " + str(self._build_step), "#ffffff")
+        if self._build_error:
+            add("Blockerad: " + self._build_error, "#ff9ba6")
+        add("Spelpoäng ≠ AI level", "#bca8bc")
+
+        add("── COMPANION ──", "#ff90c8")
+        add("COMPANION: " + ("LIVE" if enabled else "OFF"), "#ffffff")
+        if enabled and comp:
+            options = self._cached_companion_options
+            add("Nästa tick: " + remaining_seconds(comp.last_tick_at,
+                float(options.get("tick_seconds", 30)), current), "#ffffff")
+            add("Skärm: " + str(comp.captures) + " lyckade", "#ffffff")
+            add("Senaste: " + clean_line(comp.last_capture_note, 25), "#d4b7c9")
+        else:
+            add("Inga observationer aktiva", "#d4b7c9")
+
+        lines.append(("bold #ff90c8", "TÄNKER · klicka här / F2\n", self._side_click))
+        add("STEG: " + self.phase, "#ffe0f1")
+        if running and app.current_run:
+            duration = int(max(0, current - float(app.current_run.t0)))
+            add("AI-anrop/uppgift: " + str(duration) + "s", "#ffffff")
+        if self.show_thinking:
+            for event in list(self.events)[-4:]:
+                add(" " + event, "#ffe0f1")
+        add("AKTIVITET · VERKTYG", "bold #ff90c8")
+        if self.trace:
+            for label, ok, _when in list(self.trace)[-4:]:
+                icon = "✓" if ok is True else "✕" if ok is False else "›"
+                add(" " + icon + " " + clean_line(label, 30), "#ffffff")
+        else:
+            add(" Inga verktyg körda", "#bca8bc")
+        add("Arbetslogg · inga dolda tankar", "#d4b7c9")
         self._side_cache = lines
         return lines
 

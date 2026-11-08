@@ -6522,6 +6522,34 @@ async def main_async(app: Buddy) -> None:
         app.ui.event(f"cleared a stop request left at {iso(detail.get('requested_at')) if detail.get('requested_at') else 'an earlier run'}")
     app.activity.start()
     app.start_companion()
+    # The owner requested a REAL agent-built Tetris project in the workspace.
+    # Queue exactly one tool-driven coding job when saved autonomous owner consent
+    # is active. The separate pixel game in the sidebar is a deterministic
+    # simulation and never contributes AI LEVEL evidence by itself.
+    if auto_enabled and app.gateway.key():
+        try:
+            existing = app.store.one(
+                "SELECT id FROM tasks WHERE title LIKE 'Pixel Tetris BUILD%' LIMIT 1")
+            if not existing:
+                goal = (
+                    "Build a real playable pixel-art Tetris game for the owner in "
+                    + str(DIRS["workspace"] / "pixel-tetris")
+                    + ". Use the real file_write / dev tool interfaces to write "
+                      "the source (a self-contained index.html with JS and CSS is fine). "
+                      "Implement seven tetrominoes, falling gravity, movement, rotation, "
+                      "line clearing, game over and restart. Do not claim a feature works "
+                      "unless you have actually executed checks verifying it. Create "
+                      "automated tests for the piece and line-clearing rules and run them. "
+                      "Use tool_search to discover tools, run tests, inspect their outputs, "
+                      "fix failures and only then finish with verified evidence. "
+                      "Report blockers truthfully. Work only inside this project folder. "
+                      "Do not alter Buddy core, send messages, or install software."
+                )
+                tid = app.tasks.create("Pixel Tetris BUILD · source + tests",
+                                       {"kind": "agent", "goal": goal})
+                app.ui.event("Pixel Tetris coding job queued: " + tid)
+        except Exception as exc:
+            app.ui.event("Pixel Tetris job not queued: " + type(exc).__name__)
     worker = asyncio.ensure_future(app.tasks.worker())
     if auto_enabled and (app.presence_task is None or app.presence_task.done()):
         app.presence_task = asyncio.ensure_future(presence_heartbeat(app))
