@@ -398,6 +398,17 @@ class LivePanel:
                 self._build_state = str(related.get("state") or "unknown")
                 self._build_step = int(related.get("step_idx") or 0)
                 self._build_error = clean_line(related.get("error") or "", 35)
+                if self._build_state == "done":
+                    # A completed task is NOT necessarily a verified game.
+                    import json
+                    try:
+                        record = json.loads(related.get("result") or "{}")
+                        if not record.get("verified", False):
+                            self._build_state = "klar · ej verifierad"
+                        else:
+                            self._build_state = "klar · agentverifierad"
+                    except (ValueError, TypeError):
+                        self._build_state = "klar · bevis saknas"
             else:
                 self._build_state = "ej köad"
         except Exception as exc:
@@ -481,7 +492,7 @@ class LivePanel:
         if self._tetris is not None:
             for row in self._tetris.display():
                 add(" " + row, "#ff9bd0")
-            add(f"SPel: {self._tetris.score}p · {self._tetris.lines} rader", "#ffffff")
+            add(f"Spel: {self._tetris.score}p · {self._tetris.lines} rader", "#ffffff")
             add(f"Riktiga lås: {self._tetris.pieces}", "#ffffff")
         else:
             add("Spelmotor ej startad", "#bca8bc")
