@@ -81,17 +81,23 @@ def evidence_progress(snapshot: dict) -> dict:
 
 
 def pixel_companion(mode: str, frame: int = 0) -> tuple[str, ...]:
-    """Tiny cute ASCII sprite; expression follows observed state, not invented sentience."""
-    face = {
-        "working": "( >ᴗ< )",
-        "observing": "( o.o )",
-        "awake": "( ^ᴗ^ )",
-        "sleeping": "( -.- )",
-    }.get(mode, "( •.• )")
-    ears = r"  /\_/\\"
-    feet = r"  /     \\"
-    tail = "  ᘛ  ♡" if frame % 2 == 0 else "  ♡  ᘛ"
-    return (ears, " " + face, feet, tail)
+    """Cute 7-line terminal pixel pet; expressions match real agent activity."""
+    eyes, mouth = {
+        "working": ("◕ ◕", "ᴗ"),
+        "observing": ("● ●", "ᵕ"),
+        "awake": ("• •", "ω"),
+        "sleeping": ("─ ─", "﹏"),
+    }.get(mode, ("• •", "ᴗ"))
+    heart = "♡" if frame % 2 else "♥"
+    return (
+        "     ▄███▄     ",
+        "   ▄███████▄   ",
+        "   █  " + eyes + "  █   ",
+        "   █   " + mouth + "   █   ",
+        "   ▀█  " + heart + "  █▀   ",
+        "     ▀███▀     ",
+        "      ▀ ▀      ",
+    )
 
 
 class LivePanel:
