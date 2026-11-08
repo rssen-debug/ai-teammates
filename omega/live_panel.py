@@ -153,9 +153,12 @@ class LivePanel:
                 comp = app.companion.loop
         except Exception:
             pass
-        sleeping = not running and not (comp and comp.enabled)
-        mode = "● ARBETAR" if running else ("◉ OBSERVERAR" if comp and comp.enabled else "○ SOVER")
-        add(mode, "bold #46f184" if not sleeping else "#899c91")
+        observing = bool(comp and comp.enabled and comp.captures > 0
+                         and (now - comp.last_capture_at) < 90)
+        active = running or observing
+        mode = ("● ARBETAR" if running else "◉ OBSERVERAR" if observing
+                else "◌ VAKEN · INVÄNTAR CYKEL" if comp and comp.enabled else "○ SOVER")
+        add(mode, "bold #46f184" if active else "#899c91")
         add("AI  kilo-auto/free  ·  VOICE OFF", "#b8f3c7")
         add("──────────────────────────────────", "#1f5438")
         add("STEG: " + self.phase, "bold #a1ffbe")
@@ -164,6 +167,8 @@ class LivePanel:
         add("COMPANION: " + ("LIVE" if comp and comp.enabled else "OFF"), "#41e888")
         if comp and comp.enabled:
             opts = comp.options()
+            add("Nästa Companion-tick: " + remaining_seconds(
+                comp.last_tick_at, float(opts.get("tick_seconds", 30)), now))
             capture_after = float(opts.get("capture_seconds", 30))
             next_capture = remaining_seconds(comp.last_capture_at, capture_after, now)
             if comp.last_capture_at == 0:
@@ -197,7 +202,8 @@ class LivePanel:
             add("AI LEVEL: ej uppmätt", "#899c91")
         add("Nivån bygger på verifierad evidens.", "#7d9a86")
         add("──────────────────────────────────", "#1f5438")
-        add("Panelen visar inte privata AI-tankar.", "#8aab94")
+        add("Arbetsstatus, inte intern tankekedja.", "#8aab94")
+        add("Skriv /presence för 20-minutersrapport.", "#8aab94")
         return lines
 
     # Below methods become overrides on an actual CLI subclass.
