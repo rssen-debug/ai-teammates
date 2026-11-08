@@ -10,7 +10,7 @@ from types import SimpleNamespace
 OMEGA = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(OMEGA))
 
-from live_panel import LivePanel, remaining_seconds, clean_line, evidence_progress, pixel_companion, companion_stage, companion_personality
+from live_panel import LivePanel, remaining_seconds, clean_line, evidence_progress, pixel_companion, companion_stage, companion_personality, measured_axis_rows, evidence_focus
 
 
 class FakeCLI:
@@ -112,6 +112,83 @@ class PanelTest(unittest.TestCase):
         self.assertIn("STEGET MISSLYCKADES", failed)
         self.assertIn("UTFALL", failed)
 
+    def test_evolution_skill_map_uses_only_completed_real_tool_calls(self):
+        p = self.build()
+        first = "".join(fragment[1] for fragment in p._side_text())
+        self.assertIn("EVOLUTION · SKILL MAP", first)
+        self.assertEqual(p._skill_checks["FILER"], [0, 0])
+        for _ in range(4):
+            p._refresh()
+            p._side_text()
+        self.assertEqual(p._skill_checks["FILER"], [0, 0])
+        p.ui.step("Läser lokal fil")
+        self.assertEqual(p._skill_checks["FILER"], [0, 0])
+        p.ui.step_done(True)
+        self.assertEqual(p._skill_checks["FILER"], [1, 0])
+        p.ui.step("Läser lokal fil")
+        p.ui.step_done(False, "permission denied")
+        self.assertEqual(p._skill_checks["FILER"], [1, 1])
+        rendered = "".join(fragment[1] for fragment in p._side_text())
+        self.assertIn("SENASTE HÄNDELSER", rendered)
+        self.assertIn("FILER", rendered)
+        self.assertEqual(p._cached_level.get("level"), None)
+
+    def test_evolution_chat_does_not_masquerade_as_skill_progress(self):
+        p = self.build()
+        run = SimpleNamespace(ledger=[])
+        p.ui.summary(run, SimpleNamespace(status="answered", verified=True))
+        self.assertEqual(sum(sum(x) for x in p._skill_checks.values()), 0)
+        self.assertEqual(p._verified_work, 0)
+        self.assertEqual(len(p._evolution_timeline), 1)
+        self.assertIn("AI-svar levererat", p._evolution_timeline[0][1])
+
+    def test_six_axis_evidence_is_grounded_in_persisted_metrics(self):
+        p = self.build()
+        p._cached_level = {
+            "level": 16,
+            "axes": [
+                {"axis": "A", "value": .9, "measured": True},
+                {"axis": "B", "value": None, "measured": False},
+                {"axis": "C", "value": .25, "measured": True},
+                {"axis": "E", "value": .6, "measured": True},
+            ],
+        }
+        rendered = "".join(part[1] for part in p._side_text())
+        self.assertIn("KAPACITET", rendered)
+        self.assertIn("FOKUS: VERKTYG", rendered)
+        self.assertIn("INGET UNDERLAG", rendered)
+        self.assertEqual(p._cached_level["level"], 16)
+
+    def test_measured_axes_reject_invalid_and_unmeasured_values(self):
+        rows = measured_axis_rows({"axes": [
+            {"axis": "A", "value": 1.1},
+            {"axis": "B", "value": .5, "measured": False},
+            {"axis": "C", "value": .3, "measured": True},
+            {"axis": "D", "value": True},
+        ]})
+        self.assertEqual(rows[0][2], None)
+        self.assertEqual(rows[1][2], None)
+        self.assertEqual(rows[2][2], .3)
+        self.assertEqual(rows[3][2], None)
+        self.assertTrue(all(value is None for _, _, value in measured_axis_rows({})))
+        self.assertTrue(all(value is None for _, _, value in measured_axis_rows({"axes": "bad"})))
+
+    def test_recommended_next_test_is_not_fake_learning(self):
+        p = self.build()
+        p._cached_level = {
+            "level": 16, "measured_events": 39,
+            "evidence_full": 250, "raw_level": 45,
+            "axes": [{"axis": "A", "value": .9, "measured": True},
+                     {"axis": "E", "value": .2, "measured": True}],
+        }
+        original = dict(p._cached_level)
+        shown = "".join(part[1] for part in p._side_text())
+        self.assertIn("NÄSTA TEST: Kör reproducerbara benchmark", shown)
+        self.assertIn("Mot nästa nivå", shown)
+        self.assertEqual(p._cached_level, original)
+        self.assertEqual(p._tool_successes, 0)
+        self.assertIsNone(evidence_focus({"axes": []}))
+
     def test_progress_does_not_change_ai_level_or_evidence(self):
         p = self.build()
         p._cached_level = {"level": 16}
@@ -155,6 +232,23 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(p._tool_successes, 0)
         shown = "".join(fragment[1] for fragment in p._side_text())
         self.assertIn("VERIFIERAD UPPGIFT", shown)
+
+    def test_failed_ledger_cannot_inflate_verified_work(self):
+        p = self.build()
+        run = SimpleNamespace(ledger=[{"ok": False}])
+        result = SimpleNamespace(status="complete", verified=True)
+        p.ui.summary(run, result)
+        self.assertEqual(p._verified_work, 0)
+        self.assertEqual(p._unverified_work, 1)
+        self.assertEqual(p._answers_delivered, 1)
+
+    def test_failed_runs_are_not_successful_answers(self):
+        p = self.build()
+        run = SimpleNamespace(ledger=[{"ok": False}])
+        result = SimpleNamespace(status="failed", verified=False)
+        p.ui.summary(run, result)
+        self.assertEqual(p._answers_delivered, 0)
+        self.assertEqual(p._unverified_work, 1)
 
     def test_unverified_work_cannot_increase_verified_counter(self):
         p = self.build()

@@ -9,6 +9,7 @@ only for an interactive terminal.
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 import os
 import sys
 from pathlib import Path
@@ -20,6 +21,8 @@ import threading
 import time
 import textwrap
 from typing import Any
+
+from genesis_telemetry import ExperienceLedger
 
 from prompt_toolkit import Application
 from prompt_toolkit.key_binding import KeyBindings
@@ -192,6 +195,69 @@ def pixel_companion(mode: str, frame: int = 0,
     )
 
 
+SKILL_LABELS = (
+    ("FILER", ("file", "fil", "folder", "mapp", "path", "directory", "read", "write")),
+    ("WEBB", ("browser", "chrome", "web", "url", "dom", "page", "sida")),
+    ("KOD", ("python", "script", "code", "git", "repo", "test", "kod")),
+    ("WINDOWS", ("window", "uia", "desktop", "powershell", "process", "fönster")),
+)
+
+def observed_skill(tool_label: str) -> str:
+    """Visible, best-effort category; never learning evidence."""
+    label = clean_line(tool_label, 150).casefold()
+    for name, keywords in SKILL_LABELS:
+        if any(word in label for word in keywords):
+            return name
+    return "ÖVRIGT"
+
+
+LEVEL_AXES = (
+    ("A", "UPPGIFTER"),
+    ("B", "ÅTERHÄMTNING"),
+    ("C", "VERKTYG"),
+    ("D", "MINNE"),
+    ("E", "BENCHMARK"),
+    ("F", "REGRESSION"),
+)
+
+def measured_axis_rows(snapshot: dict) -> list[tuple[str, str, float | None]]:
+    """Show only real persisted axis metrics; missing axes are unknown."""
+    if not isinstance(snapshot, dict):
+        return []
+    raw = snapshot.get("axes", [])
+    if not isinstance(raw, list):
+        return []
+    values = {}
+    for entry in raw:
+        if not isinstance(entry, dict) or entry.get("axis") not in dict(LEVEL_AXES):
+            continue
+        value = entry.get("value")
+        if entry.get("measured") is False or value is None or isinstance(value, bool):
+            values[entry["axis"]] = None
+        elif isinstance(value, (int, float)) and 0 <= value <= 1:
+            values[entry["axis"]] = float(value)
+    return [(key, name, values.get(key)) for key, name in LEVEL_AXES]
+
+
+AXIS_NEXT_ACTION = {
+    "UPPGIFTER": "Testa en uppgift med kontroll",
+    "ÅTERHÄMTNING": "Testa säker felåterhämtning",
+    "VERKTYG": "Verifiera fler olika verktyg",
+    "MINNE": "Testa minnessökning + återbruk",
+    "BENCHMARK": "Kör reproducerbara benchmark",
+    "REGRESSION": "Kör hela regressionstestsviten",
+}
+
+def evidence_focus(snapshot: dict) -> tuple[str, str] | None:
+    """Pick lowest *measured* quality axis, never an unobserved guess."""
+    known = [(name, val) for _, name, val in measured_axis_rows(snapshot)
+             if val is not None]
+    if not known:
+        return None
+    name, value = min(known, key=lambda item: item[1])
+    return name, AXIS_NEXT_ACTION[name]
+
+
 class LivePanel:
     """Factory-backed UI: uses the existing CLI contract, not a second agent."""
 
@@ -252,6 +318,19 @@ class LivePanel:
         self._last_answer_at = 0.0
         self._run_state = "VÄNTAR"
         self._run_state_detail = ""
+        # Session observations, not claimed model intelligence or persistent levels.
+        self._skill_checks = {name: [0, 0] for name in ("FILER", "WEBB", "KOD", "WINDOWS", "ÖVRIGT")}
+        self._evolution_timeline: deque[tuple[str, str]] = deque(maxlen=6)
+        self._current_skill = "ÖVRIGT"
+        # Persistent, category-only historical statistics; no content stored.
+        self._experience = None
+        self._experience_snapshot = {}
+        try:
+            self._experience = ExperienceLedger()
+            self._experience_snapshot = self._experience.snapshot()
+        except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError):
+            # A restricted/missing data directory must not break the UI.
+            pass
         self.show_thinking = True
         self.events: deque[str] = deque(maxlen=24)
         self._stream_text = ""
@@ -544,6 +623,36 @@ class LivePanel:
             add("│ SENAST LYCKAT · ännu inget", "#d9b7cf")
         add("╰── Bara riktiga verktygshändelser ─╯", "#ff90c8")
         add("Verktygsutfall ≠ verifierad AI-level", "#a795a6")
+        add("╭──── EVOLUTION · SKILL MAP ───╮", "#80f4b2")
+        for skill, (won, lost) in self._skill_checks.items():
+            total = won + lost
+            if total:
+                # Ratio describes completed tool calls, not level or mastery.
+                blocks = round(8 * won / total)
+                add(f"│ {skill:<8} {'▰' * blocks}{'▱' * (8-blocks)} {won}/{total}", "#baf3d2")
+            else:
+                add(f"│ {skill:<8} ▱▱▱▱▱▱▱▱ --", "#839e92")
+        add("│ Staplar = andel OK, antal till höger", "#92aea3")
+        add("╰── Inga nivåer från animationer ─╯", "#80f4b2")
+        history = self._experience_snapshot
+        if history:
+            add("── GENESIS · MELLAN SESSIONER ──", "bold #80f4b2")
+            add(f"Historiska verktygssteg: {history['total']}", "#baf3d2")
+            trend = history.get("trend_pp")
+            if trend is None:
+                add("Veckotrend: underlag saknas", "#829c91")
+            else:
+                add(f"Veckotrend: {trend:+.1f} procentenheter", "#baf3d2" if trend >= 0 else "#ff9ba6")
+            practice = history.get("needs_practice")
+            if practice:
+                add("Öva mer på: " + practice, "#f2c78f")
+            add("Historik ≠ bevisad intelligens", "#829c91")
+        add("EVOLUTION · SENASTE HÄNDELSER", "bold #ff90c8")
+        if self._evolution_timeline:
+            for when, label in reversed(self._evolution_timeline):
+                add(f"{when} · {label}", "#c9e6d3")
+        else:
+            add("Ännu inga avslutade händelser", "#91a89d")
 
         # Never re-read SQLite inside prompt_toolkit rendering.
         if stamp - self._level_checked_at >= 45:
@@ -568,10 +677,31 @@ class LivePanel:
                 else:
                     add("Evidens " + str(progress["events"]) + "/" +
                         str(progress["required"]) + " · -" + str(progress["remaining"]), "#ffffff")
+                    total = max(1, progress["required"])
+                    dots = round(16 * min(1.0, progress["events"] / total))
+                    add("Mot nästa nivå [" + "▰" * dots + "▱" * (16-dots) + "]", "#80f4b2")
             else:
                 add("Nivåunderlag saknas", "#ffffff")
         else:
             add("AI LEVEL: väntar på mätning", "#ffffff")
+
+        rows = measured_axis_rows(self._cached_level)
+        if rows:
+            add("── KAPACITET · MÄTBARA AXELVÄRDEN ──", "bold #80f4b2")
+            known = [(name, val) for _, name, val in rows if val is not None]
+            for key, name, val in rows:
+                if val is None:
+                    add(f"{key} {name:<13} INGET UNDERLAG", "#829c91")
+                else:
+                    filled = round(8 * val)
+                    add(f"{key} {name:<13} {'■' * filled}{'·' * (8-filled)} {val:.0%}",
+                        "#a7f1c8" if val >= .7 else "#f2c78f")
+            if known:
+                weakest, score = min(known, key=lambda pair: pair[1])
+                add(f"FOKUS: {weakest} · {score:.0%}", "#ffcae6")
+                focus = evidence_focus(self._cached_level)
+                if focus:
+                    add("NÄSTA TEST: " + focus[1], "#baf3d2")
 
         lines.append(("bold #ff90c8", "MIN ARBETSPLAN · " + ("DÖLJ" if self.show_thinking else "VISA") + " / F2\n", self._side_click))
         if self.show_thinking:
@@ -693,6 +823,7 @@ class LivePanel:
         panel.step_time = time.monotonic()
         panel._progress_phase = "WORK"
         panel.trace.append((panel.tool, None, time.time()))
+        panel._current_skill = observed_skill(panel.tool)
         panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.tool)
         panel._refresh()
 
@@ -706,6 +837,19 @@ class LivePanel:
         panel._last_tool_duration = duration
         panel._last_tool_event_at = time.monotonic()
         panel._progress_outcomes.append(bool(ok))
+        category = observed_skill(panel.trace[-1][0]) if panel.trace else panel._current_skill
+        counts = panel._skill_checks[category]
+        counts[0 if ok else 1] += 1
+        if panel._experience is not None and not getattr(getattr(panel.app, "privacy", None), "private", False):
+            try:
+                panel._experience.record(category, bool(ok))
+                panel._experience_snapshot = panel._experience.snapshot()
+            except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError):
+                # Never fail a real user action because telemetry is unavailable.
+                pass
+        panel._evolution_timeline.append((
+            datetime.now().strftime("%H:%M"),
+            ("✓ " if ok else "✕ ") + category + " · " + clean_line(panel.tool, 21)))
         if ok:
             panel._tool_successes += 1
             panel._tool_streak += 1
@@ -733,11 +877,18 @@ class LivePanel:
         count = sum(1 for item in run.ledger if item.get("ok"))
         verified = bool(result.verified) and result.status in ("complete", "answered")
         # A fluent model answer is activity, never proof of new capability.
-        panel._answers_delivered += 1
-        panel._last_answer_at = time.monotonic()
-        independently_checked = bool(run.ledger) and verified and result.status == "complete"
+        delivered = result.status in ("answered", "complete")
+        if delivered:
+            panel._answers_delivered += 1
+            panel._last_answer_at = time.monotonic()
+            panel._evolution_timeline.append((datetime.now().strftime("%H:%M"), "AI-svar levererat"))
+        # A failed tool cannot become a verified completed task simply because
+        # a model claims success or a ledger object exists.
+        independently_checked = (verified and result.status == "complete"
+                                  and any(item.get("ok") is True for item in run.ledger))
         if independently_checked:
             panel._verified_work += 1
+            panel._evolution_timeline.append((datetime.now().strftime("%H:%M"), "✓ Uppgift verifierad"))
             panel._run_state = "VERIFIERAD UPPGIFT"
             panel.action_result = "Uppgiften klar med registrerade verktygsresultat."
         elif verified and not run.ledger and result.status == "answered":
@@ -745,6 +896,7 @@ class LivePanel:
             panel.action_result = "Svar levererat. Inga verktygssteg utfördes eller verifierades."
         else:
             panel._unverified_work += 1
+            panel._evolution_timeline.append((datetime.now().strftime("%H:%M"), "△ Ej verifierat"))
             panel._run_state = "EJ VERIFIERAT"
             panel.action_result = "Körningen avslutad utan oberoende verifiering."
         panel.action_title = "AI-svar levererat" if not run.ledger else "Uppgift avslutad"
