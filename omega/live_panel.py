@@ -228,6 +228,11 @@ class LivePanel:
         self._side_cache: list = []
         self._side_cache_at = 0.0
         self._side_dirty = True
+        self._tetris: Any = None
+        self._tetris_task: asyncio.Task | None = None
+        self._build_state = "ej startad"
+        self._build_step = 0
+        self._build_error = ""
         self.tool = "-"
         self.step_time = 0.0
         self.queue: asyncio.Queue[str] = asyncio.Queue()
@@ -243,7 +248,7 @@ class LivePanel:
         @keys.add("f2")
         def _toggle(_event: Any) -> None:
             self.toggle_thinking()
-        right = Frame(Window(content=self._status_control, wrap_lines=True),
+        right = Frame(Window(content=self._status_control, wrap_lines=False),
                       title=" OMEGA · LIVE ", width=Dimension.exact(39))
         visibility = Condition(lambda: shutil.get_terminal_size((120, 35)).columns >= 94)
         self._layout = Layout(
@@ -280,6 +285,7 @@ class LivePanel:
         self._loop = asyncio.get_running_loop()
         self.task = self._loop.create_task(self.application.run_async())
         self._companion_task = self._loop.create_task(self._companion_poll())
+        self._tetris_task = self._loop.create_task(self._tetris_loop())
 
     async def read_line(self) -> str:
         return await self.queue.get()
@@ -287,6 +293,8 @@ class LivePanel:
     def close(self) -> None:
         if self._companion_task is not None:
             self._companion_task.cancel()
+        if self._tetris_task is not None:
+            self._tetris_task.cancel()
         if self.application.is_running:
             self.application.exit()
 
@@ -357,6 +365,44 @@ class LivePanel:
         else:
             update()
 
+    async def _tetris_loop(self) -> None:
+        """Live game state, not fabricated AI activity or an AI level shortcut.
+
+        The coding task is a distinct, durable tool-driven process in the task DB.
+        Polling that state happens in a worker thread so typing remains responsive.
+        """
+        try:
+            from pixel_tetris import PixelTetris
+            self._tetris = PixelTetris()
+        except Exception as exc:
+            self._build_error = "Tetris engine: " + type(exc).__name__
+            return
+        while True:
+            try:
+                self._tetris.tick()
+                self._refresh()
+                if self.app.tasks:
+                    await asyncio.to_thread(self._poll_build_state)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self._build_error = type(exc).__name__
+            await asyncio.sleep(1.2)
+
+    def _poll_build_state(self) -> None:
+        try:
+            tasks = self.app.tasks.list(30)
+            related = next((task for task in tasks
+                            if str(task.get("title") or "").startswith("Pixel Tetris BUILD")), None)
+            if related:
+                self._build_state = str(related.get("state") or "unknown")
+                self._build_step = int(related.get("step_idx") or 0)
+                self._build_error = clean_line(related.get("error") or "", 35)
+            else:
+                self._build_state = "ej köad"
+        except Exception as exc:
+            self._build_error = "task status: " + type(exc).__name__
+
     async def _companion_poll(self) -> None:
         """Collect potentially blocking settings/Windows idle data outside UI rendering."""
         while True:
@@ -406,7 +452,7 @@ class LivePanel:
         now = time.time()
         lines: list[tuple[str, str]] = []
         def add(text: str, style: str = "") -> None:
-            lines.append((style, clean_line(text, 55) + "\n"))
+            lines.append((style, clean_line(text, 34) + "\n"))
 
         running = bool(app.current_run)
         # Rendering must NEVER query SQLite, discover plugins or poll Win32.
@@ -430,7 +476,23 @@ class LivePanel:
         add(companion_personality(sprite_mode, sprite_level, last_tool_ok), "#ffcae6")
         if sprite_level is None:
             add("Växer först när level mäts.", "#d4b7c9")
-        add("AI  kilo-auto/free  ·  VOICE OFF", "#ffffff")
+        add("AI kilo-auto/free · VOICE OFF", "#ffffff")
+        add("──── PIXEL TETRIS · LIVE ────", "#744061")
+        if self._tetris is not None:
+            for row in self._tetris.display():
+                add(" " + row, "#ff9bd0")
+            add(f"SPel: {self._tetris.score}p · {self._tetris.lines} rader", "#ffffff")
+            add(f"Riktiga lås: {self._tetris.pieces}", "#ffffff")
+        else:
+            add("Spelmotor ej startad", "#bca8bc")
+        # Game physics never contributes to AI LEVEL. A live project build is
+        # separately backed by the persistent task engine and its evidence.
+        add("AI BYGGER: " + self._build_state, "#ff8fc5")
+        if self._build_step:
+            add("Agentsteg: " + str(self._build_step), "#ffffff")
+        if self._build_error:
+            add("Hinder: " + self._build_error, "#ff9ba6")
+        add("Spel ≠ AI-framsteg", "#bca8bc")
         if running and app.current_run:
             elapsed = max(0, int(now - float(app.current_run.t0)))
             add(f"Väntat på AI: {elapsed // 60:02d}:{elapsed % 60:02d}", "#ffffff")
