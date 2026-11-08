@@ -151,54 +151,75 @@ def _majin_env(ctx: Ctx) -> Optional[dict]:
 # ════════════════════════════════════════════════════════════════════════════
 # 1–3 · INSTALLATION
 # ════════════════════════════════════════════════════════════════════════════
-#: Problems `install.ps1 -Verify` reports when the installer simply has not been RUN
-#: on this machine. Each is a true statement about the host, not a defect in the
-#: product or in the installer: with no venv there is no launcher, no PATH entry and
-#: no installed dependency set to check either.
-NOT_INSTALLED_MARKERS = (
-    "no venv at ",                    # the installer's own primary artifact is absent
-    "launcher missing: ",
-    "PATH does not contain ",
-    "no supported Python found",      # nothing could have been installed at all
-    "required dependencies are missing",
-)
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
 
 
-def verify_problem_class(verify_output: str) -> tuple[str, list[str]]:
-    """Classify a failing `install.ps1 -Verify` run as ("blocked"|"fail", problems).
+def windows_data_home() -> Path:
+    """The data home `install.ps1` derives by default: %APPDATA%\\StuddyBuddy.
+
+    Computed here instead of read from `buddy.HOME` because this harness repoints
+    BUDDY_HOME at a scratch directory at import time, while the installer verifies
+    the real one. Mirrors install.ps1's own fallback to %USERPROFILE%\\AppData\\Roaming.
+    """
+    appdata = os.environ.get("APPDATA") or os.path.join(os.environ.get("USERPROFILE", ""), "AppData", "Roaming")
+    return Path(appdata) / "StuddyBuddy"
+
+
+def install_is_present(data_home: Path | None = None) -> bool:
+    """True when `install.ps1` has been run on this machine at least once.
+
+    Both artifacts are the installer's own: it creates `venv\\` early and writes
+    `install-manifest.json` as its last step. Either one existing proves an install
+    was attempted and got somewhere; neither existing means this host has never run
+    the installer at all — which is the case on every CI runner.
+    """
+    home = data_home or windows_data_home()
+    return (home / "install-manifest.json").is_file() or (home / "venv").exists()
+
+
+def verify_problem_class(verify_output: str, installed: bool | None = None) -> tuple[str, list[str], str]:
+    """Classify a failing `install.ps1 -Verify` run: ("blocked"|"fail", problems, why).
 
     The installer prints every problem as a line starting "x " and ends with
     "x verification FAILED: N problem(s)".
 
-    "blocked" is returned only when EVERY reported problem is one of the
-    NOT_INSTALLED_MARKERS, i.e. the whole failure is "this host has never run the
-    installer". A CI runner is exactly that: it has no venv, so there is no launcher,
-    no PATH entry and no numpy/faster-whisper/winsdk/edge-tts to import. Reporting
-    that as a product failure is the same host-precondition-as-failure mistake already
-    fixed three times on this branch (benchmark B13 reporting FAIL instead of SKIP,
-    the Notepad check crashing without an interactive desktop, the voice check
-    treating "no audio device" as a failure).
+    The classification does NOT try to interpret the wording of those problems. It
+    asks one question that has an unambiguous answer on disk: has the installer ever
+    been run on this machine? If not, everything -Verify reports — no venv, no
+    launcher, no PATH entry, no importable dependency, a `buddy doctor runtime` that
+    fails through a fallback interpreter — is a true statement about THIS host rather
+    than a defect in the product, and the scenario is BLOCKED. Treating it as a
+    failure is the same host-precondition-as-failure mistake already fixed three times
+    on this branch (benchmark B13 reporting FAIL instead of SKIP, the Notepad check
+    crashing without an interactive desktop, the voice check treating "no audio
+    device" as a failure).
 
-    Everything else fails, and the default is deliberately conservative:
+    If an install IS present, the same findings are defects: the installer's whole job
+    was to leave a working venv, launcher, PATH entry and dependency set, so a problem
+    now describes a broken install and fails the scenario.
 
-      * a venv that exists but whose interpreter does not run  -> the installer built
-        something broken;
-      * 'buddy version' failing, or `buddy doctor runtime` reporting problems -> the
-        installed product does not answer;
-      * `entrypoint missing` -> the product we ship is not where it must be;
-      * ANY problem not recognised here -> unknown, so it is treated as a defect
-        rather than as an excuse.
+    A non-zero exit that reports no problem line at all also fails: silence is a
+    defect, never an excuse.
 
-    A real defect therefore cannot hide behind an uninstalled host, and a non-zero
-    exit that reports no problem at all is itself treated as a failure.
+    Earlier versions of this function classified by matching problem text against a
+    list of expected phrasings. That is fragile in a way that is invisible from a
+    passing test — it guessed three of the installer's five absent-install messages
+    and misjudged the runner twice. Asking the filesystem removes the guessing.
     """
-    problems = [ln.strip() for ln in verify_output.splitlines()
-                if re.match(r"^\s*x\s+", ln) and "verification FAILED" not in ln]
+    out = _ANSI_RE.sub("", verify_output.replace("\u00a0", " "))
+    problems = [ln.strip() for ln in out.splitlines()
+                if re.match(r"^\s*x\s+\S", ln) and "verification FAILED" not in ln]
+    if installed is None:
+        installed = install_is_present()
     if not problems:
-        return "fail", problems
-    if all(any(marker in problem for marker in NOT_INSTALLED_MARKERS) for problem in problems):
-        return "blocked", problems
-    return "fail", problems
+        return "fail", problems, ("-Verify exited non-zero but reported no problem line; "
+                                  "a silent failure is a defect, not a missing install")
+    if not installed:
+        return "blocked", problems, ("the installer has never been run on this host — no install "
+                                     "manifest and no venv — so every problem -Verify reports "
+                                     "describes this machine, not the installer")
+    return "fail", problems, ("an install IS present on this host, so what -Verify reports is "
+                              "about that install, and it is broken")
 
 
 def s01_fresh_install(ctx: Ctx) -> Result:
@@ -230,32 +251,32 @@ def s01_fresh_install(ctx: Ctx) -> Result:
         ctx.save("01-installer-verify.txt", out)
         if rc.returncode != 0:
             # A non-zero exit has two very different causes: this host has never run
-            # the installer, or the installer/product is actually broken. Only the
-            # first is a BLOCKED.
-            kind, problems = verify_problem_class(out)
-            ev["verify_problems"] = problems
+            # the installer, or an install exists here and is broken. Only the first
+            # is a BLOCKED, and which one it is is decided by the installer's own
+            # artifacts on disk, not by parsing what it printed.
+            installed = install_is_present()
+            kind, problems, reason = verify_problem_class(out, installed)
+            home = windows_data_home()
+            ev.update({"install_present": installed, "data_home": str(home),
+                       "verify_problems": problems, "verify_reason": reason})
+            # One problem per line, printed here rather than folded into the detail:
+            # the harness clips a scenario detail to 220 characters, and a joined list
+            # of Windows paths does not fit. That clipping is what hid the real cause
+            # of this scenario for two consecutive CI runs.
+            for problem in problems:
+                print(f"      verify: {problem[2:] if problem.startswith('x ') else problem}")
             if kind == "blocked":
-                # The installer was never RUN on this machine, only verified. A CI
-                # runner has no numpy, faster-whisper, websocket-client, winsdk or
-                # edge-tts, so -Verify correctly reports them absent. That is a true
-                # statement about this host, not a defect in the installer — reporting
-                # it as FAIL is the same host-precondition-as-failure mistake as
-                # benchmark B13, the Notepad check and the voice check.
-                #
-                # Any OTHER problem still fails the scenario, so a broken manifest, a
-                # missing entrypoint, a missing launcher or a failing `buddy doctor`
-                # cannot hide behind this branch.
                 return Result(BLOCKED,
-                              f"install.ps1 -Verify ran and every problem it reported was an "
-                              f"absent install ({len(problems)} problem(s): "
-                              f"{'; '.join(p[2:] if p.startswith('x ') else p for p in problems)}) "
-                              f"— the installer has not been run on this host, so what it would "
-                              f"have created cannot be verified here", ev,
+                              f"no install on this host (no manifest, no venv at {home}); the "
+                              f"{len(problems)} problem(s) -Verify reports describe this machine, "
+                              f"not the installer", ev,
                               unproven="executing the installer itself, which is what actually "
-                                       "creates the venv and installs the dependencies",
+                                       "creates the venv, writes the launcher and installs the "
+                                       "dependencies",
                               fix="powershell -NoProfile -ExecutionPolicy Bypass -File omega/install/install.ps1")
-            return Result(FAIL, f"install.ps1 -Verify exited {rc.returncode}: "
-                                f"{'; '.join(problems) or out[-400:]}", ev)
+            return Result(FAIL, f"install.ps1 -Verify exited {rc.returncode} with {len(problems)} "
+                                f"problem(s) against an install that IS present — see the verify: "
+                                f"lines above", ev)
         return Result(PASS, detail + "; install.ps1 -Verify ran clean on Windows", ev)
     return Result(PASS, detail, ev,
                   unproven="actually executing the installer needs Windows; run `buddy accept 1` there",
