@@ -39,9 +39,9 @@ class GatewayStreamingTest(unittest.TestCase):
     def test_tool_fragments_are_reconstructed_without_executing_tools(self):
         events = [
             {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_1", "type": "function",
-                               "function": {"name": "tool_", "arguments": "{\\"q\\":"}}]}, "finish_reason": None}]},
+                               "function": {"name": "tool_", "arguments": "{\"q\":"}}]}, "finish_reason": None}]},
             {"choices": [{"delta": {"tool_calls": [{"index": 0, "function":
-                               {"name": "search", "arguments": "\\"ok\\"}"}}]}, "finish_reason": "tool_calls"}]},
+                               {"name": "search", "arguments": "\"ok\"}"}}]}, "finish_reason": "tool_calls"}]},
         ]
         g = self.make_gateway()
         with patch("urllib.request.urlopen", return_value=FakeResponse(events)):
