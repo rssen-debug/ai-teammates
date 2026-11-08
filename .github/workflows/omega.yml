@@ -101,8 +101,15 @@ jobs:
           set -e
           if [ "$rc" -ne 0 ]; then
             echo "::error::run_all.py exited ${rc} on ${{ matrix.os }} / py${{ matrix.python }}"
-            grep -E "^[[:space:]]*(FAIL|ERROR|BLOCKED)" run_all.txt | sed 's/^/::error::/' || true
-            tail -n 40 run_all.txt | sed 's/^/::error::output| /'
+            # Which SUITE failed, then WHICH TESTS, then the exception types. Order
+            # matters: the summary alone says "14 failed" without naming a single one.
+            grep -E "^[[:space:]]*(FAIL|ERROR|BLOCKED)[[:space:]]" run_all.txt | sed 's/^/::error::suite| /' || true
+            grep -E "^(FAIL|ERROR): " run_all.txt | sed 's/^/::error::test| /' || true
+            grep -E "^[A-Za-z_.]*(Error|Exception|Warning): " run_all.txt | sort -u \
+              | sed 's/^/::error::exc| /' || true
+            grep -E "ImportError|ModuleNotFoundError|_FailedTest|SyntaxWarning" run_all.txt \
+              | sort -u | sed 's/^/::error::import| /' || true
+            tail -n 25 run_all.txt | sed 's/^/::error::tail| /'
           fi
           exit $rc
 

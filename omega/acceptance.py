@@ -51,6 +51,11 @@ sys.path.insert(0, str(HERE))
 
 import buddy  # noqa: E402  (must be imported after BUDDY_HOME is set)
 
+# Same reason as run_all.py: this harness prints decorated output, and a cp1252
+# Windows console cannot encode the glyphs. A crash here would look like a failed
+# scenario rather than what it is — a reporting problem.
+buddy.force_utf8_output()
+
 IS_WIN = sys.platform == "win32"
 PASS, FAIL, BLOCKED, NOT_TESTED = "PASS", "FAIL", "BLOCKED", "NOT TESTED"
 

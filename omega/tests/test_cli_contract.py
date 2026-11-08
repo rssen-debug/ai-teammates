@@ -217,6 +217,14 @@ class TestBenchmarkAndAcceptanceRunnersExist(unittest.TestCase):
                                msg="skipped tasks must not enter the denominator")
 
 
+def _in_cp1252(ch: str) -> bool:
+    try:
+        ch.encode("cp1252")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
 class TestRendering(unittest.TestCase):
     """Help text and colour are user-facing contracts, so they get tested too.
 
@@ -256,6 +264,43 @@ class TestRendering(unittest.TestCase):
         rc, out = self.run_cli(["help"], {"FORCE_COLOR": "1", "TERM": "xterm-256color"})
         self.assertEqual(rc, 0)
         self.assertIn("\033[", out, "a pipe with FORCE_COLOR is how `buddy | less -R` works")
+
+    def test_decorated_output_survives_a_cp1252_console(self) -> None:
+        """A stock Windows console encodes cp1252, which has an em-dash but none of
+        ●, ·, ✗ or ✓ — and this CLI prints ● thousands of times.
+
+        The stream reconfiguration used to live in CLI.__init__, which only the
+        interactive REPL constructs, so every one-shot subcommand raised
+        UnicodeEncodeError on its first decorated line, on the product's own primary
+        platform. Worst instance: run_all.py died on the line that prints a failure
+        bullet, so a failing suite crashed the reporter instead of being reported and
+        the identities of 14 failing tests were lost.
+        """
+        for args in (["level"], ["legacy", "status"], ["help"], ["companion", "status"]):
+            rc, out = self.run_cli(args, {"PYTHONIOENCODING": "cp1252", "NO_COLOR": "1"})
+            self.assertNotIn("UnicodeEncodeError", out,
+                             f"`buddy {' '.join(args)}` crashed on a cp1252 console:\n{out[-500:]}")
+            self.assertNotIn("charmap", out)
+            self.assertEqual(rc, 0, out[-400:])
+            # Not "contains ●" — `buddy level` has no dot. The property that matters
+            # is that at least one character cp1252 CANNOT represent came out intact,
+            # which is the thing that used to raise.
+            exotic = sorted({ch for ch in out if not _in_cp1252(ch)})
+            self.assertTrue(exotic, f"`buddy {' '.join(args)}` emitted nothing outside cp1252, "
+                                    "so this case would pass even if the guard were removed")
+
+    def test_the_reporters_reconfigure_their_streams(self) -> None:
+        """Source-level, deliberately.
+
+        A reporter that crashes while reporting a failure cannot tell you it crashed
+        for that reason — the symptom is a traceback and a lost exit code, which on
+        CI looks like "the harness is broken". So the guard is pinned here rather
+        than left to a test that would need a failing suite to exercise it.
+        """
+        for rel in ("tests/run_all.py", "acceptance.py"):
+            src = (OMEGA / rel).read_text(encoding="utf-8")
+            self.assertRegex(src, r'reconfigure\(encoding="utf-8"|force_utf8_output\(\)',
+                             f"{rel} must widen stdout/stderr before printing decorated output")
 
     def test_a_dumb_terminal_gets_no_escapes(self) -> None:
         rc, out = self.run_cli(["help"], {"TERM": "dumb"})

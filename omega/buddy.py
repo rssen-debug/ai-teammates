@@ -62,6 +62,33 @@ if sys.version_info < (3, 10):
 APP_NAME = "Studdy Buddy"
 APP_VERSION = "1.0.0"
 IS_WIN = sys.platform == "win32"
+
+
+def force_utf8_output() -> None:
+    """Make stdout and stderr UTF-8 with replacement, once, on every platform.
+
+    This product prints `●` thousands of times (V.dot), plus `·`, `—` and `✗`. A
+    stock Windows console defaults to cp1252, which does contain an em-dash but has
+    none of those glyphs, so the first decorated line raises UnicodeEncodeError.
+
+    It used to be configured only inside CLI.__init__, which just the interactive
+    REPL constructs — leaving every one-shot subcommand (`buddy level`,
+    `buddy doctor`, `buddy legacy status`, and the test reporters) writing to a
+    cp1252 stream. In run_all.py the crash landed on the line that prints a failure
+    bullet, so the reporter died precisely when there was a failure to report, and
+    the details of 14 failing tests were lost.
+
+    errors="replace" is the part that matters: an unencodable character degrades to
+    a placeholder instead of taking the process down. Losing a glyph is cosmetic.
+    Losing the report is not.
+    """
+    if IS_WIN:
+        with contextlib.suppress(Exception):
+            ctypes.windll.kernel32.SetConsoleOutputCP(65001)   # real consoles only
+    for stream in (sys.stdout, sys.stderr):
+        with contextlib.suppress(Exception):
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+
 SOURCE_FILE = Path(__file__).resolve()
 
 
@@ -5017,7 +5044,7 @@ class Doctor:
 
 
 def print_report(items: list[dict]) -> int:
-    """Render a diagnostics report.
+    r"""Render a diagnostics report.
 
     The line shape here is a contract, not decoration: omega/tests/run_all.py
     parses `^\s*FAIL\s+(\S+)\s+(.+?)\s+—\s+(.*)$` to lift failing items into
@@ -8108,6 +8135,7 @@ def render_usage() -> str:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    force_utf8_output()
     argv = list(sys.argv[1:] if argv is None else argv)
 
     # ── internal entrypoints used by the isolated test harness ──

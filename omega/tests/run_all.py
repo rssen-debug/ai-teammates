@@ -203,6 +203,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default="", help="write the JSON report to this path")
     a = ap.parse_args(argv)
 
+    # UTF-8 with replacement, before anything is printed. This reporter emits `—`
+    # and a `✗` bullet; on a cp1252 Windows console the bullet raised
+    # UnicodeEncodeError, so a failing suite crashed the reporter instead of being
+    # reported — the one moment the output matters most.
+    for _stream in (sys.stdout, sys.stderr):
+        with contextlib.suppress(Exception):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+
     started = time.time()
     report_path = Path(a.out) if a.out else (OMEGA / "last_full_test_report.json")
     selftest_report = report_path.with_name("last_selftest_report.json")
