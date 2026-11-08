@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from buddy import Buddy, session
+from buddy import Buddy, main_async
 
 
 class Voice:
@@ -45,7 +45,7 @@ class VoiceToggleTest(unittest.TestCase):
         self.assertFalse(self.mic.running)
 
     def test_session_does_not_autostart_microphone(self):
-        src = inspect.getsource(session)
+        src = inspect.getsource(main_async)
         self.assertIn('app.settings.set("voice_enabled", False)', src)
         self.assertNotIn("app.voice.start)", src)
         self.assertIn("Voice OFF on startup", src)
