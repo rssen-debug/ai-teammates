@@ -4241,6 +4241,14 @@ class AgentRun:
                 history = DecisionHistory().snapshot(category)
         self.decision = decide(goal, available_tools=candidates,
                                tool_status=status, historical=history)
+        # Load genuinely ready read-only tools for the goal without asking a
+        # weak model to discover the obvious. Loading != executing; executor
+        # still enforces every grant and tool-specific safety restriction.
+        for tool_name in self.decision.available_tools:
+            tool = app.registry.get(tool_name)
+            if (tool is not None and tool.risk == Risk.OBSERVE and
+                    (tool.observes or tool.core)):
+                self.active.add(tool_name)
 
     # ── tool loading ──
     def activate(self, names: list[str]) -> None:
