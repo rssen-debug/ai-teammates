@@ -5217,7 +5217,7 @@ class CompanionSubsystem:
             if not res.ok:
                 raise ToolError(res.error or "screen_describe failed", res.category or "os_error")
             d = res.data if isinstance(res.data, dict) else {"text": str(res.data)}
-            return d.get("description") or d.get("text") or ""
+            return d.get("interpretation_of_screenshot") or d.get("description") or d.get("text") or ""
 
         async def aread(text: Any) -> str:
             return text if isinstance(text, str) else str(text or "")
@@ -5281,6 +5281,7 @@ class CompanionSubsystem:
                 self.app.settings, observation=self.observation, model=self.model,
                 store=self.app.store, memory=self.app.memory,
                 chat=self._chat, idle_probe=self.idle_seconds, pending_input=self._pending,
+                capture_context=lambda: self.app.world.target() or {},
                 log_fn=lambda ev, **kw: log(ev, **kw))
         return self._loop
 
@@ -5673,7 +5674,9 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 o(f"Activity: {'ON' if self.activity.enabled else 'OFF'}; grants: {self.perms.all()}; "
                   f"screenshot uploads: {self.settings.get('screenshot_upload')}; "
                   f"companion: {'ON' if self.companion.present()[0] and self.companion.loop.enabled else 'OFF'}; "
-                  f"voice: {'ON' if self.voice.running else 'OFF'}")
+                  f"voice: {'ON' if self.voice.running else 'OFF'}; "
+                  f"screen captures: {self.companion.loop.captures if self.companion.present()[0] else 0}; "
+                  f"last capture: {self.companion.loop.last_capture_note if self.companion.present()[0] else 'unavailable'}")
             elif sub == "all":
                 self.settings.set("free_only", True)
                 self.settings.set("models", {role: "kilo-auto/free" for role in Router.ROLES})
@@ -5681,6 +5684,9 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 for scope in ("observe", "input", "write", "exec"):
                     self.perms.set(scope, "always")
                 self.settings.set("screenshot_upload", "allow")
+                # Refresh cached backend after the owner has explicitly allowed screenshot uploads.
+                if self.companion.present()[0] and self.companion._obs is not None:
+                    self.companion._obs.backend = self.companion._backend(self.companion.mod)
                 self.settings.set("observe_enabled", True)
                 self.activity.start()
                 self.tasks.paused = False
