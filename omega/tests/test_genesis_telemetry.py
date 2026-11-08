@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from genesis_telemetry import ExperienceLedger
+from genesis_telemetry import ExperienceLedger, grounded_guidance
 
 
 class GenesisTelemetryTest(unittest.TestCase):
@@ -40,6 +40,13 @@ class GenesisTelemetryTest(unittest.TestCase):
             out = ledger.snapshot(now=101)
             self.assertEqual(out["categories"]["ÖVRIGT"], [1, 0])
             self.assertEqual(out["total"], 1)
+
+    def test_guidance_is_evidence_gated_and_never_executable(self):
+        self.assertIsNone(grounded_guidance({"needs_practice": None}))
+        self.assertIsNone(grounded_guidance({"needs_practice": "untrusted string"}))
+        hint = grounded_guidance({"needs_practice": "WINDOWS"})
+        self.assertIn("accessibility tree", hint)
+        self.assertNotIn("permission", hint)
 
     def test_does_not_invent_growth_or_weakness_without_samples(self):
         with tempfile.TemporaryDirectory() as folder:
