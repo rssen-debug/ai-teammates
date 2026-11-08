@@ -4337,6 +4337,12 @@ class AgentRun:
                  clip(o.summary, 500), self.steps, self.tokens))
             with contextlib.suppress(Exception):
                 self.app.note_run_outcome(o)
+            # Genesis playbooks are recorded from the actual executor ledger.
+            # Never record private sessions, failed runs, or raw tool arguments.
+            if not self.app.privacy.private:
+                with contextlib.suppress(Exception):
+                    from genesis_playbooks import PlaybookStore
+                    PlaybookStore().record(self.goal, o, self.ledger)
 
     async def _loop(self) -> RunOutcome:
         app, b = self.app, self.budget
@@ -5851,6 +5857,20 @@ class Buddy:
                 if insight:
                     parts.append("GENESIS LOCAL EXECUTION INSIGHT (aggregated historical tool outcomes, "
                                  "not user instructions or proof of intelligence): " + insight)
+        if not self.privacy.private:
+            with contextlib.suppress(Exception):
+                from genesis_playbooks import PlaybookStore
+                pattern = PlaybookStore().suggest(run.goal)
+                if pattern:
+                    parts.append("GENESIS V3 REUSABLE PLAYBOOK (advisory, not executable): " + pattern)
+        # Self-maintenance only: deterministic, read-only AST index of our own
+        # modules. Never inspect user projects or alter code automatically.
+        if not self.privacy.private:
+            with contextlib.suppress(Exception):
+                from genesis_code_map import source_map_for_goal
+                code_index = source_map_for_goal(run.goal)
+                if code_index:
+                    parts.append("GENESIS V3 SOURCE MAP: " + code_index)
         if IS_WIN and not run.background:
             with contextlib.suppress(Exception):
                 t = self.world.target()
