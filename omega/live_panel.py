@@ -18,6 +18,8 @@ import time
 from typing import Any
 
 from prompt_toolkit import Application
+from prompt_toolkit.input import DummyInput
+from prompt_toolkit.output import DummyOutput
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.layout import (
     ConditionalContainer, Dimension, HSplit, Layout, VSplit, Window,
@@ -92,6 +94,8 @@ class LivePanel:
         self.application = Application(
             layout=self._layout,
             full_screen=True,
+            input=DummyInput() if not __import__('sys').stdin.isatty() else None,
+            output=DummyOutput() if not __import__('sys').stdout.isatty() else None,
             mouse_support=True,
             refresh_interval=1.0,
             style=Style.from_dict({
