@@ -789,7 +789,7 @@ class CompanionLoop:
             # Active-owner reflection needs a recently successful visual observation.
             if not (self.last_capture_text and self.last_capture_at
                     and _now() - self.last_capture_at < max(180.0, cadence)):
-                return False, "owner active; awaiting new screen evidence for safe proactive reflection"
+                return False, "owner is active; awaiting new screen evidence for safe proactive reflection"
         if not self.budget.allows(1):
             return False, (f"daily reflection budget exhausted "
                            f"({self.budget.spent()}/{self.budget.max} tokens)")
