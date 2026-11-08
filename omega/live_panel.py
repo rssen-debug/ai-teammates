@@ -312,7 +312,7 @@ class LivePanel:
     def stream_delta(self, text: str) -> None:
         if not self._stream_active:
             return
-        self._stream_text += re.sub(r"\\x1b\\[[0-9;]*m", "", str(text))
+        self._stream_text += re.sub(r"\x1b\[[0-9;]*m", "", str(text))
         # Do not rebuild an increasingly large conversation per character.
         if len(self._stream_text) < 64 or len(self._stream_text) % 48 < len(text):
             self._render_chat()
