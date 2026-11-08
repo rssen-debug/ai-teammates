@@ -4234,7 +4234,13 @@ class AgentRun:
                     status[name] = bool(tool.status()[0])
                 except Exception:
                     status[name] = False
-        self.decision = decide(goal, available_tools=candidates, tool_status=status)
+        history = {}
+        if not app.privacy.private:
+            with contextlib.suppress(Exception):
+                from genesis_decision import DecisionHistory
+                history = DecisionHistory().snapshot(category)
+        self.decision = decide(goal, available_tools=candidates,
+                               tool_status=status, historical=history)
 
     # ── tool loading ──
     def activate(self, names: list[str]) -> None:
@@ -4359,6 +4365,12 @@ class AgentRun:
                  clip(o.summary, 500), self.steps, self.tokens))
             with contextlib.suppress(Exception):
                 self.app.note_run_outcome(o)
+            # Actual task outcomes feed a category-only reliability estimate.
+            # Ordinary chat and private mode never enter decision history.
+            if not self.app.privacy.private and o is not None:
+                with contextlib.suppress(Exception):
+                    from genesis_decision import DecisionHistory
+                    DecisionHistory().record(self.decision.domain, o, self.steps)
             # Genesis playbooks are recorded from the actual executor ledger.
             # Never record private sessions, failed runs, or raw tool arguments.
             if not self.app.privacy.private:
