@@ -68,7 +68,7 @@ class PanelTest(unittest.TestCase):
         self.assertNotIn("Ett verktyg misslyckades", p._chat.text)
         p.toggle_thinking()
         rendered = "".join(fragment[1] for fragment in p._side_text())
-        self.assertIn("Verktygsfel", rendered)
+        self.assertIn("SENASTE FEL", rendered)
 
     def test_model_call_is_required_for_each_tetris_piece(self):
         import asyncio
