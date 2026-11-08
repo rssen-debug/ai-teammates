@@ -2024,6 +2024,21 @@ class Memory:
         return True
 
     def delete(self, mid: int) -> bool:
+        r = self.s.one("SELECT provenance FROM memories WHERE id=?", (mid,))
+        if not r:
+            return False
+        with contextlib.suppress(ValueError, TypeError, json.JSONDecodeError):
+            note = (json.loads(r["provenance"] or "{}") or {}).get("obsidian_file")
+            if note:
+                vault = Path(Settings(self.s).get("obsidian_vault") or HOME / "obsidian-vault").expanduser().resolve()
+                target = Path(note).resolve()
+                # Only the application's own generated observation paths may be removed.
+                if not target.is_relative_to(vault / "observations"):
+                    return False
+                try:
+                    target.unlink(missing_ok=True)
+                except OSError:
+                    return False
         return self.s.x("DELETE FROM memories WHERE id=?", (mid,)).rowcount > 0
 
     def list(self, kind: str | None = None, limit: int = 50) -> list[dict]:
@@ -5737,7 +5752,7 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 o(f"exported {self.memory.export_obsidian(DIRS['export'])} notes to {DIRS['export']} (Obsidian-compatible)")
             elif sub == "clear":
                 self.memory.forget_all()
-                o("All memories and conversation history deleted.")
+                o("SQLite memories/conversation cleared. Obsidian notes are separate; use /obsidian clear --yes if you also want those erased.")
         elif cmd == "/obsidian":
             sub = args[0].lower() if args else "status"
             folder = Path(self.settings.get("obsidian_vault") or HOME / "obsidian-vault").expanduser()
@@ -5755,13 +5770,24 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                     self.settings.set("obsidian_vault", str(folder))
                     self.companion._personal_vault = None
                     o(f"Obsidian vault path set: {folder}")
+            elif sub == "clear":
+                if "--yes" not in args[1:]:
+                    o("This deletes all auto-generated observation notes (not unrelated vault files). Confirm with /obsidian clear --yes.")
+                else:
+                    mod = sibling("personal_memory")
+                    if mod is None:
+                        o("Obsidian writer unavailable; no notes deleted.")
+                    else:
+                        n = mod.ObservationVault(folder).clear_observations()
+                        self.store.x("DELETE FROM memories WHERE kind='episodic' AND tags='companion,screen,observation'")
+                        o(f"Deleted {n} generated observation notes and their matching SQLite memories.")
             elif sub == "status":
                 o(f"Obsidian auto memory: {'ON' if self.settings.get('obsidian_auto_memory', False) else 'OFF'}")
                 o(f"Vault: {folder}  (can be opened as a vault in Obsidian)")
                 o("Stores short screened visual descriptions; source is unverified AI vision, not inferred personal facts.")
                 o("To disable: /obsidian off. Delete individual note files directly in Obsidian.")
             else:
-                o("Usage: /obsidian [status | on | off | path ABSOLUTE_PATH]")
+                o("Usage: /obsidian [status | on | off | path ABSOLUTE_PATH | clear --yes]")
         elif cmd == "/resources":
             o(resources_report())
         elif cmd == "/doctor":
