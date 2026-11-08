@@ -10,7 +10,7 @@ from types import SimpleNamespace
 OMEGA = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(OMEGA))
 
-from live_panel import LivePanel, remaining_seconds, clean_line, evidence_progress, pixel_companion, companion_stage, companion_personality
+from live_panel import LivePanel, remaining_seconds, clean_line, evidence_progress, pixel_companion, companion_stage, companion_personality, measured_axis_rows
 
 
 class FakeCLI:
@@ -141,6 +141,37 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(p._verified_work, 0)
         self.assertEqual(len(p._evolution_timeline), 1)
         self.assertIn("AI-svar levererat", p._evolution_timeline[0][1])
+
+    def test_six_axis_evidence_is_grounded_in_persisted_metrics(self):
+        p = self.build()
+        p._cached_level = {
+            "level": 16,
+            "axes": [
+                {"axis": "A", "value": .9, "measured": True},
+                {"axis": "B", "value": None, "measured": False},
+                {"axis": "C", "value": .25, "measured": True},
+                {"axis": "E", "value": .6, "measured": True},
+            ],
+        }
+        rendered = "".join(part[1] for part in p._side_text())
+        self.assertIn("KAPACITET", rendered)
+        self.assertIn("FOKUS: VERKTYG", rendered)
+        self.assertIn("INGET UNDERLAG", rendered)
+        self.assertEqual(p._cached_level["level"], 16)
+
+    def test_measured_axes_reject_invalid_and_unmeasured_values(self):
+        rows = measured_axis_rows({"axes": [
+            {"axis": "A", "value": 1.1},
+            {"axis": "B", "value": .5, "measured": False},
+            {"axis": "C", "value": .3, "measured": True},
+            {"axis": "D", "value": True},
+        ]})
+        self.assertEqual(rows[0][2], None)
+        self.assertEqual(rows[1][2], None)
+        self.assertEqual(rows[2][2], .3)
+        self.assertEqual(rows[3][2], None)
+        self.assertEqual(measured_axis_rows({}), [])
+        self.assertEqual(measured_axis_rows({"axes": "bad"}), [])
 
     def test_progress_does_not_change_ai_level_or_evidence(self):
         p = self.build()
