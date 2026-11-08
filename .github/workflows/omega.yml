@@ -85,7 +85,26 @@ jobs:
         # Exits non-zero if ANY suite fails. BLOCKED suites do not fail the build:
         # a runner has no desktop session, no microphone and no Kilo key, and
         # reporting that honestly is the product's whole point.
-        run: python omega/tests/run_all.py
+        #
+        # On failure the output is re-emitted as check-run ANNOTATIONS. Two reasons,
+        # and the first one is for humans: annotations appear inline on the PR's
+        # Checks tab, so a failure is readable without opening the raw log. The
+        # second is that the raw log endpoint lives on a different host than the API,
+        # and where that host is unreachable the annotations are the only channel
+        # left — which is how the Windows-only failure this was written for got
+        # diagnosed at all.
+        shell: bash
+        run: |
+          set +e
+          python omega/tests/run_all.py 2>&1 | tee run_all.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::run_all.py exited ${rc} on ${{ matrix.os }} / py${{ matrix.python }}"
+            grep -E "^[[:space:]]*(FAIL|ERROR|BLOCKED)" run_all.txt | sed 's/^/::error::/' || true
+            tail -n 40 run_all.txt | sed 's/^/::error::output| /'
+          fi
+          exit $rc
 
       - name: Acceptance scenarios
         shell: bash
@@ -117,5 +136,6 @@ jobs:
             omega/last_full_test_report.json
             omega/last_selftest_report.json
             acceptance.txt
+            run_all.txt
           if-no-files-found: ignore
           retention-days: 14
