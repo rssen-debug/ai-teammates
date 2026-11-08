@@ -5897,6 +5897,14 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                   f"Obsidian auto memory: {self.settings.get('obsidian_auto_memory', False)}")
             elif sub == "all":
                 self.settings.set("auto_mode_on_start", True)
+                if IS_WIN and not autostart_state():
+                    try:
+                        on, msg = set_autostart(True)
+                        if on:
+                            self.settings.set("autostart", True)
+                        o("Windows login autostart: " + msg)
+                    except OSError as exc:
+                        o("Windows login autostart could not be enabled: " + str(exc))
                 self.settings.set("free_only", True)
                 self.settings.set("models", {role: "kilo-auto/free" for role in Router.ROLES})
                 self.settings.set("escalation_ladder", [])
