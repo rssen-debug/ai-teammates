@@ -6657,7 +6657,7 @@ def presence_report(app: Buddy, minutes: int = 20) -> str:
             + (("  Recently observed:\n" + "".join("    • " + clip(note["content"], 125) + "\n" for note in recent_notes))
                if recent_notes else "  No recent screen observations saved yet.\n")
             + "  Observations are fallible, not proof of knowledge or personal intentions.\n"
-            + "  Ask 'Vad har du lärt dig om mina projekt?' for an evidence-grounded summary.")
+            + "  Sammanfattningen bygger bara på lagrade, kontrollerbara uppgifter.")
 
 
 async def accelerator_autopilot_loop(app: Buddy, interval: float = 300) -> None:
@@ -6719,9 +6719,10 @@ async def presence_heartbeat(app: Buddy, interval: float = 1200) -> None:
         if app.shutting_down or app.privacy.private:
             continue
         try:
-            app.ui.event("20 min · observation och framsteg (lokala, uppmätta data)")
-            app.out(presence_report(app, minutes=20))
-            app.ui.prompt()
+            # Presence is telemetry, not an assistant reply. Keep the CHAT
+            # transcript reserved for the user's conversation. The sidebar
+            # already exposes live stats; no unsolicited multi-line dumps.
+            app.ui.event("Presence · status uppdaterad (endast panel)")
         except Exception as exc:
             log("presence_report_failed", error=type(exc).__name__)
 
@@ -6767,8 +6768,9 @@ async def main_async(app: Buddy) -> None:
         # Diagnostics are opt-in through saved presence, not a 30-second startup delay.
         if IS_WIN:
             ram_snapshot = await asyncio.to_thread(resources_report)
-            app.ui.event("RAM snapshot on startup (no continuous profiler):")
-            app.out("\n".join(ram_snapshot.splitlines()[:8]))
+            # Startup diagnostics belong to events, not the user CHAT.
+            app.ui.event("RAM översikt vid start: " +
+                         clip(" | ".join(ram_snapshot.splitlines()[:3]), 130))
         else:
             app.ui.event("RAM diagnostics require Windows; /resources reports that explicitly.")
     if app.stop.requested():
