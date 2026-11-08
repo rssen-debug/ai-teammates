@@ -6563,6 +6563,16 @@ async def main_async(app: Buddy) -> None:
         detail = app.stop.detail()
         app.stop.clear()
         app.ui.event(f"cleared a stop request left at {iso(detail.get('requested_at')) if detail.get('requested_at') else 'an earlier run'}")
+    # Explicit startup opt-ins from the owner's launch command. Persist choices
+    # so subsequent launches use the same approved voice/selection settings.
+    if IS_WIN and os.environ.get("BUDDY_ENABLE_SELECTION") == "1":
+        app.settings.set("selection_hotkey", True)
+    if IS_WIN and os.environ.get("BUDDY_ENABLE_VOICE") == "1":
+        app.settings.set("voice_enabled", True)
+    if os.environ.get("BUDDY_VOICE_STYLE") == "narrator":
+        app.settings.set("tts_engine", "edge")
+        app.settings.set("tts_voice", "en-AU-WilliamNeural")
+        app.settings.set("tts_rate", "+7%")
     app.activity.start()
     app.start_companion()
     if IS_WIN and app.settings.get("selection_hotkey", False):
