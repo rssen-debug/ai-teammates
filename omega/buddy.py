@@ -6588,6 +6588,10 @@ class ScriptedGateway(Gateway):
         m = self.script.pop(0) if self.script else {"role": "assistant", "content": "(script exhausted)"}
         return {"message": m, "finish": "stop", "usage": {"total_tokens": 10}, "model": model}
 
+    async def chat_stream(self, model: str, messages: list[dict], tools: Any = None, **kw: Any) -> dict:
+        """Deterministic mocked reply, never contact a real model during tests."""
+        return self.chat_sync(model, messages, tools, **kw)
+
 
 def tcall(name: str, args: dict) -> dict:
     return {"role": "assistant", "content": "", "tool_calls": [{"id": "c" + uuid.uuid4().hex[:6], "type": "function",
