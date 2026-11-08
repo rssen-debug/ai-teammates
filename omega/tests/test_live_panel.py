@@ -125,6 +125,46 @@ class PanelTest(unittest.TestCase):
         self.assertIn("Verktygsutfall", shown)
         self.assertIn("AI LEVEL: 16/100", shown)
 
+    def test_chat_answer_is_visible_activity_but_not_tool_or_learning(self):
+        p = self.build()
+        p._cached_level = {"level": 16}
+        p.ui.explain_action("Vad betyder den här länken?", "Analyserar din fråga",
+                            "Jag tolkar innehållet", "Svara direkt eller välj verktyg")
+        self.assertIn("inget verktygsresultat", p.action_result)
+        from types import SimpleNamespace
+        run = SimpleNamespace(ledger=[])
+        result = SimpleNamespace(status="answered", verified=True)
+        p.ui.summary(run, result)
+        self.assertEqual(p._answers_delivered, 1)
+        self.assertEqual(p._verified_work, 0)
+        self.assertEqual(p._tool_successes, 0)
+        self.assertEqual(p._cached_level["level"], 16)
+        shown = "".join(fragment[1] for fragment in p._side_text())
+        self.assertIn("AI-SVAR KLART", shown)
+        self.assertIn("Inga verktygssteg", shown)
+        self.assertNotIn("Verktyget körs", shown)
+
+    def test_verified_tool_task_separate_from_chat_activity(self):
+        p = self.build()
+        from types import SimpleNamespace
+        run = SimpleNamespace(ledger=[{"ok": True, "tool": "file_read"}])
+        result = SimpleNamespace(status="complete", verified=True)
+        p.ui.summary(run, result)
+        self.assertEqual(p._answers_delivered, 1)
+        self.assertEqual(p._verified_work, 1)
+        self.assertEqual(p._tool_successes, 0)
+        shown = "".join(fragment[1] for fragment in p._side_text())
+        self.assertIn("VERIFIERAD UPPGIFT", shown)
+
+    def test_unverified_work_cannot_increase_verified_counter(self):
+        p = self.build()
+        from types import SimpleNamespace
+        run = SimpleNamespace(ledger=[{"ok": False}])
+        p.ui.summary(run, SimpleNamespace(status="unverified", verified=False))
+        self.assertEqual(p._unverified_work, 1)
+        self.assertEqual(p._verified_work, 0)
+        self.assertEqual(p._run_state, "EJ VERIFIERAT")
+
     def test_next_level_uses_real_evidence_not_clock(self):
         a = evidence_progress({"level": 10, "measured_events": 23,
                                "raw_level": 40, "evidence_full": 250})
