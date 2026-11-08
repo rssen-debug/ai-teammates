@@ -5913,7 +5913,7 @@ class Buddy:
             log("summary_failed", err=str(e))
 
     # ── slash commands ──
-    HELP = """/selection [on|off|status]  /voice style [narrator|default]  /help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
+    HELP = """/selection [on|off|auto on|auto off|status]  /voice style [narrator|default]  /help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
 /memory [list|search Q|forget ID|export|clear]  /obsidian [status|on|off|sync|path PATH|clear --yes]  /resources  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
 /grants [revoke]  /activate [all|status|off]  /presence  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
@@ -5944,7 +5944,24 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                     self.selection_bridge = SelectionBridge(self)
                     self.selection_bridge.start()
                 o("Markeringshjälp aktiverad · Ctrl+Alt+B")
+            elif sub == "auto" and len(args) > 1:
+                on = args[1].lower() == "on"
+                self.settings.set("selection_auto", on)
+                if on:
+                    self.settings.set("selection_hotkey", True)
+                    if IS_WIN and not self.selection_bridge:
+                        from selection_bridge import SelectionBridge
+                        self.selection_bridge = SelectionBridge(self)
+                        self.selection_bridge.start()
+                    elif self.selection_bridge and self.selection_bridge.auto_task is None:
+                        self.selection_bridge.auto_task = asyncio.create_task(
+                            self.selection_bridge._auto_scan())
+                elif self.selection_bridge and self.selection_bridge.auto_task:
+                    self.selection_bridge.auto_task.cancel()
+                    self.selection_bridge.auto_task = None
+                o("Automatisk markeringshjälp " + ("ON" if on else "OFF"))
             elif sub == "off":
+                self.settings.set("selection_auto", False)
                 self.settings.set("selection_hotkey", False)
                 if self.selection_bridge:
                     self.selection_bridge.stop()
@@ -6567,6 +6584,9 @@ async def main_async(app: Buddy) -> None:
     # so subsequent launches use the same approved voice/selection settings.
     if IS_WIN and os.environ.get("BUDDY_ENABLE_SELECTION") == "1":
         app.settings.set("selection_hotkey", True)
+    if IS_WIN and os.environ.get("BUDDY_SELECTION_AUTO") == "1":
+        app.settings.set("selection_hotkey", True)
+        app.settings.set("selection_auto", True)
     if IS_WIN and os.environ.get("BUDDY_ENABLE_VOICE") == "1":
         app.settings.set("voice_enabled", True)
     if os.environ.get("BUDDY_STT_CPU") == "1":
