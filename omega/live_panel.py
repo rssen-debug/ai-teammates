@@ -449,7 +449,7 @@ class LivePanel:
                     "Play Tetris. Your input contains the actual board, piece, and a list "
                     "of legal moves [id,x,landing,cells]. YOU must decide based on "
                     "survival, holes and line clears. Reply ONLY with a concise "
-                    "decision e.g. {\\\"move\\\":3,\\\"reason\\\":\\\"avoid a hole\\\"}. "
+                    "decision e.g. move:3 reason:avoid_holes. "
                     "No lengthy reasoning. Never invent an id."},
                     {"role": "user", "content": prompt}],
                 max_tokens=220, timeout=45)
@@ -472,7 +472,7 @@ class LivePanel:
                         {"role": "user", "content":
                          "Choose the next move using the actual board and candidate landings. "
                          "Allowed ids: " + ",".join(map(str, sorted(allowed))) +
-                         "\\nBoard and candidates: " + prompt},
+                         "\nBoard and candidates: " + prompt},
                     ], max_tokens=100, timeout=30)
                 retry_text = (retry.get("message") or {}).get("content") or ""
                 chosen, rationale = parse_tetris_move(retry_text, allowed)
