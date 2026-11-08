@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import tempfile
+import sys
+from contextlib import closing
 import unittest
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from genesis_telemetry import ExperienceLedger
 
 
@@ -26,7 +29,7 @@ class GenesisTelemetryTest(unittest.TestCase):
             self.assertEqual(snapshot["previous_week"], [1, 0])
             self.assertEqual(snapshot["trend_pp"], -50.0)
             self.assertIsNone(snapshot["needs_practice"])
-            with again._connect() as conn:
+            with closing(again._connect()) as conn:
                 cols = [row[1] for row in conn.execute("PRAGMA table_info(outcomes)")]
             self.assertEqual(cols, ["id", "ts", "category", "ok"])
 
