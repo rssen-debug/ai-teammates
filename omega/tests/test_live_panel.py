@@ -84,6 +84,35 @@ class PanelTest(unittest.TestCase):
         self.assertNotIn("run_command", p._chat.text)
         self.assertEqual(len(p.trace), 1)
 
+    def test_sidebar_redraw_never_calls_blocking_companion_methods(self):
+        p = self.build()
+        class FailsIfPolled:
+            def __getattr__(self, name):
+                raise AssertionError("render unexpectedly accessed Companion: " + name)
+        p.app.companion = FailsIfPolled()
+        rendered = "".join(text for _, text in p._side_text())
+        self.assertIn("OMEGA", rendered.upper() + "OMEGA")
+
+    def test_companion_cache_update_keeps_render_pure(self):
+        p = self.build()
+        class FakeLoop:
+            captures = 0
+            last_capture_at = 0
+            last_tick_at = 0
+            last_capture_note = "capture not configured"
+            ticks = 0
+            def options(self):
+                return {"enabled": True, "capture_seconds": 30, "tick_seconds": 30}
+            def idle_seconds(self):
+                return 12
+        loop = FakeLoop()
+        p.app.companion = SimpleNamespace(present=lambda: (True, ""), loop=loop)
+        p._read_companion_state()
+        self.assertEqual(p._cached_idle_seconds, 12)
+        self.assertTrue(p._cached_companion_enabled)
+        rendered = "".join(text for _, text in p._side_text())
+        self.assertIn("COMPANION: LIVE", rendered)
+
     def test_submit_is_visible_before_agent_runs(self):
         p = self.build()
         field = SimpleNamespace(text="hej, kan du hjälpa mig?")
