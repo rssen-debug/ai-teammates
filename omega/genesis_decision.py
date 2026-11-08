@@ -7,6 +7,12 @@ never executes anything; executor and model must still verify the live state.
 from __future__ import annotations
 
 import re
+import sqlite3
+import time
+from contextlib import closing
+from pathlib import Path
+
+from genesis_telemetry import default_path
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -42,6 +48,7 @@ class Decision:
     missing_tools: tuple[str, ...]
     confidence: str
     failure_hint: str = ""
+    reliability_hint: str = ""
 
     def prompt(self) -> str:
         if self.domain == "chat":
@@ -55,6 +62,7 @@ class Decision:
                 "If required tools are not loaded, use tool_search and check their real availability; "
                 "never claim a tool ran from this plan. "
                 + (f"Prior failure: {self.failure_hint}. " if self.failure_hint else "")
+                + (f"Measured history: {self.reliability_hint}. " if self.reliability_hint else "")
                 + "Observe -> act within permissions -> verify independent outcome.")
 
 
@@ -68,7 +76,8 @@ def _domains(goal: str) -> list[str]:
 
 
 def decide(goal: str, available_tools: Iterable[str] = (),
-           failures: Iterable[str] = (), tool_status: dict | None = None) -> Decision:
+           failures: Iterable[str] = (), tool_status: dict | None = None,
+           historical: dict | None = None) -> Decision:
     """Deterministic, no side effects, no model/cost/permission changes.
 
     Status values must be real booleans. Unknown status counts as unavailable.
@@ -93,7 +102,60 @@ def decide(goal: str, available_tools: Iterable[str] = (),
         available_tools=ready, missing_tools=missing,
         confidence="heuristic" if domains else "no_task_signal",
         failure_hint=hint,
+        reliability_hint=reliability_guidance(historical),
     )
+
+
+def reliability_guidance(stats: dict | None) -> str:
+    """Never infer a win or a capability claim from sparse evidence."""
+    if not isinstance(stats, dict) or int(stats.get("count", 0)) < 5:
+        return ""
+    attempts = max(1, int(stats["count"]))
+    wins = min(attempts, max(0, int(stats.get("verified", 0))))
+    rate = wins / attempts
+    if rate < .5:
+        return (f"only {wins}/{attempts} recent tasks were verified. "
+                "Prefer smaller reversible steps and independent read-back checks")
+    return (f"{wins}/{attempts} recent tasks were verified. "
+            "Still check the result of this new task independently")
+
+
+class DecisionHistory:
+    """No goals/filenames/prompts; just domain outcome counters, last 200 cases."""
+
+    def __init__(self, path: Path | None = None):
+        self.path = Path(path) if path else default_path().with_name("genesis-decisions.sqlite3")
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with closing(sqlite3.connect(self.path, timeout=5)) as db:
+            db.execute("""CREATE TABLE IF NOT EXISTS decisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts INTEGER NOT NULL,
+                domain TEXT NOT NULL,
+                verified INTEGER NOT NULL CHECK(verified IN (0,1)),
+                steps INTEGER NOT NULL
+            )""")
+            db.commit()
+
+    def record(self, domain: str, outcome, steps: int) -> None:
+        if domain not in ROLE_FOR_DOMAIN or domain == "chat":
+            return
+        verified = int(getattr(outcome, "status", None) == "complete" and
+                       getattr(outcome, "verified", None) is True)
+        with closing(sqlite3.connect(self.path, timeout=5)) as db:
+            db.execute("INSERT INTO decisions(ts,domain,verified,steps) VALUES (?,?,?,?)",
+                       (int(time.time()), domain, verified, max(0, int(steps))))
+            db.execute("""DELETE FROM decisions WHERE id NOT IN (
+                SELECT id FROM decisions ORDER BY id DESC LIMIT 200)""")
+            db.commit()
+
+    def snapshot(self, domain: str) -> dict:
+        if domain not in ROLE_FOR_DOMAIN:
+            return {"count": 0, "verified": 0, "avg_steps": None}
+        with closing(sqlite3.connect(self.path, timeout=5)) as db:
+            row = db.execute("""SELECT COUNT(*),COALESCE(SUM(verified),0),AVG(steps)
+                FROM decisions WHERE domain=?""", (domain,)).fetchone()
+        return {"count": row[0], "verified": row[1],
+                "avg_steps": round(row[2], 1) if row[2] is not None else None}
 
 
 def compare_strategies(cases: Iterable[dict]) -> dict:
