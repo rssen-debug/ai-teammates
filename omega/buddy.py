@@ -4512,6 +4512,26 @@ class NullUI:
         return self.answer
 
 
+def render_cli_reply(text: str) -> str:
+    """Render basic Markdown as readable terminal text, without raw ** markers."""
+    output = []
+    in_code = False
+    for line in str(text or "").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            output.append(C.c(C.DIM, "    " + line))
+            continue
+        line = re.sub(r"^\\s{0,3}#{1,4}\\s+", "", line)
+        line = re.sub(r"^\\s*[-*]\\s+", "  • ", line)
+        line = re.sub(r"\\*\\*(.+?)\\*\\*", lambda m: C.bold(m.group(1)), line)
+        line = re.sub(r"`([^`]+)`", lambda m: C.c(C.CY, m.group(1)), line)
+        output.append(line)
+    return "\\n".join(output)
+
+
 class CLI:
     def __init__(self, app: "Buddy") -> None:
         self.app = app
@@ -4566,7 +4586,7 @@ class CLI:
         self._out(C.c(C.MG, "◆ ") + C.c(C.DIM, s))
 
     def say(self, s: str) -> None:
-        self._out(C.c(C.CY, "buddy › ") + s.replace("\n", "\n        "))
+        self._out(C.c(C.CY, "buddy › ") + render_cli_reply(s).replace("\n", "\n        "))
 
     def prompt(self) -> None:
         if self.app.current_run is None and self.pending is None:
