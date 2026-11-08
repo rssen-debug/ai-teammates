@@ -10,7 +10,7 @@ from types import SimpleNamespace
 OMEGA = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(OMEGA))
 
-from live_panel import LivePanel, remaining_seconds, clean_line, evidence_progress, pixel_companion, companion_stage, companion_personality, measured_axis_rows
+from live_panel import LivePanel, remaining_seconds, clean_line, evidence_progress, pixel_companion, companion_stage, companion_personality, measured_axis_rows, evidence_focus
 
 
 class FakeCLI:
@@ -172,6 +172,22 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(rows[3][2], None)
         self.assertEqual(measured_axis_rows({}), [])
         self.assertEqual(measured_axis_rows({"axes": "bad"}), [])
+
+    def test_recommended_next_test_is_not_fake_learning(self):
+        p = self.build()
+        p._cached_level = {
+            "level": 16, "measured_events": 39,
+            "evidence_full": 250, "raw_level": 45,
+            "axes": [{"axis": "A", "value": .9, "measured": True},
+                     {"axis": "E", "value": .2, "measured": True}],
+        }
+        original = dict(p._cached_level)
+        shown = "".join(part[1] for part in p._side_text())
+        self.assertIn("NÄSTA TEST: Kör reproducerbara benchmark", shown)
+        self.assertIn("Mot nästa nivå", shown)
+        self.assertEqual(p._cached_level, original)
+        self.assertEqual(p._tool_successes, 0)
+        self.assertIsNone(evidence_focus({"axes": []}))
 
     def test_progress_does_not_change_ai_level_or_evidence(self):
         p = self.build()
