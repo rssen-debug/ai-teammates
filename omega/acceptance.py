@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -150,6 +151,27 @@ def _majin_env(ctx: Ctx) -> Optional[dict]:
 # ════════════════════════════════════════════════════════════════════════════
 # 1–3 · INSTALLATION
 # ════════════════════════════════════════════════════════════════════════════
+def verify_problem_class(verify_output: str) -> tuple[str, list[str]]:
+    """Classify a failing `install.ps1 -Verify` run: ("blocked"|"fail", problems).
+
+    The installer prints every problem as a line starting "x " and ends with
+    "x verification FAILED: N problem(s)".
+
+    "blocked" is returned only when the missing dependencies are the ENTIRE set of
+    problems, which means the installer was never run on this machine — a CI runner
+    has no numpy, faster-whisper, websocket-client, winsdk or edge-tts, and reporting
+    that as a product failure is the same host-precondition-as-failure mistake as
+    benchmark B13, the Notepad check and the voice check. Any other problem, alone or
+    alongside missing dependencies, stays a failure: a broken manifest, a missing
+    entrypoint, a missing launcher or a failing `buddy doctor` must not be able to
+    hide behind an uninstalled host.
+    """
+    problems = [ln.strip() for ln in verify_output.splitlines()
+                if re.match(r"^\s*x\s+", ln) and "verification FAILED" not in ln]
+    deps_only = bool(problems) and all("required dependencies are missing" in p for p in problems)
+    return ("blocked" if deps_only else "fail"), problems
+
+
 def s01_fresh_install(ctx: Ctx) -> Result:
     """The installer must exist, be valid, and contain no hardcoded user paths."""
     if not INSTALLER.is_file():
@@ -175,9 +197,34 @@ def s01_fresh_install(ctx: Ctx) -> Result:
     if IS_WIN:
         rc = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(INSTALLER),
                              "-Verify"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
-        ctx.save("01-installer-verify.txt", rc.stdout + rc.stderr)
+        out = (rc.stdout or "") + (rc.stderr or "")
+        ctx.save("01-installer-verify.txt", out)
         if rc.returncode != 0:
-            return Result(FAIL, f"install.ps1 -Verify exited {rc.returncode}: {(rc.stderr or rc.stdout)[-400:]}", ev)
+            # The installer prints every problem as a line starting "x ", and ends
+            # with "x verification FAILED: N problem(s)". Counting those lines lets
+            # the two very different reasons for a non-zero exit be told apart.
+            kind, problems = verify_problem_class(out)
+            ev["verify_problems"] = problems
+            if kind == "blocked":
+                # The installer was never RUN on this machine, only verified. A CI
+                # runner has no numpy, faster-whisper, websocket-client, winsdk or
+                # edge-tts, so -Verify correctly reports them absent. That is a true
+                # statement about this host, not a defect in the installer — reporting
+                # it as FAIL is the same host-precondition-as-failure mistake as
+                # benchmark B13, the Notepad check and the voice check.
+                #
+                # Any OTHER problem still fails the scenario, so a broken manifest, a
+                # missing entrypoint, a missing launcher or a failing `buddy doctor`
+                # cannot hide behind this branch.
+                return Result(BLOCKED,
+                              f"install.ps1 -Verify ran and reported only absent dependencies "
+                              f"({len(problems)} problem(s)) — the installer has not been run on this "
+                              f"host, so its dependency set cannot be verified here", ev,
+                              unproven="executing the installer itself, which is what actually "
+                                       "creates the venv and installs the dependencies",
+                              fix="powershell -NoProfile -ExecutionPolicy Bypass -File omega/install/install.ps1")
+            return Result(FAIL, f"install.ps1 -Verify exited {rc.returncode}: "
+                                f"{'; '.join(problems) or out[-400:]}", ev)
         return Result(PASS, detail + "; install.ps1 -Verify ran clean on Windows", ev)
     return Result(PASS, detail, ev,
                   unproven="actually executing the installer needs Windows; run `buddy accept 1` there",

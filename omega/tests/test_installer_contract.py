@@ -19,7 +19,10 @@ scenario 1 records honestly that executing it still needs a real Windows host.
 
 from __future__ import annotations
 
+import json
 import re
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -183,6 +186,68 @@ class TestNoDriftFromTheProduct(unittest.TestCase):
         invoked = self._invoked_subcommands()
         self.assertIn("doctor", invoked, "the installer must actually run `buddy doctor`")
         self.assertIn("deps", invoked, "the installer must read the product's own dependency policy")
+
+
+class TestAcceptanceReadsTheInstallerCorrectly(unittest.TestCase):
+    """Scenario 1 must tell "this host has no installer" from "the installer is broken".
+
+    The two look identical from the outside: `install.ps1 -Verify` exits non-zero.
+    A CI runner never ran the installer, so verification correctly reports the
+    dependencies absent — that is a statement about the host, not a defect. But a
+    missing entrypoint, a missing launcher or a failing `buddy doctor` IS a defect,
+    and must keep failing even on a machine where the dependencies also happen to be
+    missing.
+
+    Run in a child process: acceptance.py repoints BUDDY_HOME at import, which must
+    not happen inside a live test session.
+    """
+
+    CHILD = """
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import acceptance
+cases = json.loads(sys.argv[2])
+print(json.dumps({k: acceptance.verify_problem_class(v)[0] for k, v in cases.items()}))
+"""
+
+    def _classify(self, cases: dict) -> dict:
+        proc = subprocess.run(
+            [sys.executable, "-c", self.CHILD, str(OMEGA), json.dumps(cases)],
+            capture_output=True, text=True, timeout=180, encoding="utf-8", errors="replace")
+        self.assertEqual(proc.returncode, 0, f"child failed: {proc.stderr[-2000:]}")
+        return json.loads(proc.stdout.strip().splitlines()[-1])
+
+    def test_absent_dependencies_alone_are_blocked_not_failed(self) -> None:
+        out = ("  + installer contract OK\n"
+               "  x required dependencies are missing:\n"
+               "numpy faster-whisper websocket-client winsdk edge-tts\n"
+               "  x verification FAILED: 1 problem(s)\n")
+        self.assertEqual(self._classify({"ci": out})["ci"], "blocked")
+
+    def test_a_structural_problem_still_fails(self) -> None:
+        cases = {
+            "entrypoint": "  x entrypoint missing: C:\\app\\omega\\buddy.py\n"
+                          "  x verification FAILED: 1 problem(s)\n",
+            "launcher": "  x launcher missing: C:\\app\\omega\\launcher\\buddy.cmd\n"
+                        "  x verification FAILED: 1 problem(s)\n",
+            "doctor": "  x buddy doctor runtime reported problems (exit 1)\n"
+                      "  x verification FAILED: 1 problem(s)\n",
+            # the dangerous case: a real defect hiding behind an uninstalled host
+            "both": "  x entrypoint missing: C:\\app\\omega\\buddy.py\n"
+                    "  x required dependencies are missing:\nnumpy\n"
+                    "  x verification FAILED: 2 problem(s)\n",
+        }
+        got = self._classify(cases)
+        self.assertEqual(got, {k: "fail" for k in cases},
+                         "a structural problem must fail the scenario even when "
+                         "dependencies are also missing")
+
+    def test_a_clean_verify_is_not_a_failure(self) -> None:
+        got = self._classify({"ok": "  + install.ps1 -Verify completed clean\n"})
+        self.assertEqual(got["ok"], "fail",
+                         "an empty problem list is not evidence of an uninstalled host; "
+                         "only a non-zero exit reaches this classifier")
+
 
 
 if __name__ == "__main__":
