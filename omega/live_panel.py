@@ -192,6 +192,22 @@ def pixel_companion(mode: str, frame: int = 0,
     )
 
 
+SKILL_LABELS = (
+    ("FILER", ("file", "fil", "folder", "mapp", "path", "directory", "read", "write")),
+    ("WEBB", ("browser", "chrome", "web", "url", "dom", "page", "sida")),
+    ("KOD", ("python", "script", "code", "git", "repo", "test", "kod")),
+    ("WINDOWS", ("window", "uia", "desktop", "powershell", "process", "fönster")),
+)
+
+def observed_skill(tool_label: str) -> str:
+    """Visible, best-effort category; never learning evidence."""
+    label = clean_line(tool_label, 150).casefold()
+    for name, keywords in SKILL_LABELS:
+        if any(word in label for word in keywords):
+            return name
+    return "ÖVRIGT"
+
+
 class LivePanel:
     """Factory-backed UI: uses the existing CLI contract, not a second agent."""
 
@@ -252,6 +268,10 @@ class LivePanel:
         self._last_answer_at = 0.0
         self._run_state = "VÄNTAR"
         self._run_state_detail = ""
+        # Session observations, not claimed model intelligence or persistent levels.
+        self._skill_checks = {name: [0, 0] for name in ("FILER", "WEBB", "KOD", "WINDOWS", "ÖVRIGT")}
+        self._evolution_timeline: deque[tuple[str, str]] = deque(maxlen=6)
+        self._current_skill = "ÖVRIGT"
         self.show_thinking = True
         self.events: deque[str] = deque(maxlen=24)
         self._stream_text = ""
@@ -544,6 +564,22 @@ class LivePanel:
             add("│ SENAST LYCKAT · ännu inget", "#d9b7cf")
         add("╰── Bara riktiga verktygshändelser ─╯", "#ff90c8")
         add("Verktygsutfall ≠ verifierad AI-level", "#a795a6")
+        add("╭──── EVOLUTION · SKILL MAP ───╮", "#80f4b2")
+        for skill, (won, lost) in self._skill_checks.items():
+            total = won + lost
+            if total:
+                blocks = min(8, won)
+                add(f"│ {skill:<8} {'▰' * blocks}{'▱' * (8-blocks)} {won}/{total}", "#baf3d2")
+            else:
+                add(f"│ {skill:<8} ▱▱▱▱▱▱▱▱ --", "#839e92")
+        add("│ Staplar = lyckade tool calls/session", "#92aea3")
+        add("╰── Inga nivåer från animationer ─╯", "#80f4b2")
+        add("EVOLUTION · SENASTE HÄNDELSER", "bold #ff90c8")
+        if self._evolution_timeline:
+            for when, label in reversed(self._evolution_timeline):
+                add(f"{when} · {label}", "#c9e6d3")
+        else:
+            add("Ännu inga avslutade händelser", "#91a89d")
 
         # Never re-read SQLite inside prompt_toolkit rendering.
         if stamp - self._level_checked_at >= 45:
@@ -693,6 +729,7 @@ class LivePanel:
         panel.step_time = time.monotonic()
         panel._progress_phase = "WORK"
         panel.trace.append((panel.tool, None, time.time()))
+        panel._current_skill = observed_skill(panel.tool)
         panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.tool)
         panel._refresh()
 
@@ -706,6 +743,12 @@ class LivePanel:
         panel._last_tool_duration = duration
         panel._last_tool_event_at = time.monotonic()
         panel._progress_outcomes.append(bool(ok))
+        category = observed_skill(panel.trace[-1][0]) if panel.trace else panel._current_skill
+        counts = panel._skill_checks[category]
+        counts[0 if ok else 1] += 1
+        panel._evolution_timeline.append((
+            datetime.now().strftime("%H:%M"),
+            ("✓ " if ok else "✕ ") + category + " · " + clean_line(panel.tool, 21)))
         if ok:
             panel._tool_successes += 1
             panel._tool_streak += 1
@@ -734,10 +777,12 @@ class LivePanel:
         verified = bool(result.verified) and result.status in ("complete", "answered")
         # A fluent model answer is activity, never proof of new capability.
         panel._answers_delivered += 1
+        panel._evolution_timeline.append((datetime.now().strftime("%H:%M"), "AI-svar levererat"))
         panel._last_answer_at = time.monotonic()
         independently_checked = bool(run.ledger) and verified and result.status == "complete"
         if independently_checked:
             panel._verified_work += 1
+            panel._evolution_timeline.append((datetime.now().strftime("%H:%M"), "✓ Uppgift verifierad"))
             panel._run_state = "VERIFIERAD UPPGIFT"
             panel.action_result = "Uppgiften klar med registrerade verktygsresultat."
         elif verified and not run.ledger and result.status == "answered":
@@ -745,6 +790,7 @@ class LivePanel:
             panel.action_result = "Svar levererat. Inga verktygssteg utfördes eller verifierades."
         else:
             panel._unverified_work += 1
+            panel._evolution_timeline.append((datetime.now().strftime("%H:%M"), "△ Ej verifierat"))
             panel._run_state = "EJ VERIFIERAT"
             panel.action_result = "Körningen avslutad utan oberoende verifiering."
         panel.action_title = "AI-svar levererat" if not run.ledger else "Uppgift avslutad"
