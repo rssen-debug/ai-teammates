@@ -1882,6 +1882,19 @@ class Memory:
     def __init__(self, store: Store):
         self.s = store
 
+    def _mirror_obsidian(self, kind: str, title: str, content: str, status: str) -> None:
+        """Only explicit durable memory types are mirrored, not every chat line."""
+        if not Settings(self.s).get("obsidian_auto_memory", False):
+            return
+        module = sibling("personal_memory")
+        if module is None or kind not in module.ObservationVault.KNOWLEDGE_KINDS:
+            return
+        try:
+            vault = Path(Settings(self.s).get("obsidian_vault") or HOME / "obsidian-vault").expanduser()
+            module.ObservationVault(vault).record_knowledge(kind, title, content, status)
+        except Exception as exc:
+            log("obsidian_knowledge_mirror_failed", kind=kind, error=type(exc).__name__)
+
     @staticmethod
     def dedupe_key(kind: str, title: str, content: str) -> str:
         norm = re.sub(r"\s+", " ", f"{title}\n{content}".strip().lower())
@@ -1899,10 +1912,13 @@ class Memory:
             self.s.x("UPDATE memories SET content=?, tags=?, status=?, updated=?, source_run=?, dedupe=?, "
                      "provenance=COALESCE(?, provenance), scope=COALESCE(NULLIF(?,''), scope) WHERE id=?",
                      (content, tags, status, t, run_id, dedupe, prov, scope, ex["id"]))
+            self._mirror_obsidian(kind, title, content, status)
             return ex["id"]
-        return self.s.x("INSERT INTO memories(kind,title,content,tags,status,source_run,created,updated,dedupe,provenance,scope) "
-                        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                        (kind, title, content, tags, status, run_id, t, t, dedupe, prov, scope)).lastrowid
+        new_id = self.s.x("INSERT INTO memories(kind,title,content,tags,status,source_run,created,updated,dedupe,provenance,scope) "
+                          "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                          (kind, title, content, tags, status, run_id, t, t, dedupe, prov, scope)).lastrowid
+        self._mirror_obsidian(kind, title, content, status)
+        return new_id
 
     def search(self, query: str, kind: str | None = None, limit: int = 6, touch: bool = True,
                scope: str | None = None, kinds: tuple | None = None) -> list[dict]:
