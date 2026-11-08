@@ -233,6 +233,14 @@ class LivePanel:
         self._build_state = "ej startad"
         self._build_step = 0
         self._build_error = ""
+        self._tetris_ai_state = "väntar"
+        self._tetris_ai_calls = 0
+        self._tetris_ai_moves = 0
+        self._tetris_ai_failed = 0
+        self._tetris_last_decision = ""
+        self._tetris_retry_after = 0.0
+        self._tetris_wait_started = 0.0
+        self._tetris_decision_task: asyncio.Task | None = None
         self.tool = "-"
         self.step_time = 0.0
         self.queue: asyncio.Queue[str] = asyncio.Queue()
@@ -295,6 +303,8 @@ class LivePanel:
             self._companion_task.cancel()
         if self._tetris_task is not None:
             self._tetris_task.cancel()
+        if self._tetris_decision_task is not None:
+            self._tetris_decision_task.cancel()
         if self.application.is_running:
             self.application.exit()
 
@@ -365,25 +375,104 @@ class LivePanel:
         else:
             update()
 
-    async def _tetris_loop(self) -> None:
-        """Live game state, not fabricated AI activity or an AI level shortcut.
+    async def _tetris_decide(self) -> None:
+        """Every placement is a REAL gateway decision, checked against legal moves.
 
-        The coding task is a distinct, durable tool-driven process in the task DB.
-        Polling that state happens in a worker thread so typing remains responsive.
+        This call uses the same configured provider, does not claim any learning,
+        and pauses instead of simulating AI moves when the API is unavailable.
         """
+        game = self._tetris
+        if game is None or not game.awaiting_move:
+            return
+        try:
+            from pixel_tetris import WIDTH, HEIGHT
+            import json
+            choices = game.choices()
+            if not choices:
+                self._tetris_ai_state = "inga lagliga drag"
+                self._tetris_retry_after = time.monotonic() + 30
+                return
+            # Send real board and each legal landing to the language model.
+            # Candidate ids are identifiers, NOT pre-ranked recommendations.
+            prompt = json.dumps({
+                "board": ["".join("#" if cell else "." for cell in row) for row in game.board],
+                "piece": [list(point) for point in game.shape],
+                "width": WIDTH, "height": HEIGHT,
+                "legal_moves": [{"id": m["id"], "x": m["x"],
+                                 "cells": [list(pt) for pt in m["cells"]],
+                                 "landing": m["landing"]} for m in choices],
+            }, separators=(",", ":"))
+            self._tetris_ai_state = "AI väljer drag..."
+            self._tetris_wait_started = time.monotonic()
+            self._refresh()
+            model = self.app.router.resolve("chat")
+            self._tetris_ai_calls += 1
+            result = await self.app.gateway.chat(
+                model, [{"role": "system", "content":
+                    "You are the real Tetris player. Choose one legal move id based on "
+                    "board geometry and expected survival / completed lines. "
+                    "Return only JSON with an integer field named move. "
+                    "Never invent an id not in legal_moves."},
+                    {"role": "user", "content": prompt}],
+                max_tokens=60, timeout=35)
+            answer = (result.get("message") or {}).get("content") or ""
+            match = re.search(r'\\{[^{}]*"move"\\s*:\\s*(\\d+)[^{}]*\\}', answer)
+            if not match:
+                raise ValueError("AI svarade utan giltigt JSON-drag")
+            chosen = int(match.group(1))
+            if not game.choose(chosen):
+                raise ValueError("AI föreslog ogiltigt drag")
+            self._tetris_ai_moves += 1
+            elapsed = time.monotonic() - self._tetris_wait_started
+            self._tetris_last_decision = f"Drag {chosen} · {elapsed:.1f}s · AI-verifierat"
+            self._tetris_ai_state = "pjäs faller"
+            self.events.append(datetime.now().strftime("%H:%M:%S") + " · AI Tetris: " + self._tetris_last_decision)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self._tetris_ai_failed += 1
+            self._tetris_ai_state = "AI PAUSAD · " + type(exc).__name__
+            self._tetris_last_decision = "Inget drag godkänt"
+            self._tetris_retry_after = time.monotonic() + min(120, 10 * self._tetris_ai_failed)
+            self.events.append(datetime.now().strftime("%H:%M:%S") + " · AI Tetris blockerad: " + type(exc).__name__)
+        finally:
+            self._refresh()
+
+    async def _tetris_loop(self) -> None:
         try:
             from pixel_tetris import PixelTetris
             self._tetris = PixelTetris()
         except Exception as exc:
             self._build_error = "Tetris engine: " + type(exc).__name__
             return
+        last_tasks_poll = 0.0
         while True:
             try:
-                self._tetris.tick()
+                current = time.monotonic()
+                if current - last_tasks_poll > 5:
+                    last_tasks_poll = current
+                    if getattr(self.app, "tasks", None) is not None:
+                        await asyncio.to_thread(self._poll_build_state)
+                if self._tetris.awaiting_move:
+                    busy = bool(self.app.current_run) or bool(getattr(
+                        getattr(self.app, "tasks", None), "current", {}))
+                    has_key = bool(self.app.gateway.key())
+                    if busy:
+                        self._tetris_ai_state = "pausad för användaren/uppgift"
+                    elif not has_key:
+                        self._tetris_ai_state = "BLOCKERAD · ingen AI-nyckel"
+                    elif (current >= self._tetris_retry_after and
+                          (self._tetris_decision_task is None or self._tetris_decision_task.done())):
+                        self._tetris_decision_task = asyncio.create_task(self._tetris_decide())
+                else:
+                    result = self._tetris.tick()
+                    if result in ("lock", "clear", "game_over"):
+                        self._tetris_ai_state = "nästa AI-beslut"
+                        self.events.append(datetime.now().strftime("%H:%M:%S") + " · Tetris " + result)
                 self._refresh()
-                if self.app.tasks:
-                    await asyncio.to_thread(self._poll_build_state)
             except asyncio.CancelledError:
+                if self._tetris_decision_task:
+                    self._tetris_decision_task.cancel()
                 raise
             except Exception as exc:
                 self._build_error = type(exc).__name__
@@ -518,6 +607,12 @@ class LivePanel:
             add(f"Poäng {self._tetris.score} · rader {self._tetris.lines} · pjäser {self._tetris.pieces}", "#ffffff")
         else:
             add("Spelmotor ej startad", "#bca8bc")
+        add("SPELARE: Kilo AI · " + self._tetris_ai_state, "#ff8fc5")
+        add(f"AI-drag {self._tetris_ai_moves} / anrop {self._tetris_ai_calls}", "#ffffff")
+        if self._tetris_last_decision:
+            add(self._tetris_last_decision, "#d4b7c9")
+        if self._tetris_ai_failed:
+            add("AI-fel: " + str(self._tetris_ai_failed), "#ff9ba6")
         add("AI BYGGER: " + self._build_state, "#ff8fc5")
         if self._build_step:
             add("Agentsteg: " + str(self._build_step), "#ffffff")
