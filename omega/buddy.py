@@ -5863,6 +5863,14 @@ class Buddy:
                 pattern = PlaybookStore().suggest(run.goal)
                 if pattern:
                     parts.append("GENESIS V3 REUSABLE PLAYBOOK (advisory, not executable): " + pattern)
+        # Self-maintenance only: deterministic, read-only AST index of our own
+        # modules. Never inspect user projects or alter code automatically.
+        if not self.privacy.private:
+            with contextlib.suppress(Exception):
+                from genesis_code_map import source_map_for_goal
+                code_index = source_map_for_goal(run.goal)
+                if code_index:
+                    parts.append("GENESIS V3 SOURCE MAP: " + code_index)
         if IS_WIN and not run.background:
             with contextlib.suppress(Exception):
                 t = self.world.target()
