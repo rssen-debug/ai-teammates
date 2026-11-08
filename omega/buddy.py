@@ -4290,7 +4290,17 @@ class AgentRun:
                     "dev_run_tests": "Testar ändringarna", "browser_context": "Undersöker webbläsaren"}.get(name, label)
         phase = ("VERIFIERAR" if spec.observes and self.last_effect >= 0 else
                  "UTFÖR" if spec.effect else "UNDERSÖKER")
-        app.ui.step(f"{C.c(C.B, phase)}  {category}  {C.c(C.DIM, '[' + name + ']')}")
+        why = {"tool_search": "hittar rätt verktyg", "desktop_context": "förstår din miljö",
+               "screen_observe": "läser verkligt UI-innehåll",
+               "screen_describe": "ser det UI-text inte kan visa",
+               "file_read": "samlar underlag", "file_write": "genomför ändringen",
+               "run_command": "utför nästa tekniska steg",
+               "process_list": "kontrollerar om arbetet är klart",
+               "dev_run_tests": "kontrollerar att ändringen fungerar",
+               "browser_context": "kontrollerar aktuell webbsida"}.get(name, "")
+        app.ui.step(f"{C.c(C.B, phase)}  {category}"
+                    + (C.c(C.DIM, '  · ' + why) if why else "")
+                    + f"  {C.c(C.DIM, '[' + name + ']')}")
         res = await app.executor.execute(spec, args, ToolContext(app, self, self.task_id, self.background, self.resumed))
         self.seq += 1
         res.evidence_id = f"ev{self.seq}"
