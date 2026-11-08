@@ -5273,6 +5273,13 @@ class CompanionSubsystem:
         return {"content": msg.get("content", "") if isinstance(msg, dict) else str(msg),
                 "tokens": int(usage.get("total_tokens") or usage.get("tokens") or 0)}
 
+    def _screen_context(self) -> dict:
+        """Never observe Buddy's own credential-bearing terminal as screen activity."""
+        w = self.app.world.target()
+        if not w or self.app.world.is_buddy_host(w):
+            return {}
+        return {"title": w.get("title", ""), "app": w.get("app", "")}
+
     @property
     def loop(self) -> Any:
         m = self.need()
@@ -5281,7 +5288,7 @@ class CompanionSubsystem:
                 self.app.settings, observation=self.observation, model=self.model,
                 store=self.app.store, memory=self.app.memory,
                 chat=self._chat, idle_probe=self.idle_seconds, pending_input=self._pending,
-                capture_context=lambda: self.app.world.target() or {},
+                capture_context=self._screen_context,
                 log_fn=lambda ev, **kw: log(ev, **kw))
         return self._loop
 
