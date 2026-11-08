@@ -211,6 +211,8 @@ class LivePanel:
         self._last_level_change = 0.0
         self._level_checked_at = 0.0
         self._level_task: asyncio.Task | None = None
+        self._companion_task: asyncio.Task | None = None
+        self._cached_idle_seconds: float = 0.0
         self._cached_companion: Any = None
         self._cached_companion_options: dict = {}
         self._cached_companion_enabled = False
@@ -263,11 +265,14 @@ class LivePanel:
     def start(self) -> None:
         self._loop = asyncio.get_running_loop()
         self.task = self._loop.create_task(self.application.run_async())
+        self._companion_task = self._loop.create_task(self._companion_poll())
 
     async def read_line(self) -> str:
         return await self.queue.get()
 
     def close(self) -> None:
+        if self._companion_task is not None:
+            self._companion_task.cancel()
         if self.application.is_running:
             self.application.exit()
 
@@ -304,6 +309,38 @@ class LivePanel:
         else:
             update()
 
+    async def _companion_poll(self) -> None:
+        """Collect potentially blocking settings/Windows idle data outside UI rendering."""
+        while True:
+            try:
+                await asyncio.to_thread(self._read_companion_state)
+                self._refresh()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                self._cached_companion = None
+                self._cached_companion_enabled = False
+                self._cached_companion_options = {}
+            await asyncio.sleep(8)
+
+    def _read_companion_state(self) -> None:
+        try:
+            companion = self.app.companion
+            loop = companion.loop if companion.present()[0] else None
+            options = loop.options() if loop else {}
+            idle = float(loop.idle_seconds()) if loop else 0.0
+            with self._lock:
+                self._cached_companion = loop
+                self._cached_companion_options = options
+                self._cached_companion_enabled = bool(options.get("enabled"))
+                self._cached_idle_seconds = idle
+        except Exception:
+            with self._lock:
+                self._cached_companion = None
+                self._cached_companion_options = {}
+                self._cached_companion_enabled = False
+                self._cached_idle_seconds = 0.0
+
     async def _refresh_level(self) -> None:
         try:
             self._cached_level = await asyncio.to_thread(lambda: self.app.settings.get("level") or self.app.level_snapshot())
@@ -319,18 +356,8 @@ class LivePanel:
             lines.append((style, clean_line(text, 55) + "\n"))
 
         running = bool(app.current_run)
-        # Avoid loading the profile/SQLite and lazy Companion subsystem on
-        # every 1-second redraw: doing so stalls the terminal input.
-        if time.monotonic() - self._companion_checked_at >= 8:
-            self._companion_checked_at = time.monotonic()
-            try:
-                self._cached_companion = app.companion.loop if app.companion.present()[0] else None
-                self._cached_companion_options = self._cached_companion.options() if self._cached_companion else {}
-                self._cached_companion_enabled = bool(self._cached_companion_options.get("enabled"))
-            except Exception:
-                self._cached_companion = None
-                self._cached_companion_enabled = False
-                self._cached_companion_options = {}
+        # Rendering must NEVER query SQLite, discover plugins or poll Win32.
+        # The dedicated companion poll above maintains these cached values.
         comp = self._cached_companion
         comp_enabled = self._cached_companion_enabled
         observing = bool(comp_enabled and comp and comp.captures > 0
@@ -368,7 +395,7 @@ class LivePanel:
             if comp.last_capture_at == 0:
                 next_capture = "första körning ej klar"
             add("Nästa skärmkoll: " + next_capture)
-            idle = max(0, float(comp.idle_seconds()))
+            idle = max(0, float(self._cached_idle_seconds))
             threshold = float(opts.get("idle_seconds", 180))
             add("Reflektion vid vila: " + f"{max(0, int(threshold-idle))} s")
             add("Lyckade skärmkoller: " + str(comp.captures))
