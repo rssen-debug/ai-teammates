@@ -95,6 +95,8 @@ class DecisionV5Test(unittest.TestCase):
         self.assertIn("parts.append(run.decision.prompt())", source)
         self.assertIn("DecisionHistory().record(self.decision.domain, o, self.steps)", source)
         self.assertIn('self.decision.reason', source)
+        self.assertIn("for tool_name in self.decision.available_tools:", source)
+        self.assertIn("tool.risk == Risk.OBSERVE", source)
 
 
 if __name__ == "__main__":
