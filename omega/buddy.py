@@ -6678,6 +6678,13 @@ async def accelerator_autopilot_loop(app: Buddy, interval: float = 300) -> None:
                     if outcome.get("queued", 0):
                         app.ui.event("Autopilot lärande: " + str(outcome["queued"]) +
                                      " övningar köade från verkliga tidigare fel")
+                    # Forge is low-cost and uses REAL stored evidence; only
+                    # draft/test one read-only skill, never silently activate.
+                    from genesis_forge import forge_once
+                    forge = await asyncio.to_thread(forge_once, app)
+                    if forge.get("created"):
+                        app.ui.event("GENESIS SKILL FORGE · " + forge["name"] +
+                                     " · " + forge["status"] + " (inte aktiverad)")
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:

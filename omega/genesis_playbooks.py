@@ -109,6 +109,27 @@ class PlaybookStore:
                 ". This is a suggestion, not authorization. Re-observe live state, "
                 "check tool availability and permissions, verify each effect; do not blindly replay.")
 
+    def forge_candidates(self, min_verified: int = 3, limit: int = 2) -> list[dict]:
+        """Only repeated, verified patterns, never raw prompts or arguments."""
+        with closing(sqlite3.connect(self.path, timeout=5)) as con:
+            rows = con.execute("""SELECT signature,category,tools_json,verified_runs
+                FROM playbooks WHERE verified_runs >= ?
+                ORDER BY verified_runs DESC,last_seen DESC LIMIT ?""",
+                (max(3, int(min_verified)), max(1, min(5, int(limit))))).fetchall()
+        candidates = []
+        for signature, category, encoded, count in rows:
+            try:
+                names = json.loads(encoded)
+            except (TypeError, ValueError):
+                continue
+            if (category not in ALLOWED_CATEGORIES or not isinstance(names, list)
+                    or not names or len(names) > 12
+                    or any(not isinstance(n, str) or not TOOL_RE.fullmatch(n) for n in names)):
+                continue
+            candidates.append({"signature": signature, "category": category,
+                               "tools": names, "verified_runs": count})
+        return candidates
+
     def count(self) -> int:
         with closing(sqlite3.connect(self.path, timeout=5)) as con:
             return int(con.execute("SELECT COUNT(*) FROM playbooks WHERE verified_runs>=2").fetchone()[0])
