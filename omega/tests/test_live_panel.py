@@ -121,6 +121,25 @@ class PanelTest(unittest.TestCase):
         self.assertIn("hej, kan du hjälpa mig?", p._chat.text)
         self.assertEqual(p.queue.get_nowait(), "hej, kan du hjälpa mig?")
 
+    def test_thinking_label_click_uses_supported_prompt_toolkit_fragments(self):
+        from prompt_toolkit.data_structures import Point
+        from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
+        p = self.build()
+        self.assertFalse(p.show_thinking)
+        p._status_control.create_content(width=39, height=35)
+        result = p._status_control.mouse_handler(
+            MouseEvent(position=Point(x=1, y=10),
+                       event_type=MouseEventType.MOUSE_UP,
+                       button=MouseButton.LEFT, modifiers=frozenset()))
+        # Fragmen­t clickability is verified separately below because its
+        # line position changes when Companion status changes.
+        clickable = [frag for frag in p._side_text() if len(frag) == 3]
+        self.assertEqual(len(clickable), 1)
+        clickable[0][2](MouseEvent(position=Point(x=1, y=0),
+                                   event_type=MouseEventType.MOUSE_UP,
+                                   button=MouseButton.LEFT, modifiers=frozenset()))
+        self.assertTrue(p.show_thinking)
+
     def test_live_stream_preview_can_be_toggled_and_cleared(self):
         p = self.build()
         p.toggle_thinking()
