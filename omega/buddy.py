@@ -5679,7 +5679,7 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 o(f"autostart: {'on' if autostart_state() else 'off'}")
         elif cmd == "/key":
             import getpass
-            k = await asyncio.to_thread(getpass.getpass, "New KiloCode API key (hidden): ")
+            k = await asyncio.to_thread(read_visible_kilo_key, "New KiloCode API key (visible, Ctrl+V): ")
             if k.strip():
                 self.vault.set("kilo_api_key", k.strip())
                 ok, d = await asyncio.to_thread(self.gateway.ping, self.router.resolve("chat"))
@@ -5760,6 +5760,14 @@ def ask_yn(q: str, default: bool = True) -> bool:
     return default if not a else a in ("y", "yes", "j", "ja")
 
 
+def read_visible_kilo_key(prompt: str = "KiloCode API key (visible, paste with Ctrl+V): ") -> str:
+    """Explicitly visible interactive paste; never log or echo the value again."""
+    if not sys.stdin.isatty():
+        raise RuntimeError("Kilo key entry requires an interactive terminal")
+    print("  NOTE: Your key will be visible on screen while typing/pasting. Keep others away.")
+    return input(prompt).strip()
+
+
 def first_run(app: Buddy) -> None:
     import getpass
     print(C.c(C.B, "\n● STUDDY BUDDY — first-time setup\n"))
@@ -5777,8 +5785,8 @@ def first_run(app: Buddy) -> None:
             ok, tail = pip_install(miss)
             print("  " + ("installed." if ok else "pip reported a problem:\n" + tail))
     if not app.gateway.key():
-        print("\n  Paste your KiloCode API key (input is hidden, stored with Windows DPAPI, never logged):")
-        k = getpass.getpass("  key › ").strip()
+        print("\n  Paste your KiloCode API key (visible while entering, stored with Windows DPAPI, never logged):")
+        k = read_visible_kilo_key("  key › ")
         if k:
             app.vault.set("kilo_api_key", k)
     if app.gateway.key():
@@ -7640,7 +7648,7 @@ def cmd_key(rest: list[str]) -> int:
             return 0
         if action == "set":
             import getpass
-            k = getpass.getpass("KiloCode API key (hidden, not stored in shell history): ").strip()
+            k = read_visible_kilo_key()
             if not k:
                 print("  nothing entered; the existing key is unchanged")
                 return 1
