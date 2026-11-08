@@ -5558,6 +5558,20 @@ class Buddy:
         mems = self.memory.search(run.goal, limit=4, touch=False)
         if mems:
             parts.append("RELEVANT MEMORY:\n" + "\n".join(f"- [{m['kind']}/{m['status']}] {m['title']}: {clip(m['content'], 300)}" for m in mems))
+        # Study help needs relevant reading context, even when the user only says
+        # "quiz me". Observations are evidence of an opened topic, not mastery.
+        if re.search(r"(?i)\b(studera|plugga|förhör|quiz|tenta|läxa|exam|study|studies|learn|testa mig)\b", run.goal):
+            recent = self.store.q(
+                "SELECT content,updated FROM memories WHERE kind='episodic' "
+                "AND tags LIKE '%screen,observation%' ORDER BY updated DESC LIMIT 6")
+            if recent:
+                parts.append("RECENT STUDY SCREEN CONTEXT (unverified, not proof of learning):\n"
+                             + "\n".join("- " + clip(row["content"], 220) for row in recent))
+            parts.append("STUDY COACH: Offer a focused question or short quiz grounded in the user's actual "
+                         "materials or confirmed knowledge. Ask one question at a time; after each answer "
+                         "explain errors precisely, adapt difficulty, and never pretend they mastered a topic "
+                         "merely because it was visible on screen.")
+
         summ = self.memory.history()[0]
         if summ and not run.background:
             parts.append("EARLIER CONVERSATION SUMMARY:\n" + summ)
