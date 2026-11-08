@@ -48,20 +48,8 @@ def clear_rows(board):
     return [[0] * WIDTH for _ in range(count)] + remaining, count
 
 
-def evaluate(board, cleared):
-    heights = []
-    holes = 0
-    for x in range(WIDTH):
-        first = next((y for y in range(HEIGHT) if board[y][x]), HEIGHT)
-        heights.append(HEIGHT - first)
-        holes += sum(not board[y][x] for y in range(first, HEIGHT))
-    roughness = sum(abs(a-b) for a,b in zip(heights, heights[1:]))
-    return 12.0 * cleared - 0.8 * sum(heights) - 5.0 * holes - 0.4 * roughness
-
-
 class PixelTetris:
-    """Game physics and a reproducible heuristic autoplayer, not an AI result."""
-
+    """Physics-only Tetris. A real model must choose each legal placement."""
     def __init__(self, seed=None):
         self.rng = random.Random(seed)
         self.board = [[0] * WIDTH for _ in range(HEIGHT)]
@@ -70,56 +58,65 @@ class PixelTetris:
         self.pieces = 0
         self.games = 0
         self.active = None
+        self.shape = None
         self.x = 0
-        self.y = 0
+        self.y = -2
+        self.awaiting_move = True
         self.spawn()
 
-    def _target(self, cells):
-        best = None
-        for rotation in rotations(cells):
-            width = max(x for x, _ in rotation) + 1
+    def choices(self):
+        if self.shape is None:
+            return []
+        moves = []
+        for rotated in rotations(self.shape):
+            width = max(x for x, _ in rotated) + 1
             for x in range(WIDTH - width + 1):
-                y = -2
-                if not fits(self.board, rotation, x, y):
+                landing = -2
+                if not fits(self.board, rotated, x, landing):
                     continue
-                while fits(self.board, rotation, x, y + 1):
-                    y += 1
-                if any(y + dy < 0 for _, dy in rotation):
+                while fits(self.board, rotated, x, landing + 1):
+                    landing += 1
+                if any(landing + dy < 0 for _, dy in rotated):
                     continue
-                projected = [row[:] for row in self.board]
-                for dx, dy in rotation:
-                    projected[y + dy][x + dx] = 1
-                remaining, cleared = clear_rows(projected)
-                value = evaluate(remaining, cleared)
-                if best is None or value > best[0]:
-                    best = (value, rotation, x)
-        return best
+                moves.append({"id": len(moves), "cells": rotated,
+                              "x": x, "landing": landing})
+        return moves
 
     def spawn(self):
-        cells = self.rng.choice(SHAPES)
-        target = self._target(cells)
-        if target is None:
+        self.shape = self.rng.choice(SHAPES)
+        self.active = self.shape
+        self.x, self.y = 3, -2
+        self.awaiting_move = True
+        if not self.choices():
             self.games += 1
             self.board = [[0] * WIDTH for _ in range(HEIGHT)]
-            target = self._target(cells)
-        if target is None:
-            raise RuntimeError("tetromino cannot enter an empty board")
-        _, self.active, self.x = target
-        self.y = -2
+            self.shape = self.rng.choice(SHAPES)
+            self.active = self.shape
+            self.x, self.y = 3, -2
+
+    def choose(self, move_id):
+        if not self.awaiting_move:
+            return False
+        for candidate in self.choices():
+            if type(move_id) is int and candidate["id"] == move_id:
+                self.active = candidate["cells"]
+                self.x = candidate["x"]
+                self.y = -2
+                self.awaiting_move = False
+                return True
+        return False
 
     def tick(self):
-        if self.active is None:
-            self.spawn()
+        if self.awaiting_move:
+            return "waiting_ai"
         if fits(self.board, self.active, self.x, self.y + 1):
             self.y += 1
             return "fall"
         for dx, dy in self.active:
             x, y = self.x + dx, self.y + dy
             if y < 0:
-                # A top-out is an actual game-over event, not a level-up.
                 self.games += 1
                 self.board = [[0] * WIDTH for _ in range(HEIGHT)]
-                self.active = None
                 self.spawn()
                 return "game_over"
             self.board[y][x] = 1
@@ -127,7 +124,6 @@ class PixelTetris:
         self.pieces += 1
         self.lines += cleared
         self.score += (0, 100, 300, 500, 800)[min(4, cleared)]
-        self.active = None
         self.spawn()
         return "clear" if cleared else "lock"
 
