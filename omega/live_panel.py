@@ -9,6 +9,7 @@ only for an interactive terminal.
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 import os
 import sys
 from pathlib import Path
@@ -327,7 +328,7 @@ class LivePanel:
         try:
             self._experience = ExperienceLedger()
             self._experience_snapshot = self._experience.snapshot()
-        except (OSError, ValueError, RuntimeError):
+        except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError):
             # A restricted/missing data directory must not break the UI.
             pass
         self.show_thinking = True
@@ -843,7 +844,7 @@ class LivePanel:
             try:
                 panel._experience.record(category, bool(ok))
                 panel._experience_snapshot = panel._experience.snapshot()
-            except (OSError, ValueError, RuntimeError):
+            except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError):
                 # Never fail a real user action because telemetry is unavailable.
                 pass
         panel._evolution_timeline.append((
@@ -876,10 +877,15 @@ class LivePanel:
         count = sum(1 for item in run.ledger if item.get("ok"))
         verified = bool(result.verified) and result.status in ("complete", "answered")
         # A fluent model answer is activity, never proof of new capability.
-        panel._answers_delivered += 1
-        panel._evolution_timeline.append((datetime.now().strftime("%H:%M"), "AI-svar levererat"))
-        panel._last_answer_at = time.monotonic()
-        independently_checked = bool(run.ledger) and verified and result.status == "complete"
+        delivered = result.status in ("answered", "complete")
+        if delivered:
+            panel._answers_delivered += 1
+            panel._last_answer_at = time.monotonic()
+            panel._evolution_timeline.append((datetime.now().strftime("%H:%M"), "AI-svar levererat"))
+        # A failed tool cannot become a verified completed task simply because
+        # a model claims success or a ledger object exists.
+        independently_checked = (verified and result.status == "complete"
+                                  and any(item.get("ok") is True for item in run.ledger))
         if independently_checked:
             panel._verified_work += 1
             panel._evolution_timeline.append((datetime.now().strftime("%H:%M"), "✓ Uppgift verifierad"))
