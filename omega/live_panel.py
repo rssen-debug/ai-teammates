@@ -188,6 +188,37 @@ def pixel_companion(mode: str, frame: int = 0,
     )
 
 
+def parse_tetris_move(answer: str, allowed: set[int]) -> tuple[int | None, str]:
+    """Parse only a model-originated choice, with no heuristic/fake fallback.
+
+    Accept JSON, fenced JSON, or a bare move id; refuse unknown ids.
+    The rationale is a short user-visible decision explanation, not private CoT.
+    """
+    import json
+    raw = str(answer or "").strip()
+    reason = ""
+    candidate = None
+    with __import__("contextlib").suppress(ValueError, TypeError):
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            candidate = data.get("move", data.get("move_id"))
+            reason = str(data.get("reason") or data.get("why") or "")
+        elif type(data) is int:
+            candidate = data
+    if candidate is None:
+        match = re.search(r'["\\\']?(?:move|move_id)["\\\']?\\s*[:=]\\s*["\\\']?(\\d+)', raw, re.I)
+        if match:
+            candidate = int(match.group(1))
+            why_match = re.search(r'["\\\']?(?:reason|why)["\\\']?\\s*[:=]\\s*["\\\']([^"\\\']+)', raw, re.I)
+            if why_match:
+                reason = why_match.group(1)
+        elif re.fullmatch(r"\\d+", raw):
+            candidate = int(raw)
+    if type(candidate) is not int or candidate not in allowed:
+        return None, ""
+    return candidate, reason[:100]
+
+
 class LivePanel:
     """Factory-backed UI: uses the existing CLI contract, not a second agent."""
 
@@ -238,6 +269,9 @@ class LivePanel:
         self._tetris_ai_moves = 0
         self._tetris_ai_failed = 0
         self._tetris_last_decision = ""
+        self._tetris_reason = ""
+        self._tetris_last_error = ""
+        self._last_tool_error = ""
         self._tetris_retry_after = 0.0
         self._tetris_wait_started = 0.0
         self._tetris_decision_task: asyncio.Task | None = None
@@ -392,36 +426,41 @@ class LivePanel:
                 self._tetris_ai_state = "inga lagliga drag"
                 self._tetris_retry_after = time.monotonic() + 30
                 return
-            # Send real board and each legal landing to the language model.
-            # Candidate ids are identifiers, NOT pre-ranked recommendations.
+            # Short bounded payload gives free chat models room to make a move.
+            # Real current board and legal landings; the engine never picks.
             prompt = json.dumps({
                 "board": ["".join("#" if cell else "." for cell in row) for row in game.board],
                 "piece": [list(point) for point in game.shape],
-                "width": WIDTH, "height": HEIGHT,
-                "legal_moves": [{"id": m["id"], "x": m["x"],
-                                 "cells": [list(pt) for pt in m["cells"]],
-                                 "landing": m["landing"]} for m in choices],
+                "moves": [[m["id"], m["x"], m["landing"],
+                           [list(pt) for pt in m["cells"]]] for m in choices],
             }, separators=(",", ":"))
-            self._tetris_ai_state = "AI väljer drag..."
+            self._tetris_ai_state = "Skickar bräde till Kilo"
             self._tetris_wait_started = time.monotonic()
+            self.events.append(datetime.now().strftime("%H:%M:%S") +
+                f" · Tetris: {len(choices)} lagliga placeringar · frågar modellen")
             self._refresh()
             model = self.app.router.resolve("chat")
             self._tetris_ai_calls += 1
             result = await self.app.gateway.chat(
                 model, [{"role": "system", "content":
-                    "You are the real Tetris player. Choose one legal move id based on "
-                    "board geometry and expected survival / completed lines. "
-                    "Return only JSON with an integer field named move. "
-                    "Never invent an id not in legal_moves."},
+                    "Play Tetris. Your input contains the actual board, piece, and a list "
+                    "of legal moves [id,x,landing,cells]. YOU must decide based on "
+                    "survival, holes and line clears. Reply ONLY with a concise "
+                    "decision e.g. {\\\"move\\\":3,\\\"reason\\\":\\\"avoid a hole\\\"}. "
+                    "No lengthy reasoning. Never invent an id."},
                     {"role": "user", "content": prompt}],
-                max_tokens=60, timeout=35)
+                max_tokens=220, timeout=45)
             answer = (result.get("message") or {}).get("content") or ""
-            match = re.search(r'\{[^{}]*"move"\s*:\s*(\d+)[^{}]*\}', answer)
-            if not match:
-                raise ValueError("AI svarade utan giltigt JSON-drag")
-            chosen = int(match.group(1))
+            chosen, rationale = parse_tetris_move(answer, {m["id"] for m in choices})
+            if chosen is None:
+                raise ValueError("Modellen gav inget lagligt drag: " +
+                                 clean_line(answer, 72))
             if not game.choose(chosen):
-                raise ValueError("AI föreslog ogiltigt drag")
+                raise ValueError("Spelet avvisade modellens drag")
+            self._tetris_reason = clean_line(rationale or
+                "Modellen valde en giltig placering", 80)
+            self._tetris_last_error = ""
+            self._tetris_ai_state = "Valt drag · pjäs faller"
             self._tetris_ai_moves += 1
             elapsed = time.monotonic() - self._tetris_wait_started
             self._tetris_last_decision = f"Drag {chosen} · {elapsed:.1f}s · giltigt AI-drag"
@@ -431,10 +470,11 @@ class LivePanel:
             raise
         except Exception as exc:
             self._tetris_ai_failed += 1
-            self._tetris_ai_state = "AI PAUSAD · " + type(exc).__name__
+            self._tetris_ai_state = "AI FEL · pausad"
+            self._tetris_last_error = clean_line(str(exc), 110)
             self._tetris_last_decision = "Inget drag godkänt"
             self._tetris_retry_after = time.monotonic() + min(120, 10 * self._tetris_ai_failed)
-            self.events.append(datetime.now().strftime("%H:%M:%S") + " · AI Tetris blockerad: " + type(exc).__name__)
+            self.events.append(datetime.now().strftime("%H:%M:%S") + " · AI Tetris: " + self._tetris_last_error)
         finally:
             self._refresh()
 
@@ -617,6 +657,10 @@ class LivePanel:
         add(f"AI-drag {self._tetris_ai_moves} / anrop {self._tetris_ai_calls}", "#ffffff")
         if self._tetris_last_decision:
             add(self._tetris_last_decision, "#d4b7c9")
+        if self._tetris_reason:
+            add("Varför: " + self._tetris_reason, "#ffcae6")
+        if self._tetris_last_error:
+            add("Orsak: " + self._tetris_last_error, "#ff9ba6")
         if self._tetris_ai_failed:
             add("AI-fel: " + str(self._tetris_ai_failed), "#ff9ba6")
         add("AI BYGGER: " + self._build_state, "#ff8fc5")
@@ -637,6 +681,8 @@ class LivePanel:
             add("Från: " + clean_line(selected.get("app", ""), 20), "#ffffff")
         voice = getattr(app, "voice", None)
         add("RÖST: " + (voice.state_label() if voice else "OFF"), "#ffffff")
+        if voice and not voice.running and voice.error:
+            add("Röstfel: " + clean_line(voice.error, 100), "#ff9ba6")
         add("── COMPANION ──", "#ff90c8")
         add("COMPANION: " + ("LIVE" if enabled else "OFF"), "#ffffff")
         if enabled and comp:
@@ -653,8 +699,10 @@ class LivePanel:
         if running and app.current_run:
             duration = int(max(0, current - float(app.current_run.t0)))
             add("AI-anrop/uppgift: " + str(duration) + "s", "#ffffff")
+        if self._last_tool_error:
+            add("Verktygsfel: " + self._last_tool_error, "#ff9ba6")
         if self.show_thinking:
-            for event in list(self.events)[-4:]:
+            for event in list(self.events)[-8:]:
                 add(" " + event, "#ffe0f1")
         add("AKTIVITET · VERKTYG", "bold #ff90c8")
         if self.trace:
@@ -694,8 +742,12 @@ class LivePanel:
         panel.phase = ("Steg klart" if ok else "Steg misslyckades")
         panel.events.append(datetime.now().strftime("%H:%M:%S") + " · " + panel.phase)
         if err and not ok:
-            # Never dump raw exceptions here: provider errors can contain secrets.
-            panel._add("Ett verktyg misslyckades. Se felstatus i panelen.")
+            from buddy import redact
+            panel._last_tool_error = clean_line(redact(str(err)), 110)
+            panel.events.append(datetime.now().strftime("%H:%M:%S") +
+                                " · Fel: " + panel._last_tool_error)
+        elif ok:
+            panel._last_tool_error = ""
         panel._refresh()
 
     def summary(self, run: Any, result: Any) -> None:
