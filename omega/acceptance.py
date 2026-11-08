@@ -151,25 +151,54 @@ def _majin_env(ctx: Ctx) -> Optional[dict]:
 # ════════════════════════════════════════════════════════════════════════════
 # 1–3 · INSTALLATION
 # ════════════════════════════════════════════════════════════════════════════
+#: Problems `install.ps1 -Verify` reports when the installer simply has not been RUN
+#: on this machine. Each is a true statement about the host, not a defect in the
+#: product or in the installer: with no venv there is no launcher, no PATH entry and
+#: no installed dependency set to check either.
+NOT_INSTALLED_MARKERS = (
+    "no venv at ",                    # the installer's own primary artifact is absent
+    "launcher missing: ",
+    "PATH does not contain ",
+    "no supported Python found",      # nothing could have been installed at all
+    "required dependencies are missing",
+)
+
+
 def verify_problem_class(verify_output: str) -> tuple[str, list[str]]:
-    """Classify a failing `install.ps1 -Verify` run: ("blocked"|"fail", problems).
+    """Classify a failing `install.ps1 -Verify` run as ("blocked"|"fail", problems).
 
     The installer prints every problem as a line starting "x " and ends with
     "x verification FAILED: N problem(s)".
 
-    "blocked" is returned only when the missing dependencies are the ENTIRE set of
-    problems, which means the installer was never run on this machine — a CI runner
-    has no numpy, faster-whisper, websocket-client, winsdk or edge-tts, and reporting
-    that as a product failure is the same host-precondition-as-failure mistake as
-    benchmark B13, the Notepad check and the voice check. Any other problem, alone or
-    alongside missing dependencies, stays a failure: a broken manifest, a missing
-    entrypoint, a missing launcher or a failing `buddy doctor` must not be able to
-    hide behind an uninstalled host.
+    "blocked" is returned only when EVERY reported problem is one of the
+    NOT_INSTALLED_MARKERS, i.e. the whole failure is "this host has never run the
+    installer". A CI runner is exactly that: it has no venv, so there is no launcher,
+    no PATH entry and no numpy/faster-whisper/winsdk/edge-tts to import. Reporting
+    that as a product failure is the same host-precondition-as-failure mistake already
+    fixed three times on this branch (benchmark B13 reporting FAIL instead of SKIP,
+    the Notepad check crashing without an interactive desktop, the voice check
+    treating "no audio device" as a failure).
+
+    Everything else fails, and the default is deliberately conservative:
+
+      * a venv that exists but whose interpreter does not run  -> the installer built
+        something broken;
+      * 'buddy version' failing, or `buddy doctor runtime` reporting problems -> the
+        installed product does not answer;
+      * `entrypoint missing` -> the product we ship is not where it must be;
+      * ANY problem not recognised here -> unknown, so it is treated as a defect
+        rather than as an excuse.
+
+    A real defect therefore cannot hide behind an uninstalled host, and a non-zero
+    exit that reports no problem at all is itself treated as a failure.
     """
     problems = [ln.strip() for ln in verify_output.splitlines()
                 if re.match(r"^\s*x\s+", ln) and "verification FAILED" not in ln]
-    deps_only = bool(problems) and all("required dependencies are missing" in p for p in problems)
-    return ("blocked" if deps_only else "fail"), problems
+    if not problems:
+        return "fail", problems
+    if all(any(marker in problem for marker in NOT_INSTALLED_MARKERS) for problem in problems):
+        return "blocked", problems
+    return "fail", problems
 
 
 def s01_fresh_install(ctx: Ctx) -> Result:
@@ -200,9 +229,9 @@ def s01_fresh_install(ctx: Ctx) -> Result:
         out = (rc.stdout or "") + (rc.stderr or "")
         ctx.save("01-installer-verify.txt", out)
         if rc.returncode != 0:
-            # The installer prints every problem as a line starting "x ", and ends
-            # with "x verification FAILED: N problem(s)". Counting those lines lets
-            # the two very different reasons for a non-zero exit be told apart.
+            # A non-zero exit has two very different causes: this host has never run
+            # the installer, or the installer/product is actually broken. Only the
+            # first is a BLOCKED.
             kind, problems = verify_problem_class(out)
             ev["verify_problems"] = problems
             if kind == "blocked":
@@ -217,9 +246,11 @@ def s01_fresh_install(ctx: Ctx) -> Result:
                 # missing entrypoint, a missing launcher or a failing `buddy doctor`
                 # cannot hide behind this branch.
                 return Result(BLOCKED,
-                              f"install.ps1 -Verify ran and reported only absent dependencies "
-                              f"({len(problems)} problem(s)) — the installer has not been run on this "
-                              f"host, so its dependency set cannot be verified here", ev,
+                              f"install.ps1 -Verify ran and every problem it reported was an "
+                              f"absent install ({len(problems)} problem(s): "
+                              f"{'; '.join(p[2:] if p.startswith('x ') else p for p in problems)}) "
+                              f"— the installer has not been run on this host, so what it would "
+                              f"have created cannot be verified here", ev,
                               unproven="executing the installer itself, which is what actually "
                                        "creates the venv and installs the dependencies",
                               fix="powershell -NoProfile -ExecutionPolicy Bypass -File omega/install/install.ps1")

@@ -189,17 +189,18 @@ class TestNoDriftFromTheProduct(unittest.TestCase):
 
 
 class TestAcceptanceReadsTheInstallerCorrectly(unittest.TestCase):
-    """Scenario 1 must tell "this host has no installer" from "the installer is broken".
+    """Scenario 1 must tell "this host has no install" from "the installer is broken".
 
-    The two look identical from the outside: `install.ps1 -Verify` exits non-zero.
-    A CI runner never ran the installer, so verification correctly reports the
-    dependencies absent — that is a statement about the host, not a defect. But a
-    missing entrypoint, a missing launcher or a failing `buddy doctor` IS a defect,
-    and must keep failing even on a machine where the dependencies also happen to be
-    missing.
+    Both look identical from the outside: `install.ps1 -Verify` exits non-zero. A CI
+    runner never ran the installer, so verification correctly reports that there is no
+    venv, no launcher, no PATH entry and no importable dependency set — that is a
+    statement about the host, not a defect. But a venv whose interpreter does not run,
+    a product that fails `buddy version`, a failing `buddy doctor`, a missing
+    entrypoint, or any problem nobody anticipated IS a defect and must keep failing the
+    scenario even when the host is also uninstalled.
 
-    Run in a child process: acceptance.py repoints BUDDY_HOME at import, which must
-    not happen inside a live test session.
+    Run in a child process: acceptance.py repoints BUDDY_HOME at import, which must not
+    happen inside a live test session.
     """
 
     CHILD = """
@@ -217,36 +218,56 @@ print(json.dumps({k: acceptance.verify_problem_class(v)[0] for k, v in cases.ite
         self.assertEqual(proc.returncode, 0, f"child failed: {proc.stderr[-2000:]}")
         return json.loads(proc.stdout.strip().splitlines()[-1])
 
-    def test_absent_dependencies_alone_are_blocked_not_failed(self) -> None:
-        out = ("  + installer contract OK\n"
-               "  x required dependencies are missing:\n"
-               "numpy faster-whisper websocket-client winsdk edge-tts\n"
-               "  x verification FAILED: 1 problem(s)\n")
+    @staticmethod
+    def _out(*problems: str) -> str:
+        """Reproduce the installer's own output shape, problem lines included."""
+        lines = ["STUDDY BUDDY OMEGA - install verification", "  + entrypoint present"]
+        lines += [f"  x {p}" for p in problems]
+        lines.append(f"  x verification FAILED: {len(problems)} problem(s)")
+        return "\n".join(lines) + "\n"
+
+    def test_the_real_ci_runner_output_is_blocked(self) -> None:
+        """Exactly what windows-latest reported, where the installer was never run."""
+        out = self._out(
+            "no venv at C:\\Users\\runneradmin\\AppData\\Roaming\\StuddyBuddy\\venv",
+            "launcher missing: C:\\Users\\runneradmin\\AppData\\Roaming\\StuddyBuddy\\bin\\buddy.cmd")
         self.assertEqual(self._classify({"ci": out})["ci"], "blocked")
 
-    def test_a_structural_problem_still_fails(self) -> None:
+    def test_every_absent_install_symptom_is_blocked(self) -> None:
         cases = {
-            "entrypoint": "  x entrypoint missing: C:\\app\\omega\\buddy.py\n"
-                          "  x verification FAILED: 1 problem(s)\n",
-            "launcher": "  x launcher missing: C:\\app\\omega\\launcher\\buddy.cmd\n"
-                        "  x verification FAILED: 1 problem(s)\n",
-            "doctor": "  x buddy doctor runtime reported problems (exit 1)\n"
-                      "  x verification FAILED: 1 problem(s)\n",
+            "deps": self._out("required dependencies are missing:\nnumpy winsdk edge-tts"),
+            "venv": self._out("no venv at C:\\app\\venv"),
+            "launcher": self._out("launcher missing: C:\\app\\bin\\buddy.cmd"),
+            "path": self._out("PATH does not contain C:\\app\\bin (open a new terminal)"),
+            "python": self._out("no supported Python found (need 3.10 to 3.13)"),
+            "all": self._out("no venv at C:\\app\\venv", "launcher missing: C:\\app\\bin\\buddy.cmd",
+                             "PATH does not contain C:\\app\\bin",
+                             "required dependencies are missing:\nnumpy"),
+        }
+        self.assertEqual(self._classify(cases), {k: "blocked" for k in cases})
+
+    def test_a_defect_still_fails_even_on_an_uninstalled_host(self) -> None:
+        cases = {
+            "broken_venv": self._out("venv exists but its interpreter does not run: C:\\app\\venv\\Scripts\\python.exe"),
+            "product_silent": self._out("'buddy version' failed (exit 1): Traceback (most recent call last)"),
+            "doctor": self._out("buddy doctor runtime reported problems (exit 1):\n  x no key"),
+            "entrypoint": self._out("entrypoint missing: C:\\app\\omega\\buddy.py"),
             # the dangerous case: a real defect hiding behind an uninstalled host
-            "both": "  x entrypoint missing: C:\\app\\omega\\buddy.py\n"
-                    "  x required dependencies are missing:\nnumpy\n"
-                    "  x verification FAILED: 2 problem(s)\n",
+            "defect_plus_absent": self._out("no venv at C:\\app\\venv",
+                                            "buddy doctor runtime reported problems (exit 1)"),
+            "unknown_problem": self._out("something nobody anticipated went wrong"),
         }
         got = self._classify(cases)
         self.assertEqual(got, {k: "fail" for k in cases},
-                         "a structural problem must fail the scenario even when "
-                         "dependencies are also missing")
+                         "any defect, any unrecognised problem, or a defect alongside "
+                         "absent-install symptoms must fail the scenario")
 
-    def test_a_clean_verify_is_not_a_failure(self) -> None:
-        got = self._classify({"ok": "  + install.ps1 -Verify completed clean\n"})
-        self.assertEqual(got["ok"], "fail",
+    def test_a_nonzero_exit_that_reports_no_problem_is_a_failure(self) -> None:
+        got = self._classify({"silent": "STUDDY BUDDY OMEGA - install verification\n  + entrypoint present\n"})
+        self.assertEqual(got["silent"], "fail",
                          "an empty problem list is not evidence of an uninstalled host; "
-                         "only a non-zero exit reaches this classifier")
+                         "silence is a defect")
+
 
 
 
