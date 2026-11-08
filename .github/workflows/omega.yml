@@ -55,6 +55,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install split-pane terminal dependency
+        run: python -m pip install "prompt-toolkit>=3.0,<4"
+
       - name: Prove the launcher contract holds
         # Runs before the heavy suites: it is fast, and a launcher that cannot
         # find an interpreter makes everything else untestable for a real user.

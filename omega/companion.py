@@ -714,6 +714,7 @@ class CompanionLoop:
         self._stop = threading.Event()
         self.last: Optional[TickReport] = None
         self.ticks = 0
+        self.last_tick_at = 0.0
         self.errors: list[str] = []
 
     def options(self) -> dict:
@@ -993,6 +994,7 @@ class CompanionLoop:
                 "why_not": "" if ok else why,
                 "observation": self.obs.state(),
                 "errors": list(self.errors[-5:]),
+                "last_tick_at": self.last_tick_at,
                 "capture_count": self.captures, "last_capture_note": self.last_capture_note,
                 "last_capture_at": self.last_capture_at,
                 "last": self.last.to_dict() if self.last else None}
@@ -1022,6 +1024,7 @@ class CompanionLoop:
             if len(out) > 120:
                 del out[:len(out) - 120]
             self.ticks += 1
+            self.last_tick_at = _now()
             if max_ticks is not None and self.ticks >= max_ticks:
                 break
             with contextlib.suppress(Exception):
