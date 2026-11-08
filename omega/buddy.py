@@ -4219,6 +4219,36 @@ class AgentRun:
         self.resume_messages = resume_messages
         self.failures = 0
         self.last_failed: Optional[str] = None
+        # V5 is computed once per user goal from real registry status; this is
+        # advisory only, never permission elevation or automatic execution.
+        from genesis_decision import decide
+        from genesis_decision import _domains, CATEGORY_TOOLS
+        domains = _domains(goal)
+        category = domains[0] if domains else "chat"
+        candidates = CATEGORY_TOOLS.get(category, ())
+        status = {}
+        for name in candidates:
+            tool = app.registry.get(name)
+            if tool is not None:
+                try:
+                    status[name] = bool(tool.status()[0])
+                except Exception:
+                    status[name] = False
+        history = {}
+        if not app.privacy.private:
+            with contextlib.suppress(Exception):
+                from genesis_decision import DecisionHistory
+                history = DecisionHistory().snapshot(category)
+        self.decision = decide(goal, available_tools=candidates,
+                               tool_status=status, historical=history)
+        # Load genuinely ready read-only tools for the goal without asking a
+        # weak model to discover the obvious. Loading != executing; executor
+        # still enforces every grant and tool-specific safety restriction.
+        for tool_name in self.decision.available_tools:
+            tool = app.registry.get(tool_name)
+            if (tool is not None and tool.risk == Risk.OBSERVE and
+                    (tool.observes or tool.core)):
+                self.active.add(tool_name)
 
     # ── tool loading ──
     def activate(self, names: list[str]) -> None:
@@ -4263,7 +4293,10 @@ class AgentRun:
         if self.escalated:
             return self.escalated
         cats = {self.app.registry.get(n).category for n in self.active if self.app.registry.get(n)}
-        role = "coding" if "dev" in cats else "computer" if cats & {"desktop", "screen", "browser"} else "planner"
+        # Use task intent before merely inspecting which tools are loaded:
+        # core tools are loaded for all tasks and must not force computer mode.
+        role = self.decision.role if self.decision.confidence == "heuristic" else (
+            "coding" if "dev" in cats else "computer" if cats & {"desktop", "screen", "browser"} else "chat")
         return r.resolve(role)
 
     def unverified_effects(self) -> bool:
@@ -4340,6 +4373,12 @@ class AgentRun:
                  clip(o.summary, 500), self.steps, self.tokens))
             with contextlib.suppress(Exception):
                 self.app.note_run_outcome(o)
+            # Actual task outcomes feed a category-only reliability estimate.
+            # Ordinary chat and private mode never enter decision history.
+            if not self.app.privacy.private and o is not None:
+                with contextlib.suppress(Exception):
+                    from genesis_decision import DecisionHistory
+                    DecisionHistory().record(self.decision.domain, o, self.steps)
             # Genesis playbooks are recorded from the actual executor ledger.
             # Never record private sessions, failed runs, or raw tool arguments.
             if not self.app.privacy.private:
@@ -4369,9 +4408,14 @@ class AgentRun:
             model = self.pick_model()
             app.ui.status("Analyserar nästa steg utifrån hittade resultat" if self.ledger else "Tolkar uppgiften och väljer verktyg")
             if not self.ledger and hasattr(app.ui, "explain_action"):
-                app.ui.explain_action(self.goal, "Analyserar din fråga",
-                    "Jag tar fram ett svar eller väljer ett verktyg utifrån uppgiften.",
-                    "Nästa steg blir ett svar eller ett registrerat verktygsanrop.")
+                # Human-readable, deterministic decision summary (NOT hidden
+                # chain-of-thought). Source: actual goal and tool availability.
+                app.ui.explain_action(
+                    self.goal, "V5 · " + self.decision.domain.upper(),
+                    self.decision.reason,
+                    ("Tillgängliga: " + ", ".join(self.decision.available_tools)
+                     if self.decision.available_tools else
+                     "Sök verktyg eller svara utan datoråtgärd."))
             start_wait = time.monotonic()
             fragments = 0
             first_token_at: float | None = None
@@ -5841,6 +5885,8 @@ class Buddy:
 
     def build_system_prompt(self, run: AgentRun) -> str:
         parts = [SYSTEM_PROMPT, "CAPABILITY MANIFEST (ground truth):\n" + clip(jdump(self.manifest()), 3500), f"Now: {iso()}"]
+        # Executed on every real user/background AgentRun, not a dormant module.
+        parts.append(run.decision.prompt())
         # Cosmetics only. The pixel pet visually evolves as measured capability
         # grows, but its character does not claim intelligence beyond evidence.
         level_info = self.level_snapshot()
