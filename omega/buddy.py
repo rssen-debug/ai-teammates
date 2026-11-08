@@ -4684,6 +4684,15 @@ class CLI:
         comp_ok, _why = a.companion.present()
         comp_on = bool(comp_ok and a.companion.loop.enabled)
         trust_mode = a.companion.trust.mode if comp_ok else "normal"
+        level_info = a.measure_level(record=False)
+        level_d = level_info.to_dict() if hasattr(level_info, "to_dict") else level_info
+        lv = level_d.get("level")
+        if isinstance(lv, (int, float)):
+            lit = max(0, min(20, int(round(float(lv) / 5))))
+            level_line = (C.c(C.G, "●" * lit) + C.c(C.DIM, "○" * (20 - lit))
+                          + f"  {int(lv)}/100 · verified evidence")
+        else:
+            level_line = C.dim("○" * 20 + "  not measured")
         out = [
             V.dot("ok" if ok_ai[0] else "warn") + " " + C.bold("STUDDY BUDDY OMEGA") + C.dim(f"  v{APP_VERSION}"),
             V.rule(),
@@ -4697,6 +4706,7 @@ class CLI:
             V.kv("Autopilot", f"{V.dot('info')} ready  " + C.dim(f"{active} active"), 11),
             V.kv("Companion", (f"{V.dot('ok')} loop on" if comp_on else f"{V.dot('off')} loop off")
                               + C.dim(f"  · trust {trust_mode}"), 11),
+            V.kv("Growth", level_line, 11),
             ""]
         self._out("\n".join(out))
 
@@ -5517,6 +5527,7 @@ class Buddy:
         self.current_run: Optional[AgentRun] = None
         self.current_task: Optional[asyncio.Task] = None
         self.companion_task: Optional[asyncio.Task] = None
+        self.presence_task: Optional[asyncio.Task] = None
         self.ai_state: tuple[bool, str] = (False, "not checked")
         self.lock = InstanceLock()
         self.stop = StopSignal()
@@ -5707,7 +5718,7 @@ class Buddy:
     HELP = """/help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
 /memory [list|search Q|forget ID|export|clear]  /obsidian [status|on|off|sync|path PATH|clear --yes]  /resources  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
-/grants [revoke]  /activate [all|status|off]  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
+/grants [revoke]  /activate [all|status|off]  /presence  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
 Just talk normally — Buddy decides when to use tools. Say "stop" at any time."""
 
     async def command(self, line: str) -> None:
@@ -5827,6 +5838,8 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 o("Usage: /obsidian [status | on | off | sync | path ABSOLUTE_PATH | clear --yes]")
         elif cmd == "/resources":
             o(resources_report())
+        elif cmd == "/presence":
+            o(presence_report(self, minutes=20))
         elif cmd == "/doctor":
             o("Running diagnostics…")
             items = await asyncio.to_thread(self.doctor.run, "all")
@@ -5871,6 +5884,8 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
         elif cmd == "/activate":
             sub = args[0].lower() if args else "status"
             if sub == "status":
+                o(f"Auto-start modules: {bool(self.settings.get('auto_mode_on_start'))}; "
+                  f"Companion mode: {'active' if self.companion.present()[0] and self.companion.loop.enabled else 'off'}")
                 o(f"Activity: {'ON' if self.activity.enabled else 'OFF'}; grants: {self.perms.all()}; "
                   f"screenshot uploads: {self.settings.get('screenshot_upload')}; "
                   f"companion: {'ON' if self.companion.present()[0] and self.companion.loop.enabled else 'OFF'}; "
@@ -5879,6 +5894,7 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                   f"last capture: {self.companion.loop.last_capture_note if self.companion.present()[0] else 'unavailable'}; "
                   f"Obsidian auto memory: {self.settings.get('obsidian_auto_memory', False)}")
             elif sub == "all":
+                self.settings.set("auto_mode_on_start", True)
                 self.settings.set("free_only", True)
                 self.settings.set("models", {role: "kilo-auto/free" for role in Router.ROLES})
                 self.settings.set("escalation_ladder", [])
@@ -5908,11 +5924,17 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
                 results = await asyncio.to_thread(self.doctor.run, "desktop")
                 for item in results:
                     o(f"Screen check: {item['status']} {item['name']} — {item.get('detail', '')}")
+                if self.presence_task is None or self.presence_task.done():
+                    self.presence_task = asyncio.ensure_future(presence_heartbeat(self))
                 self.perms.audit("user", "activate_all_except_voice", "configuration", "enabled")
                 o("Activated available modules: Kilo Auto Free, Owner grants, screenshot upload, activity, autopilot worker and companion. Voice OFF.")
                 o("Screenshots can be sent to KiloCode; protected and private windows remain excluded. Sensitive actions still require approval.")
                 self.ui.header()
             elif sub == "off":
+                self.settings.set("auto_mode_on_start", False)
+                if self.presence_task is not None:
+                    self.presence_task.cancel()
+                    self.presence_task = None
                 self.stop_companion()
                 if self.companion.present()[0]:
                     self.companion.loop.enable(False)
@@ -6137,6 +6159,122 @@ def first_run(app: Buddy) -> None:
     print(C.c(C.G, "\n  Setup done. Just talk to Buddy. /help lists the few commands.\n"))
 
 
+def activate_saved_presence(app: Buddy) -> tuple[bool, str]:
+    """Restore only previously authorized owner grants on startup.
+
+    Existing installations that already ran /activate all have the grants and
+    screenshot consent persisted even before auto_mode_on_start was introduced.
+    Explicit /activate off prevents automatic re-enablement.
+    """
+    chosen = app.settings.get("auto_mode_on_start")
+    if chosen is False:
+        return False, "owner disabled automatic presence"
+    grants = app.perms.all()
+    prior_consent = (all(grants.get(k) == "always" for k in ("observe", "input", "write", "exec"))
+                     and app.settings.get("screenshot_upload") == "allow")
+    if chosen is not True and not prior_consent:
+        return False, "awaiting prior owner activation (/activate all)"
+    app.settings.set("auto_mode_on_start", True)
+    app.settings.set("free_only", True)
+    app.settings.set("escalation_ladder", [])
+    app.settings.set("models", {role: "kilo-auto/free" for role in Router.ROLES})
+    # Never silently undo a revoked permission; restore only explicitly granted scopes.
+    if not prior_consent:
+        return False, "grants or screenshot consent were revoked; auto mode cannot restore them"
+    if app.companion.present()[0]:
+        app.companion.loop.enable(True)
+        app.companion._obs = None  # refresh backend after reading persisted consent
+        ok, reason = app.companion.observation.set_depth("capture")
+        if not ok:
+            app.companion.observation.set_depth("titles")
+            return True, "screen capture unavailable (titles fallback): " + reason
+    # Existing /activate all already stored these. Respect /obsidian off and
+    # /activity off if the owner changed those settings afterwards.
+    return True, "owner-authorized modules restored; activity/Obsidian/Voice retain their saved settings"
+
+
+def sync_owner_knowledge(app: Buddy) -> tuple[int, int]:
+    """Idempotently mirror durable knowledge; no screenshots or raw chat export."""
+    if not app.settings.get("obsidian_auto_memory", False):
+        return 0, 0
+    mod = sibling("personal_memory")
+    if mod is None:
+        return 0, 0
+    folder = Path(app.settings.get("obsidian_vault") or HOME / "obsidian-vault").expanduser()
+    vault = mod.ObservationVault(folder)
+    count = skipped = 0
+    for mem in app.store.q("SELECT kind,title,content,status FROM memories"):
+        if mem["kind"] not in mod.ObservationVault.KNOWLEDGE_KINDS:
+            continue
+        ok, _ = vault.record_knowledge(mem["kind"], mem["title"], mem["content"], mem["status"] or "unverified")
+        count += int(ok)
+        skipped += int(not ok)
+    return count, skipped
+
+
+def presence_report(app: Buddy, minutes: int = 20) -> str:
+    """Measured status only: no fabricated learning, intentions or companionship scores."""
+    since = now() - max(1, minutes) * 60
+    recent = app.store.one("SELECT COUNT(*) c FROM memories WHERE kind='episodic' "
+                           "AND tags LIKE '%screen,observation%' AND updated>=?", (since,))
+    activities = app.store.one("SELECT COUNT(*) c, COUNT(DISTINCT app) a FROM activity "
+                               "WHERE end>=?", (since,))
+    runs = app.store.one("SELECT COUNT(*) c, SUM(CASE WHEN verified=1 THEN 1 ELSE 0 END) v "
+                         "FROM runs WHERE ts>=?", (since,))
+    mem_stats = app.memory.stats()
+    recent_notes = app.store.q("SELECT content FROM memories WHERE kind='episodic' "
+                                "AND tags LIKE '%screen,observation%' AND updated>=? "
+                                "ORDER BY updated DESC LIMIT 2", (since,))
+    measured = app.measure_level(record=False)
+    d = measured.to_dict() if hasattr(measured, "to_dict") else measured
+    level = d.get("level")
+    if isinstance(level, (int, float)):
+        marks = max(0, min(20, int(round(float(level) / 5))))
+        dots = C.c(C.G, "●" * marks) + C.c(C.DIM, "○" * (20 - marks))
+        past = None
+        with contextlib.suppress(Exception):
+            history_mod = sibling("level")
+            if history_mod is not None:
+                history = history_mod.history(app.store.path, limit=150)
+                older = [h for h in history if float(h.get("ts") or 0) <= since]
+                if older:
+                    past = int(older[-1]["level"])
+        delta = ("  (Δ " + f"{int(level) - past:+d}" + " in period)" if past is not None else
+                 "  (no earlier measurement)")
+        progress = f"{dots}  LVL {level}/100 · {d.get('tier', 'unknown')}" + delta
+    else:
+        progress = "○" * 20 + "  not measured yet"
+    observation = int((recent or {}).get("c") or 0)
+    distinct_apps = int((activities or {}).get("a") or 0)
+    verified = int((runs or {}).get("v") or 0)
+    attempted = int((runs or {}).get("c") or 0)
+    return ("  ── OMEGA PRESENCE · latest " + str(minutes) + " minutes ──\n"
+            + "  Evidence-based capability: " + progress + "\n"
+            + f"  Saved screen observations: {observation} (AI descriptions, unverified)\n"
+            + f"  Apps appearing in activity log: {distinct_apps}\n"
+            + f"  Verified agent runs: {verified}/{attempted}\n"
+            + f"  Searchable long-term memories: {mem_stats.get('total', 0)}\n"
+            + f"  Obsidian auto-memory: {'ON' if app.settings.get('obsidian_auto_memory', False) else 'OFF'}\n"
+            + (("  Recently observed:\n" + "".join("    • " + clip(note["content"], 125) + "\n" for note in recent_notes))
+               if recent_notes else "  No recent screen observations saved yet.\n")
+            + "  Observations are fallible, not proof of knowledge or personal intentions.\n"
+            + "  Ask 'Vad har du lärt dig om mina projekt?' for an evidence-grounded summary.")
+
+
+async def presence_heartbeat(app: Buddy, interval: float = 1200) -> None:
+    """A proactive report every 20 min while Buddy is open, no paid model calls."""
+    while True:
+        await asyncio.sleep(interval)
+        if app.shutting_down or app.privacy.private:
+            continue
+        try:
+            app.ui.event("20 min · observation och framsteg (lokala, uppmätta data)")
+            app.out(presence_report(app, minutes=20))
+            app.ui.prompt()
+        except Exception as exc:
+            log("presence_report_failed", error=type(exc).__name__)
+
+
 async def main_async(app: Buddy) -> None:
     app.loop = asyncio.get_running_loop()
     import signal
@@ -6151,6 +6289,18 @@ async def main_async(app: Buddy) -> None:
         signal.signal(signal.SIGINT, on_sigint)
     if app.gateway.key():
         await asyncio.to_thread(app.doctor.run, "gateway")
+    auto_enabled, auto_note = activate_saved_presence(app)
+    if auto_enabled:
+        app.ui.event("auto presence: " + auto_note)
+        synced, filtered = await asyncio.to_thread(sync_owner_knowledge, app)
+        app.ui.event(f"Obsidian sync: {synced} saved, {filtered} filtered")
+        # Diagnostics are opt-in through saved presence, not a 30-second startup delay.
+        if IS_WIN:
+            ram_snapshot = await asyncio.to_thread(resources_report)
+            app.ui.event("RAM snapshot on startup (no continuous profiler):")
+            app.out("\n".join(ram_snapshot.splitlines()[:8]))
+        else:
+            app.ui.event("RAM diagnostics require Windows; /resources reports that explicitly.")
     if app.stop.requested():
         # A marker left by an earlier `buddy stop` must not silently paralyse a
         # session the owner just started on purpose.
@@ -6160,6 +6310,8 @@ async def main_async(app: Buddy) -> None:
     app.activity.start()
     app.start_companion()
     worker = asyncio.ensure_future(app.tasks.worker())
+    if auto_enabled and (app.presence_task is None or app.presence_task.done()):
+        app.presence_task = asyncio.ensure_future(presence_heartbeat(app))
     recovered = app.tasks.recover(stale_after=0)
     if recovered:
         app.ui.event(f"resuming {len(recovered)} interrupted task(s) from their last checkpoint")
@@ -6186,6 +6338,9 @@ async def main_async(app: Buddy) -> None:
         pass
     finally:
         worker.cancel()
+        if app.presence_task is not None:
+            app.presence_task.cancel()
+            app.presence_task = None
         await app.close()
         print(C.c(C.DIM, "\nBuddy stopped: no background work, microphone or tracking is running."))
 
