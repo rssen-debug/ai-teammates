@@ -860,6 +860,9 @@ class Gateway:
                                 slot["function"]["arguments"] += fn.get("arguments") or ""
                             if choice.get("finish_reason"):
                                 finish = choice["finish_reason"]
+                if not received or finish is None:
+                    raise GatewayError("stream_interrupted",
+                        "The provider closed the stream without a completion marker.")
                 self.base = base
                 self.usage["prompt"] += int(usage.get("prompt_tokens") or 0)
                 self.usage["completion"] += int(usage.get("completion_tokens") or 0)
@@ -4347,8 +4350,13 @@ class AgentRun:
             if hasattr(app.ui, "stream_begin"):
                 app.ui.stream_begin()
             try:
-                resp = await app.gateway.chat_stream(model, self._compact(), self.tool_schemas(restricted),
-                                                    max_tokens=4096, timeout=150, on_delta=on_token)
+                if callable(getattr(app.gateway, "chat_stream", None)):
+                    resp = await app.gateway.chat_stream(model, self._compact(), self.tool_schemas(restricted),
+                                                         max_tokens=4096, timeout=150, on_delta=on_token)
+                else:
+                    # Compatibility for tests/plug-in gateways that only expose chat().
+                    resp = await app.gateway.chat(model, self._compact(), self.tool_schemas(restricted),
+                                                  max_tokens=4096, timeout=150)
             finally:
                 if hasattr(app.ui, "stream_end"):
                     app.ui.stream_end()
