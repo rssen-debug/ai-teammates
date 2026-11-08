@@ -416,7 +416,7 @@ class LivePanel:
                     {"role": "user", "content": prompt}],
                 max_tokens=60, timeout=35)
             answer = (result.get("message") or {}).get("content") or ""
-            match = re.search(r'\\{[^{}]*"move"\\s*:\\s*(\\d+)[^{}]*\\}', answer)
+            match = re.search(r'\{[^{}]*"move"\s*:\s*(\d+)[^{}]*\}', answer)
             if not match:
                 raise ValueError("AI svarade utan giltigt JSON-drag")
             chosen = int(match.group(1))
@@ -424,7 +424,7 @@ class LivePanel:
                 raise ValueError("AI föreslog ogiltigt drag")
             self._tetris_ai_moves += 1
             elapsed = time.monotonic() - self._tetris_wait_started
-            self._tetris_last_decision = f"Drag {chosen} · {elapsed:.1f}s · AI-verifierat"
+            self._tetris_last_decision = f"Drag {chosen} · {elapsed:.1f}s · giltigt AI-drag"
             self._tetris_ai_state = "pjäs faller"
             self.events.append(datetime.now().strftime("%H:%M:%S") + " · AI Tetris: " + self._tetris_last_decision)
         except asyncio.CancelledError:
