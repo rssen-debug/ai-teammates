@@ -121,6 +121,21 @@ class PanelTest(unittest.TestCase):
         self.assertIn("hej, kan du hjälpa mig?", p._chat.text)
         self.assertEqual(p.queue.get_nowait(), "hej, kan du hjälpa mig?")
 
+    def test_live_stream_preview_can_be_toggled_and_cleared(self):
+        p = self.build()
+        p.toggle_thinking()
+        self.assertTrue(p.show_thinking)
+        p.stream_begin()
+        p.stream_delta("He")
+        p.stream_delta("j!")
+        self.assertIn("Hej!", p._chat.text)
+        p.stream_end()
+        self.assertNotIn("Hej!", p._chat.text)
+        p.ui._out("buddy › Hej!")
+        self.assertEqual(p._chat.text.count("Hej!"), 1)
+        p.toggle_thinking()
+        self.assertFalse(p.show_thinking)
+
     def test_colour_and_ansi_are_clean(self):
         p = self.build()
         p.ui._out("\x1b[36mbuddy › vit text\x1b[0m")
