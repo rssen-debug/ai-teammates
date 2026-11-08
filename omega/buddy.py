@@ -5799,6 +5799,15 @@ class Buddy:
                 if t:
                     parts.append(f"The user's current window (for 'this/here'): {t['app']} — {clip(t['title'], 100)}"
                                  if not self.privacy.protected_window(t["title"], t["app"]) else "The user's current window is protected (hidden).")
+        # Explicit owner-provided preferences/corrections outrank guesses from screen
+        # observations; bounded context avoids bloating the CPU/chat prompt.
+        owner_rules = self.store.q(
+            "SELECT kind,content FROM memories WHERE tags LIKE '%owner-confirmed%' "
+            "AND kind IN ('preference','correction') ORDER BY updated DESC LIMIT 5")
+        if owner_rules:
+            parts.append("OWNER-CONFIRMED WORKING RULES (subject to current owner instructions):\\n"
+                         + "\\n".join(f"- {row['kind']}: {clip(row['content'], 260)}"
+                                      for row in owner_rules))
         mems = self.memory.search(run.goal, limit=4, touch=False)
         if mems:
             parts.append("RELEVANT MEMORY:\n" + "\n".join(f"- [{m['kind']}/{m['status']}] {m['title']}: {clip(m['content'], 300)}" for m in mems))
@@ -5913,7 +5922,7 @@ class Buddy:
             log("summary_failed", err=str(e))
 
     # ── slash commands ──
-    HELP = """/selection [on|off|auto on|auto off|status]  /voice style [narrator|default]  /help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
+    HELP = """/teach TEXT  /correct TEXT  /continuity [status|sync]  /selection [on|off|auto on|auto off|status]  /voice style [narrator|default]  /help  /status  /voice [on|off|mute|unmute|test|device N]  /activity [on|off|today|clear|retention DAYS]
 /memory [list|search Q|forget ID|export|clear]  /obsidian [status|on|off|sync|path PATH|clear --yes]  /resources  /doctor  /pause  /resume  /stop  /quit /exit
 /private [on|off]  /privacy upload [ask|allow|deny]  /tasks [cancel ID|retry ID]  /task GOAL
 /grants [revoke]  /activate [all|status|off]  /presence  /owner [status|on --yes|off]  /free [status|on|off]  /models [set ROLE ID]  /skills  /autostart [on|off]  /key
@@ -5935,6 +5944,35 @@ Just talk normally — Buddy decides when to use tools. Say "stop" at any time."
             bad = {k: v for k, v in self.caps.snapshot().items() if v["state"] not in ("working",) and not k.startswith("tool:")}
             if bad:
                 o("Capabilities not (yet) working: " + "; ".join(f"{k}={v['state']}" for k, v in bad.items()))
+        elif cmd in ("/teach", "/correct"):
+            value = " ".join(args).strip()
+            if not value:
+                o("Skriv /teach hur du vill arbeta, eller /correct vad Buddy ska göra annorlunda.")
+            elif self.privacy.private:
+                o("Kan inte spara personlig regel i privatläge.")
+            elif len(value) > 1200:
+                o("Regeln är för lång (max 1200 tecken).")
+            else:
+                kind = "preference" if cmd == "/teach" else "correction"
+                key = hashlib.sha256(value.casefold().encode("utf-8")).hexdigest()[:12]
+                self.memory.save(kind, f"Ägarens {'preferens' if kind == 'preference' else 'korrigering'} {key}",
+                                 value, tags="owner-confirmed,personalization", status="verified",
+                                 provenance={"source": "owner-explicit-command"})
+                o("Personlig regel sparad och synkas till Obsidian om minnet är aktiverat.")
+        elif cmd == "/continuity":
+            sub = args[0] if args else "status"
+            if sub == "sync":
+                if self.privacy.private:
+                    o("Synkning pausad i privatläge.")
+                else:
+                    result = await asyncio.to_thread(sync_owner_knowledge, self)
+                    o(f"Obsidian synk: {result[0]} skrivna, {result[1]} filtrerade.")
+            else:
+                o("Obsidian: " + ("ON" if self.settings.get("obsidian_auto_memory") else "OFF")
+                  + " · lokalt minne: " + str(self.memory.stats().get("total", 0))
+                  + " · autostart: " + ("ON" if autostart_state() else "OFF"))
+                o("Flyttbar, kontrollerbar export: buddy legacy build. Verifiera med buddy legacy verify PATH.")
+                o("Observera att legacy-export är okrypterad tills du själv krypterar den.")
         elif cmd == "/selection":
             sub = args[0] if args else "status"
             if sub == "on":
@@ -6515,6 +6553,26 @@ def presence_report(app: Buddy, minutes: int = 20) -> str:
             + "  Ask 'Vad har du lärt dig om mina projekt?' for an evidence-grounded summary.")
 
 
+async def memory_continuity_loop(app: Buddy, interval: float = 900) -> None:
+    """Periodic local Obsidian reconciliation without model calls.
+
+    This is a bounded, opt-in durability check, not continuous surveillance.
+    Exporting a full legacy bundle remains an explicit owner action because
+    it contains potentially sensitive memories in plaintext.
+    """
+    while True:
+        await asyncio.sleep(interval)
+        if app.shutting_down or app.privacy.private or not app.settings.get("obsidian_auto_memory", False):
+            continue
+        try:
+            synced, filtered = await asyncio.to_thread(sync_owner_knowledge, app)
+            app.ui.event(f"Obsidian checkpoint: {synced} durable notes, {filtered} filtered")
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log("memory_continuity_sync_failed", error=type(exc).__name__)
+
+
 async def presence_heartbeat(app: Buddy, interval: float = 1200) -> None:
     """A proactive report every 20 min while Buddy is open, no paid model calls."""
     while True:
@@ -6634,6 +6692,7 @@ async def main_async(app: Buddy) -> None:
         except Exception as exc:
             app.ui.event("Pixel Tetris job not queued: " + type(exc).__name__)
     worker = asyncio.ensure_future(app.tasks.worker())
+    memory_sync = asyncio.create_task(memory_continuity_loop(app))
     if auto_enabled and (app.presence_task is None or app.presence_task.done()):
         app.presence_task = asyncio.ensure_future(presence_heartbeat(app))
     recovered = app.tasks.recover(stale_after=0)
@@ -6663,6 +6722,7 @@ async def main_async(app: Buddy) -> None:
         pass
     finally:
         worker.cancel()
+        memory_sync.cancel()
         if app.selection_bridge is not None:
             app.selection_bridge.stop()
         if app.live_panel is not None:
