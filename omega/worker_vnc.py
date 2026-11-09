@@ -150,7 +150,8 @@ def install(buddy):
             self.budget["max_seconds"] = min(float(self.budget["max_seconds"]), 120)
             self.budget["max_risky"] = min(int(self.budget["max_risky"]), 6)
             self.budget["reserve_steps"] = min(int(self.budget["reserve_steps"]), 2)
-            if self.app.settings.get("worker_vnc_enabled", False):
+            if (self.app.settings.get("worker_vnc_enabled", False)
+                    and not self.app.browser_bridge.ready()[0]):
                 self.activate(["vnc_capture", "vnc_click", "vnc_key", "vnc_type"])
             else:
                 self.activate([n for n in SAFE_BACKGROUND_BROWSER
@@ -159,7 +160,7 @@ def install(buddy):
     async def agent_execute(self):
         if not self.background and is_browser_ui_goal(self.goal):
             worker = self.app.vnc_worker
-            if worker.enabled:
+            if worker.enabled and not self.app.browser_bridge.ready()[0]:
                 ok, reason = worker.ready()
                 if not ok:
                     return buddy.RunOutcome("blocked",
@@ -239,6 +240,7 @@ def install(buddy):
                 hint="Använd background_* mot exakt tab_id.")
         if (vm_mode
                 and spec.category in ("desktop", "screen", "browser")
+                and spec.name not in SAFE_BACKGROUND_BROWSER
                 and spec.name not in ("tool_search",)):
             return buddy.ToolResult(tool=spec.name, ok=False, category="permission_denied",
                 error="Isolerat VM-läge är aktivt. Lokalt skrivbord och lokal webbläsare är spärrade.",
