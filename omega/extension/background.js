@@ -52,6 +52,25 @@ function clickTab(selector) {
   return {clicked:true,selector,before,after:before===null?null:
     (el.checked===true||el.getAttribute('aria-checked')==='true')};
 }
+function clickMany(selectors) {
+  if(!Array.isArray(selectors)||selectors.length<1||selectors.length>5) throw Error("Choose 1-5 selectors");
+  const elements=selectors.map(selector=>{
+    if(typeof selector!=='string'||selector.length>400) throw Error("Invalid selector");
+    const el=document.querySelector(selector);
+    if(!el) throw Error("Selector not found: "+selector);
+    if(el.matches('input[type="submit"],button[type="submit"]')) throw Error("Submitting forms is blocked");
+    return el;
+  });
+  // Preflight ALL selectors before changing anything.
+  return elements.map((el,i)=>{
+    const before=el.matches('input[type="checkbox"],[role="checkbox"],input[type="radio"]') ?
+      (el.checked===true||el.getAttribute('aria-checked')==='true'):null;
+    el.click();
+    const after=before===null?null:
+      (el.checked===true||el.getAttribute('aria-checked')==='true');
+    return {selector:selectors[i],clicked:true,before,after};
+  });
+}
 function typeTab(selector,value) {
   if(!selector||selector.length>400||typeof value!=='string'||value.length>4000)
     throw Error("Invalid input");
@@ -80,11 +99,12 @@ async function handleTask(task) {
   if(!Number.isInteger(args.tab_id)) throw Error("Specify exact tab_id from background_tabs");
   const tab=await chrome.tabs.get(args.tab_id);
   if(!/^https?:\/\//i.test(tab.url||'')) throw Error("Only http/https tabs supported");
-  const func={elements:visibleNodes,text:readTab,click:clickTab,type:typeTab}[action];
+  const func={elements:visibleNodes,text:readTab,click:clickTab,click_many:clickMany,type:typeTab}[action];
   if(!func) throw Error("Unsupported action");
   const callArgs=action==='text'?[args.selector||'body']:
     action==='elements'?[]:
-    action==='click'?[args.selector]:[args.selector,args.text];
+    action==='click'?[args.selector]:
+    action==='click_many'?[args.selectors]:[args.selector,args.text];
   const results=await chrome.scripting.executeScript({
     target:{tabId:tab.id},world:"ISOLATED",func,args:callArgs
   });
