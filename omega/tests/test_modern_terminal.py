@@ -31,7 +31,7 @@ class ModernTerminalTests(unittest.TestCase):
         p = self.panel()
         self.assertIs(p._layout.current_window, p._typing.window)
         self.assertNotIn("OMEGA · LIVE", str(p._layout.container))
-        self.assertFalse(p._typing.multiline)
+        self.assertEqual(p._typing.window.height.preferred, 1)
 
     def test_first_submit_queues_once_without_waiting_for_reply(self):
         p = self.panel()
