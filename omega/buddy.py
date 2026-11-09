@@ -9465,6 +9465,8 @@ import provider_native as _provider_native
 _provider_native.install(sys.modules[__name__])
 import worker_vnc as _worker_vnc
 _worker_vnc.install(sys.modules[__name__])
+import voice_study as _voice_study
+_voice_study.install(sys.modules[__name__])
 
 
 if __name__ == "__main__":
