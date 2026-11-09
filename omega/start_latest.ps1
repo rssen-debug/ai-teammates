@@ -90,6 +90,20 @@ if (-not $NoInstall) {
 & $python -m py_compile $entry (Join-Path $release "omega\live_panel.py") (Join-Path $release "omega\voice_study.py")
 Assert-Exit "Python syntax"
 
+if ($WithBrowser) {
+    # Keep a fixed unpacked extension directory so Chrome users only load it once.
+    $extSource = Join-Path $release "omega\\extension"
+    $extTarget = Join-Path $env:LOCALAPPDATA "StuddyBuddy\\extension"
+    if (!(Test-Path (Join-Path $extSource "manifest.json"))) {
+        throw "Omega browser extension missing from verified release."
+    }
+    New-Item -ItemType Directory -Path $extTarget -Force | Out-Null
+    Copy-Item -Path (Join-Path $extSource "*") -Destination $extTarget -Recurse -Force
+    Write-Host "EXISTING CHROME EXTENSION: $extTarget" -ForegroundColor Magenta
+    Write-Host "chrome://extensions -> Developer mode -> Load unpacked -> select the above folder" -ForegroundColor Cyan
+    Write-Host "Then use /browser pair in Omega. Do NOT start another Chrome profile." -ForegroundColor Cyan
+}
+
 $env:PYTHONUTF8 = "1"
 $env:PYTHONIOENCODING = "utf-8"
 $env:PYTHONPATH = Join-Path $release "omega"
