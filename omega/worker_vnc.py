@@ -133,7 +133,7 @@ def install(buddy):
     # a Windows window or inject global keyboard/mouse events.
     SAFE_BACKGROUND_BROWSER = frozenset((
         "browser_tabs", "browser_dom_text", "browser_click", "browser_type",
-        "browser_navigate", "browser_eval", "browser_dom", "browser_snapshot",
+        
     ))
 
     def is_browser_ui_goal(goal):
