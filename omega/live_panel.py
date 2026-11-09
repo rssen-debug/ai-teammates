@@ -410,7 +410,8 @@ class LivePanel:
         keys = KeyBindings()
         @keys.add("f2")
         def _toggle(_event: Any) -> None:
-            self.toggle_thinking()
+            self._show_tui_details = not self._show_tui_details
+            self._refresh()
         @keys.add("f3")
         def _metrics(_event: Any) -> None:
             self.compact_mode = not self.compact_mode
@@ -419,12 +420,18 @@ class LivePanel:
         # half the conversation or shrink the composer as in the old split view.
         self._top_control = FormattedTextControl(self._top_text)
         self._bottom_control = FormattedTextControl(self._bottom_text)
+        self._details_control = FormattedTextControl(self._details_text)
+        self._show_tui_details = False
         self._layout = Layout(
             HSplit([
                 Window(content=self._top_control, height=1, style="class:chrome"),
                 Window(height=1, char="─", style="class:divider"),
                 self._chat,
                 Window(height=1, char="─", style="class:divider"),
+                ConditionalContainer(
+                    Window(content=self._details_control, height=3, style="class:chrome"),
+                    filter=Condition(lambda: self._show_tui_details),
+                ),
                 self._typing,
                 Window(content=self._bottom_control, height=1, style="class:chrome"),
             ]),
@@ -452,6 +459,17 @@ class LivePanel:
             }),
         )
 
+    def _details_text(self) -> list[tuple[str, str]]:
+        # Public execution summaries, never private chain-of-thought.
+        return [
+            ("bold #e49cc9", "  TASK  "),
+            ("#dcd2e7", clean_line(self.goal or "Waiting", 80) + "\n"),
+            ("bold #e49cc9", "  STEP  "),
+            ("#dcd2e7", clean_line(self.action_title or self.phase, 80) + "\n"),
+            ("bold #9cddb2", "  CHECK "),
+            ("#dcd2e7", clean_line(self.action_result or self.action_expect or "No result yet", 80)),
+        ]
+
     def _top_text(self) -> list[tuple[str, str]]:
         """Nonblocking single-line identity and real model status."""
         working = bool(getattr(self.app, "current_run", None))
@@ -462,6 +480,7 @@ class LivePanel:
             model = self.app.router.resolve("chat")
         except (AttributeError, KeyError, ValueError, TypeError):
             provider, model = "unknown", "unknown"
+        vm_mode = bool(self.app.settings.get("worker_vnc_enabled", False)) if hasattr(self.app, "settings") else False
         return [
             ("bold #e49cc9", "  ◈ OMEGA  "),
             ("#786a88", "│  "),
@@ -471,6 +490,8 @@ class LivePanel:
             ("#786a88", "   │   "),
             ("bold #9cddb2" if working else "#b6b0c3",
              "WORKING" if working else "READY"),
+            ("#786a88", "  │  "),
+            ("bold #9cddb2" if vm_mode else "#786a88", "VM" if vm_mode else "HOST"),
         ]
 
     def _bottom_text(self) -> list[tuple[str, str]]:
