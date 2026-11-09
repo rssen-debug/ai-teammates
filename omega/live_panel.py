@@ -29,7 +29,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.mouse_events import MouseEventType
 from prompt_toolkit.input import DummyInput
 from prompt_toolkit.output import DummyOutput
-from prompt_toolkit.filters import Condition
+from prompt_toolkit.filters import Condition, has_focus
 from prompt_toolkit.layout import (
     ConditionalContainer, Dimension, HSplit, Layout, VSplit, Window,
 )
