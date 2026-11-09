@@ -9460,6 +9460,8 @@ def _oneshot(text: str) -> int:
 # imported copy of buddy.py. No keys are written to this source tree.
 import provider_native as _provider_native
 _provider_native.install(sys.modules[__name__])
+import worker_vnc as _worker_vnc
+_worker_vnc.install(sys.modules[__name__])
 
 
 if __name__ == "__main__":
