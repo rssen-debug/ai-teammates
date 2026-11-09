@@ -132,7 +132,7 @@ def install(buddy):
     # These operations target a CDP tab by websocket ID. They do not activate
     # a Windows window or inject global keyboard/mouse events.
     SAFE_BACKGROUND_BROWSER = frozenset((
-        "browser_tabs", "browser_dom_text", "browser_click", "browser_type",
+        "browser_tabs", "browser_dom_text", "browser_dom_elements", "browser_click", "browser_type",
         
     ))
 
