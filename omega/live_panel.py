@@ -126,73 +126,73 @@ def companion_personality(mode: str, level: int | None = None,
 
 def pixel_companion(mode: str, frame: int = 0,
                     level: int | None = None) -> tuple[str, ...]:
-    """Five pixel-art life stages tied to actual LEVEL 1-100 evidence.
+    """Coherent five-stage pixel pet; only basic block/ASCII glyphs.
 
-    Small idle blink/bob animations use time only for appearance. Growth itself
-    strictly follows the measured level from omega/level.py.
+    Each row is a fixed-width terminal cell row. Avoid fractional blocks,
+    wide emoji and mixed-width Unicode facial features, which damaged WinPTY
+    rendering. Frames change facial expression only, NEVER measured growth.
     """
     stage, _ = companion_stage(level)
-    blink = frame % 9 == 8
-    eyes = ("─ ─" if blink or mode == "sleeping" else
-            "◕ ◕" if mode == "working" else
-            "● ●" if mode == "observing" else "• •")
-    mouth = ("﹏" if mode == "sleeping" else
-             "ᴗ" if mode in ("working", "observing") else "ω")
-    heart = "♥" if frame % 2 == 0 else "♡"
+    blink = frame % 9 == 8 or mode == "sleeping"
+    eyes = "- -" if blink else "O O" if mode == "working" else "o o"
+    mouth = "w" if mode == "awake" else "v" if mode != "sleeping" else "-"
+    pulse = "<3" if frame % 2 == 0 else "++"
     if stage == 0:
-        return (
-            "     ▄██▄",
-            "    █ " + eyes + " █",
-            "    █  " + mouth + "  █",
-            "     ▀██▀",
-            "      ▀▀",
+        lines = (
+            "    █████    ",
+            "   ███████   ",
+            "  ██ " + eyes + " ██  ",
+            "   ██ " + mouth + " ██   ",
+            "    █████    ",
         )
-    if stage == 1:
-        return (
-            "     ▄███▄",
-            "   ▄███████▄",
-            "   █  " + eyes + "  █",
-            "   █   " + mouth + "   █",
-            "   ▀█  " + heart + "  █▀",
-            "     ▀███▀",
-            "      ▀ ▀",
+    elif stage == 1:
+        lines = (
+            "    █████    ",
+            "  █████████  ",
+            " ██  " + eyes + "  ██ ",
+            " ██   " + mouth + "   ██ ",
+            " ██   " + pulse + "  ██ ",
+            "  █████████  ",
+            "   ██   ██   ",
         )
-    if stage == 2:
-        return (
-            "   ▄▄     ▄▄",
-            "  ▄██▄▄███▄▄",
-            " ▄██████████▄",
-            " ███  " + eyes + "  ███",
-            " ███   " + mouth + "   ███",
-            " ▀██   " + heart + "   ██▀",
-            "   ▀███████▀",
-            "    ▀▀ ▀▀",
+    elif stage == 2:
+        lines = (
+            "  ██     ██  ",
+            "  ███   ███  ",
+            " ███████████ ",
+            " ██  " + eyes + "  ██ ",
+            " ██   " + mouth + "   ██ ",
+            " ██   " + pulse + "  ██ ",
+            "  █████████  ",
+            "   ██   ██   ",
         )
-    if stage == 3:
-        return (
-            "  ✦ ▄▄     ▄▄ ✦",
-            "   ▄██▄▄███▄▄",
-            " ▄████████████▄",
-            " ███   " + eyes + "   ███",
-            " ███    " + mouth + "    ███",
-            " ███    " + heart + "    ███",
-            " ▀████████████▀",
-            "   ▀██▀ ▀██▀",
-            "    ▀▀   ▀▀",
+    elif stage == 3:
+        lines = (
+            "  ██     ██  ",
+            " ████   ████ ",
+            "█████████████",
+            "███  " + eyes + "  ███",
+            "███   " + mouth + "   ███",
+            "███   " + pulse + "  ███",
+            " ███████████ ",
+            "  ███   ███  ",
+            "  ██     ██  ",
         )
-    return (
-        "       ✧   ✦",
-        "  ✦ ▄▄▄     ▄▄▄ ✦",
-        "   ▄████▄▄▄████▄",
-        "  ███████████████",
-        "  ████   " + eyes + "  ████",
-        "  ████    " + mouth + "   ████",
-        "  ████    " + heart + "   ████",
-        "  ▀█████████████▀",
-        "    ▀███▀ ▀███▀",
-        "      ▀▀   ▀▀",
-        "   ✧           ✧",
-    )
+    else:
+        lines = (
+            "  ██     ██  ",
+            " ████   ████ ",
+            "█████████████",
+            "█████████████",
+            "███  " + eyes + "  ███",
+            "███   " + mouth + "   ███",
+            "███   " + pulse + "  ███",
+            " ███████████ ",
+            "  █████████  ",
+            "  ███   ███  ",
+            "  ██     ██  ",
+        )
+    return tuple(line.center(17) for line in lines)
 
 
 SKILL_LABELS = (
