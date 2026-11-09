@@ -38,7 +38,7 @@ from prompt_toolkit.widgets import Frame, TextArea
 from prompt_toolkit.styles import Style
 
 
-LIVE_PANEL_BUILD = "fast-background-v4-20261109"
+LIVE_PANEL_BUILD = "wrap-v3-20261109"
 
 
 def chat_wrap_width(columns: int) -> int:
