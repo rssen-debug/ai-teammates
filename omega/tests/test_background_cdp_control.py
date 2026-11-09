@@ -57,20 +57,23 @@ class BackgroundControlTests(unittest.TestCase):
         self.assertEqual(result.category, "permission_denied")
 
     def test_browser_controls_tool_is_registered(self):
-        self.assertIsNotNone(self.app.registry.get("browser_dom_elements"))
+        for name in ("background_tabs", "background_elements", "background_text",
+                     "background_click", "background_type"):
+            with self.subTest(tool=name):
+                self.assertIsNotNone(self.app.registry.get(name))
 
     def test_click_tasks_have_tight_budget(self):
         run = buddy.AgentRun(self.app, "Klicka på de tre rätta alternativen")
         self.assertLessEqual(run.budget["max_steps"], 12)
         self.assertLessEqual(run.budget["max_seconds"], 120)
 
-    def test_missing_debug_tab_blocks_immediately_without_agent_calls(self):
+    def test_missing_extension_blocks_immediately_without_agent_calls(self):
         run = buddy.AgentRun(self.app, "Skriv till ChatGPT i en webbläsarflik")
-        with patch.object(buddy, "cdp_ok", return_value=(False, "no debug session")):
+        with patch.object(self.app.browser_bridge, "ready", return_value=(False, "not paired")):
             outcome = asyncio.run(run.execute())
         self.assertEqual(outcome.status, "blocked")
         self.assertEqual(outcome.steps, 0)
-        self.assertIn("CDP", outcome.summary)
+        self.assertIn("tillägget", outcome.summary.lower())
 
 if __name__ == "__main__":
     unittest.main()

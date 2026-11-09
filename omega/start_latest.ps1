@@ -82,7 +82,7 @@ Assert-Exit "Supported Python version"
 # Install only declared and auditable packages, never shell-piped downloads.
 $deps = @("prompt-toolkit>=3.0,<4", "pillow", "uiautomation")
 if ($WithVoice) { $deps += @("sounddevice", "numpy", "faster-whisper") }
-if ($WithBrowser) { $deps += @("websocket-client") }
+if ($WithBrowser) { $deps += @("websockets>=14,<17") }
 if (-not $NoInstall) {
     & $python -m pip install --disable-pip-version-check @deps
     Assert-Exit "Python dependencies"
@@ -90,12 +90,26 @@ if (-not $NoInstall) {
 & $python -m py_compile $entry (Join-Path $release "omega\live_panel.py") (Join-Path $release "omega\voice_study.py")
 Assert-Exit "Python syntax"
 
+if ($WithBrowser) {
+    # Keep a fixed unpacked extension directory so Chrome users only load it once.
+    $extSource = Join-Path $release "omega\extension"
+    $extTarget = Join-Path $env:LOCALAPPDATA "StuddyBuddy\extension"
+    if (!(Test-Path (Join-Path $extSource "manifest.json"))) {
+        throw "Omega browser extension missing from verified release."
+    }
+    New-Item -ItemType Directory -Path $extTarget -Force | Out-Null
+    Copy-Item -Path (Join-Path $extSource "*") -Destination $extTarget -Recurse -Force
+    Write-Host "EXISTING CHROME EXTENSION: $extTarget" -ForegroundColor Magenta
+    Write-Host "chrome://extensions -> Developer mode -> Load unpacked -> select the above folder" -ForegroundColor Cyan
+    Write-Host "Then use /browser pair in Omega. Do NOT start another Chrome profile." -ForegroundColor Cyan
+}
+
 $env:PYTHONUTF8 = "1"
 $env:PYTHONIOENCODING = "utf-8"
 $env:PYTHONPATH = Join-Path $release "omega"
 Write-Host "OMEGA BYOK BETA  |  $($sha.Substring(0,12))" -ForegroundColor Green
 Write-Host "Local data/keys preserved. Keys are entered inside Omega; never paste them in a public issue." -ForegroundColor Cyan
-Write-Host "/models -> /api openrouter or /api go -> /testapi. Voice: /voice study on; /voice on." -ForegroundColor Cyan
+Write-Host "/models -> /api openrouter or /api go -> /testapi. Voice: /voice study on; /voice on. Browser: /browser pair." -ForegroundColor Cyan
 
 if ($DoctorOnly) {
     & $python $entry doctor
