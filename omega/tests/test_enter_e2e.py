@@ -52,14 +52,18 @@ class EnterE2ETests(unittest.IsolatedAsyncioTestCase):
             panel._loop = asyncio.get_running_loop()
             task = asyncio.create_task(app.run_async())
             try:
-                await asyncio.sleep(0.08)
+                for _ in range(50):
+                    if app.is_running:
+                        break
+                    await asyncio.sleep(0.01)
+                self.assertTrue(app.is_running, "terminal app did not start")
                 pipe.send_text(keys)
                 got = [
                     await asyncio.wait_for(panel.queue.get(), timeout=2.0)
                     for _ in expected
                 ]
                 self.assertEqual(got, expected)
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.12)
                 self.assertTrue(panel.queue.empty(), "duplicate message was queued")
             finally:
                 if app.is_running:
