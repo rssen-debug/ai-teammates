@@ -206,6 +206,7 @@ def install(buddy):
     original_submit = Buddy.submit
     original_interrupt = Voice.interrupt
     original_capture = Voice._transcribe_and_submit
+    original_voice_start = Voice.start
 
     async def command(self, line):
         p = line.strip().lower().split()
@@ -214,6 +215,7 @@ def install(buddy):
             if action in ("on", "off"):
                 enabled = action == "on"
                 self.settings.set("voice_study_mode", enabled)
+                self.voice._study_silence_frames = 14 if enabled else 28
                 if not enabled and getattr(self, "_study_cancel", None):
                     self._study_cancel.set()
                     self.voice.interrupt()
@@ -270,8 +272,15 @@ def install(buddy):
                 self._study_stt_busy = False
         threading.Thread(target=job, name="omega-study-stt", daemon=True).start()
 
+    def voice_start(self):
+        self._study_silence_frames = (
+            14 if self.app.settings.get("voice_study_mode", False) else 28
+        )
+        return original_voice_start(self)
+
     Buddy.command = command
     Buddy.submit = submit
+    Voice.start = voice_start
     Voice.interrupt = interrupt
     Voice._transcribe_and_submit = transcribe_and_submit
     Buddy.HELP += "\n/voice study [on|off|status]  (low-latency, no tools, streaming spoken tutoring)"
