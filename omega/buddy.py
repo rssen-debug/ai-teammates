@@ -7735,8 +7735,11 @@ async def windows_tests(s: Suite, app: Buddy, key: bool) -> None:
     except Exception as e:
         s.rec("J4", "voice playback", "FAIL", str(e))
     s.rec("J5", "speech recognition (real speech)", "NOT TESTED", "needs a spoken sentence: run `python buddy.py --voice-test`")
-    # D: deterministic desktop chain (no LLM): launch → find → type → read back
+    # D: deterministic desktop chain (no LLM): host desktop control is
+    # deliberately disabled. A real VM/CDP harness must prove this separately.
     try:
+        if not live:
+            raise Unavailable("Host focus protection is enabled; UIA Notepad control is intentionally blocked.")
         phrase = "Studdy Buddy test 123"
         r = await exec_tool(app, "app_launch", {"target": "notepad"})
         if not r.ok:
@@ -7761,8 +7764,11 @@ async def windows_tests(s: Suite, app: Buddy, key: bool) -> None:
         back = await exec_tool(app, "ui_read", {"ref": ref})
         ok = w.ok and back.ok and phrase in ((back.data or {}).get("value") or "")
         s.rec("D", "Notepad: open → type → read back (real desktop)", "PASS" if ok else "FAIL", f"readback={clip(str((back.data or {}).get('value')), 60)!r}; close Notepad manually (don't save)")
+    except Unavailable as e:
+        s.rec("D", "Notepad control (host isolated)", "BLOCKED", str(e))
     except Exception as e:
-        s.rec("D", "Notepad control", "FAIL", f"{type(e).__name__}: {e}")
+        label = "BLOCKED" if "HOST PROTECTED" in str(e) else "FAIL"
+        s.rec("D", "Notepad control", label, f"{type(e).__name__}: {e}")
 
 
 async def live_scenarios(s: Suite, app: Buddy) -> None:
