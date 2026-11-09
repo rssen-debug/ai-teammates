@@ -676,7 +676,7 @@ class LivePanel:
         # Do not rebuild an increasingly large conversation per character.
         current = time.monotonic()
         if (current - self._last_stream_paint >= 0.16 or
-                re.search(r"[.!?]\\s*$", self._stream_text)):
+                re.search(r"[.!?]\s*$", self._stream_text)):
             self._last_stream_paint = current
             self._render_chat()
 
