@@ -326,7 +326,13 @@ class LivePanel:
         # Cached on the background refresh, never query Settings/SQLite while
         # prompt_toolkit is rendering a keystroke.
         self._cached_free_only = True
+        self._cached_provider = "Loading"
+        self._cached_model = "Checking provider"
+        self._cached_vm_mode = False
+        self._cached_work_mode = "HOST"
         self._last_stream_paint = 0.0
+        self._chat_base_key = None
+        self._chat_base_wrapped = ""
         self._submitted_at: deque[float] = deque(maxlen=100)
         self._input_delay_max = 0.0
         self._last_level: int | None = None
@@ -426,7 +432,8 @@ class LivePanel:
         self._top_control = FormattedTextControl(self._top_text)
         self._bottom_control = FormattedTextControl(self._bottom_text)
         self._details_control = FormattedTextControl(self._details_text)
-        self._show_tui_details = False
+        # A small live activity timeline remains visible by default. F2 hides it.
+        self._show_tui_details = True
         self._layout = Layout(
             HSplit([
                 Window(content=self._top_control, height=1, style="class:chrome"),
@@ -434,8 +441,9 @@ class LivePanel:
                 self._chat,
                 Window(height=1, char="─", style="class:divider"),
                 ConditionalContainer(
-                    Window(content=self._details_control, height=3, style="class:chrome"),
-                    filter=Condition(lambda: self._show_tui_details),
+                    Window(content=self._details_control, height=7, style="class:chrome"),
+                    filter=Condition(lambda: self._show_tui_details and
+                                     shutil.get_terminal_size((100, 30)).lines >= 21),
                 ),
                 self._typing,
                 Window(content=self._bottom_control, height=1, style="class:chrome"),
@@ -465,51 +473,73 @@ class LivePanel:
         )
 
     def _details_text(self) -> list[tuple[str, str]]:
-        # Public execution summaries, never private chain-of-thought.
+        """Lightweight, truthful execution timeline. No disk, API or model calls.
+
+        The terminal renderer calls this repeatedly, including while the user
+        types. Only consult fields already populated by the agent callbacks.
+        """
+        current = self.trace[-1] if self.trace else None
+        latest_tool = current[0] if current else "-"
+        result = ("RUNNING" if current and current[1] is None else
+                  "PASS" if current and current[1] else
+                  "FAIL" if current else "NOT RUN")
+        newest = list(self.events)[-2:]
+        while len(newest) < 2:
+            newest.insert(0, "No additional events")
+        if self.compact_mode:
+            items = [
+                ("bold #e49cc9", "  ◈ LIVE  "),
+                ("#a0a0b1", "F2 hide  |  F3 metrics\n"),
+                ("bold #e49cc9", "  TASK   "),
+                ("#dcd2e7", clean_line(self.goal or self._run_state, 105) + "\n"),
+                ("bold #e49cc9", "  ACTION "),
+                ("#dcd2e7", clean_line(self.action_title or self.phase, 105) + "\n"),
+                ("bold #9cddb2", "  TOOL   "),
+                ("#dcd2e7", clean_line(latest_tool, 72) + "  "),
+                ("bold #9cddb2" if result == "PASS" else "#f9b48a", result + "\n"),
+                ("bold #e49cc9", "  CHECK  "),
+                ("#dcd2e7", clean_line(self.action_result or self.action_expect or "No verified result yet", 105) + "\n"),
+                ("#af8db0", "  " + clean_line(newest[-2], 110) + "\n"),
+                ("#af8db0", "  " + clean_line(newest[-1], 110)),
+            ]
+            return items
         return [
-            ("bold #e49cc9", "  TASK  "),
-            ("#dcd2e7", clean_line(self.goal or "Waiting", 80) + "\n"),
-            ("bold #e49cc9", "  STEP  "),
-            ("#dcd2e7", clean_line(self.action_title or self.phase, 80) + "\n"),
-            ("bold #9cddb2", "  CHECK "),
-            ("#dcd2e7", clean_line(self.action_result or self.action_expect or "No result yet", 80)),
+            ("bold #e49cc9", "  ◈ METRICS  "),
+            ("#a0a0b1", "F3 return to live view\n"),
+            ("#dcd2e7", f"  Tools: {self._tool_successes} passed / {self._tool_failures} failed\n"),
+            ("#dcd2e7", f"  Verified work: {self._verified_work}; unverified: {self._unverified_work}\n"),
+            ("#dcd2e7", f"  Last queue delay: {self._last_queue_delay:.3f}s\n"),
+            ("#dcd2e7", f"  Max queue delay: {self._input_delay_max:.3f}s\n"),
+            ("#dcd2e7", "  " + clean_line(self._last_tool_error or self._run_state_detail or self.phase, 110)),
         ]
 
     def _top_text(self) -> list[tuple[str, str]]:
-        """Nonblocking single-line identity and real model status."""
+        """Pure in-memory formatting; NEVER read SQLite during terminal redraw."""
         working = bool(getattr(self.app, "current_run", None))
-        try:
-            provider = getattr(getattr(self.app, "gateway", None), "base", "")
-            provider = "OpenRouter" if "openrouter.ai" in provider else (
-                "OpenCode Go" if "opencode.ai" in provider else "Kilo")
-            model = self.app.router.resolve("chat")
-        except (AttributeError, KeyError, ValueError, TypeError):
-            provider, model = "unknown", "unknown"
-        vm_mode = bool(self.app.settings.get("worker_vnc_enabled", False)) if hasattr(self.app, "settings") else False
         return [
             ("bold #e49cc9", "  ◈ OMEGA  "),
             ("#786a88", "│  "),
-            ("#dbd4e5", provider + "  "),
+            ("#dbd4e5", self._cached_provider + "  "),
             ("#786a88", "·  "),
-            ("#9cddb2", str(model)[:50]),
+            ("#9cddb2", self._cached_model[:50]),
             ("#786a88", "   │   "),
             ("bold #9cddb2" if working else "#b6b0c3",
              "WORKING" if working else "READY"),
             ("#786a88", "  │  "),
-            ("bold #9cddb2" if vm_mode else "#786a88", "VM" if vm_mode else "HOST"),
+            ("bold #9cddb2" if self._cached_vm_mode else "#786a88",
+             self._cached_work_mode),
         ]
 
     def _bottom_text(self) -> list[tuple[str, str]]:
-        """Compact factual footer; tool telemetry never interrupts chat."""
-        running = self._waiting_for_response
+        """Compact factual footer; no database queries or unverified progress."""
         return [
-            ("bold #9cddb2", "  ● " + ("RESPONDING" if running else "READY")),
+            ("bold #9cddb2", "  ● " + ("RESPONDING" if self._waiting_for_response else "READY")),
             ("#786a88", "  │  "),
             ("#c5bad3", f"TOOLS {self._tool_successes} OK / {self._tool_failures} FAIL"),
             ("#786a88", "  │  "),
             ("#a9a0b6", f"VERIFIED {self._verified_work}"),
             ("#786a88", "  │  "),
-            ("#b79dc6", "F2 DETAILS · F3 METRICS · /help"),
+            ("#b79dc6", "F2 LIVE · F3 METRICS · /help"),
         ]
 
     @property
@@ -620,9 +650,18 @@ class LivePanel:
         view = "\n".join(reversed(selected))
         if self._stream_active and self._stream_text:
             view += "\nbuddy › " + self._stream_text
-        # Use the actual TextArea pane width; keep the full transcript in SQLite.
+        # Cache the non-streaming transcript; streaming should never rewrap
+        # thousands of previous lines for every new token.
         wrap_at = self._current_chat_wrap_width()
-        view = wrap_chat_display(view, wrap_at)
+        base = "\n".join(reversed(selected))
+        key = (base, wrap_at)
+        if key != self._chat_base_key:
+            self._chat_base_wrapped = wrap_chat_display(base, wrap_at)
+            self._chat_base_key = key
+        view = self._chat_base_wrapped
+        if self._stream_active and self._stream_text:
+            tail = self._stream_text[-3000:]
+            view += wrap_chat_display("\nbuddy › " + tail, wrap_at)
         self._chat.text = view
         self._chat.buffer.cursor_position = len(view)
         self._refresh(sidebar=False)
@@ -731,10 +770,11 @@ class LivePanel:
             self._stderr_log_fd = None
 
     async def _companion_poll(self) -> None:
-        """Collect potentially blocking settings/Windows idle data outside UI rendering."""
+        """Collect potentially blocking data outside keyboard/render callbacks."""
         while True:
             try:
                 await asyncio.to_thread(self._read_companion_state)
+                await asyncio.to_thread(self._read_provider_state)
                 self._refresh()
             except asyncio.CancelledError:
                 raise
@@ -761,6 +801,22 @@ class LivePanel:
                 self._cached_companion_options = {}
                 self._cached_companion_enabled = False
                 self._cached_idle_seconds = 0.0
+
+    def _read_provider_state(self) -> None:
+        """Provider settings may hit SQLite; poll off-thread at low frequency."""
+        try:
+            gateway = getattr(self.app, "gateway", None)
+            provider = str(getattr(gateway, "provider", "Kilo"))
+            model = str(self.app.router.resolve("chat"))
+            vm_mode = bool(self.app.settings.get("worker_vnc_enabled", False))
+            with self._lock:
+                self._cached_provider = provider
+                self._cached_model = model
+                self._cached_vm_mode = vm_mode
+                self._cached_work_mode = "VM" if vm_mode else "HOST"
+        except (AttributeError, KeyError, ValueError, OSError, sqlite3.DatabaseError):
+            # Preserve previously grounded values; never claim a successful switch.
+            pass
 
     async def _refresh_level(self) -> None:
         try:
