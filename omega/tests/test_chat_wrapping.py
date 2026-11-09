@@ -54,7 +54,10 @@ class WrapRegressionTests(unittest.TestCase):
         source = "buddy › " + "långt_sammansatt_ord_" * 40
         p.ui._out(source)
         self.assertEqual(p.messages[-1], source)
-        width = chat_wrap_width(120)
+        # The old assertion assumed a 120-column host, but headless CI
+        # legitimately reports 80 columns. Assert using the SAME geometry
+        # that _render_chat() used, irrespective of operating system.
+        width = p._current_chat_wrap_width()
         self.assertTrue(all(len(line) <= width for line in p._chat.text.splitlines()))
         self.assertIn("långt_sammansatt_ord_", p.messages[-1])
 
@@ -74,8 +77,21 @@ class WrapRegressionTests(unittest.TestCase):
                 self.assertTrue(all(len(x) <= 40 for x in p._chat.text.splitlines()))
         except (AttributeError, TypeError):
             # Some prompt_toolkit versions use instance-only render_info.
-            self.assertIn("wrap_at = max(24, min(80, pane_columns - 7))",
+            self.assertIn("return max(24, min(80, pane_columns - 7))",
                           (Path(__file__).resolve().parents[1] / "live_panel.py").read_text(encoding="utf-8"))
+
+    def test_headless_output_size_and_render_use_identical_width(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        p = self.panel()
+        size = SimpleNamespace(columns=80, rows=35)
+        with patch.object(type(p.application.output), "get_size",
+                          return_value=size):
+            p.ui._out("buddy › " + "ett_långt_ord_" * 25)
+            actual = p._current_chat_wrap_width()
+            self.assertEqual(actual, chat_wrap_width(80))
+            self.assertTrue(all(len(line) <= actual
+                                for line in p._chat.text.splitlines()))
 
     def test_ui_fingerprint_discloses_outdated_running_version(self):
         p = self.panel()
