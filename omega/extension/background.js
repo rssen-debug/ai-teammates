@@ -146,7 +146,7 @@ async function connect() {
   };
   ws.onerror=()=>{try{ws.close();}catch{}};
 }
-chrome.runtime.onInstalled.addListener(()=>chrome.runtime.openOptionsPage());
+// Do not automatically open a tab or steal focus when the extension installs.
 chrome.runtime.onStartup.addListener(connect);
 chrome.storage.onChanged.addListener((changes,area)=>{
   if(area==='local'&&changes.pairing){
