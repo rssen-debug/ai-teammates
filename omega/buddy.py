@@ -9518,6 +9518,8 @@ import worker_vnc as _worker_vnc
 _worker_vnc.install(sys.modules[__name__])
 import voice_study as _voice_study
 _voice_study.install(sys.modules[__name__])
+import browser_extension_bridge as _browser_extension_bridge
+_browser_extension_bridge.install(sys.modules[__name__])
 
 
 if __name__ == "__main__":
