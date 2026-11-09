@@ -15,7 +15,7 @@ import time
 import uuid
 
 PORT = 18783
-ACTIONS = frozenset(("tabs", "elements", "text", "click", "type"))
+ACTIONS = frozenset(("tabs", "elements", "text", "click", "click_many", "type"))
 
 
 class BrowserBridge:
@@ -189,6 +189,16 @@ def install(buddy):
             confirm=lambda a, c: "May send, purchase, delete, or publish" if re.search(
                 r"(?i)(submit|send|post|buy|pay|delete|publish|checkout)", a.get("selector", "")) else None,
             handler=call("click")))
+        self.registry.register(buddy.ToolSpec(
+            name="background_click_many", category="browser", risk=buddy.Risk.INPUT,
+            effect=True, available=connected, timeout=14,
+            description="Click up to FIVE selected controls in one existing background tab, without changing Windows focus. Use for multi-answer quizzes after inspecting selectors with background_elements. Read back afterward.",
+            parameters=buddy.schema_obj({"tab_id": {"type": "integer"}, "selectors": {
+                "type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 5}}, ["tab_id", "selectors"]),
+            confirm=lambda a, c: "Multi-element click includes a potentially destructive selector" if any(
+                re.search(r"(?i)(submit|send|post|buy|pay|delete|publish|checkout)", str(x))
+                for x in a.get("selectors", [])) else None,
+            handler=call("click_many")))
         self.registry.register(buddy.ToolSpec(
             name="background_type", category="browser", risk=buddy.Risk.INPUT,
             effect=True, available=connected, timeout=12,
