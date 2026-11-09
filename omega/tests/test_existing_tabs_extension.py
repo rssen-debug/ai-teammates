@@ -77,6 +77,7 @@ class ExtensionBridgeTests(unittest.TestCase):
         app = buddy.Buddy(headless=True)
         self.assertIsNotNone(app.registry.get("background_tabs"))
         self.assertIsNotNone(app.registry.get("background_click"))
+        self.assertIsNotNone(app.registry.get("background_click_many"))
         with patch.object(app.browser_bridge, "ready", return_value=(False, "offline")):
             run = buddy.AgentRun(app, "Klicka på de tre rätta svaren i min Chrome-flik")
             outcome = asyncio.run(run.execute())
