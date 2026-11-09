@@ -126,73 +126,73 @@ def companion_personality(mode: str, level: int | None = None,
 
 def pixel_companion(mode: str, frame: int = 0,
                     level: int | None = None) -> tuple[str, ...]:
-    """Five pixel-art life stages tied to actual LEVEL 1-100 evidence.
+    """Coherent five-stage pixel pet; only basic block/ASCII glyphs.
 
-    Small idle blink/bob animations use time only for appearance. Growth itself
-    strictly follows the measured level from omega/level.py.
+    Each row is a fixed-width terminal cell row. Avoid fractional blocks,
+    wide emoji and mixed-width Unicode facial features, which damaged WinPTY
+    rendering. Frames change facial expression only, NEVER measured growth.
     """
     stage, _ = companion_stage(level)
-    blink = frame % 9 == 8
-    eyes = ("─ ─" if blink or mode == "sleeping" else
-            "◕ ◕" if mode == "working" else
-            "● ●" if mode == "observing" else "• •")
-    mouth = ("﹏" if mode == "sleeping" else
-             "ᴗ" if mode in ("working", "observing") else "ω")
-    heart = "♥" if frame % 2 == 0 else "♡"
+    blink = frame % 9 == 8 or mode == "sleeping"
+    eyes = "- -" if blink else "O O" if mode == "working" else "o o"
+    mouth = "w" if mode == "awake" else "v" if mode != "sleeping" else "-"
+    pulse = "<3" if frame % 2 == 0 else "++"
     if stage == 0:
-        return (
-            "     ▄██▄",
-            "    █ " + eyes + " █",
-            "    █  " + mouth + "  █",
-            "     ▀██▀",
-            "      ▀▀",
+        lines = (
+            "    █████    ",
+            "   ███████   ",
+            "  ██ " + eyes + " ██  ",
+            "   ██ " + mouth + " ██   ",
+            "    █████    ",
         )
-    if stage == 1:
-        return (
-            "     ▄███▄",
-            "   ▄███████▄",
-            "   █  " + eyes + "  █",
-            "   █   " + mouth + "   █",
-            "   ▀█  " + heart + "  █▀",
-            "     ▀███▀",
-            "      ▀ ▀",
+    elif stage == 1:
+        lines = (
+            "    █████    ",
+            "  █████████  ",
+            " ██  " + eyes + "  ██ ",
+            " ██   " + mouth + "   ██ ",
+            " ██   " + pulse + "  ██ ",
+            "  █████████  ",
+            "   ██   ██   ",
         )
-    if stage == 2:
-        return (
-            "   ▄▄     ▄▄",
-            "  ▄██▄▄███▄▄",
-            " ▄██████████▄",
-            " ███  " + eyes + "  ███",
-            " ███   " + mouth + "   ███",
-            " ▀██   " + heart + "   ██▀",
-            "   ▀███████▀",
-            "    ▀▀ ▀▀",
+    elif stage == 2:
+        lines = (
+            "  ██     ██  ",
+            "  ███   ███  ",
+            " ███████████ ",
+            " ██  " + eyes + "  ██ ",
+            " ██   " + mouth + "   ██ ",
+            " ██   " + pulse + "  ██ ",
+            "  █████████  ",
+            "   ██   ██   ",
         )
-    if stage == 3:
-        return (
-            "  ✦ ▄▄     ▄▄ ✦",
-            "   ▄██▄▄███▄▄",
-            " ▄████████████▄",
-            " ███   " + eyes + "   ███",
-            " ███    " + mouth + "    ███",
-            " ███    " + heart + "    ███",
-            " ▀████████████▀",
-            "   ▀██▀ ▀██▀",
-            "    ▀▀   ▀▀",
+    elif stage == 3:
+        lines = (
+            "  ██     ██  ",
+            " ████   ████ ",
+            "█████████████",
+            "███  " + eyes + "  ███",
+            "███   " + mouth + "   ███",
+            "███   " + pulse + "  ███",
+            " ███████████ ",
+            "  ███   ███  ",
+            "  ██     ██  ",
         )
-    return (
-        "       ✧   ✦",
-        "  ✦ ▄▄▄     ▄▄▄ ✦",
-        "   ▄████▄▄▄████▄",
-        "  ███████████████",
-        "  ████   " + eyes + "  ████",
-        "  ████    " + mouth + "   ████",
-        "  ████    " + heart + "   ████",
-        "  ▀█████████████▀",
-        "    ▀███▀ ▀███▀",
-        "      ▀▀   ▀▀",
-        "   ✧           ✧",
-    )
+    else:
+        lines = (
+            "  ██     ██  ",
+            " ████   ████ ",
+            "█████████████",
+            "█████████████",
+            "███  " + eyes + "  ███",
+            "███   " + mouth + "   ███",
+            "███   " + pulse + "  ███",
+            " ███████████ ",
+            "  █████████  ",
+            "  ███   ███  ",
+            "  ██     ██  ",
+        )
+    return tuple(line.center(17) for line in lines)
 
 
 SKILL_LABELS = (
@@ -282,6 +282,12 @@ class LivePanel:
         self.messages: deque[str] = deque(maxlen=220)
         self._cached_level: dict = {}
         self._cached_playbooks = 0
+        # Cached on the background refresh, never query Settings/SQLite while
+        # prompt_toolkit is rendering a keystroke.
+        self._cached_free_only = True
+        self._last_stream_paint = 0.0
+        self._submitted_at: deque[float] = deque(maxlen=100)
+        self._input_delay_max = 0.0
         self._last_level: int | None = None
         self._last_level_change = 0.0
         self._level_checked_at = 0.0
@@ -377,7 +383,7 @@ class LivePanel:
             output=DummyOutput() if not __import__('sys').stdout.isatty() else None,
             mouse_support=True,
             key_bindings=keys,
-            refresh_interval=2.0,
+            refresh_interval=1.0,
             style=Style.from_dict({
                 "frame.border": "#b02d78",
                 "frame.label": "bold #ff79bb",
@@ -397,7 +403,14 @@ class LivePanel:
         self._redirect_stderr()
 
     async def read_line(self) -> str:
-        return await self.queue.get()
+        line = await self.queue.get()
+        if self._submitted_at:
+            elapsed = max(0.0, time.monotonic() - self._submitted_at.popleft())
+            self._input_delay_max = max(self._input_delay_max, elapsed)
+            if elapsed > 0.35:
+                self.events.append(f"UI input queue: {elapsed:.2f}s (actual wait)")
+                self._refresh()
+        return line
 
     def close(self) -> None:
         if self._companion_task is not None:
@@ -421,7 +434,7 @@ class LivePanel:
             view += "\nbuddy › " + self._stream_text[-9000:]
         self._chat.text = view
         self._chat.buffer.cursor_position = len(view)
-        self._refresh()
+        self._refresh(sidebar=False)
 
     def stream_begin(self) -> None:
         self._stream_text = ""
@@ -433,7 +446,9 @@ class LivePanel:
             return
         self._stream_text += re.sub(r"\x1b\[[0-9;]*m", "", str(text))
         # Do not rebuild an increasingly large conversation per character.
-        if len(self._stream_text) < 64 or len(self._stream_text) % 48 < len(text):
+        current = time.monotonic()
+        if len(self._stream_text) <= 64 or current - self._last_stream_paint >= 0.10:
+            self._last_stream_paint = current
             self._render_chat()
 
     def stream_end(self) -> None:
@@ -447,14 +462,21 @@ class LivePanel:
         if entered:
             shown = re.sub(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}",
                            "[REDACTED-JWT]", entered)
-            # Echo instantly into the visible conversation, not just the backing deque.
-            self._add("you › " + clean_line(shown, 900))
+            # Commit to the agent queue BEFORE repainting a large transcript.
+            # Prior version repainted synchronously before queuing, making
+            # Enter feel stuck on slow Windows terminals.
+            self._submitted_at.append(time.monotonic())
             self.queue.put_nowait(entered)
+            if self._loop and self._loop.is_running():
+                self._loop.call_soon(self._add, "you › " + clean_line(shown, 900))
+            else:
+                self._add("you › " + clean_line(shown, 900))
         return True
 
-    def _refresh(self) -> None:
-        # Keep heavy sidebar rendering separate from each typed character.
-        self._side_dirty = True
+    def _refresh(self, sidebar: bool = True) -> None:
+        # Streaming and chat echo must NOT rebuild the large sidebar.
+        if sidebar:
+            self._side_dirty = True
         # No terminal cursor manipulation: prompt_toolkit owns the full layout.
         if self.application.is_running:
             if self._loop is not None and self._loop.is_running():
@@ -552,6 +574,13 @@ class LivePanel:
         except Exception:
             self._cached_level = {}
         try:
+            config = getattr(self.app, "settings", None)
+            if config is not None:
+                self._cached_free_only = bool(
+                    await asyncio.to_thread(config.get, "free_only", True))
+        except (OSError, ValueError, sqlite3.DatabaseError):
+            pass
+        try:
             from genesis_playbooks import PlaybookStore
             self._cached_playbooks = await asyncio.to_thread(lambda: PlaybookStore().count())
         except (OSError, ValueError, sqlite3.DatabaseError):
@@ -588,8 +617,7 @@ class LivePanel:
         add("● " + mode, "bold #ff72b6" if running or observing else "#ffffff")
         # Show the actual model policy; do not claim model IQ or run a costly
         # network model discovery call during redraw.
-        config = getattr(app, "settings", None)
-        free_only = bool(config.get("free_only", True)) if config is not None else True
+        free_only = self._cached_free_only
         if free_only:
             add("MODELL: kilo-auto/free · FREE ONLY", "#ffcbac")
         else:
@@ -604,7 +632,7 @@ class LivePanel:
         add(companion_personality(sprite_mode, level,
                                   self.trace[-1][1] if self.trace else None), "#ffcae6")
         # No fake animation: progress derives solely from finished tool calls.
-        add("╭──── OMEGA · PROGRESS CORE ───╮", "#ff90c8")
+        add("── PROGRESS CORE ──", "#ff90c8")
         add("│ SESSION: " + self._run_state, "#ffcae6")
         add(f"│ AI-SVAR {self._answers_delivered} · KONTROLLERADE {self._verified_work}", "#ffffff")
         if self._unverified_work:
@@ -635,19 +663,49 @@ class LivePanel:
             add(f"│ SENAST LYCKAT {age}s sedan", "#d9b7cf")
         else:
             add("│ SENAST LYCKAT · ännu inget", "#d9b7cf")
-        add("╰── Bara riktiga verktygshändelser ─╯", "#ff90c8")
+        add("   Bara faktiska verktygshändelser", "#a795a6")
         add("Verktygsutfall ≠ verifierad AI-level", "#a795a6")
-        add("╭──── EVOLUTION · SKILL MAP ───╮", "#80f4b2")
+        lines.append(("bold #ff90c8", "MIN ARBETSPLAN · " + ("DÖLJ" if self.show_thinking else "VISA") + " / F2\n", self._side_click))
+        if self.show_thinking:
+            add("01  MÅL", "bold #ff8fc5")
+            detail(self.goal or "Väntar på din nästa uppgift", "#ffffff", max_lines=3)
+            add("02  VAD JAG GÖR", "bold #ff8fc5")
+            detail(self.action_title or self.phase, "#ffffff", max_lines=2)
+            add("03  VARFÖR DETTA STEG", "bold #ff8fc5")
+            detail(self.action_reason or
+                   "Inget verktygsbeslut registrerat ännu.", "#f8c6e3", max_lines=3)
+            add("04  HUR JAG KONTROLLERAR", "bold #ff8fc5")
+            detail(self.action_expect or
+                   "Väntar på ett resultat att kontrollera.", "#d9b7cf", max_lines=2)
+            add("05  FAKTISKT RESULTAT", "bold #ff8fc5")
+            detail(self.action_result or "Pågår / ännu inget resultat.", "#ffffff", max_lines=3)
+            if self.action_evidence:
+                add("Händelse-ID: " + self.action_evidence, "#9bcfb1")
+            if self._last_tool_error:
+                add("SENASTE FEL:", "#ff9ba6")
+                detail(self._last_tool_error, "#ff9ba6", max_lines=2)
+            add("── HÄNDELSER · LIVE ──", "#ff8fc5")
+            for item in list(self.events)[-4:]:
+                detail(" • " + item, "#cfb5c6", max_lines=2)
+        else:
+            detail(self.action_title or self.phase, "#f8c6e3", max_lines=2)
+            if self.action_result:
+                detail(self.action_result, "#ffffff", max_lines=2)
+            if self._last_tool_error:
+                add("SENASTE FEL:", "#ff9ba6")
+                detail(self._last_tool_error, "#ff9ba6", max_lines=2)
+
+        add("── EVOLUTION · SKILL MAP ──", "#80f4b2")
         for skill, (won, lost) in self._skill_checks.items():
             total = won + lost
             if total:
                 # Ratio describes completed tool calls, not level or mastery.
                 blocks = round(8 * won / total)
-                add(f"│ {skill:<8} {'▰' * blocks}{'▱' * (8-blocks)} {won}/{total}", "#baf3d2")
+                add(f"│ {skill:<8} {'#' * blocks}{'-' * (8-blocks)} {won}/{total}", "#baf3d2")
             else:
-                add(f"│ {skill:<8} ▱▱▱▱▱▱▱▱ --", "#839e92")
+                add(f"│ {skill:<8} -------- --", "#839e92")
         add("│ Staplar = andel OK, antal till höger", "#92aea3")
-        add("╰── Inga nivåer från animationer ─╯", "#80f4b2")
+        add("   Inga nivåer från animationer", "#80f4b2")
         history = self._experience_snapshot
         if history:
             add("── GENESIS · MELLAN SESSIONER ──", "bold #80f4b2")
@@ -696,7 +754,7 @@ class LivePanel:
                         str(progress["required"]) + " · -" + str(progress["remaining"]), "#ffffff")
                     total = max(1, progress["required"])
                     dots = round(16 * min(1.0, progress["events"] / total))
-                    add("Mot nästa nivå [" + "▰" * dots + "▱" * (16-dots) + "]", "#80f4b2")
+                    add("Mot nästa nivå [" + "#" * dots + "-" * (16-dots) + "]", "#80f4b2")
             else:
                 add("Nivåunderlag saknas", "#ffffff")
         else:
@@ -711,7 +769,7 @@ class LivePanel:
                     add(f"{key} {name:<13} INGET UNDERLAG", "#829c91")
                 else:
                     filled = round(8 * val)
-                    add(f"{key} {name:<13} {'■' * filled}{'·' * (8-filled)} {val:.0%}",
+                    add(f"{key} {name:<13} {'#' * filled}{'·' * (8-filled)} {val:.0%}",
                         "#a7f1c8" if val >= .7 else "#f2c78f")
             if known:
                 weakest, score = min(known, key=lambda pair: pair[1])
@@ -720,35 +778,6 @@ class LivePanel:
                 if focus:
                     add("NÄSTA TEST: " + focus[1], "#baf3d2")
 
-        lines.append(("bold #ff90c8", "MIN ARBETSPLAN · " + ("DÖLJ" if self.show_thinking else "VISA") + " / F2\n", self._side_click))
-        if self.show_thinking:
-            add("01  MÅL", "bold #ff8fc5")
-            detail(self.goal or "Väntar på din nästa uppgift", "#ffffff", max_lines=3)
-            add("02  VAD JAG GÖR", "bold #ff8fc5")
-            detail(self.action_title or self.phase, "#ffffff", max_lines=2)
-            add("03  VARFÖR DETTA STEG", "bold #ff8fc5")
-            detail(self.action_reason or
-                   "Inget verktygsbeslut registrerat ännu.", "#f8c6e3", max_lines=3)
-            add("04  HUR JAG KONTROLLERAR", "bold #ff8fc5")
-            detail(self.action_expect or
-                   "Väntar på ett resultat att kontrollera.", "#d9b7cf", max_lines=2)
-            add("05  FAKTISKT RESULTAT", "bold #ff8fc5")
-            detail(self.action_result or "Pågår / ännu inget resultat.", "#ffffff", max_lines=3)
-            if self.action_evidence:
-                add("Händelse-ID: " + self.action_evidence, "#9bcfb1")
-            if self._last_tool_error:
-                add("SENASTE FEL:", "#ff9ba6")
-                detail(self._last_tool_error, "#ff9ba6", max_lines=2)
-            add("── HÄNDELSER · LIVE ──", "#ff8fc5")
-            for item in list(self.events)[-4:]:
-                detail(" • " + item, "#cfb5c6", max_lines=2)
-        else:
-            detail(self.action_title or self.phase, "#f8c6e3", max_lines=2)
-            if self.action_result:
-                detail(self.action_result, "#ffffff", max_lines=2)
-            if self._last_tool_error:
-                add("SENASTE FEL:", "#ff9ba6")
-                detail(self._last_tool_error, "#ff9ba6", max_lines=2)
         add("── MARKERING + RÖST ──", "#ff90c8")
         bridge = getattr(app, "selection_bridge", None)
         add("MARKERA: " + (bridge.status if bridge else "OFF"), "#ffffff")
@@ -784,6 +813,20 @@ class LivePanel:
         add("Beslut och verktyg · ingen påhittad tankekedja", "#d4b7c9")
         self._side_cache = lines
         return lines
+
+    async def _record_tool_experience(self, category: str, ok: bool) -> None:
+        def persist() -> dict | None:
+            if self._experience is None:
+                return None
+            self._experience.record(category, ok)
+            return self._experience.snapshot()
+        try:
+            snapshot = await asyncio.to_thread(persist)
+            if snapshot is not None:
+                self._experience_snapshot = snapshot
+                self._refresh()
+        except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError):
+            pass  # Telemetry must never block a human message.
 
     # Below methods become overrides on an actual CLI subclass.
     def _out(self, text: str) -> None:
@@ -858,12 +901,13 @@ class LivePanel:
         counts = panel._skill_checks[category]
         counts[0 if ok else 1] += 1
         if panel._experience is not None and not getattr(getattr(panel.app, "privacy", None), "private", False):
+            # SQLite disk writes used to happen synchronously in the UI event
+            # callback and could block Enter/keystrokes. Record off-thread.
             try:
-                panel._experience.record(category, bool(ok))
-                panel._experience_snapshot = panel._experience.snapshot()
-            except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError):
-                # Never fail a real user action because telemetry is unavailable.
-                pass
+                loop = asyncio.get_running_loop()
+                loop.create_task(panel._record_tool_experience(category, bool(ok)))
+            except RuntimeError:
+                pass  # No UI event loop during pure unit tests.
         panel._evolution_timeline.append((
             datetime.now().strftime("%H:%M"),
             ("✓ " if ok else "✕ ") + category + " · " + clean_line(panel.tool, 21)))
@@ -924,7 +968,8 @@ class LivePanel:
         panel.phase = panel._run_state
         panel.events.append(datetime.now().strftime("%H:%M:%S") +
                             " · " + panel._run_state + f" · {count} lyckade verktygssteg")
-        panel._add(f"RESULTAT · {count} lyckade verktygssteg · {panel._run_state}")
+        # Run metrics belong in the dedicated panel, not between messages
+        # in the human conversation. Only the actual answer is chat content.
         panel._refresh()
 
     def event(self, text: str) -> None:
