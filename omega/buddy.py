@@ -6590,7 +6590,7 @@ def first_run(app: Buddy) -> None:
         if ask_yn("  Install them now with pip?"):
             ok, tail = pip_install(miss)
             print("  " + ("installed." if ok else "pip reported a problem:\n" + tail))
-    if not app.gateway.key():
+    if not app.gateway.key() and getattr(app.gateway, "provider", "Kilo") == "Kilo":
         print("\n  Paste your KiloCode API key (visible while entering, stored with Windows DPAPI, never logged):")
         k = read_visible_kilo_key("  key › ")
         if k:
@@ -6600,7 +6600,7 @@ def first_run(app: Buddy) -> None:
             ms = app.gateway.models(True)
             ok, d = app.gateway.ping(app.router.resolve("planner"))
             app.ai_state = (ok, "Connected · " + app.router.resolve("planner") if ok else clip(d, 60))
-            print(f"  KiloCode: {'connected' if ok else 'FAILED — ' + d} ({len(ms)} models visible)")
+            print(f"  {getattr(app.gateway, 'provider', 'Kilo')}: {'connected' if ok else 'FAILED — ' + d} ({len(ms)} models visible)")
         except GatewayError as e:
             print(f"  KiloCode: FAILED — {e}")
     if IS_WIN:
