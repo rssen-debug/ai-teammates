@@ -80,7 +80,7 @@ class WrapRegressionTests(unittest.TestCase):
     def test_ui_fingerprint_discloses_outdated_running_version(self):
         p = self.panel()
         rendered = "".join(x[1] for x in p._side_text())
-        self.assertIn("UI  wrap-v3-20261109", rendered)
+        self.assertIn("UI wrap-v3-20261109", rendered)
         source = (Path(__file__).resolve().parents[1] / "live_panel.py").read_text(encoding="utf-8")
         self.assertIn("self._resize_task = self._loop.create_task(self._watch_chat_width())", source)
 
