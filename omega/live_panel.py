@@ -401,13 +401,18 @@ class LivePanel:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._lock = threading.RLock()
         self._typing = TextArea(height=1, multiline=False, wrap_lines=False,
-                                prompt="› ", accept_handler=self._submit)
+                                prompt="› ")
         self._chat = TextArea(read_only=True, focusable=False,
                               scrollbar=True, wrap_lines=True, line_numbers=False)
         self._status_control = FormattedTextControl(self._side_text)
         self._last_terminal_width = 0
         self._resize_task = None
         keys = KeyBindings()
+        # Own the Enter key explicitly, before TextArea's default binding.
+        # One press commits one turn; never wait for a second Enter to submit.
+        @keys.add("enter", filter=has_focus(self._typing), eager=True)
+        def _send_enter(event: Any) -> None:
+            self._submit(event.app.current_buffer)
         @keys.add("f2")
         def _toggle(_event: Any) -> None:
             self._show_tui_details = not self._show_tui_details
@@ -447,10 +452,10 @@ class LivePanel:
             # remains available; do not spend time processing mouse traffic.
             mouse_support=False,
             key_bindings=keys,
-            refresh_interval=0.3,
+            refresh_interval=0.8,
             terminal_size_polling_interval=0.5,
             max_render_postpone_time=0.03,
-            min_redraw_interval=0.04,
+            min_redraw_interval=0.05,
             style=Style.from_dict({
                 "": "#e9e7f2 bg:#100e17",
                 "text-area": "#e9e7f2 bg:#100e17",
@@ -604,7 +609,9 @@ class LivePanel:
         # Keep recent complete messages, trimming only whole older turns.
         recent = list(self.messages)
         selected = []
-        budget = 64000
+        # Window rendering is intentionally bounded. Full history remains in SQLite.
+        # Redrawing huge transcripts on every Enter causes real Windows terminal stalls.
+        budget = 14000
         for item in reversed(recent):
             if selected and budget - len(item) < 0:
                 break
@@ -613,9 +620,7 @@ class LivePanel:
         view = "\n".join(reversed(selected))
         if self._stream_active and self._stream_text:
             view += "\nbuddy › " + self._stream_text
-        # Use the width of the ACTUAL TextArea pane when prompt_toolkit has
-        # rendered it. A Windows host's reported full terminal width is not
-        # the width available to the chat alongside the OMEGA sidebar.
+        # Use the actual TextArea pane width; keep the full transcript in SQLite.
         wrap_at = self._current_chat_wrap_width()
         view = wrap_chat_display(view, wrap_at)
         self._chat.text = view
