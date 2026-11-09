@@ -48,7 +48,7 @@ class WorkerIsolationTests(unittest.TestCase):
             result = asyncio.run(app.executor.execute(spec, {}, ctx))
             self.assertFalse(result.ok)
             self.assertEqual(result.category, "permission_denied")
-            self.assertIn("Lokalt skrivbord", result.error)
+            self.assertIn("HOST PROTECTED", result.error)
         finally:
             app.settings.set("worker_vnc_enabled", False)
 
