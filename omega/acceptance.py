@@ -475,6 +475,10 @@ def s06_read_active_window(ctx: Ctx) -> Result:
     import asyncio
     res = asyncio.run(buddy.exec_tool(app, "desktop_context", {}))
     if not res.ok:
+        if res.category == "permission_denied" and "HOST PROTECTED" in res.error:
+            return Result(BLOCKED, "Host desktop focus is intentionally protected; use CDP background tabs or a VM.",
+                          {"category": res.category}, unproven="background CDP window inspection",
+                          fix="Use browser_tabs via a debug-enabled Chrome/Edge session.")
         return Result(FAIL, f"desktop_context failed: {res.error}", {"category": res.category})
     data = res.data or {}
     fg = data.get("foreground") or {}
@@ -499,6 +503,10 @@ def s07_open_notepad(ctx: Ctx) -> Result:
     # impossible on every platform.
     res = asyncio.run(buddy.exec_tool(app, "app_launch", {"target": "notepad"}))
     if not res.ok:
+        if res.category == "permission_denied" and "HOST PROTECTED" in res.error:
+            return Result(BLOCKED, "Host window launches are deliberately blocked to protect the owner's focus.",
+                          {"category": res.category}, unproven="launching apps in isolated VM",
+                          fix="Use a separate VM for non-browser desktop tasks.")
         gap = _dependency_gap("launching Notepad", res)
         if gap:
             return gap
