@@ -126,6 +126,58 @@ def install(buddy):
     original_command = Buddy.command
     original_submit = Buddy.submit
     original_execute = buddy.Executor.execute
+    original_agent_execute = buddy.AgentRun.execute
+    original_agent_init = buddy.AgentRun.__init__
+
+    # These operations target a CDP tab by websocket ID. They do not activate
+    # a Windows window or inject global keyboard/mouse events.
+    SAFE_BACKGROUND_BROWSER = frozenset((
+        "browser_tabs", "browser_dom_text", "browser_dom_elements", "browser_click", "browser_type",
+        
+    ))
+
+    def is_browser_ui_goal(goal):
+        return bool(re.search(
+            r"(?i)(klicka|markera|välj|tryck på|click|select|check|skriv till|"
+            r"skriv i|write to|send to|skicka till|flik|tab|browser)",
+            str(goal or ""),
+        ))
+
+    def run_init(self, *args, **kwargs):
+        original_agent_init(self, *args, **kwargs)
+        if not self.background and is_browser_ui_goal(self.goal):
+            self.budget["max_steps"] = min(int(self.budget["max_steps"]), 12)
+            self.budget["max_seconds"] = min(float(self.budget["max_seconds"]), 120)
+            self.budget["max_risky"] = min(int(self.budget["max_risky"]), 6)
+            self.budget["reserve_steps"] = min(int(self.budget["reserve_steps"]), 2)
+            if self.app.settings.get("worker_vnc_enabled", False):
+                self.activate(["vnc_capture", "vnc_click", "vnc_key", "vnc_type"])
+            else:
+                self.activate([n for n in SAFE_BACKGROUND_BROWSER
+                               if self.app.registry.get(n) is not None])
+
+    async def agent_execute(self):
+        if not self.background and is_browser_ui_goal(self.goal):
+            worker = self.app.vnc_worker
+            if worker.enabled:
+                ok, reason = worker.ready()
+                if not ok:
+                    return buddy.RunOutcome("blocked",
+                        "Bakgrunds-VM är inte ansluten: " + reason,
+                        False, steps=0)
+            else:
+                try:
+                    ok, reason = buddy.cdp_ok()
+                except Exception as exc:
+                    ok, reason = False, type(exc).__name__
+                if not ok:
+                    return buddy.RunOutcome(
+                        "blocked",
+                        "För att jobba osynligt i dina öppna webbläsarflikar "
+                        "behöver Chrome/Edge redan ha startats med CDP-debuggning. "
+                        "Jag tar inte över ditt skrivbord. " + str(reason)[:180],
+                        False, steps=0)
+        return await original_agent_execute(self)
 
     def init(self, headless=False):
         original_init(self, headless=headless)
@@ -168,7 +220,27 @@ def install(buddy):
         ))
 
     async def execute(self, spec, args, ctx):
-        if (self.app.settings.get("worker_vnc_enabled", False)
+        vm_mode = bool(self.app.settings.get("worker_vnc_enabled", False))
+        # Never use global Windows keyboard/mouse, UIA clicks or foreground
+        # switching. A CDP tab can be controlled without stealing OS focus.
+        if spec.category in ("desktop", "screen"):
+            return buddy.ToolResult(tool=spec.name, ok=False,
+                category="permission_denied",
+                error="HOST PROTECTED: datorns fokus och mus får inte tas över.",
+                hint="Använd bakgrunds-CDP i en debugansluten flik eller separat VM.")
+        if spec.category == "browser" and not vm_mode and spec.name not in SAFE_BACKGROUND_BROWSER:
+            return buddy.ToolResult(tool=spec.name, ok=False,
+                category="permission_denied",
+                error="Den här browser-åtgärden kan flytta fokus eller öppna fönster.",
+                hint="Använd browser_tabs/browser_dom_text/browser_click/browser_type via CDP.")
+        if (ctx.run is not None and not ctx.run.background
+                and is_browser_ui_goal(ctx.run.goal) and
+                spec.category == "terminal"):
+            return buddy.ToolResult(tool=spec.name, ok=False,
+                category="permission_denied",
+                error="Terminal/PowerShell är inte tillåtet som genväg för browser-klick.",
+                hint="Använd endast CDP mot rätt flik.")
+        if (vm_mode
                 and spec.category in ("desktop", "screen", "browser")
                 and spec.name not in ("tool_search",)):
             return buddy.ToolResult(tool=spec.name, ok=False, category="permission_denied",
@@ -240,5 +312,7 @@ def install(buddy):
     Buddy.command = command
     Buddy.submit = submit
     buddy.Executor.execute = execute
-    Buddy.HELP += ("\n/models [1|2|3]  /api [openrouter|go]  /testapi "
+    buddy.AgentRun.__init__ = run_init
+    buddy.AgentRun.execute = agent_execute
+    Buddy.HELP += ("\nBackground browser control uses CDP only; host focus and mouse are protected.\n/models [1|2|3]  /api [openrouter|go]  /testapi "
                    " /worker [status|target|password|enable --vm|disable|capture]")

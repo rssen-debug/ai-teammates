@@ -441,7 +441,7 @@ class LivePanel:
                 self._chat,
                 Window(height=1, char="─", style="class:divider"),
                 ConditionalContainer(
-                    Window(content=self._details_control, height=7, style="class:chrome"),
+                    Window(content=self._details_control, height=5, style="class:chrome"),
                     filter=Condition(lambda: self._show_tui_details and
                                      shutil.get_terminal_size((100, 30)).lines >= 21),
                 ),
@@ -460,10 +460,10 @@ class LivePanel:
             # remains available; do not spend time processing mouse traffic.
             mouse_support=False,
             key_bindings=keys,
-            refresh_interval=0.8,
+            refresh_interval=1.0,
             terminal_size_polling_interval=0.5,
             max_render_postpone_time=0.03,
-            min_redraw_interval=0.05,
+            min_redraw_interval=0.09,
             style=Style.from_dict({
                 "": "#e9e7f2 bg:#100e17",
                 "text-area": "#e9e7f2 bg:#100e17",
@@ -637,19 +637,16 @@ class LivePanel:
     def _render_chat(self) -> None:
         # The older [-16000:] slice could cut off the middle of an answer.
         # Keep recent complete messages, trimming only whole older turns.
-        recent = list(self.messages)
+        # deque is already bounded; avoid a second full list copy for each update.
         selected = []
         # Window rendering is intentionally bounded. Full history remains in SQLite.
         # Redrawing huge transcripts on every Enter causes real Windows terminal stalls.
-        budget = 14000
-        for item in reversed(recent):
+        budget = 4800
+        for item in reversed(self.messages):
             if selected and budget - len(item) < 0:
                 break
             selected.append(item)
             budget -= len(item) + 1
-        view = "\n".join(reversed(selected))
-        if self._stream_active and self._stream_text:
-            view += "\nbuddy › " + self._stream_text
         # Cache the non-streaming transcript; streaming should never rewrap
         # thousands of previous lines for every new token.
         wrap_at = self._current_chat_wrap_width()
@@ -662,8 +659,9 @@ class LivePanel:
         if self._stream_active and self._stream_text:
             tail = self._stream_text[-3000:]
             view += wrap_chat_display("\nbuddy › " + tail, wrap_at)
-        self._chat.text = view
-        self._chat.buffer.cursor_position = len(view)
+        if view != self._chat.text:
+            self._chat.text = view
+            self._chat.buffer.cursor_position = len(view)
         self._refresh(sidebar=False)
 
     def stream_begin(self) -> None:
@@ -677,7 +675,8 @@ class LivePanel:
         self._stream_text += re.sub(r"\x1b\[[0-9;]*m", "", str(text))
         # Do not rebuild an increasingly large conversation per character.
         current = time.monotonic()
-        if len(self._stream_text) <= 64 or current - self._last_stream_paint >= 0.10:
+        if (current - self._last_stream_paint >= 0.16 or
+                re.search(r"[.!?]\s*$", self._stream_text)):
             self._last_stream_paint = current
             self._render_chat()
 
