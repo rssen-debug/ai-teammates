@@ -33,6 +33,14 @@ class ModernTerminalTests(unittest.TestCase):
         self.assertNotIn("OMEGA · LIVE", str(p._layout.container))
         self.assertEqual(p._typing.window.height.preferred, 1)
 
+    def test_explicit_enter_binding_is_registered(self):
+        p = self.panel()
+        enter_bindings = [
+            b for b in p.application.key_bindings.bindings
+            if tuple(str(k) for k in b.keys) == ("Keys.ControlM",)
+        ]
+        self.assertTrue(enter_bindings)
+
     def test_first_submit_queues_once_without_waiting_for_reply(self):
         p = self.panel()
         buffer = SimpleNamespace(text="Hej Buddy")
