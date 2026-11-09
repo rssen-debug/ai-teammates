@@ -1,3 +1,16 @@
+# Omega background browsing — existing tabs extension (current default)
+
+**Current approach:** install and pair the Omega Chrome/Edge extension from
+`omega/extension` to control the user's **existing logged-in browser tabs**.
+It does not start another browser/profile or change Windows foreground focus.
+See [EXISTING_TABS.md](EXISTING_TABS.md) for instructions and limitations.
+
+The older CDP section below documents the superseded debug-browser approach.
+Omega's default browser-task gate now requires the paired extension; it does
+not silently start Chrome with remote debugging.
+
+---
+
 # Omega background browsing — user desktop is never hijacked
 
 **Goal:** work in a Chrome/Edge tab while the owner continues working in
