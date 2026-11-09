@@ -528,13 +528,18 @@ class LivePanel:
         pane_columns = getattr(pane, "window_width", 0) if pane else 0
         if isinstance(pane_columns, int) and pane_columns > 28:
             return max(24, min(80, pane_columns - 7))
-        try:
-            size = self.application.output.get_size()
-            columns = int(size.columns)
-            if columns >= 60:
-                return chat_wrap_width(columns)
-        except (AttributeError, OSError, TypeError, ValueError):
-            pass
+        # Windows10_Output is a real prompt_toolkit backend and may not expose
+        # get_size(). Never require a method merely because DummyOutput has it.
+        output = getattr(self.application, "output", None)
+        getter = getattr(output, "get_size", None)
+        if callable(getter):
+            try:
+                size = getter()
+                columns = int(size.columns)
+                if columns >= 60:
+                    return chat_wrap_width(columns)
+            except (OSError, TypeError, ValueError, AttributeError):
+                pass
         return chat_wrap_width(shutil.get_terminal_size((120, 35)).columns)
 
     def _render_chat(self) -> None:

@@ -85,13 +85,35 @@ class WrapRegressionTests(unittest.TestCase):
         from types import SimpleNamespace
         p = self.panel()
         size = SimpleNamespace(columns=80, rows=35)
+        # Native Windows10_Output does not expose get_size. The test must
+        # simulate optional support explicitly rather than assuming it exists.
         with patch.object(type(p.application.output), "get_size",
-                          return_value=size):
+                          return_value=size, create=True):
             p.ui._out("buddy › " + "ett_långt_ord_" * 25)
             actual = p._current_chat_wrap_width()
             self.assertEqual(actual, chat_wrap_width(80))
             self.assertTrue(all(len(line) <= actual
                                 for line in p._chat.text.splitlines()))
+
+    def test_native_windows_output_without_get_size_uses_terminal_fallback(self):
+        from unittest.mock import patch
+        from os import terminal_size
+        p = self.panel()
+        output = p.application.output
+        original = getattr(type(output), "get_size", None)
+        # Mock the getter lookup, retaining real output behavior otherwise.
+        import live_panel
+        true_getattr = getattr
+        def missing_get_size(obj, name, default=None):
+            if obj is output and name == "get_size":
+                return None
+            return true_getattr(obj, name, default)
+        with patch.object(live_panel.shutil, "get_terminal_size",
+                          return_value=terminal_size((80, 35))):
+            with patch.object(live_panel, "getattr", missing_get_size, create=True):
+                p.ui._out("buddy › " + "testavsnitt " * 75)
+                self.assertTrue(all(len(line) <= chat_wrap_width(80)
+                                    for line in p._chat.text.splitlines()))
 
     def test_ui_fingerprint_discloses_outdated_running_version(self):
         p = self.panel()
