@@ -8,6 +8,7 @@ When enabled, normal host screen, browser and desktop tools fail closed.
 from __future__ import annotations
 
 import hashlib
+from contextlib import contextmanager
 import ipaddress
 import os
 import re
@@ -70,8 +71,18 @@ class Worker:
         return api.connect(self.target,
                            password=self.app.vault.get("worker_vnc_password"))
 
+    @contextmanager
+    def session(self):
+        # vncdotool clients expose disconnect() rather than a guaranteed
+        # context-manager protocol. Always close even after screenshot errors.
+        client = self.connect()
+        try:
+            yield client
+        finally:
+            client.disconnect()
+
     def capture(self):
-        with self.connect() as client:
+        with self.session() as client:
             path = self.app.vault.get("worker_vnc_capture_dir")
             directory = Path(path) if path else Path(self.app.store.path).parent / "shots"
             directory.mkdir(parents=True, exist_ok=True)
@@ -87,7 +98,7 @@ class Worker:
             raise ValueError("Koordinater utanför förväntad skärmyta.")
         if button not in (1, 2, 3):
             raise ValueError("Ogiltig musknapp.")
-        with self.connect() as client:
+        with self.session() as client:
             client.mouseMove(x, y)
             client.mousePress(button)
         return {"clicked": [x, y], "button": button, "desktop": "VM"}
@@ -95,7 +106,7 @@ class Worker:
     def key(self, key):
         if not re.fullmatch(r"[a-zA-Z0-9+_-]{1,48}", key):
             raise ValueError("Ogiltig VNC-tangent.")
-        with self.connect() as client:
+        with self.session() as client:
             client.keyPress(key)
         return {"key_sent": key, "desktop": "VM"}
 
@@ -104,7 +115,7 @@ class Worker:
             raise ValueError("Skriv 1–2500 tecken.")
         if "\n" in value or "\r" in value:
             raise ValueError("Radbrytningar får inte automatiskt skicka formulär. Använd vnc_key separat.")
-        with self.connect() as client:
+        with self.session() as client:
             client.type(value)
         return {"typed_chars": len(value), "desktop": "VM", "submitted": False}
 
