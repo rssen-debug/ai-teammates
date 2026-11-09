@@ -229,3 +229,5 @@ def install(buddy):
     Buddy.command = command
     Buddy.submit = submit
     buddy.Executor.execute = execute
+    Buddy.HELP += ("\n/models [1|2|3]  /api [openrouter|go]  /testapi "
+                   " /worker [status|target|password|enable --vm|disable|capture]")
