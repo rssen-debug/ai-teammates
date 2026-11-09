@@ -7738,7 +7738,7 @@ async def windows_tests(s: Suite, app: Buddy, key: bool) -> None:
     # D: deterministic desktop chain (no LLM): host desktop control is
     # deliberately disabled. A real VM/CDP harness must prove this separately.
     try:
-        if not live:
+        if not s.live:
             raise Unavailable("Host focus protection is enabled; UIA Notepad control is intentionally blocked.")
         phrase = "Studdy Buddy test 123"
         r = await exec_tool(app, "app_launch", {"target": "notepad"})
