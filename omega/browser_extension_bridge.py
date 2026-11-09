@@ -150,11 +150,14 @@ class BrowserBridge:
 def install(buddy):
     original_init = buddy.Buddy.__init__
     original_command = buddy.Buddy.command
-    original_main = buddy.main_async
 
     def init(self, headless=False):
         original_init(self, headless=headless)
         self.browser_bridge = BrowserBridge(self)
+        if not headless:
+            # Start the local bridge without replacing main_async. The existing
+            # startup contract (especially mic OFF) remains unchanged.
+            self.browser_bridge.start()
 
         def connected():
             return self.browser_bridge.ready()
@@ -232,11 +235,6 @@ def install(buddy):
         else:
             self.out("/browser pair | status | tabs | rotate")
 
-    async def main_async(self):
-        self.browser_bridge.start()
-        return await original_main(self)
-
     buddy.Buddy.__init__ = init
     buddy.Buddy.command = command
-    buddy.main_async = main_async
     buddy.Buddy.HELP += "\n/browser pair|status|tabs|rotate  (existing Chrome/Edge tabs, no CDP)"
