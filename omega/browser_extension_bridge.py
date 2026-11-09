@@ -108,14 +108,33 @@ class BrowserBridge:
         except Exception:
             pass
         finally:
+            active = False
             with self._send_lock:
                 if self._client is client:
+                    active = True
                     self._client = None
                     self._connected.clear()
                     self._error = "Browser extension disconnected"
-            with self._pending_lock:
-                for event, _bucket in self._pending.values():
-                    event.set()
+            # A replaced older connection must not cancel a newer task.
+            if active:
+                with self._pending_lock:
+                    for event, _bucket in self._pending.values():
+                        event.set()
+
+    def revoke(self):
+        with self._send_lock:
+            old = self._client
+            self._client = None
+            self._connected.clear()
+            self._error = "Pairing rotated; connect with /browser pair"
+        if old is not None:
+            try:
+                old.close(code=1008, reason="Pairing revoked")
+            except Exception:
+                pass
+        with self._pending_lock:
+            for event, _bucket in self._pending.values():
+                event.set()
 
     def call(self, action, args=None, timeout=8):
         if action not in ACTIONS:
@@ -231,7 +250,8 @@ def install(buddy):
                 self.out("Browser extension: " + str(exc)[:200])
         elif action == "rotate":
             self.vault.set("browser_extension_pairing", secrets.token_urlsafe(32))
-            self.out("Old extension pairing revoked. Reconnect using /browser pair.")
+            await __import__("asyncio").to_thread(self.browser_bridge.revoke)
+            self.out("Old extension pairing revoked and connection closed. Reconnect using /browser pair.")
         else:
             self.out("/browser pair | status | tabs | rotate")
 
