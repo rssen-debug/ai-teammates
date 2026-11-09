@@ -50,7 +50,7 @@ class BetaBootstrapTests(unittest.TestCase):
         )
         result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive",
                                  "-Command", ps], capture_output=True,
-                                text=True, timeout=30)
+                                text=True, encoding="utf-8", errors="replace", timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
 
     def test_provider_keys_are_not_in_source(self):
