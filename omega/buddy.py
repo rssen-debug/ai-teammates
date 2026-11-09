@@ -5233,7 +5233,7 @@ class Voice:
                     else:
                         buf.append(fr)
                         silence = silence + 1 if rms < thr * 0.8 else 0
-                        if silence >= 28 or len(buf) > sr * 30 // blk:
+                        if silence >= getattr(self, "_study_silence_frames", 28) or len(buf) > sr * 30 // blk:
                             audio = np.concatenate(buf)
                             in_speech, buf, speech_frames = False, [], 0
                             if len(audio) > sr * 0.35:
