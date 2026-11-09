@@ -1,5 +1,5 @@
 // Omega tab automation: chrome.scripting works in existing background tabs.
-// No chrome.tabs.update({active:true}), window focus, native mouse or keypress.
+// Never activate a tab or window; no native mouse or keyboard injection.
 "use strict";
 const ENDPOINT = "ws://127.0.0.1:18783";
 let socket = null;
