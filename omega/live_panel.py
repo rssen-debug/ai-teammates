@@ -968,7 +968,8 @@ class LivePanel:
         panel.phase = panel._run_state
         panel.events.append(datetime.now().strftime("%H:%M:%S") +
                             " · " + panel._run_state + f" · {count} lyckade verktygssteg")
-        panel._add(f"RESULTAT · {count} lyckade verktygssteg · {panel._run_state}")
+        # Run metrics belong in the dedicated panel, not between messages
+        # in the human conversation. Only the actual answer is chat content.
         panel._refresh()
 
     def event(self, text: str) -> None:
