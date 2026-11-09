@@ -92,8 +92,8 @@ Assert-Exit "Python syntax"
 
 if ($WithBrowser) {
     # Keep a fixed unpacked extension directory so Chrome users only load it once.
-    $extSource = Join-Path $release "omega\\extension"
-    $extTarget = Join-Path $env:LOCALAPPDATA "StuddyBuddy\\extension"
+    $extSource = Join-Path $release "omega\extension"
+    $extTarget = Join-Path $env:LOCALAPPDATA "StuddyBuddy\extension"
     if (!(Test-Path (Join-Path $extSource "manifest.json"))) {
         throw "Omega browser extension missing from verified release."
     }
