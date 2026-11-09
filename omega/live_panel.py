@@ -339,6 +339,11 @@ class LivePanel:
             # A restricted/missing data directory must not break the UI.
             pass
         self.show_thinking = True
+        self.compact_mode = True
+        self._last_queue_delay = 0.0
+        self._last_model_delay = 0.0
+        self._waiting_for_response = False
+        self._waiting_started = 0.0
         self.events: deque[str] = deque(maxlen=24)
         self._stream_text = ""
         self._stream_active = False
@@ -363,6 +368,10 @@ class LivePanel:
         @keys.add("f2")
         def _toggle(_event: Any) -> None:
             self.toggle_thinking()
+        @keys.add("f3")
+        def _metrics(_event: Any) -> None:
+            self.compact_mode = not self.compact_mode
+            self._refresh()
         right = Frame(Window(content=self._status_control, wrap_lines=False),
                       title=" OMEGA · LIVE ", width=Dimension.exact(48))
         visibility = Condition(lambda: shutil.get_terminal_size((120, 35)).columns >= 94)
@@ -407,6 +416,7 @@ class LivePanel:
         if self._submitted_at:
             elapsed = max(0.0, time.monotonic() - self._submitted_at.popleft())
             self._input_delay_max = max(self._input_delay_max, elapsed)
+            self._last_queue_delay = elapsed
             if elapsed > 0.35:
                 self.events.append(f"UI input queue: {elapsed:.2f}s (actual wait)")
                 self._refresh()
@@ -418,6 +428,17 @@ class LivePanel:
         self._restore_stderr()
         if self.application.is_running:
             self.application.exit()
+
+    def response_started(self) -> None:
+        self._waiting_for_response = True
+        self._waiting_started = time.monotonic()
+        self._refresh()
+
+    def response_finished(self) -> None:
+        if self._waiting_for_response:
+            self._last_model_delay = max(0.0, time.monotonic() - self._waiting_started)
+        self._waiting_for_response = False
+        self._refresh()
 
     def toggle_thinking(self) -> None:
         self.show_thinking = not self.show_thinking
@@ -587,7 +608,87 @@ class LivePanel:
             self._cached_playbooks = 0
         self._refresh()
 
+    def _compact_side_text(self) -> list[tuple[str, str]]:
+        """Short, scannable operator dashboard; no blocking I/O or fake metrics.
+
+        Full legacy metrics are still available with F3, details with F2.
+        The renderer only reads existing in-memory fields; no filesystem,
+        model calls or Windows UI automation on the keystroke path.
+        """
+        stamp = time.monotonic()
+        if not self._side_dirty and stamp - self._side_cache_at < 0.75:
+            return self._side_cache
+        self._side_dirty = False
+        self._side_cache_at = stamp
+        rows: list[tuple[str, str]] = []
+        def add(text: str, style: str = "") -> None:
+            rows.append((style, clean_line(text, 43) + "\n"))
+        app = self.app
+        running = bool(getattr(app, "current_run", None))
+        add("● " + ("ARBETAR" if running else "VAKEN · VÄNTAR"),
+            "bold #ff8fc5")
+        add("MODEL  kilo-auto/free" if self._cached_free_only else
+            "MODEL  anpassad rollrouting", "#f0c0d8")
+        level = self._cached_level.get("level")
+        stage, stage_name = companion_stage(level)
+        for line in pixel_companion("working" if running else "awake",
+                                    int(time.time() / 2), level):
+            add(line, "#ff8fc5")
+        add("PIXELKOMPIS  " + stage_name + f"  {stage+1}/5", "bold #ffffff")
+        add("──────────────────────────────────", "#633958")
+        add("UPPGIFT  " + ("PÅGÅR" if running else self._run_state), "bold #80f4b2")
+        add("Senaste: " + clean_line(self.goal or "Ingen uppgift", 33), "#ffffff")
+        add("VERKTYG  OK " + str(self._tool_successes) +
+            "  FEL " + str(self._tool_failures), "#baf3d2")
+        add("KONTROLLERAT  " + str(self._verified_work) +
+            "  EJ KONTROLL  " + str(self._unverified_work), "#f0c0d8")
+        if self._waiting_for_response:
+            elapsed = time.monotonic() - self._waiting_started
+            add(f"AI väntar/svarar: {elapsed:.1f}s", "#ffcbac")
+        elif self._last_model_delay:
+            add(f"Senaste AI-körning: {self._last_model_delay:.1f}s", "#c7b6dc")
+        if self._last_queue_delay:
+            add(f"Enter till köläsning: {self._last_queue_delay:.2f}s",
+                "#ffcbac" if self._last_queue_delay > 0.35 else "#baf3d2")
+        add("──────────────────────────────────", "#633958")
+        add("ARBETSSÄTT   F2 detaljer · F3 allt", "#ff90c8")
+        if self.show_thinking:
+            add("MÅL  " + clean_line(self.goal or "Redo för ny uppgift", 35))
+            add("GÖR  " + clean_line(self.action_title or self.phase, 35))
+            add("VARFÖR  " + clean_line(self.action_reason or
+                                      "Inget verktygsbeslut ännu", 34),
+                "#f2c6dc")
+            if self.action_result:
+                add("RESULTAT  " + clean_line(self.action_result, 33), "#c9e6d3")
+        add("──────────────────────────────────", "#633958")
+        history = self._experience_snapshot
+        if history:
+            add("HISTORIK  " + str(history.get("total", 0)) + " verktygssteg",
+                "#baf3d2")
+            add("PLAYBOOKS  " + str(self._cached_playbooks) + " verifierade",
+                "#baf3d2")
+        if isinstance(level, (int, float)):
+            add("AI LEVEL  " + str(max(1, min(100, int(level)))) + "/100",
+                "#ffffff")
+            progress = evidence_progress(self._cached_level)
+            if progress.get("measured") and not progress.get("complete"):
+                add("Nästa nivå  " + str(progress.get("target", "?")) +
+                    (" · kvalitet krävs" if progress.get("quality_limited")
+                     else " · mer evidens krävs"), "#baf3d2")
+        else:
+            add("AI LEVEL  inväntar mätning", "#829c91")
+        if self._last_tool_error:
+            add("SENASTE FEL  " + clean_line(self._last_tool_error, 28),
+                "#ff9ba6")
+        add("SENASTE HÄNDELSER", "bold #ff90c8")
+        for event in list(self.events)[-3:]:
+            add("• " + clean_line(event, 39), "#d4bbcb")
+        self._side_cache = rows
+        return rows
+
     def _side_text(self) -> list[tuple[str, str]]:
+        if self.compact_mode:
+            return self._compact_side_text()
         stamp = time.monotonic()
         if not self._side_dirty and stamp - self._side_cache_at < 1.0:
             return self._side_cache
