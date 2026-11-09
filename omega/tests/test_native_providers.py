@@ -44,17 +44,17 @@ class NativeProviderTests(unittest.TestCase):
                          ["https://opencode.ai/inference/go/openai/v1"])
         self.assertEqual(gateway.key(), "test-go-token")
         import provider_native
-        one = urllib.request.Request(gateway.base + "/chat/completions")
-        two = urllib.request.Request(gateway.base + "/models")
-        self.assertEqual(one.get_header("X-opencode-session"),
-                         two.get_header("X-opencode-session"))
-        self.assertEqual(one.get_header("X-opencode-session"),
+        one = gateway.omega_headers({"Accept": "application/json"})
+        two = gateway.omega_headers({"Accept": "text/event-stream"})
+        self.assertEqual(one.get("x-opencode-session"),
+                         two.get("x-opencode-session"))
+        self.assertEqual(one.get("x-opencode-session"),
                          provider_native.SESSION_ID)
 
     def test_openrouter_requests_do_not_inherit_go_header(self):
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/chat/completions")
-        self.assertIsNone(req.get_header("X-opencode-session"))
+        gateway = buddy.Gateway(FakeVault({"omega_active_provider": "OpenRouter"}))
+        headers = gateway.omega_headers({})
+        self.assertNotIn("x-opencode-session", headers)
 
     def test_kilo_mode_remains_available(self):
         gateway = buddy.Gateway(FakeVault({"omega_active_provider": "Kilo"}))
