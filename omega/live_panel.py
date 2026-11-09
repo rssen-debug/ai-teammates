@@ -401,7 +401,7 @@ class LivePanel:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._lock = threading.RLock()
         self._typing = TextArea(height=1, multiline=False, wrap_lines=False,
-                                prompt="you › ", accept_handler=self._submit)
+                                prompt="› ", accept_handler=self._submit)
         self._chat = TextArea(read_only=True, focusable=False,
                               scrollbar=True, wrap_lines=True, line_numbers=False)
         self._status_control = FormattedTextControl(self._side_text)
@@ -415,17 +415,19 @@ class LivePanel:
         def _metrics(_event: Any) -> None:
             self.compact_mode = not self.compact_mode
             self._refresh()
-        right = Frame(Window(content=self._status_control, wrap_lines=False),
-                      title=" OMEGA · LIVE ", width=Dimension.exact(48))
-        visibility = Condition(lambda: shutil.get_terminal_size((120, 35)).columns >= 94)
+        # Full-width terminal-first layout. A sidebar isn't allowed to steal
+        # half the conversation or shrink the composer as in the old split view.
+        self._top_control = FormattedTextControl(self._top_text)
+        self._bottom_control = FormattedTextControl(self._bottom_text)
         self._layout = Layout(
-            VSplit([
-                HSplit([
-                    Frame(self._chat, title=" CHAT "),
-                    Frame(self._typing, title=" SKRIV "),
-                ], padding=0),
-                ConditionalContainer(right, filter=visibility),
-            ], padding=1),
+            HSplit([
+                Window(content=self._top_control, height=1, style="class:chrome"),
+                Window(height=1, char="─", style="class:divider"),
+                self._chat,
+                Window(height=1, char="─", style="class:divider"),
+                self._typing,
+                Window(content=self._bottom_control, height=1, style="class:chrome"),
+            ]),
             focused_element=self._typing,
         )
         self.application = Application(
@@ -438,17 +440,51 @@ class LivePanel:
             # remains available; do not spend time processing mouse traffic.
             mouse_support=False,
             key_bindings=keys,
-            refresh_interval=1.0,
+            refresh_interval=0.3,
             terminal_size_polling_interval=0.5,
-            max_render_postpone_time=0.05,
-            min_redraw_interval=0.08,
+            max_render_postpone_time=0.03,
+            min_redraw_interval=0.04,
             style=Style.from_dict({
-                "frame.border": "#b02d78",
-                "frame.label": "bold #ff79bb",
-                "text-area": "#ffffff bg:#140d17",
-                "": "#ffffff bg:#140d17",
+                "": "#e9e7f2 bg:#100e17",
+                "text-area": "#e9e7f2 bg:#100e17",
+                "chrome": "#b7acc9 bg:#1c1626",
+                "divider": "#594269 bg:#100e17",
             }),
         )
+
+    def _top_text(self) -> list[tuple[str, str]]:
+        """Nonblocking single-line identity and real model status."""
+        working = bool(getattr(self.app, "current_run", None))
+        try:
+            provider = getattr(getattr(self.app, "gateway", None), "base", "")
+            provider = "OpenRouter" if "openrouter.ai" in provider else (
+                "OpenCode Go" if "opencode.ai" in provider else "Kilo")
+            model = self.app.router.resolve("chat")
+        except (AttributeError, KeyError, ValueError, TypeError):
+            provider, model = "unknown", "unknown"
+        return [
+            ("bold #e49cc9", "  ◈ OMEGA  "),
+            ("#786a88", "│  "),
+            ("#dbd4e5", provider + "  "),
+            ("#786a88", "·  "),
+            ("#9cddb2", str(model)[:50]),
+            ("#786a88", "   │   "),
+            ("bold #9cddb2" if working else "#b6b0c3",
+             "WORKING" if working else "READY"),
+        ]
+
+    def _bottom_text(self) -> list[tuple[str, str]]:
+        """Compact factual footer; tool telemetry never interrupts chat."""
+        running = self._waiting_for_response
+        return [
+            ("bold #9cddb2", "  ● " + ("RESPONDING" if running else "READY")),
+            ("#786a88", "  │  "),
+            ("#c5bad3", f"TOOLS {self._tool_successes} OK / {self._tool_failures} FAIL"),
+            ("#786a88", "  │  "),
+            ("#a9a0b6", f"VERIFIED {self._verified_work}"),
+            ("#786a88", "  │  "),
+            ("#b79dc6", "F2 DETAILS · F3 METRICS · /help"),
+        ]
 
     @property
     def ui(self) -> Any:
