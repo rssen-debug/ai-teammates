@@ -60,7 +60,7 @@ def wrap_chat_display(text: str, width: int = 96) -> str:
     No ellipsis/truncation; long tokens/URLs are displayed across safe lines.
     We intentionally don't modify conversation state or the model input.
     """
-    width = max(36, min(120, int(width)))
+    width = max(16, min(120, int(width)))
     wrapped = []
     for line in str(text).split("\n"):
         if not line:
