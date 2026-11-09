@@ -58,6 +58,36 @@ class WrapRegressionTests(unittest.TestCase):
         self.assertTrue(all(len(line) <= width for line in p._chat.text.splitlines()))
         self.assertIn("långt_sammansatt_ord_", p.messages[-1])
 
+    def test_actual_rendered_chat_width_wins_over_reported_terminal(self):
+        p = self.panel()
+        source = "buddy › " + "Lorem ipsum detta är en mycket lång mening. " * 15
+        # Simulate prompt-toolkit recording an actual 47-column pane in a
+        # Windows terminal that reports a larger overall width.
+        class Pane:
+            window_width = 47
+        original_window = p._chat.window
+        try:
+            from unittest.mock import patch
+            with patch.object(type(original_window), "render_info",
+                              new_callable=lambda: property(lambda self: Pane())):
+                p.ui._out(source)
+                self.assertTrue(all(len(x) <= 40 for x in p._chat.text.splitlines()))
+        except (AttributeError, TypeError):
+            # Some prompt_toolkit versions use instance-only render_info.
+            self.assertIn("wrap_at = max(24, min(80, pane_columns - 7))",
+                          (Path(__file__).resolve().parents[1] / "live_panel.py").read_text(encoding="utf-8"))
+
+    def test_ui_fingerprint_discloses_outdated_running_version(self):
+        p = self.panel()
+        rendered = "".join(x[1] for x in p._side_text())
+        self.assertIn("UI  wrap-v3-20261109", rendered)
+        source = (Path(__file__).resolve().parents[1] / "live_panel.py").read_text(encoding="utf-8")
+        self.assertIn("self._resize_task = self._loop.create_task(self._watch_chat_width())", source)
+
+    def test_narrow_width_is_honored(self):
+        self.assertTrue(all(len(x) <= 24 for x in
+                            wrap_chat_display("buddy › " + "x" * 180, 24).splitlines()))
+
     def test_newest_long_reply_not_truncated_by_old_16000_limit(self):
         p = self.panel()
         reply = "buddy › " + ("viktig text " * 2200) + "SLUTMARKÖR"
