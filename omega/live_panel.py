@@ -390,9 +390,15 @@ class LivePanel:
             full_screen=True,
             input=DummyInput() if not __import__('sys').stdin.isatty() else None,
             output=DummyOutput() if not __import__('sys').stdout.isatty() else None,
-            mouse_support=True,
+            # Some Windows console hosts generate many mouse events and fail
+            # to notify full-screen terminal resizes reliably. Keyboard F2/F3
+            # remains available; do not spend time processing mouse traffic.
+            mouse_support=False,
             key_bindings=keys,
             refresh_interval=1.0,
+            terminal_size_polling_interval=0.5,
+            max_render_postpone_time=0.05,
+            min_redraw_interval=0.08,
             style=Style.from_dict({
                 "frame.border": "#b02d78",
                 "frame.label": "bold #ff79bb",
