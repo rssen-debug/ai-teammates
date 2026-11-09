@@ -38,6 +38,44 @@ from prompt_toolkit.widgets import Frame, TextArea
 from prompt_toolkit.styles import Style
 
 
+def chat_wrap_width(columns: int) -> int:
+    """Conservative chat width in terminal cells, leaving room for sidebar.
+
+    We use a maximum readable measure even in very wide Windows terminals.
+    Prompt-toolkit's soft wrapping plus a cursor at EOF can horizontally
+    scroll nonfocusable read-only TextAreas: hard wrap is display-only.
+    """
+    columns = max(60, int(columns))
+    if columns >= 100:
+        return min(100, max(42, columns - 61))
+    return max(36, columns - 8)
+
+
+def wrap_chat_display(text: str, width: int = 96) -> str:
+    """Wrap *display text*, preserving paragraphs and original stored content.
+
+    No ellipsis/truncation; long tokens/URLs are displayed across safe lines.
+    We intentionally don't modify conversation state or the model input.
+    """
+    width = max(36, min(120, int(width)))
+    wrapped = []
+    for line in str(text).split("\n"):
+        if not line:
+            wrapped.append("")
+            continue
+        # Keep indentation for replies and bullet lists without overflowing.
+        indent = len(line) - len(line.lstrip(" "))
+        continuation = " " * min(indent, 12)
+        rows = textwrap.wrap(
+            line, width=width, expand_tabs=True, tabsize=4,
+            replace_whitespace=False, drop_whitespace=False,
+            break_long_words=True, break_on_hyphens=False,
+            subsequent_indent=continuation,
+        )
+        wrapped.extend(rows or [""])
+    return "\n".join(wrapped)
+
+
 def remaining_seconds(last: float, seconds: float, current: float) -> str:
     """Elapsed timer with no invented deadline."""
     if not last or seconds <= 0:
@@ -456,9 +494,21 @@ class LivePanel:
         return None
 
     def _render_chat(self) -> None:
-        view = "\n".join(self.messages)[-16000:]
+        # The older [-16000:] slice could cut off the middle of an answer.
+        # Keep recent complete messages, trimming only whole older turns.
+        recent = list(self.messages)
+        selected = []
+        budget = 64000
+        for item in reversed(recent):
+            if selected and budget - len(item) < 0:
+                break
+            selected.append(item)
+            budget -= len(item) + 1
+        view = "\n".join(reversed(selected))
         if self._stream_active and self._stream_text:
-            view += "\nbuddy › " + self._stream_text[-9000:]
+            view += "\nbuddy › " + self._stream_text
+        cols = shutil.get_terminal_size((120, 35)).columns
+        view = wrap_chat_display(view, chat_wrap_width(cols))
         self._chat.text = view
         self._chat.buffer.cursor_position = len(view)
         self._refresh(sidebar=False)
