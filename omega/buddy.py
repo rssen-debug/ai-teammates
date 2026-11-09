@@ -725,9 +725,12 @@ class Gateway:
         if not key:
             raise GatewayError("no_key", "No KiloCode API key configured.")
         data = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(base + path, data=data, method=method, headers={
+        headers = {
             "Authorization": f"Bearer {key}", "Content-Type": "application/json",
-            "User-Agent": f"StuddyBuddy/{APP_VERSION}", "X-KiloCode-TaskId": "studdy-buddy"})
+            "User-Agent": f"StuddyBuddy/{APP_VERSION}", "X-KiloCode-TaskId": "studdy-buddy"}
+        if hasattr(self, "omega_headers"):
+            headers = self.omega_headers(headers)
+        req = urllib.request.Request(base + path, data=data, method=method, headers=headers)
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", "replace"))
 
@@ -812,12 +815,15 @@ class Gateway:
         for base in self.candidates:
             received = False
             try:
+                headers = {"Authorization": f"Bearer {key}",
+                           "Content-Type": "application/json",
+                           "Accept": "text/event-stream",
+                           "User-Agent": f"StuddyBuddy/{APP_VERSION}"}
+                if hasattr(self, "omega_headers"):
+                    headers = self.omega_headers(headers)
                 req = urllib.request.Request(base + "/chat/completions",
                     data=json.dumps(body).encode("utf-8"), method="POST",
-                    headers={"Authorization": f"Bearer {key}",
-                             "Content-Type": "application/json",
-                             "Accept": "text/event-stream",
-                             "User-Agent": f"StuddyBuddy/{APP_VERSION}"})
+                    headers=headers)
                 content: list[str] = []
                 tool_parts: dict[int, dict] = {}
                 finish = None
