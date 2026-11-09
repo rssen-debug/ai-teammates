@@ -27,7 +27,11 @@ class PanelTest(unittest.TestCase):
     def build(self):
         app = SimpleNamespace(current_run=None, companion=FakeCompanion(),
                               level_snapshot=lambda: {"level": 10, "tier": "growing"})
-        return LivePanel(app, FakeCLI)
+        panel = LivePanel(app, FakeCLI)
+        # Legacy diagnostics are intentionally still available with F3.
+        # Existing in-depth assertions exercise that full view.
+        panel.compact_mode = False
+        return panel
 
     def test_tool_failure_reason_is_visible_and_not_echoed_into_input(self):
         p = self.build()

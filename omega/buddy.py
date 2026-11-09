@@ -6020,10 +6020,13 @@ class Buddy:
         self.ui.prompt()
 
     async def _chat(self, text: str, source: str) -> None:
+        if self.live_panel is not None:
+            self.live_panel.response_started()
         run = AgentRun(self, text, source=source)
         self.current_run = run
-        self.memory.add_turn("user", text, run.id, source)
         try:
+            # Disk/database locks may take seconds; never stall Windows UI input.
+            await asyncio.to_thread(self.memory.add_turn, "user", text, run.id, source)
             out = await run.execute()
         except asyncio.CancelledError:
             return
@@ -6032,11 +6035,14 @@ class Buddy:
             out = RunOutcome("failed", f"Internal error: {type(e).__name__}: {e}", False)
         finally:
             self.current_run = None
+            if self.live_panel is not None:
+                self.live_panel.response_finished()
         used = sorted({l["tool"] for l in run.ledger})
         stored = out.summary + (f"\n[tools used: {', '.join(used)}; verified: {out.verified}]" if used else "")
-        self.memory.add_turn("assistant", stored, run.id, "reply")
+        await asyncio.to_thread(self.memory.add_turn, "assistant",
+                                stored, run.id, "reply")
         if out.status in ("complete", "answered") and out.verified and run.ledger:
-            self.memory.mark_run_verified(run.id)
+            await asyncio.to_thread(self.memory.mark_run_verified, run.id)
         self.ui.summary(run, out)
         self.ui.say(out.summary)
         if out.footer:
@@ -6048,14 +6054,15 @@ class Buddy:
 
     async def maybe_summarize(self) -> None:
         try:
-            old = self.memory.needs_summary()
+            old = await asyncio.to_thread(self.memory.needs_summary)
             if not old:
                 return
             text = "\n".join(f"{r['role']}: {clip(r['content'], 800)}" for r in old)
             r = await self.gateway.chat(self.router.resolve("chat"), [
                 {"role": "system", "content": "Summarise this conversation for long-term context: user goals, preferences, decisions, open items. Max 250 words."},
                 {"role": "user", "content": text}], max_tokens=500)
-            self.memory.store_summary(r["message"].get("content", ""), old[-1]["id"])
+            await asyncio.to_thread(self.memory.store_summary,
+                                    r["message"].get("content", ""), old[-1]["id"])
         except Exception as e:
             log("summary_failed", err=str(e))
 
