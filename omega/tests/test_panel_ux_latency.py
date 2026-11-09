@@ -43,7 +43,7 @@ class PanelUXTests(unittest.TestCase):
         p._refresh()
         full = "".join(fragment[1] for fragment in p._side_text())
         self.assertLess(full.index("MIN ARBETSPLAN"), full.index("EVOLUTION · SKILL MAP"))
-        self.assertIn("PROGRESS CORE", content)
+        self.assertIn("UPPGIFT", content)
         self.assertNotIn("▰", content)
         self.assertNotIn("▱", content)
 
