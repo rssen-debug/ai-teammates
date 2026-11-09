@@ -89,7 +89,7 @@ class SpeechStream:
             voice.speaking = True
             try:
                 lang = voice.last_lang or "sv"
-                if voice.app.settings.get("tts_engine") == "edge" and voice.app.dep_available("edge_tts"):
+                if voice.app.settings.get("tts_engine") == "edge" and __import__("importlib.util", fromlist=["find_spec"]).find_spec("edge_tts") is not None:
                     voice._speak_edge(phrase, lang)
                 else:
                     voice._speak_sapi(phrase, lang)
