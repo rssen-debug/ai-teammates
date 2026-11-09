@@ -15,13 +15,15 @@ class ModernTerminalTests(unittest.TestCase):
     def panel(self):
         app = SimpleNamespace(
             current_run=None,
-            gateway=SimpleNamespace(base="https://openrouter.ai/api/v1"),
+            gateway=SimpleNamespace(base="https://openrouter.ai/api/v1", provider="OpenRouter"),
             router=SimpleNamespace(resolve=lambda role: "deepseek/deepseek-v4.1-flash-1017"),
+            settings=SimpleNamespace(get=lambda key, default=None: False),
         )
         return LivePanel(app, DummyCLI)
 
     def test_clean_header_shows_actual_gateway_and_model(self):
         p = self.panel()
+        p._read_provider_state()
         head = "".join(fragment[1] for fragment in p._top_text())
         self.assertIn("OpenRouter", head)
         self.assertIn("deepseek/deepseek-v4.1-flash-1017", head)
