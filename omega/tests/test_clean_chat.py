@@ -50,7 +50,8 @@ class CleanChatTest(unittest.IsolatedAsyncioTestCase):
     def test_sidebar_discloses_free_only_policy(self):
         panel = (Path(__file__).resolve().parents[1] / "live_panel.py").read_text(encoding="utf-8")
         self.assertIn('MODELL: kilo-auto/free · FREE ONLY', panel)
-        self.assertIn('config.get("free_only", True)', panel)
+        self.assertIn('await asyncio.to_thread(config.get, "free_only", True)', panel)
+        self.assertIn("free_only = self._cached_free_only", panel)
 
     def test_prompt_requires_link_evidence_and_no_generic_ask(self):
         self.assertIn("inspect it with browser/web tools", buddy.SYSTEM_PROMPT)
