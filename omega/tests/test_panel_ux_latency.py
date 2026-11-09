@@ -63,6 +63,7 @@ class PanelUXTests(unittest.TestCase):
         p.ui._out("buddy › Hej")
         self.assertFalse(p._side_dirty)
         p.stream_begin()
+        p._side_text()  # One legitimate status change on stream begin.
         p.stream_delta("Hej")
         self.assertFalse(p._side_dirty)
 
