@@ -48,7 +48,9 @@ def install(buddy):
             return "OpenRouter"
         if os.environ.get("OPENCODE_GO_API_KEY") or vault.get("opencode_go_api_key"):
             return "OpenCode Go"
-        return "Kilo"
+        if os.environ.get("KILO_API_KEY") or vault.get("kilo_api_key"):
+            return "Kilo"
+        return "OpenRouter"  # key can be entered AFTER starting the app
 
     def gateway_init(self, vault):
         provider = provider_from_vault(vault)
