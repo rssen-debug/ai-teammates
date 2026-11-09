@@ -5,6 +5,8 @@ installation still needs a dedicated acceptance runner.
 """
 from pathlib import Path
 import unittest
+import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -35,6 +37,21 @@ class BetaBootstrapTests(unittest.TestCase):
         self.assertIn('"faster-whisper"', source)
         self.assertIn("if ($WithVoice)", source)
         self.assertIn("if ($DoctorOnly)", source)
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows PowerShell parser required")
+    def test_launcher_is_valid_powershell_syntax(self):
+        """Parse only: installing dependencies is not part of the CI job."""
+        path = str(ROOT / "start_latest.ps1").replace("'", "''")
+        ps = (
+            "$tokens=$null; $errors=$null; "
+            f"[System.Management.Automation.Language.Parser]::ParseFile('{path}',"
+            "[ref]$tokens,[ref]$errors) | Out-Null; "
+            "if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }"
+        )
+        result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive",
+                                 "-Command", ps], capture_output=True,
+                                text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
 
     def test_provider_keys_are_not_in_source(self):
         provider = (ROOT / "provider_native.py").read_text(encoding="utf-8")
