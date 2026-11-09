@@ -82,7 +82,7 @@ Assert-Exit "Supported Python version"
 # Install only declared and auditable packages, never shell-piped downloads.
 $deps = @("prompt-toolkit>=3.0,<4", "pillow", "uiautomation")
 if ($WithVoice) { $deps += @("sounddevice", "numpy", "faster-whisper") }
-if ($WithBrowser) { $deps += @("websocket-client") }
+if ($WithBrowser) { $deps += @("websockets>=14,<17") }
 if (-not $NoInstall) {
     & $python -m pip install --disable-pip-version-check @deps
     Assert-Exit "Python dependencies"
@@ -95,7 +95,7 @@ $env:PYTHONIOENCODING = "utf-8"
 $env:PYTHONPATH = Join-Path $release "omega"
 Write-Host "OMEGA BYOK BETA  |  $($sha.Substring(0,12))" -ForegroundColor Green
 Write-Host "Local data/keys preserved. Keys are entered inside Omega; never paste them in a public issue." -ForegroundColor Cyan
-Write-Host "/models -> /api openrouter or /api go -> /testapi. Voice: /voice study on; /voice on." -ForegroundColor Cyan
+Write-Host "/models -> /api openrouter or /api go -> /testapi. Voice: /voice study on; /voice on. Browser: /browser pair." -ForegroundColor Cyan
 
 if ($DoctorOnly) {
     & $python $entry doctor
