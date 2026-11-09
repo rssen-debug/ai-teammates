@@ -627,6 +627,8 @@ class LivePanel:
         if entered:
             shown = re.sub(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}",
                            "[REDACTED-JWT]", entered)
+            if getattr(self.app, "_omega_key_entry", None):
+                shown = "[API-nyckel dold]"
             # Commit to the agent queue BEFORE repainting a large transcript.
             # Prior version repainted synchronously before queuing, making
             # Enter feel stuck on slow Windows terminals.
