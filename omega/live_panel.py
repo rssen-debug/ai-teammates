@@ -29,7 +29,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.mouse_events import MouseEventType
 from prompt_toolkit.input import DummyInput
 from prompt_toolkit.output import DummyOutput
-from prompt_toolkit.filters import Condition
+from prompt_toolkit.filters import Condition, has_focus
 from prompt_toolkit.layout import (
     ConditionalContainer, Dimension, HSplit, Layout, VSplit, Window,
 )
@@ -401,31 +401,45 @@ class LivePanel:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._lock = threading.RLock()
         self._typing = TextArea(height=1, multiline=False, wrap_lines=False,
-                                prompt="you › ", accept_handler=self._submit)
+                                prompt="› ")
         self._chat = TextArea(read_only=True, focusable=False,
                               scrollbar=True, wrap_lines=True, line_numbers=False)
         self._status_control = FormattedTextControl(self._side_text)
         self._last_terminal_width = 0
         self._resize_task = None
         keys = KeyBindings()
+        # Own the Enter key explicitly, before TextArea's default binding.
+        # One press commits one turn; never wait for a second Enter to submit.
+        @keys.add("enter", filter=has_focus(self._typing), eager=True)
+        def _send_enter(event: Any) -> None:
+            self._submit(event.app.current_buffer)
         @keys.add("f2")
         def _toggle(_event: Any) -> None:
-            self.toggle_thinking()
+            self._show_tui_details = not self._show_tui_details
+            self._refresh()
         @keys.add("f3")
         def _metrics(_event: Any) -> None:
             self.compact_mode = not self.compact_mode
             self._refresh()
-        right = Frame(Window(content=self._status_control, wrap_lines=False),
-                      title=" OMEGA · LIVE ", width=Dimension.exact(48))
-        visibility = Condition(lambda: shutil.get_terminal_size((120, 35)).columns >= 94)
+        # Full-width terminal-first layout. A sidebar isn't allowed to steal
+        # half the conversation or shrink the composer as in the old split view.
+        self._top_control = FormattedTextControl(self._top_text)
+        self._bottom_control = FormattedTextControl(self._bottom_text)
+        self._details_control = FormattedTextControl(self._details_text)
+        self._show_tui_details = False
         self._layout = Layout(
-            VSplit([
-                HSplit([
-                    Frame(self._chat, title=" CHAT "),
-                    Frame(self._typing, title=" SKRIV "),
-                ], padding=0),
-                ConditionalContainer(right, filter=visibility),
-            ], padding=1),
+            HSplit([
+                Window(content=self._top_control, height=1, style="class:chrome"),
+                Window(height=1, char="─", style="class:divider"),
+                self._chat,
+                Window(height=1, char="─", style="class:divider"),
+                ConditionalContainer(
+                    Window(content=self._details_control, height=3, style="class:chrome"),
+                    filter=Condition(lambda: self._show_tui_details),
+                ),
+                self._typing,
+                Window(content=self._bottom_control, height=1, style="class:chrome"),
+            ]),
             focused_element=self._typing,
         )
         self.application = Application(
@@ -438,17 +452,65 @@ class LivePanel:
             # remains available; do not spend time processing mouse traffic.
             mouse_support=False,
             key_bindings=keys,
-            refresh_interval=1.0,
+            refresh_interval=0.8,
             terminal_size_polling_interval=0.5,
-            max_render_postpone_time=0.05,
-            min_redraw_interval=0.08,
+            max_render_postpone_time=0.03,
+            min_redraw_interval=0.05,
             style=Style.from_dict({
-                "frame.border": "#b02d78",
-                "frame.label": "bold #ff79bb",
-                "text-area": "#ffffff bg:#140d17",
-                "": "#ffffff bg:#140d17",
+                "": "#e9e7f2 bg:#100e17",
+                "text-area": "#e9e7f2 bg:#100e17",
+                "chrome": "#b7acc9 bg:#1c1626",
+                "divider": "#594269 bg:#100e17",
             }),
         )
+
+    def _details_text(self) -> list[tuple[str, str]]:
+        # Public execution summaries, never private chain-of-thought.
+        return [
+            ("bold #e49cc9", "  TASK  "),
+            ("#dcd2e7", clean_line(self.goal or "Waiting", 80) + "\n"),
+            ("bold #e49cc9", "  STEP  "),
+            ("#dcd2e7", clean_line(self.action_title or self.phase, 80) + "\n"),
+            ("bold #9cddb2", "  CHECK "),
+            ("#dcd2e7", clean_line(self.action_result or self.action_expect or "No result yet", 80)),
+        ]
+
+    def _top_text(self) -> list[tuple[str, str]]:
+        """Nonblocking single-line identity and real model status."""
+        working = bool(getattr(self.app, "current_run", None))
+        try:
+            provider = getattr(getattr(self.app, "gateway", None), "base", "")
+            provider = "OpenRouter" if "openrouter.ai" in provider else (
+                "OpenCode Go" if "opencode.ai" in provider else "Kilo")
+            model = self.app.router.resolve("chat")
+        except (AttributeError, KeyError, ValueError, TypeError):
+            provider, model = "unknown", "unknown"
+        vm_mode = bool(self.app.settings.get("worker_vnc_enabled", False)) if hasattr(self.app, "settings") else False
+        return [
+            ("bold #e49cc9", "  ◈ OMEGA  "),
+            ("#786a88", "│  "),
+            ("#dbd4e5", provider + "  "),
+            ("#786a88", "·  "),
+            ("#9cddb2", str(model)[:50]),
+            ("#786a88", "   │   "),
+            ("bold #9cddb2" if working else "#b6b0c3",
+             "WORKING" if working else "READY"),
+            ("#786a88", "  │  "),
+            ("bold #9cddb2" if vm_mode else "#786a88", "VM" if vm_mode else "HOST"),
+        ]
+
+    def _bottom_text(self) -> list[tuple[str, str]]:
+        """Compact factual footer; tool telemetry never interrupts chat."""
+        running = self._waiting_for_response
+        return [
+            ("bold #9cddb2", "  ● " + ("RESPONDING" if running else "READY")),
+            ("#786a88", "  │  "),
+            ("#c5bad3", f"TOOLS {self._tool_successes} OK / {self._tool_failures} FAIL"),
+            ("#786a88", "  │  "),
+            ("#a9a0b6", f"VERIFIED {self._verified_work}"),
+            ("#786a88", "  │  "),
+            ("#b79dc6", "F2 DETAILS · F3 METRICS · /help"),
+        ]
 
     @property
     def ui(self) -> Any:
@@ -547,7 +609,9 @@ class LivePanel:
         # Keep recent complete messages, trimming only whole older turns.
         recent = list(self.messages)
         selected = []
-        budget = 64000
+        # Window rendering is intentionally bounded. Full history remains in SQLite.
+        # Redrawing huge transcripts on every Enter causes real Windows terminal stalls.
+        budget = 14000
         for item in reversed(recent):
             if selected and budget - len(item) < 0:
                 break
@@ -556,9 +620,7 @@ class LivePanel:
         view = "\n".join(reversed(selected))
         if self._stream_active and self._stream_text:
             view += "\nbuddy › " + self._stream_text
-        # Use the width of the ACTUAL TextArea pane when prompt_toolkit has
-        # rendered it. A Windows host's reported full terminal width is not
-        # the width available to the chat alongside the OMEGA sidebar.
+        # Use the actual TextArea pane width; keep the full transcript in SQLite.
         wrap_at = self._current_chat_wrap_width()
         view = wrap_chat_display(view, wrap_at)
         self._chat.text = view
@@ -591,6 +653,9 @@ class LivePanel:
         if entered:
             shown = re.sub(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}",
                            "[REDACTED-JWT]", entered)
+            if (getattr(self.app, "_omega_key_entry", None) or
+                    getattr(self.app, "_worker_vnc_password_pending", False)):
+                shown = "[API-nyckel dold]"
             # Commit to the agent queue BEFORE repainting a large transcript.
             # Prior version repainted synchronously before queuing, making
             # Enter feel stuck on slow Windows terminals.

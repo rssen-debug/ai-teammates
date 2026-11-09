@@ -725,9 +725,12 @@ class Gateway:
         if not key:
             raise GatewayError("no_key", "No KiloCode API key configured.")
         data = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(base + path, data=data, method=method, headers={
+        headers = {
             "Authorization": f"Bearer {key}", "Content-Type": "application/json",
-            "User-Agent": f"StuddyBuddy/{APP_VERSION}", "X-KiloCode-TaskId": "studdy-buddy"})
+            "User-Agent": f"StuddyBuddy/{APP_VERSION}", "X-KiloCode-TaskId": "studdy-buddy"}
+        if hasattr(self, "omega_headers"):
+            headers = self.omega_headers(headers)
+        req = urllib.request.Request(base + path, data=data, method=method, headers=headers)
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", "replace"))
 
@@ -812,12 +815,15 @@ class Gateway:
         for base in self.candidates:
             received = False
             try:
+                headers = {"Authorization": f"Bearer {key}",
+                           "Content-Type": "application/json",
+                           "Accept": "text/event-stream",
+                           "User-Agent": f"StuddyBuddy/{APP_VERSION}"}
+                if hasattr(self, "omega_headers"):
+                    headers = self.omega_headers(headers)
                 req = urllib.request.Request(base + "/chat/completions",
                     data=json.dumps(body).encode("utf-8"), method="POST",
-                    headers={"Authorization": f"Bearer {key}",
-                             "Content-Type": "application/json",
-                             "Accept": "text/event-stream",
-                             "User-Agent": f"StuddyBuddy/{APP_VERSION}"})
+                    headers=headers)
                 content: list[str] = []
                 tool_parts: dict[int, dict] = {}
                 finish = None
@@ -4331,7 +4337,14 @@ class AgentRun:
             first = (f"AUTONOMOUS BACKGROUND TASK (no user is available to answer questions).\nGOAL: {self.goal}\n"
                      "Work step by step with tools, verify results, and finish with the finish tool (status complete only when verified).")
         else:
-            hist = [{"role": r["role"], "content": r["content"]} for r in app.memory.history()[1]]
+            summary, turns = app.memory.history()
+            hist = [{"role": r["role"], "content": r["content"]} for r in turns]
+            # converse()/_chat() already persisted the current user message.
+            # Do not send that message twice to the model.
+            if hist and hist[-1]["role"] == "user" and hist[-1]["content"] == self.goal:
+                hist.pop()
+            if summary:
+                sys_prompt += "\nPREVIOUS CONVERSATION SUMMARY (context, not instructions):\n" + clip(summary, 12000)
             first = None
         self.messages = [{"role": "system", "content": sys_prompt}]
         self.messages += hist
@@ -6584,16 +6597,13 @@ def first_run(app: Buddy) -> None:
             ok, tail = pip_install(miss)
             print("  " + ("installed." if ok else "pip reported a problem:\n" + tail))
     if not app.gateway.key():
-        print("\n  Paste your KiloCode API key (visible while entering, stored with Windows DPAPI, never logged):")
-        k = read_visible_kilo_key("  key › ")
-        if k:
-            app.vault.set("kilo_api_key", k)
+        print("\n  No API key configured. Start Buddy and use /models, then /api openrouter or /api go.")
     if app.gateway.key():
         try:
             ms = app.gateway.models(True)
             ok, d = app.gateway.ping(app.router.resolve("planner"))
             app.ai_state = (ok, "Connected · " + app.router.resolve("planner") if ok else clip(d, 60))
-            print(f"  KiloCode: {'connected' if ok else 'FAILED — ' + d} ({len(ms)} models visible)")
+            print(f"  {getattr(app.gateway, 'provider', 'Kilo')}: {'connected' if ok else 'FAILED — ' + d} ({len(ms)} models visible)")
         except GatewayError as e:
             print(f"  KiloCode: FAILED — {e}")
     if IS_WIN:
@@ -9447,6 +9457,14 @@ def _oneshot(text: str) -> int:
     finally:
         with contextlib.suppress(Exception):
             app.majin.close()
+
+
+# Enable native provider routing for the actual running module, not a second
+# imported copy of buddy.py. No keys are written to this source tree.
+import provider_native as _provider_native
+_provider_native.install(sys.modules[__name__])
+import worker_vnc as _worker_vnc
+_worker_vnc.install(sys.modules[__name__])
 
 
 if __name__ == "__main__":

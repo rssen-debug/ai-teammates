@@ -122,12 +122,12 @@ class PanelUXTests(unittest.TestCase):
     def test_terminal_resize_uses_windows_polling_and_fast_render_limit(self):
         p = self.panel()
         self.assertEqual(p.application.terminal_size_polling_interval, 0.5)
-        self.assertEqual(p.application.max_render_postpone_time, 0.05)
+        self.assertLessEqual(p.application.max_render_postpone_time, 0.05)
         self.assertFalse(p.application.mouse_support())
 
     def test_ui_input_has_no_10_second_delay_built_in(self):
         p = self.panel()
-        self.assertEqual(p.application.refresh_interval, 1.0)
+        self.assertLessEqual(p.application.refresh_interval, 1.0)
         field = SimpleNamespace(text="hej")
         p._submit(field)
         self.assertEqual(p.queue.get_nowait(), "hej")
