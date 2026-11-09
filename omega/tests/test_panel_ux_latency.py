@@ -80,6 +80,51 @@ class PanelUXTests(unittest.TestCase):
         self.assertNotIn("RESULTAT", p._chat.text)
         self.assertIn("AI-SVAR KLART", "".join(x[1] for x in p._side_text()))
 
+    def test_compact_mode_hides_huge_metrics_but_keeps_true_evidence(self):
+        p = self.panel()
+        p._cached_level = {"level": 30, "measured_events": 75,
+                           "raw_level": 30.2, "evidence_full": 250}
+        p._refresh()
+        lines = "".join(x[1] for x in p._side_text())
+        self.assertTrue(p.compact_mode)
+        self.assertLess(len(lines.splitlines()), 42)
+        self.assertIn("AI LEVEL 30/100", lines)
+        self.assertIn("VERKTYG", lines)
+        self.assertIn("ARBETSSÄTT", lines)
+        self.assertNotIn("KAPACITET · MÄTBARA", lines)
+        self.assertEqual(p._verified_work, 0)
+
+    def test_separate_queue_and_agent_timing(self):
+        import time
+        p = self.panel()
+        field = SimpleNamespace(text="hej")
+        p._submit(field)
+        self.assertEqual(p.queue.get_nowait(), "hej")
+        p._last_queue_delay = 0.03
+        p.response_started()
+        p._waiting_started = time.monotonic() - 0.12
+        in_flight = "".join(x[1] for x in p._side_text())
+        self.assertIn("AI väntar/svarar", in_flight)
+        self.assertIn("Enter till köläsning: 0.03s", in_flight)
+        p.response_finished()
+        finished = "".join(x[1] for x in p._side_text())
+        self.assertIn("Senaste AI-körning", finished)
+        self.assertFalse(p._waiting_for_response)
+
+    def test_chat_db_operations_do_not_block_ui_loop(self):
+        source = (Path(__file__).resolve().parents[1] / "buddy.py").read_text(encoding="utf-8")
+        self.assertIn('await asyncio.to_thread(self.memory.add_turn, "user"', source)
+        self.assertIn('await asyncio.to_thread(self.memory.add_turn, "assistant"', source)
+        self.assertIn("await asyncio.to_thread(self.memory.needs_summary)", source)
+        self.assertIn("self.live_panel.response_started()", source)
+        self.assertIn("self.live_panel.response_finished()", source)
+
+    def test_terminal_resize_uses_windows_polling_and_fast_render_limit(self):
+        p = self.panel()
+        self.assertEqual(p.application.terminal_size_polling_interval, 0.5)
+        self.assertEqual(p.application.max_render_postpone_time, 0.05)
+        self.assertFalse(p.application.mouse_support())
+
     def test_ui_input_has_no_10_second_delay_built_in(self):
         p = self.panel()
         self.assertEqual(p.application.refresh_interval, 1.0)
