@@ -447,7 +447,7 @@ class LivePanel:
         self._stream_text += re.sub(r"\x1b\[[0-9;]*m", "", str(text))
         # Do not rebuild an increasingly large conversation per character.
         current = time.monotonic()
-        if current - self._last_stream_paint >= 0.10:
+        if len(self._stream_text) <= 64 or current - self._last_stream_paint >= 0.10:
             self._last_stream_paint = current
             self._render_chat()
 
@@ -814,6 +814,20 @@ class LivePanel:
         self._side_cache = lines
         return lines
 
+    async def _record_tool_experience(self, category: str, ok: bool) -> None:
+        def persist() -> dict | None:
+            if self._experience is None:
+                return None
+            self._experience.record(category, ok)
+            return self._experience.snapshot()
+        try:
+            snapshot = await asyncio.to_thread(persist)
+            if snapshot is not None:
+                self._experience_snapshot = snapshot
+                self._refresh()
+        except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError):
+            pass  # Telemetry must never block a human message.
+
     # Below methods become overrides on an actual CLI subclass.
     def _out(self, text: str) -> None:
         self._panel_state._add(text)
@@ -887,12 +901,13 @@ class LivePanel:
         counts = panel._skill_checks[category]
         counts[0 if ok else 1] += 1
         if panel._experience is not None and not getattr(getattr(panel.app, "privacy", None), "private", False):
+            # SQLite disk writes used to happen synchronously in the UI event
+            # callback and could block Enter/keystrokes. Record off-thread.
             try:
-                panel._experience.record(category, bool(ok))
-                panel._experience_snapshot = panel._experience.snapshot()
-            except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError):
-                # Never fail a real user action because telemetry is unavailable.
-                pass
+                loop = asyncio.get_running_loop()
+                loop.create_task(panel._record_tool_experience(category, bool(ok)))
+            except RuntimeError:
+                pass  # No UI event loop during pure unit tests.
         panel._evolution_timeline.append((
             datetime.now().strftime("%H:%M"),
             ("✓ " if ok else "✕ ") + category + " · " + clean_line(panel.tool, 21)))
