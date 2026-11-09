@@ -3355,6 +3355,51 @@ def build_tools(app: "Buddy") -> None:
         description="Read the text of a web page (innerText of a CSS selector, default body) from a browser tab via CDP.",
         parameters=schema_obj({"selector": {"type": "string"}, "tab_title_contains": {"type": "string"}, "max_chars": {"type": "integer"}}), handler=h_dom)
 
+    def h_dom_elements(a: dict, ctx: ToolContext) -> dict:
+        """Find visible buttons/fields in a CDP-connected tab without OS focus."""
+        t = cdp_tab(a)
+        js = r"""(() => {
+          const nodes = Array.from(document.querySelectorAll(
+            'button,input,textarea,select,[role="button"],[role="checkbox"],[contenteditable="true"]'));
+          const css = (el) => {
+            if (el.id && !/\\s/.test(el.id)) return '#' + CSS.escape(el.id);
+            const parts = [];
+            for (let cur = el; cur && cur.nodeType === 1 && parts.length < 7; cur = cur.parentElement) {
+              const tag = cur.tagName.toLowerCase();
+              const sibs = cur.parentElement ? Array.from(cur.parentElement.children).filter(x => x.tagName === cur.tagName) : [cur];
+              parts.unshift(tag + (sibs.length > 1 ? ':nth-of-type(' + (sibs.indexOf(cur)+1) + ')' : ''));
+              if (cur.id) { parts[0] = '#' + CSS.escape(cur.id); break; }
+            }
+            return parts.join(' > ');
+          };
+          return nodes.filter(el => {
+            const r = el.getBoundingClientRect();
+            const st = getComputedStyle(el);
+            return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none';
+          }).slice(0,60).map(el => ({
+            selector: css(el), tag: el.tagName.toLowerCase(),
+            role: el.getAttribute('role') || '',
+            label: (el.getAttribute('aria-label') || el.getAttribute('placeholder') ||
+                    el.innerText || el.getAttribute('title') || '').trim().slice(0,100),
+            type: el.getAttribute('type') || '',
+            checked: el.matches('input[type="checkbox"],[role="checkbox"]') ?
+                     (el.checked === true || el.getAttribute('aria-checked') === 'true') : null
+          }));
+        })()"""
+        result = cdp_call(t["webSocketDebuggerUrl"], "Runtime.evaluate",
+                          {"expression": js, "returnByValue": True})
+        elements = result.get("result", {}).get("value")
+        if not isinstance(elements, list):
+            raise ToolError("unable to inspect page elements", "browser_error")
+        return {"tab": t["title"], "url": t["url"],
+                "elements": elements[:min(60, max(1, int(a.get("limit", 35))))]}
+
+    reg(name="browser_dom_elements", category="browser", risk=Risk.OBSERVE,
+        observes=True, available=cdp_ok, progress="Inspecting browser controls",
+        description="List visible interactive form controls and CSS selectors via CDP without focusing the browser or moving the OS mouse.",
+        parameters=schema_obj({"tab_title_contains": {"type": "string"}, "limit": {"type": "integer"}}),
+        handler=h_dom_elements)
+
     def h_dom_click(a: dict, ctx: ToolContext) -> dict:
         t = cdp_tab(a)
         js = (f"(() => {{ const el = document.querySelector({json.dumps(a['selector'])}); if(!el) return 'NOT_FOUND'; "
