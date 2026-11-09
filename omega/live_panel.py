@@ -465,10 +465,9 @@ class LivePanel:
         """Rewrap existing text when Windows terminal is resized, not on keys."""
         while True:
             try:
-                columns = shutil.get_terminal_size((120, 35)).columns
-                pane = getattr(getattr(self._chat, "window", None), "render_info", None)
-                pane_width = getattr(pane, "window_width", 0) if pane else 0
-                signature = (columns, pane_width)
+                # Detect geometry changes from the same source as rendering,
+                # not a different Windows host size estimate.
+                signature = self._current_chat_wrap_width()
                 if signature != self._last_terminal_width:
                     self._last_terminal_width = signature
                     self._render_chat()
@@ -518,6 +517,26 @@ class LivePanel:
             self.toggle_thinking()
         return None
 
+    def _current_chat_wrap_width(self) -> int:
+        """Use the exact same width source for UI and its regression tests.
+
+        In particular, a non-interactive CI shell may report 80 columns while
+        a test assumed 120. Prefer actual prompt_toolkit window geometry,
+        then its output geometry, then the process terminal fallback.
+        """
+        pane = getattr(getattr(self._chat, "window", None), "render_info", None)
+        pane_columns = getattr(pane, "window_width", 0) if pane else 0
+        if isinstance(pane_columns, int) and pane_columns > 28:
+            return max(24, min(80, pane_columns - 7))
+        try:
+            size = self.application.output.get_size()
+            columns = int(size.columns)
+            if columns >= 60:
+                return chat_wrap_width(columns)
+        except (AttributeError, OSError, TypeError, ValueError):
+            pass
+        return chat_wrap_width(shutil.get_terminal_size((120, 35)).columns)
+
     def _render_chat(self) -> None:
         # The older [-16000:] slice could cut off the middle of an answer.
         # Keep recent complete messages, trimming only whole older turns.
@@ -535,12 +554,7 @@ class LivePanel:
         # Use the width of the ACTUAL TextArea pane when prompt_toolkit has
         # rendered it. A Windows host's reported full terminal width is not
         # the width available to the chat alongside the OMEGA sidebar.
-        pane = getattr(getattr(self._chat, "window", None), "render_info", None)
-        pane_columns = getattr(pane, "window_width", 0) if pane else 0
-        if isinstance(pane_columns, int) and pane_columns > 28:
-            wrap_at = max(24, min(80, pane_columns - 7))
-        else:
-            wrap_at = chat_wrap_width(shutil.get_terminal_size((120, 35)).columns)
+        wrap_at = self._current_chat_wrap_width()
         view = wrap_chat_display(view, wrap_at)
         self._chat.text = view
         self._chat.buffer.cursor_position = len(view)
