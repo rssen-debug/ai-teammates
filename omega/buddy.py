@@ -6024,9 +6024,9 @@ class Buddy:
             self.live_panel.response_started()
         run = AgentRun(self, text, source=source)
         self.current_run = run
-        # Disk/database locks may take seconds; never stall Windows UI input.
-        await asyncio.to_thread(self.memory.add_turn, "user", text, run.id, source)
         try:
+            # Disk/database locks may take seconds; never stall Windows UI input.
+            await asyncio.to_thread(self.memory.add_turn, "user", text, run.id, source)
             out = await run.execute()
         except asyncio.CancelledError:
             return
