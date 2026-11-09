@@ -49,7 +49,7 @@ def install(buddy):
             return "OpenCode Go"
         if os.environ.get("KILO_API_KEY") or vault.get("kilo_api_key"):
             return "Kilo"
-        return "OpenRouter"  # key can be entered AFTER starting the app
+        return "Kilo"  # preserve the existing free-only default until user selects a provider
 
     def gateway_init(self, vault):
         provider = provider_from_vault(vault)
