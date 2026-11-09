@@ -102,7 +102,15 @@ async function connect() {
   if(!saved.pairing) return;
   const ws=new WebSocket(ENDPOINT);
   socket=ws;
-  ws.onopen=()=>ws.send(JSON.stringify({type:'hello',token:saved.pairing}));
+  let heartbeat = null;
+  ws.onopen=()=>{
+    ws.send(JSON.stringify({type:'hello',token:saved.pairing}));
+    // Chrome MV3 can suspend idle service workers. Keep a small local
+    // WebSocket heartbeat (<30 seconds) during pairing, not network polling.
+    heartbeat=setInterval(()=>{
+      if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'heartbeat'}));
+    },20000);
+  };
   ws.onmessage=async (event)=>{
     let msg;
     try {msg=JSON.parse(event.data);} catch {return;}
@@ -112,7 +120,10 @@ async function connect() {
     catch(err){answer={type:'result',id:msg.id,ok:false,error:String(err.message||err).slice(0,250)};}
     if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(answer));
   };
-  ws.onclose=scheduleRetry;
+  ws.onclose=()=>{
+    if(heartbeat)clearInterval(heartbeat);
+    scheduleRetry();
+  };
   ws.onerror=()=>{try{ws.close();}catch{}};
 }
 chrome.runtime.onInstalled.addListener(()=>chrome.runtime.openOptionsPage());
