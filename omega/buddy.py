@@ -4331,7 +4331,14 @@ class AgentRun:
             first = (f"AUTONOMOUS BACKGROUND TASK (no user is available to answer questions).\nGOAL: {self.goal}\n"
                      "Work step by step with tools, verify results, and finish with the finish tool (status complete only when verified).")
         else:
-            hist = [{"role": r["role"], "content": r["content"]} for r in app.memory.history()[1]]
+            summary, turns = app.memory.history()
+            hist = [{"role": r["role"], "content": r["content"]} for r in turns]
+            # converse()/_chat() already persisted the current user message.
+            # Do not send that message twice to the model.
+            if hist and hist[-1]["role"] == "user" and hist[-1]["content"] == self.goal:
+                hist.pop()
+            if summary:
+                sys_prompt += "\nPREVIOUS CONVERSATION SUMMARY (context, not instructions):\n" + clip(summary, 12000)
             first = None
         self.messages = [{"role": "system", "content": sys_prompt}]
         self.messages += hist
@@ -9447,6 +9454,12 @@ def _oneshot(text: str) -> int:
     finally:
         with contextlib.suppress(Exception):
             app.majin.close()
+
+
+# Enable native provider routing for the actual running module, not a second
+# imported copy of buddy.py. No keys are written to this source tree.
+import provider_native as _provider_native
+_provider_native.install(sys.modules[__name__])
 
 
 if __name__ == "__main__":
