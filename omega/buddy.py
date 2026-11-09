@@ -6596,11 +6596,8 @@ def first_run(app: Buddy) -> None:
         if ask_yn("  Install them now with pip?"):
             ok, tail = pip_install(miss)
             print("  " + ("installed." if ok else "pip reported a problem:\n" + tail))
-    if not app.gateway.key() and getattr(app.gateway, "provider", "Kilo") == "Kilo":
-        print("\n  Paste your KiloCode API key (visible while entering, stored with Windows DPAPI, never logged):")
-        k = read_visible_kilo_key("  key › ")
-        if k:
-            app.vault.set("kilo_api_key", k)
+    if not app.gateway.key():
+        print("\n  No API key configured. Start Buddy and use /models, then /api openrouter or /api go.")
     if app.gateway.key():
         try:
             ms = app.gateway.models(True)
