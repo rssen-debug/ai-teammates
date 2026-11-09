@@ -38,6 +38,9 @@ from prompt_toolkit.widgets import Frame, TextArea
 from prompt_toolkit.styles import Style
 
 
+LIVE_PANEL_BUILD = "wrap-v3-20261109"
+
+
 def chat_wrap_width(columns: int) -> int:
     """Conservative chat width in terminal cells, leaving room for sidebar.
 
@@ -47,8 +50,8 @@ def chat_wrap_width(columns: int) -> int:
     """
     columns = max(60, int(columns))
     if columns >= 100:
-        return min(100, max(42, columns - 61))
-    return max(36, columns - 8)
+        return min(80, max(36, columns - 61))
+    return max(24, min(72, columns - 8))
 
 
 def wrap_chat_display(text: str, width: int = 96) -> str:
@@ -57,7 +60,7 @@ def wrap_chat_display(text: str, width: int = 96) -> str:
     No ellipsis/truncation; long tokens/URLs are displayed across safe lines.
     We intentionally don't modify conversation state or the model input.
     """
-    width = max(36, min(120, int(width)))
+    width = max(16, min(120, int(width)))
     wrapped = []
     for line in str(text).split("\n"):
         if not line:
@@ -402,6 +405,8 @@ class LivePanel:
         self._chat = TextArea(read_only=True, focusable=False,
                               scrollbar=True, wrap_lines=True, line_numbers=False)
         self._status_control = FormattedTextControl(self._side_text)
+        self._last_terminal_width = 0
+        self._resize_task = None
         keys = KeyBindings()
         @keys.add("f2")
         def _toggle(_event: Any) -> None:
@@ -453,7 +458,25 @@ class LivePanel:
         self._loop = asyncio.get_running_loop()
         self.task = self._loop.create_task(self.application.run_async())
         self._companion_task = self._loop.create_task(self._companion_poll())
+        self._resize_task = self._loop.create_task(self._watch_chat_width())
         self._redirect_stderr()
+
+    async def _watch_chat_width(self) -> None:
+        """Rewrap existing text when Windows terminal is resized, not on keys."""
+        while True:
+            try:
+                columns = shutil.get_terminal_size((120, 35)).columns
+                pane = getattr(getattr(self._chat, "window", None), "render_info", None)
+                pane_width = getattr(pane, "window_width", 0) if pane else 0
+                signature = (columns, pane_width)
+                if signature != self._last_terminal_width:
+                    self._last_terminal_width = signature
+                    self._render_chat()
+            except asyncio.CancelledError:
+                raise
+            except (AttributeError, ValueError, OSError):
+                pass
+            await asyncio.sleep(1.0)
 
     async def read_line(self) -> str:
         line = await self.queue.get()
@@ -469,6 +492,8 @@ class LivePanel:
     def close(self) -> None:
         if self._companion_task is not None:
             self._companion_task.cancel()
+        if self._resize_task is not None:
+            self._resize_task.cancel()
         self._restore_stderr()
         if self.application.is_running:
             self.application.exit()
@@ -507,8 +532,16 @@ class LivePanel:
         view = "\n".join(reversed(selected))
         if self._stream_active and self._stream_text:
             view += "\nbuddy › " + self._stream_text
-        cols = shutil.get_terminal_size((120, 35)).columns
-        view = wrap_chat_display(view, chat_wrap_width(cols))
+        # Use the width of the ACTUAL TextArea pane when prompt_toolkit has
+        # rendered it. A Windows host's reported full terminal width is not
+        # the width available to the chat alongside the OMEGA sidebar.
+        pane = getattr(getattr(self._chat, "window", None), "render_info", None)
+        pane_columns = getattr(pane, "window_width", 0) if pane else 0
+        if isinstance(pane_columns, int) and pane_columns > 28:
+            wrap_at = max(24, min(80, pane_columns - 7))
+        else:
+            wrap_at = chat_wrap_width(shutil.get_terminal_size((120, 35)).columns)
+        view = wrap_chat_display(view, wrap_at)
         self._chat.text = view
         self._chat.buffer.cursor_position = len(view)
         self._refresh(sidebar=False)
@@ -683,6 +716,7 @@ class LivePanel:
         running = bool(getattr(app, "current_run", None))
         add("● " + ("ARBETAR" if running else "VAKEN · VÄNTAR"),
             "bold #ff8fc5")
+        add("UI  " + LIVE_PANEL_BUILD, "#baf3d2")
         add("MODEL  kilo-auto/free" if self._cached_free_only else
             "MODEL  anpassad rollrouting", "#f0c0d8")
         level = self._cached_level.get("level")
@@ -772,6 +806,7 @@ class LivePanel:
         mode = ("ARBETAR" if running else "OBSERVERAR" if observing
                 else "VAKEN · VÄNTAR" if enabled else "SOVER")
         add("● " + mode, "bold #ff72b6" if running or observing else "#ffffff")
+        add("UI  " + LIVE_PANEL_BUILD, "#baf3d2")
         # Show the actual model policy; do not claim model IQ or run a costly
         # network model discovery call during redraw.
         free_only = self._cached_free_only
