@@ -67,6 +67,14 @@ class PanelUXTests(unittest.TestCase):
         p.stream_delta("Hej")
         self.assertFalse(p._side_dirty)
 
+    def test_run_status_goes_to_sidebar_not_user_chat(self):
+        p = self.panel()
+        p.ui.summary(SimpleNamespace(ledger=[]),
+                     SimpleNamespace(status="answered", verified=True))
+        self.assertEqual(p._run_state, "AI-SVAR KLART")
+        self.assertNotIn("RESULTAT", p._chat.text)
+        self.assertIn("AI-SVAR KLART", "".join(x[1] for x in p._side_text()))
+
     def test_ui_input_has_no_10_second_delay_built_in(self):
         p = self.panel()
         self.assertEqual(p.application.refresh_interval, 1.0)
