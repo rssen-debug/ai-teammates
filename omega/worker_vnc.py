@@ -132,8 +132,8 @@ def install(buddy):
     # These operations target a CDP tab by websocket ID. They do not activate
     # a Windows window or inject global keyboard/mouse events.
     SAFE_BACKGROUND_BROWSER = frozenset((
-        "browser_tabs", "browser_dom_text", "browser_dom_elements", "browser_click", "browser_type",
-        
+        "background_tabs", "background_elements", "background_text",
+        "background_click", "background_type",
     ))
 
     def is_browser_ui_goal(goal):
@@ -166,17 +166,14 @@ def install(buddy):
                         "Bakgrunds-VM är inte ansluten: " + reason,
                         False, steps=0)
             else:
-                try:
-                    ok, reason = buddy.cdp_ok()
-                except Exception as exc:
-                    ok, reason = False, type(exc).__name__
+                ok, reason = self.app.browser_bridge.ready()
                 if not ok:
                     return buddy.RunOutcome(
                         "blocked",
-                        "För att jobba osynligt i dina öppna webbläsarflikar "
-                        "behöver Chrome/Edge redan ha startats med CDP-debuggning. "
-                        "Jag tar inte över ditt skrivbord. " + str(reason)[:180],
-                        False, steps=0)
+                        "Tillägget för dina befintliga Chrome-flikar är inte anslutet. "
+                        "Kör /browser pair och installera omega/extension. "
+                        "Dina Windows-fönster och din mus lämnas orörda. "
+                        + str(reason)[:130], False, steps=0)
         return await original_agent_execute(self)
 
     def init(self, headless=False):
@@ -227,19 +224,19 @@ def install(buddy):
             return buddy.ToolResult(tool=spec.name, ok=False,
                 category="permission_denied",
                 error="HOST PROTECTED: datorns fokus och mus får inte tas över.",
-                hint="Använd bakgrunds-CDP i en debugansluten flik eller separat VM.")
+                hint="Använd Chrome-tilläggets background_* verktyg eller separat VM.")
         if spec.category == "browser" and not vm_mode and spec.name not in SAFE_BACKGROUND_BROWSER:
             return buddy.ToolResult(tool=spec.name, ok=False,
                 category="permission_denied",
                 error="Den här browser-åtgärden kan flytta fokus eller öppna fönster.",
-                hint="Använd browser_tabs/browser_dom_text/browser_click/browser_type via CDP.")
+                hint="Använd background_tabs/background_elements/background_click/background_type via lokalt tillägg.")
         if (ctx.run is not None and not ctx.run.background
                 and is_browser_ui_goal(ctx.run.goal) and
                 spec.category == "terminal"):
             return buddy.ToolResult(tool=spec.name, ok=False,
                 category="permission_denied",
                 error="Terminal/PowerShell är inte tillåtet som genväg för browser-klick.",
-                hint="Använd endast CDP mot rätt flik.")
+                hint="Använd background_* mot exakt tab_id.")
         if (vm_mode
                 and spec.category in ("desktop", "screen", "browser")
                 and spec.name not in ("tool_search",)):
@@ -314,5 +311,5 @@ def install(buddy):
     buddy.Executor.execute = execute
     buddy.AgentRun.__init__ = run_init
     buddy.AgentRun.execute = agent_execute
-    Buddy.HELP += ("\nBackground browser control uses CDP only; host focus and mouse are protected.\n/models [1|2|3]  /api [openrouter|go]  /testapi "
+    Buddy.HELP += ("\nBackground browser control uses existing-tabs extension only; host focus and mouse are protected.\n/models [1|2|3]  /api [openrouter|go]  /testapi "
                    " /worker [status|target|password|enable --vm|disable|capture]")
