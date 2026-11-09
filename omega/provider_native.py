@@ -38,7 +38,6 @@ def install(buddy):
     original_router_ladder = Router.ladder
     original_command = Buddy.command
     original_submit = Buddy.submit
-    original_request = urllib.request.Request
 
     def provider_from_vault(vault):
         selected = vault.get("omega_active_provider")
@@ -81,11 +80,11 @@ def install(buddy):
             return []
         return original_router_ladder(self)
 
-    def session_request(url, *args, **kwargs):
-        req = original_request(url, *args, **kwargs)
-        if isinstance(url, str) and url.startswith(GO_PREFIX):
-            req.add_header("x-opencode-session", SESSION_ID)
-        return req
+    def omega_headers(self, headers):
+        headers = dict(headers)
+        if getattr(self, "provider", "Kilo") == "OpenCode Go":
+            headers["x-opencode-session"] = SESSION_ID
+        return headers
 
     async def command(self, line):
         parts = line.strip().split()
@@ -165,4 +164,4 @@ def install(buddy):
     Router.ladder = ladder
     Buddy.command = command
     Buddy.submit = submit
-    urllib.request.Request = session_request
+    Gateway.omega_headers = omega_headers
